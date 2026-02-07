@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ここから下がテーブル定義（モデル）です
+// 家族（自分、娘、または共有など）
+model FamilyMember {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique // "自分", "娘"
+  receipts  Receipt[]
+}
+
+// レシート（親データ）
+model Receipt {
+  id            Int          @id @default(autoincrement())
+  date          DateTime     @default(now())
+  storeName     String?      // 店舗名
+  totalAmount   Int          // 合計金額
+  familyMember  FamilyMember @relation(fields: [memberId], references: [id])
+  memberId      Int
+  rawText       String?      // Geminiの全解析ログ
+  items         Item[]       // 購入明細（1:N）
+  createdAt     DateTime     @default(now())
+}
+
+// 購入明細（子データ）
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String?  // 商品名
+  price       Int?     // 単価
+  quantity    Int?     // 数量
+  receipt     Receipt  @relation(fields: [receiptId], references: [id])
+  receiptId   Int
+}
