@@ -3,45 +3,36 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
- * レシートと明細をトランザクション内で保存する
+ * AI解析済みのレシートデータをDBに永続化する
+ * schema.prisma の定義 (memberId, date, Item) に準拠
  */
-export async function saveReceiptTransaction(data: {
-  storeName: string;
-  transactionDate: Date;
-  totalAmount: number;
-  familyMemberId: number;
-  items: {
-    name: string;
-    price: number;
-    quantity: number;
-    categoryId?: number;
-  }[];
-}) {
+export const saveParsedReceipt = async (memberId: number, parsedData: any) => {
   return await prisma.$transaction(async (tx) => {
-    // 1. レシート親レコードの作成
+    // 1. Receipt（親）を保存
     const receipt = await tx.receipt.create({
       data: {
-        storeName: data.storeName,
-        transactionDate: data.transactionDate,
-        totalAmount: data.totalAmount,
-        familyMemberId: data.familyMemberId,
+        memberId: memberId,              // userId ではなく memberId
+        storeName: parsedData.storeName || '不明な店舗',
+        date: new Date(parsedData.purchaseDate || Date.now()), // purchaseDate ではなく date
+        totalAmount: parsedData.totalAmount || 0,
+        rawText: parsedData.rawText || null,
+
+        // 2. Item（子）を同時に作成
+        // モデル名が ReceiptItem ではなく Item なので注意
+        items: {
+          create: parsedData.items.map((item: any) => ({
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity || 1,
+            categoryId: item.categoryId || null, // 任意項目
+          })),
+        },
+      },
+      include: {
+        items: true,
       },
     });
 
-    // 2. 明細レコードの子レコード群を一括作成
-    // Prisma v5以降であれば createMany も使えますが、
-    // 関連を持たせた確実な作成のため、ここでは基本的な map 展開を提示します
-    const items = await Promise.all(
-      data.items.map((item) =>
-        tx.receiptItem.create({
-          data: {
-            ...item,
-            receiptId: receipt.id, // 親のIDを紐付け
-          },
-        })
-      )
-    );
-
-    return { receipt, items };
+    return receipt;
   });
-}
+};
