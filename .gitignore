@@ -6,3 +6,4 @@ npm-debug.log*
 .DS_Store
 /generated/prisma
 .env
+test-assets/
