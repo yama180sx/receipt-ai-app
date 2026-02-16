@@ -1,28 +1,35 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
 import logger from '../utils/logger';
+import { normalizeStoreName, inferCategoryId } from '../utils/normalizer';
 
 const prisma = new PrismaClient();
 
 /**
- * AI解析済みのデータをDBに永続化する
+ * AI解析済みのデータをDBに永続化する（正規化処理を含む）
  */
 export const saveParsedReceipt = async (memberId: number, parsedData: ParsedReceipt) => {
   try {
+    // 1. 店舗名の正規化
+    const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
+
     return await prisma.$transaction(async (tx) => {
+      // 2. レシートの作成
       const receipt = await tx.receipt.create({
         data: {
           memberId: memberId,
-          storeName: parsedData.storeName || '不明な店舗',
+          storeName: officialStoreName,
           date: new Date(parsedData.purchaseDate || Date.now()),
           totalAmount: parsedData.totalAmount || 0,
           rawText: JSON.stringify(parsedData),
           items: {
-            create: parsedData.items.map((item) => ({
+            create: await Promise.all(parsedData.items.map(async (item) => ({
               name: item.name,
               price: item.price,
               quantity: item.quantity || 1,
-            })),
+              // 3. 商品名からカテゴリーIDを推論
+              categoryId: await inferCategoryId(item.name)
+            }))),
           },
         },
         include: {

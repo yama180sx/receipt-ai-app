@@ -7,57 +7,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// 家族メンバー（支出の主体）を管理
+// 家族構成
 model FamilyMember {
   id       Int       @id @default(autoincrement())
-  /// メンバー名 (例: "自分", "妻", "息子")
   name     String    @unique
-  /// このメンバーに紐付くレシート一覧
   receipts Receipt[]
 }
 
-/// 支出の分類（食費、日用品など）を管理するマスター
+// 費目カテゴリー（キーワード判定機能付き）
 model Category {
-  id    Int    @id @default(autoincrement())
-  /// カテゴリー名
-  name  String @unique
-  /// このカテゴリーに分類された明細一覧
-  items Item[]
+  id       Int      @id @default(autoincrement())
+  name     String   @unique
+  keywords Json     @default("[]") // PostgreSQLのJSONBとして保存
+  items    Item[]
 }
 
-/// レシート（親データ）：1つの店舗での会計単位
+// 店舗正規化マスタ
+model Store {
+  id           Int      @id @default(autoincrement())
+  officialName String   @unique
+  aliases      Json     @default("[]") // PostgreSQLのJSONBとして保存
+}
+
 model Receipt {
-  id            Int          @id @default(autoincrement())
-  /// 購入日
-  date          DateTime     @default(now())
-  /// 店舗名
-  storeName     String?
-  /// 合計金額
-  totalAmount   Int
-  /// 支払いを行った家族メンバー
-  familyMember  FamilyMember @relation(fields: [memberId], references: [id])
-  memberId      Int
-  /// Geminiによる解析結果の生テキスト（デバッグ・再解析用）
-  rawText       String?
-  /// 購入した商品明細（1:N）
-  items         Item[]
-  /// レコード作成日時
-  createdAt     DateTime     @default(now())
+  id          Int          @id @default(autoincrement())
+  memberId    Int
+  member      FamilyMember @relation(fields: [memberId], references: [id])
+  storeName   String
+  date        DateTime
+  totalAmount Int
+  rawText     String
+  items       Item[]
+  createdAt   DateTime     @default(now())
 }
 
-/// 購入明細（子データ）：レシート内の各行
 model Item {
-  id        Int      @id @default(autoincrement())
-  /// 商品名
-  name      String?
-  /// 単価
-  price     Int?
-  /// 数量
-  quantity  Int?
-  /// 親レシートへの参照
-  receipt   Receipt  @relation(fields: [receiptId], references: [id])
-  receiptId Int
-  /// 商品カテゴリーへの参照（任意）
-  category   Category? @relation(fields: [categoryId], references: [id])
+  id         Int      @id @default(autoincrement())
+  receiptId  Int
+  receipt    Receipt  @relation(fields: [receiptId], references: [id])
   categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  name       String
+  price      Int
+  quantity   Int      @default(1)
 }
