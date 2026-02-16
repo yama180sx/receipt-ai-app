@@ -1,12 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-
-// 引数は一切渡さない。
-// Node.jsのプロセスが持っている DATABASE_URL を Prisma 内部に自動で探させる。
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('--- 🚀 Seeding Start ---');
 
+  // 1. 家族構成
   const familyMembers = [
     { id: 1, name: 'あなた（管理者）' },
     { id: 2, name: '妻' },
@@ -21,19 +19,43 @@ async function main() {
     });
   }
 
+  // 2. 費目カテゴリー & キーワード判定 (Categoryモデルに集約)
   const categories = [
-    { id: 1, name: '食費' },
-    { id: 2, name: '日用品' },
-    { id: 3, name: '教育費' },
-    { id: 4, name: '光熱費' },
-    { id: 5, name: 'その他' },
+    { id: 1, name: '食費', keywords: ['鮭', 'そば', 'グラタン', '弁当', 'パン', 'おにぎり', '惣菜', 'サンド'] },
+    { id: 2, name: '日用品', keywords: ['洗剤', 'タオル', 'ティッシュ', '電池', '石鹸', 'マスク'] },
+    { id: 3, name: '教育費', keywords: ['ノート', '参考書', '文具'] },
+    { id: 4, name: '光熱費', keywords: [] },
+    { id: 5, name: 'その他', keywords: [] },
   ];
 
   for (const c of categories) {
     await prisma.category.upsert({
       where: { id: c.id },
-      update: { name: c.name },
-      create: c,
+      update: { 
+        name: c.name, 
+        keywords: c.keywords // JSON型として保存される
+      },
+      create: {
+        id: c.id,
+        name: c.name,
+        keywords: c.keywords
+      },
+    });
+  }
+
+  // 3. 店舗正規化マスタ (StoreMaster から Store に修正)
+  const stores = [
+    { officialName: 'セブン-イレブン', aliases: ['セブン', 'ｾﾌﾞﾝ', '7-11', 'セブンイレブン'] },
+    { officialName: 'ローソン', aliases: ['ﾛｰｿﾝ', 'LAWSON'] },
+    { officialName: 'ファミリーマート', aliases: ['ﾌｧﾐﾘｰﾏｰﾄ', 'ﾌｧﾐﾏ', 'FamilyMart'] },
+    { officialName: 'セイコーマート', aliases: ['ｾｲｺｰﾏｰﾄ', 'ｾコマ', 'SeicoMart'] },
+  ];
+
+  for (const s of stores) {
+    await prisma.store.upsert({
+      where: { officialName: s.officialName },
+      update: { aliases: s.aliases },
+      create: s,
     });
   }
 

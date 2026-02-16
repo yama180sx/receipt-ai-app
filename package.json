@@ -26,7 +26,7 @@
     "typescript": "~5.9.2"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "npx tsx prisma/seed.ts"
   },
   "private": true
 }
