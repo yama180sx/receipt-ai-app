@@ -7,3 +7,6 @@ npm-debug.log*
 /generated/prisma
 .env
 test-assets/
+# Logs
+logs/
+*.log

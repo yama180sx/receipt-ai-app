@@ -5,6 +5,7 @@ import * as path from 'path';
 
 async function test() {
   const sampleMemberId = 1; // 適宜テスト用の会員IDを指定
+  // const sampleMemberId = 9999; // 存在しないIDに変更
   const sampleImage = path.join(process.cwd(), 'test-assets', 'sample_receipt.jpg');
 
   try {
