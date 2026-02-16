@@ -1,10 +1,11 @@
-import { PrismaClient, Prisma } from '@prisma/client'; // Prismaをインポート
+import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
+import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
 
 /**
- * 【強化版】AI解析済みのデータをDBに永続化する
+ * AI解析済みのデータをDBに永続化する
  */
 export const saveParsedReceipt = async (memberId: number, parsedData: ParsedReceipt) => {
   try {
@@ -32,64 +33,62 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // Prisma特有のエラーハンドリング
       switch (error.code) {
         case 'P2002':
-          console.error(`❌ [DBエラー] 一意制約違反: 重複したデータが存在します。(${error.meta?.target})`);
+          logger.error(`[DBエラー] 一意制約違反: 重複したデータが存在します。target: ${error.meta?.target}`);
           break;
         case 'P2003':
-          console.error(`❌ [DBエラー] 外部キー制約違反: 指定された memberId (${memberId}) が存在しません。`);
+          logger.error(`[DBエラー] 外部キー制約違反: memberId (${memberId}) が存在しません。`);
           break;
         case 'P2025':
-          console.error(`❌ [DBエラー] レコードが見つかりません。`);
+          logger.error(`[DBエラー] レコードが見つかりません。`);
           break;
         default:
-          console.error(`❌ [DBエラー] Prismaエラーコード: ${error.code}`, error.message);
+          logger.error(`[DBエラー] Prismaエラーコード: ${error.code}`, { message: error.message });
       }
     } else if (error instanceof Prisma.PrismaClientValidationError) {
-      console.error("❌ [DBエラー] バリデーションエラー: スキーマとデータの型が一致しません。");
+      logger.error("[DBエラー] バリデーションエラー: スキーマ不整合", { error });
     } else {
-      console.error("❌ [DBエラー] 未知のデータベースエラーが発生しました。");
+      logger.error("[DBエラー] 未知のデータベースエラー", { error });
     }
-    
-    // 上位の processAndSaveReceipt にエラーを伝播させ、解析データのログ出力をトリガーさせる
     throw error;
   }
 };
 
 /**
- * 【強化版】画像解析からDB保存までを統合する
+ * 画像解析からDB保存までを統合する
  */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
   let step = 'INITIALIZING';
   let parsedData: ParsedReceipt | null = null;
+  const startTime = Date.now();
 
   try {
-    // 1. Geminiで解析
     step = 'GEMINI_ANALYSIS';
-    console.log(`[${step}] 解析開始: ${imagePath}`);
+    logger.info(`[${step}] 解析開始 path: ${imagePath}`);
     parsedData = await analyzeReceiptImage(imagePath);
-    console.log(`[${step}] ✅ 解析成功`);
+    logger.info(`[${step}] ✅ 解析成功`);
 
-    // 2. 解析結果をDBへ保存
     step = 'DB_PERSISTENCE';
-    console.log(`[${step}] 保存開始 (Member: ${memberId})`);
+    logger.info(`[${step}] 保存開始 memberId: ${memberId}`);
     const result = await saveParsedReceipt(memberId, parsedData);
-    console.log(`[${step}] ✅ DB保存成功 (ID: ${result.id})`);
+    
+    const duration = Date.now() - startTime;
+    logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { durationMs: duration });
 
     return result;
 
   } catch (error: any) {
-    // ステップごとに詳細なエラーログを出力
-    console.error(`❌ [ERROR] ${step} フェーズで失敗しました。`);
+    logger.error(`[ERROR] ${step} フェーズで失敗しました。`, { 
+      step, 
+      memberId, 
+      errorMessage: error.message 
+    });
     
     if (step === 'DB_PERSISTENCE' && parsedData) {
-      // 解析には成功したが保存に失敗した場合、データをロストしないようログに吐き出す
-      console.error("💡 ヒント: 解析データは正常に取得できていました。DBの制約を確認してください。");
-      console.error("解析済みデータ内容:", JSON.stringify(parsedData, null, 2));
+      logger.warn("解析データバックアップ", { parsedData });
     }
 
-    // 上位（呼び出し元）には元々のエラーを投げる
     throw error;
   }
 };
