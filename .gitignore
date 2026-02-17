@@ -10,3 +10,5 @@ test-assets/
 # Logs
 logs/
 *.log
+# Uploaded images
+uploads/
