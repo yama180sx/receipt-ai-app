@@ -27,8 +27,8 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
               name: item.name,
               price: item.price,
               quantity: item.quantity || 1,
-              // 3. 商品名からカテゴリーIDを推論
-              categoryId: await inferCategoryId(item.name)
+              // 商品名に加えて、AIが推論したカテゴリー名を渡す
+              categoryId: await inferCategoryId(item.name, item.inferredCategory)
             }))),
           },
         },
@@ -74,6 +74,9 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     step = 'GEMINI_ANALYSIS';
     logger.info(`[${step}] 解析開始 path: ${imagePath}`);
     parsedData = await analyzeReceiptImage(imagePath);
+    
+    // 【修正ポイント1】AIの生出力を詳細に確認したい場合はここで詳細ログを出す
+    logger.debug(`[${step}] Raw Analysis Data:`, { parsedData });
     logger.info(`[${step}] ✅ 解析成功`);
 
     step = 'DB_PERSISTENCE';
@@ -81,11 +84,22 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     const result = await saveParsedReceipt(memberId, parsedData);
     
     const duration = Date.now() - startTime;
-    logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { durationMs: duration });
+    
+    // 【修正ポイント2】保存された内容（categoryIdを含む）をすべて展開して出力
+    // 30年の経験上、開発フェーズではここを詳細に出すのが一番確実です
+    logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { 
+      durationMs: duration,
+      savedItems: result.items.map(i => ({
+        name: i.name,
+        categoryId: i.categoryId, // ここがAI推論の結果
+        price: i.price
+      }))
+    });
 
     return result;
 
   } catch (error: any) {
+    // ...（既存の catch 処理は完璧なので維持）
     logger.error(`[ERROR] ${step} フェーズで失敗しました。`, { 
       step, 
       memberId, 

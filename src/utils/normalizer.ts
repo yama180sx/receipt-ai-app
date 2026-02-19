@@ -21,16 +21,26 @@ export const normalizeStoreName = async (rawName: string): Promise<string> => {
 /**
  * 商品名からカテゴリーIDを推論
  */
-export const inferCategoryId = async (itemName: string): Promise<number | null> => {
+export const inferCategoryId = async (productName: string, aiCategory?: string): Promise<number> => {
   const categories = await prisma.category.findMany();
-  
-  for (const category of categories) {
-    const keywords = category.keywords as string[];
-    if (keywords.some(kw => itemName.includes(kw))) {
-      return category.id;
+
+  // 1. 既存のキーワードマスタでのマッチング（最優先）
+  for (const cat of categories) {
+    const keywords = cat.keywords as string[];
+    if (keywords.some(k => productName.includes(k))) {
+      return cat.id;
     }
   }
-  // マッチしない場合は「その他」のIDを探す
-  const otherCategory = categories.find(c => c.name === 'その他');
-  return otherCategory ? otherCategory.id : null;
+
+  // 2. マスタにない場合、AIの推論結果でカテゴリー名をマッチング
+  if (aiCategory) {
+    const matched = categories.find(cat => 
+      cat.name === aiCategory || aiCategory.includes(cat.name)
+    );
+    if (matched) return matched.id;
+  }
+
+  // 3. 最終手段
+  const other = categories.find(c => c.name === 'その他');
+  return other ? other.id : 1;
 };

@@ -5,6 +5,7 @@ export interface ParsedItem {
   name: string;
   price: number;
   quantity: number;
+  inferredCategory: string;
 }
 
 export interface ParsedReceipt {
