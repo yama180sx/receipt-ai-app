@@ -5,13 +5,21 @@ import path from 'path';
 import fs from 'fs';
 import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
+import { PrismaClient } from '@prisma/client';
+import receiptRoutes from './routes/receiptRoutes';
 
 const app = express();
 const port = process.env.PORT || 3000;
+const prisma = new PrismaClient(); // PrismaClientのインスタンス化（既存になければ）
 
 // CORS設定（Expoからのアクセスを許可）
-app.use(cors());
+app.use(cors({
+  origin: '*', // 開発環境なので全許可
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], // PATCHを明示的に許可
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+app.use('/api', receiptRoutes);
 
 // アップロード先ディレクトリの確保
 const uploadDir = 'uploads';
@@ -56,6 +64,53 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   } catch (error: any) {
     logger.error(`[APIエラー] ${error.message}`);
     res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
+  }
+});
+
+/**
+ * カテゴリー一覧取得（UI選択用）
+ */
+app.patch('/api/items/:id/category', async (req, res) => {
+  const { id } = req.params;
+  const { categoryId } = req.body;
+
+  try {
+    const updatedItem = await prisma.item.update({
+      where: { id: Number(id) },
+      data: { 
+        categoryId: categoryId ? Number(categoryId) : null 
+      },
+      include: { category: true } 
+    });
+
+    logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> Category ${updatedItem.category?.name || '未分類'}`);
+    res.json(updatedItem);
+  } catch (error: any) {
+    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to update item category' });
+  }
+});
+
+/**
+ * レシート内項目のカテゴリー修正
+ */
+app.patch('/api/receipt-items/:id', async (req, res) => {
+  const { id } = req.params;
+  const { categoryId } = req.body;
+
+  try {
+    // prisma.receiptItem ではなく prisma.item を使用
+    const updatedItem = await prisma.item.update({
+      where: { id: Number(id) },
+      data: { categoryId: Number(categoryId) },
+      include: { category: true } 
+    });
+
+    logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> CategoryID ${categoryId}`);
+    res.json(updatedItem);
+  } catch (error: any) {
+    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to update receipt item' });
   }
 });
 

@@ -13,13 +13,25 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
     // 1. 店舗名の正規化
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
 
+    // 【修正】JST時刻の厳密なパース処理
+    // Geminiからくる purchaseDate ("2026-02-18T12:36:00") に +09:00 を付加
+    let jstDate: Date;
+    if (parsedData.purchaseDate) {
+      const dateStr = parsedData.purchaseDate.includes('+') 
+        ? parsedData.purchaseDate 
+        : `${parsedData.purchaseDate}+09:00`;
+      jstDate = new Date(dateStr);
+    } else {
+      jstDate = new Date();
+    }
+
     return await prisma.$transaction(async (tx) => {
       // 2. レシートの作成
       const receipt = await tx.receipt.create({
         data: {
           memberId: memberId,
           storeName: officialStoreName,
-          date: new Date(parsedData.purchaseDate || Date.now()),
+          date: jstDate,
           totalAmount: parsedData.totalAmount || 0,
           rawText: JSON.stringify(parsedData),
           items: {
@@ -27,7 +39,7 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
               name: item.name,
               price: item.price,
               quantity: item.quantity || 1,
-              // 商品名に加えて、AIが推論したカテゴリー名を渡す
+              // 商品名とAI推論カテゴリーからIDを特定
               categoryId: await inferCategoryId(item.name, item.inferredCategory)
             }))),
           },
@@ -75,7 +87,6 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     logger.info(`[${step}] 解析開始 path: ${imagePath}`);
     parsedData = await analyzeReceiptImage(imagePath);
     
-    // 【修正ポイント1】AIの生出力を詳細に確認したい場合はここで詳細ログを出す
     logger.debug(`[${step}] Raw Analysis Data:`, { parsedData });
     logger.info(`[${step}] ✅ 解析成功`);
 
@@ -85,13 +96,12 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     
     const duration = Date.now() - startTime;
     
-    // 【修正ポイント2】保存された内容（categoryIdを含む）をすべて展開して出力
-    // 30年の経験上、開発フェーズではここを詳細に出すのが一番確実です
+    // 保存後のデータ（特に推論されたcategoryId）をログに展開
     logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { 
       durationMs: duration,
       savedItems: result.items.map(i => ({
         name: i.name,
-        categoryId: i.categoryId, // ここがAI推論の結果
+        categoryId: i.categoryId,
         price: i.price
       }))
     });
@@ -99,7 +109,6 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     return result;
 
   } catch (error: any) {
-    // ...（既存の catch 処理は完璧なので維持）
     logger.error(`[ERROR] ${step} フェーズで失敗しました。`, { 
       step, 
       memberId, 

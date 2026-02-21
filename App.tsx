@@ -1,15 +1,28 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [resultData, setResultData] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
 
-  // T320サーバーのURL
-  const SERVER_URL = 'http://192.168.1.32:3000/api/receipts/upload';
+  // T320サーバーのURL（.env優先、なければ直書き）
+  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
 
-  // カメラを起動して撮影する
+  // カテゴリーマスタ取得
+  useEffect(() => {
+    fetch(`${API_BASE}/categories`)
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => setCategories(data))
+      .catch(err => console.error('マスタ取得失敗:', err));
+  }, [API_BASE]);
+
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -23,38 +36,59 @@ export default function App() {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      // 撮影後、自動でアップロードへ
-      uploadImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setImage(uri);
+      uploadImage(uri);
     }
   };
 
-  // 画像をT320へ送信する
-  const uploadImage = async (uri: string) => {
-    setUploading(true);
-    
-    const formData = new FormData();
-    // FormDataに画像を添付（nameはserver.tsのupload.single('image')に合わせる）
-    formData.append('image', {
-      uri,
-      name: 'receipt.jpg',
-      type: 'image/jpeg',
-    } as any);
-    formData.append('memberId', '1'); // 管理者として送信
+  // 【重要修正】カテゴリー更新ロジック
+  const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
+    if (!categoryId) return;
 
     try {
-      const response = await fetch(SERVER_URL, {
+      // バックエンドのパス patch('/items/:id/category') に合わせる
+      const response = await fetch(`${API_BASE}/items/${itemId}/category`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId }),
+      });
+      
+      if (!response.ok) throw new Error('DB更新に失敗しました');
+      
+      const updatedItem = await response.json();
+
+      // UIを更新
+      setResultData((prev: any) => ({
+        ...prev,
+        items: prev.items.map((item: any) => 
+          item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+        )
+      }));
+    } catch (error: any) {
+      Alert.alert('エラー', error.message);
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setUploading(true);
+    setResultData(null);
+    
+    const formData = new FormData();
+    // 型安全のためのキャスト
+    formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
+    formData.append('memberId', '1');
+
+    try {
+      const response = await fetch(`${API_BASE}/receipts/upload`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // FormDataの場合はヘッダーをブラウザ/Expoに任せる（手動でmultipart/form-dataを指定すると境界線エラーが出ることがあります）
       });
 
       const result = await response.json();
-      
       if (response.ok) {
-        Alert.alert('成功', `解析完了！店舗: ${result.data.storeName}`);
+        setResultData(result.data);
       } else {
         throw new Error(result.error || 'アップロード失敗');
       }
@@ -66,29 +100,78 @@ export default function App() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>レシートAI解析</Text>
       
-      {image && <Image source={{ uri: image }} style={styles.preview} />}
+      {!resultData && image && <Image source={{ uri: image }} style={styles.preview} />}
       
       <TouchableOpacity 
         style={[styles.button, uploading && styles.buttonDisabled]} 
         onPress={takePhoto}
         disabled={uploading}
       >
-        <Text style={styles.buttonText}>
-          {uploading ? '解析中...' : 'レシートを撮影する'}
-        </Text>
+        <Text style={styles.buttonText}>{uploading ? '解析中...' : 'レシートを撮影'}</Text>
       </TouchableOpacity>
-    </View>
+
+      {resultData && (
+        <View style={styles.resultContainer}>
+          <Text style={styles.storeName}>店舗: {resultData.storeName}</Text>
+          <Text style={styles.total}>合計: ¥{resultData.totalAmount}</Text>
+          
+          <Text style={styles.sectionTitle}>明細・カテゴリー修正</Text>
+          
+          {resultData.items.map((item: any) => (
+            <View key={item.id} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemPrice}>¥{item.price}</Text>
+              </View>
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={item.categoryId}
+                  onValueChange={(val) => handleCategoryChange(item.id, val)}
+                  style={styles.picker}
+                  mode="dropdown"
+                >
+                  <Picker.Item label="未分類" value={null} color="#999" />
+                  {categories.map(c => (
+                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          ))}
+          
+          <TouchableOpacity 
+            style={[styles.button, {marginTop: 30, backgroundColor: '#34C759', width: '100%'}]} 
+            onPress={() => {
+                setResultData(null);
+                setImage(null);
+            }}
+          >
+            <Text style={styles.buttonText}>完了</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  preview: { width: 300, height: 400, marginBottom: 20, borderRadius: 10 },
-  button: { backgroundColor: '#007AFF', padding: 15, borderRadius: 10, width: 200, alignItems: 'center' },
-  buttonDisabled: { backgroundColor: '#ccc' },
-  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  container: { paddingVertical: 60, alignItems: 'center', backgroundColor: '#f0f2f5' },
+  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: '#1a1a1a' },
+  preview: { width: 300, height: 400, marginBottom: 20, borderRadius: 15 },
+  button: { backgroundColor: '#007AFF', padding: 16, borderRadius: 12, width: 220, alignItems: 'center', shadowOpacity: 0.1 },
+  buttonDisabled: { backgroundColor: '#aeb9c4' },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  resultContainer: { width: '95%', marginTop: 10, padding: 20, backgroundColor: 'white', borderRadius: 16, elevation: 4 },
+  storeName: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  total: { fontSize: 18, marginBottom: 15, color: '#007AFF', fontWeight: '700' },
+  sectionTitle: { fontSize: 14, color: '#888', marginBottom: 10, textTransform: 'uppercase' },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 15, color: '#333', fontWeight: '500' },
+  itemPrice: { fontSize: 13, color: '#666' },
+  pickerWrapper: { flex: 1, height: 40, justifyContent: 'center', backgroundColor: '#f8f9fa', borderRadius: 8, marginLeft: 10, overflow: 'hidden' },
+  picker: { width: '100%', transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }
 });
