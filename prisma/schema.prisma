@@ -14,11 +14,11 @@ model FamilyMember {
   receipts Receipt[]
 }
 
-// 費目カテゴリー（キーワード判定機能付き）
+// 費目カテゴリー
 model Category {
-  id       Int      @id @default(autoincrement())
-  name     String   @unique
-  keywords Json     @default("[]") // PostgreSQLのJSONBとして保存
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  keywords Json      @default("[]") 
   items    Item[]
 }
 
@@ -26,7 +26,7 @@ model Category {
 model Store {
   id           Int      @id @default(autoincrement())
   officialName String   @unique
-  aliases      Json     @default("[]") // PostgreSQLのJSONBとして保存
+  aliases      Json     @default("[]") 
 }
 
 model Receipt {
@@ -34,20 +34,22 @@ model Receipt {
   memberId    Int
   member      FamilyMember @relation(fields: [memberId], references: [id])
   storeName   String
-  date        DateTime
+  // 【修正】PostgreSQLのTIMESTAMPTZ型を明示
+  date        DateTime     @db.Timestamptz(3)
   totalAmount Int
   rawText     String
   items       Item[]
-  createdAt   DateTime     @default(now())
+  // 【修正】PostgreSQLのTIMESTAMPTZ型を明示
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
 }
 
 model Item {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   receiptId  Int
-  receipt    Receipt  @relation(fields: [receiptId], references: [id])
+  receipt    Receipt   @relation(fields: [receiptId], references: [id])
   categoryId Int?
   category   Category? @relation(fields: [categoryId], references: [id])
   name       String
   price      Int
-  quantity   Int      @default(1)
+  quantity   Int       @default(1)
 }

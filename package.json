@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.19.2",
+    "@react-native-picker/picker": "2.11.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "expo": "~54.0.32",
