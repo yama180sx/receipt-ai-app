@@ -39,3 +39,14 @@ export const updateItemCategory = async (itemId: number, categoryId: number): Pr
   if (!response.ok) throw new Error('Failed to update category');
   return response.json();
 };
+
+/**
+ * レシート一覧を取得
+ * @param params { memberId?: number, month?: string }
+ */
+export const fetchReceipts = async (params: { memberId?: number, month?: string } = {}) => {
+  const query = new URLSearchParams(params as any).toString();
+  const response = await fetch(`${BASE_URL}/receipts?${query}`);
+  if (!response.ok) throw new Error('Failed to fetch receipts');
+  return response.json();
+};

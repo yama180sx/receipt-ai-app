@@ -2,23 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
+// 1. 作成した HistoryScreen をインポート
+import HistoryScreen from './HistoryScreen';
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
+  // 2. 表示画面を制御する State を追加
+  const [currentView, setCurrentView] = useState<'main' | 'history'>('main');
 
-  // T320サーバーのURL（.env優先、なければ直書き）
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
 
-  // カテゴリーマスタ取得
   useEffect(() => {
     fetch(`${API_BASE}/categories`)
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
+      .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setCategories(data))
       .catch(err => console.error('マスタ取得失敗:', err));
   }, [API_BASE]);
@@ -29,12 +28,7 @@ export default function App() {
       Alert.alert('権限エラー', 'カメラへのアクセス許可が必要です。');
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8 });
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setImage(uri);
@@ -42,23 +36,16 @@ export default function App() {
     }
   };
 
-  // 【重要修正】カテゴリー更新ロジック
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
-
     try {
-      // バックエンドのパス patch('/items/:id/category') に合わせる
       const response = await fetch(`${API_BASE}/items/${itemId}/category`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categoryId }),
       });
-      
       if (!response.ok) throw new Error('DB更新に失敗しました');
-      
       const updatedItem = await response.json();
-
-      // UIを更新
       setResultData((prev: any) => ({
         ...prev,
         items: prev.items.map((item: any) => 
@@ -73,19 +60,11 @@ export default function App() {
   const uploadImage = async (uri: string) => {
     setUploading(true);
     setResultData(null);
-    
     const formData = new FormData();
-    // 型安全のためのキャスト
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', '1');
-
     try {
-      const response = await fetch(`${API_BASE}/receipts/upload`, {
-        method: 'POST',
-        body: formData,
-        // FormDataの場合はヘッダーをブラウザ/Expoに任せる（手動でmultipart/form-dataを指定すると境界線エラーが出ることがあります）
-      });
-
+      const response = await fetch(`${API_BASE}/receipts/upload`, { method: 'POST', body: formData });
       const result = await response.json();
       if (response.ok) {
         setResultData(result.data);
@@ -98,6 +77,16 @@ export default function App() {
       setUploading(false);
     }
   };
+
+  // 3. 履歴画面を表示する場合の条件分岐
+  if (currentView === 'history') {
+    return (
+      <HistoryScreen 
+        onBack={() => setCurrentView('main')} 
+        API_BASE={API_BASE} 
+      />
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -112,6 +101,16 @@ export default function App() {
       >
         <Text style={styles.buttonText}>{uploading ? '解析中...' : 'レシートを撮影'}</Text>
       </TouchableOpacity>
+
+      {/* 4. 履歴確認ボタンの追加 */}
+      {!uploading && !resultData && (
+        <TouchableOpacity 
+          style={[styles.button, { marginTop: 15, backgroundColor: '#5856D6' }]} 
+          onPress={() => setCurrentView('history')}
+        >
+          <Text style={styles.buttonText}>履歴を確認</Text>
+        </TouchableOpacity>
+      )}
 
       {resultData && (
         <View style={styles.resultContainer}>

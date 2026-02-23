@@ -45,5 +45,36 @@ export const updateItemCategory = async (req: Request, res: Response) => {
   }
 };
 
-// 既存の saveParsedReceipt や processAndSaveReceipt もこのファイルにある場合は、
-// それらの関数もこの下に維持してください。
+/**
+ * レシート一覧を取得（Issue #12）
+ */
+export const getReceipts = async (req: Request, res: Response) => {
+  try {
+    const { memberId, month } = req.query; // フィルタリング用
+
+    const where: any = {};
+    if (memberId) where.memberId = Number(memberId);
+    if (month) {
+      // 月指定 (YYYY-MM) がある場合の絞り込みロジック
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
+      where.date = { gte: start, lt: end };
+    }
+
+    const receipts = await prisma.receipt.findMany({
+      where,
+      include: {
+        items: {
+          include: { category: true }
+        }
+      },
+      orderBy: { date: 'desc' } // 新しい順
+    });
+
+    res.json(receipts);
+  } catch (error: any) {
+    logger.error(`[GET_RECEIPTS_ERROR] ${error.message}`);
+    res.status(500).json({ error: 'レシート一覧の取得に失敗しました' });
+  }
+};
