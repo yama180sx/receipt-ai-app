@@ -16,17 +16,18 @@ model FamilyMember {
 
 // 費目カテゴリー
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
-  keywords Json      @default("[]") 
-  items    Item[]
+  id             Int             @id @default(autoincrement())
+  name           String          @unique
+  keywords       Json            @default("[]") 
+  items          Item[]
+  productMasters ProductMaster[] // [Issue #13] リレーション追加
 }
 
 // 店舗正規化マスタ
 model Store {
-  id           Int      @id @default(autoincrement())
-  officialName String   @unique
-  aliases      Json     @default("[]") 
+  id           Int    @id @default(autoincrement())
+  officialName String @unique
+  aliases      Json   @default("[]") 
 }
 
 model Receipt {
@@ -34,12 +35,13 @@ model Receipt {
   memberId    Int
   member      FamilyMember @relation(fields: [memberId], references: [id])
   storeName   String
-  // 【修正】PostgreSQLのTIMESTAMPTZ型を明示
+  // PostgreSQLのTIMESTAMPTZ型を明示
   date        DateTime     @db.Timestamptz(3)
   totalAmount Int
   rawText     String
+  imagePath   String?      // [Issue #12.5] 画像保存用パスを追加
   items       Item[]
-  // 【修正】PostgreSQLのTIMESTAMPTZ型を明示
+  // PostgreSQLのTIMESTAMPTZ型を明示
   createdAt   DateTime     @default(now()) @db.Timestamptz(3)
 }
 
@@ -52,4 +54,16 @@ model Item {
   name       String
   price      Int
   quantity   Int       @default(1)
+}
+
+// [Issue #12.5] 学習マスタの追加
+model ProductMaster {
+  id         Int      @id @default(autoincrement())
+  name       String   // 商品名
+  storeName  String?  // 店舗名（特定店舗のみの限定ルールに対応可能に）
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, storeName]) // 商品名と店舗の組み合わせでユニーク化
 }
