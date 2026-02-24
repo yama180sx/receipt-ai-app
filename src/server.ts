@@ -10,12 +10,12 @@ import receiptRoutes from './routes/receiptRoutes';
 
 const app = express();
 const port = process.env.PORT || 3000;
-const prisma = new PrismaClient(); // PrismaClientのインスタンス化（既存になければ）
+const prisma = new PrismaClient();
 
-// CORS設定（Expoからのアクセスを許可）
+// CORS設定
 app.use(cors({
-  origin: '*', // 開発環境なので全許可
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], // PATCHを明示的に許可
+  origin: '*',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
@@ -27,7 +27,6 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Multerの設定（メモリ保存ではなく、一旦uploadsフォルダに保存）
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -41,20 +40,17 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /**
- * レシートアップロード & 解析エンドポイント
+ * レシートアップロード & 解析
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: '画像がアップロードされていません。' });
     }
-
-    const memberId = parseInt(req.body.memberId) || 1; // デフォルトは管理者(1)
+    const memberId = parseInt(req.body.memberId) || 1;
     const imagePath = req.file.path;
 
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
-
-    // Issue #8 で完成させたロジックを呼び出す
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     res.status(200).json({
@@ -69,6 +65,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 
 /**
  * カテゴリー一覧取得（UI選択用）
+ * ※既存機能の維持
  */
 app.patch('/api/items/:id/category', async (req, res) => {
   const { id } = req.params;
@@ -92,14 +89,54 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
+ * 【Issue #14】月別カテゴリー別集計API
+ * 新規追加機能
+ */
+app.get('/api/stats/monthly', async (req, res) => {
+  const { month } = req.query; // 例: "2026-02"
+  try {
+    const targetDate = month ? new Date(`${month}-01T00:00:00Z`) : new Date();
+    const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+    const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+
+    const stats = await prisma.item.groupBy({
+      by: ['categoryId'],
+      where: {
+        receipt: { date: { gte: startOfMonth, lte: endOfMonth } },
+      },
+      _sum: { price: true },
+    });
+
+    const categories = await prisma.category.findMany();
+    const formattedStats = stats.map(s => {
+      const category = categories.find(c => c.id === s.categoryId);
+      return {
+        categoryId: s.categoryId,
+        categoryName: category ? category.name : '未分類',
+        totalAmount: s._sum.price || 0,
+        color: category ? category.color : '#999',
+      };
+    });
+
+    res.json({
+      month: `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`,
+      stats: formattedStats
+    });
+  } catch (error: any) {
+    logger.error(`[APIエラー] 集計失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to fetch monthly stats' });
+  }
+});
+
+/**
  * レシート内項目のカテゴリー修正
+ * ※Issue #13担当者がここを大幅に書き換える予定
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
 
   try {
-    // prisma.receiptItem ではなく prisma.item を使用
     const updatedItem = await prisma.item.update({
       where: { id: Number(id) },
       data: { categoryId: Number(categoryId) },
