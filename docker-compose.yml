@@ -2,6 +2,7 @@ services:
   app:
     build: .
     # 成功した起動コマンドを固定
+    user: "${UID}:${GID}"
     command: npx tsx --watch src/server.ts
     volumes:
       - .:/app

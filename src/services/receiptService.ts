@@ -6,15 +6,14 @@ import { normalizeStoreName, inferCategoryId } from '../utils/normalizer';
 const prisma = new PrismaClient();
 
 /**
- * AI解析済みのデータをDBに永続化する（正規化処理を含む）
+ * AI解析済みのデータをDBに永続化する（正規化処理・学習ロジックを含む）
  */
 export const saveParsedReceipt = async (memberId: number, parsedData: ParsedReceipt) => {
   try {
     // 1. 店舗名の正規化
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
 
-    // 【修正】JST時刻の厳密なパース処理
-    // Geminiからくる purchaseDate ("2026-02-18T12:36:00") に +09:00 を付加
+    // JST時刻の厳密なパース処理
     let jstDate: Date;
     if (parsedData.purchaseDate) {
       const dateStr = parsedData.purchaseDate.includes('+') 
@@ -35,13 +34,34 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
           totalAmount: parsedData.totalAmount || 0,
           rawText: JSON.stringify(parsedData),
           items: {
-            create: await Promise.all(parsedData.items.map(async (item) => ({
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity || 1,
-              // 商品名とAI推論カテゴリーからIDを特定
-              categoryId: await inferCategoryId(item.name, item.inferredCategory)
-            }))),
+            create: await Promise.all(parsedData.items.map(async (item) => {
+              // --- Issue #13: 学習データの参照ロジック ---
+              // 過去に同じ店、同じ商品名で登録された正解があるか確認
+              const masteredItem = await tx.productMaster.findUnique({
+                where: {
+                  name_storeName: {
+                    name: item.name,
+                    storeName: officialStoreName
+                  }
+                }
+              });
+
+              // 学習データがあればそのcategoryIdを優先。なければAI推論(inferCategoryId)を実行。
+              let finalCategoryId: number | null;
+              if (masteredItem) {
+                finalCategoryId = masteredItem.categoryId;
+                logger.info(`[学習適用] "${item.name}" (@${officialStoreName}) -> CategoryID: ${finalCategoryId}`);
+              } else {
+                finalCategoryId = await inferCategoryId(item.name, item.inferredCategory);
+              }
+
+              return {
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity || 1,
+                categoryId: finalCategoryId
+              };
+            })),
           },
         },
         include: {
@@ -96,7 +116,6 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     
     const duration = Date.now() - startTime;
     
-    // 保存後のデータ（特に推論されたcategoryId）をログに展開
     logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { 
       durationMs: duration,
       savedItems: result.items.map(i => ({

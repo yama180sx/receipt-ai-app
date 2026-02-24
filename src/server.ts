@@ -92,25 +92,57 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
- * レシート内項目のカテゴリー修正
+ * レシート内項目のカテゴリー修正（＋学習ロジック）
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
 
   try {
-    // prisma.receiptItem ではなく prisma.item を使用
-    const updatedItem = await prisma.item.update({
-      where: { id: Number(id) },
-      data: { categoryId: Number(categoryId) },
-      include: { category: true } 
+    // 1. トランザクションで実行（Item更新とマスタ学習の整合性を担保）
+    const result = await prisma.$transaction(async (tx) => {
+      // 既存の項目情報を取得（商品名と店舗名を特定するため）
+      const currentItem = await tx.item.findUnique({
+        where: { id: Number(id) },
+        include: { receipt: true } // 店舗名を取得するためにReceiptをJOIN
+      });
+
+      if (!currentItem) throw new Error('Item not found');
+
+      // 2. 本来の目的であるItemのカテゴリー更新
+      const updatedItem = await tx.item.update({
+        where: { id: Number(id) },
+        data: { categoryId: Number(categoryId) },
+        include: { category: true }
+      });
+
+      // 3. 学習ロジック: ProductMasterに「商品名＋店舗名」の正解を覚えさせる
+      // 店舗名がない場合は空文字、または共通マスタとして扱う
+      const storeName = currentItem.receipt?.storeName || "";
+      
+      await tx.productMaster.upsert({
+        where: {
+          name_storeName: {
+            name: currentItem.name,
+            storeName: storeName
+          }
+        },
+        update: { categoryId: Number(categoryId) },
+        create: {
+          name: currentItem.name,
+          storeName: storeName,
+          categoryId: Number(categoryId)
+        }
+      });
+
+      return updatedItem;
     });
 
-    logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> CategoryID ${categoryId}`);
-    res.json(updatedItem);
+    logger.info(`[学習成功] ItemID ${id} の修正をマスタに反映 (Store: ${result.receipt?.storeName || 'N/A'})`);
+    res.json(result);
   } catch (error: any) {
-    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update receipt item' });
+    logger.error(`[APIエラー] カテゴリー修正/学習失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to update item and learn category' });
   }
 });
 
