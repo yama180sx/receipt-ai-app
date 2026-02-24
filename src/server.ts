@@ -10,12 +10,12 @@ import receiptRoutes from './routes/receiptRoutes';
 
 const app = express();
 const port = process.env.PORT || 3000;
-const prisma = new PrismaClient(); // PrismaClientのインスタンス化（既存になければ）
+const prisma = new PrismaClient();
 
-// CORS設定（Expoからのアクセスを許可）
+// CORS設定
 app.use(cors({
-  origin: '*', // 開発環境なので全許可
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], // PATCHを明示的に許可
+  origin: '*',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
@@ -27,7 +27,6 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Multerの設定（メモリ保存ではなく、一旦uploadsフォルダに保存）
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -41,20 +40,17 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /**
- * レシートアップロード & 解析エンドポイント
+ * レシートアップロード & 解析
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: '画像がアップロードされていません。' });
     }
-
-    const memberId = parseInt(req.body.memberId) || 1; // デフォルトは管理者(1)
+    const memberId = parseInt(req.body.memberId) || 1;
     const imagePath = req.file.path;
 
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
-
-    // Issue #8 で完成させたロジックを呼び出す
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     res.status(200).json({
@@ -92,6 +88,46 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
+ * 【Issue #14】月別カテゴリー別集計API
+ */
+app.get('/api/stats/monthly', async (req, res) => {
+  const { month } = req.query;
+  try {
+    const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
+    const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+    const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+
+    const stats = await prisma.item.groupBy({
+      by: ['categoryId'],
+      where: {
+        receipt: { date: { gte: startOfMonth, lte: endOfMonth } },
+      },
+      _sum: { price: true },
+    });
+
+    const categories = await prisma.category.findMany();
+    const formattedStats = stats.map(s => {
+      const category = categories.find(c => c.id === s.categoryId);
+      return {
+        categoryId: s.categoryId,
+        categoryName: category ? category.name : '未分類',
+        totalAmount: s._sum.price || 0,
+        // colorプロパティの型エラー対策 (migrate済みなら本来不要だが安全策として)
+        color: (category as any)?.color || '#999',
+      };
+    });
+
+    res.json({
+      month: `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`,
+      stats: formattedStats
+    });
+  } catch (error: any) {
+    logger.error(`[APIエラー] 集計失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to fetch monthly stats' });
+  }
+});
+
+/**
  * レシート内項目のカテゴリー修正（＋学習ロジック）
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
@@ -99,25 +135,24 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
   const { categoryId } = req.body;
 
   try {
-    // 1. トランザクションで実行（Item更新とマスタ学習の整合性を担保）
     const result = await prisma.$transaction(async (tx) => {
-      // 既存の項目情報を取得（商品名と店舗名を特定するため）
       const currentItem = await tx.item.findUnique({
         where: { id: Number(id) },
-        include: { receipt: true } // 店舗名を取得するためにReceiptをJOIN
+        include: { receipt: true }
       });
 
       if (!currentItem) throw new Error('Item not found');
 
-      // 2. 本来の目的であるItemのカテゴリー更新
+      // 修正ポイント: 戻り値の型に receipt を含めるために include に追加
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: Number(categoryId) },
-        include: { category: true }
+        include: { 
+          category: true,
+          receipt: true // これにより result.receipt の赤波線が消える
+        }
       });
 
-      // 3. 学習ロジック: ProductMasterに「商品名＋店舗名」の正解を覚えさせる
-      // 店舗名がない場合は空文字、または共通マスタとして扱う
       const storeName = currentItem.receipt?.storeName || "";
       
       await tx.productMaster.upsert({
@@ -138,6 +173,7 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
       return updatedItem;
     });
 
+    // 型安全にアクセス可能
     logger.info(`[学習成功] ItemID ${id} の修正をマスタに反映 (Store: ${result.receipt?.storeName || 'N/A'})`);
     res.json(result);
   } catch (error: any) {
