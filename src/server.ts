@@ -151,6 +151,6 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  logger.info(`🚀 API Server running on http://localhost:${port}`);
+app.listen(Number(port), '0.0.0.0', () => {
+  logger.info(`🚀 API Server running on http://0.0.0.0:${port}`);
 });
