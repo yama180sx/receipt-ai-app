@@ -18,6 +18,7 @@ model FamilyMember {
 model Category {
   id             Int             @id @default(autoincrement())
   name           String          @unique
+  color          String?         // [Issue #14] UI表示用のカラーコードを追加
   keywords       Json            @default("[]") 
   items          Item[]
   productMasters ProductMaster[] // [Issue #13] リレーション追加
