@@ -19,13 +19,14 @@ async function main() {
     });
   }
 
-  // 2. 費目カテゴリー & キーワード判定 (Categoryモデルに集約)
+// 2. 費目カテゴリー & キーワード判定 (Categoryモデルに集約)
+  // [Issue #14] colorを追加
   const categories = [
-    { id: 1, name: '食費', keywords: ['鮭', 'そば', 'グラタン', '弁当', 'パン', 'おにぎり', '惣菜', 'サンド'] },
-    { id: 2, name: '日用品', keywords: ['洗剤', 'タオル', 'ティッシュ', '電池', '石鹸', 'マスク'] },
-    { id: 3, name: '教育費', keywords: ['ノート', '参考書', '文具'] },
-    { id: 4, name: '光熱費', keywords: [] },
-    { id: 5, name: 'その他', keywords: [] },
+    { id: 1, name: '食費', keywords: ['鮭', 'そば', 'グラタン', '弁当', 'パン', 'おにぎり', '惣菜', 'サンド'], color: '#FF6B6B' },
+    { id: 2, name: '日用品', keywords: ['洗剤', 'タオル', 'ティッシュ', '電池', '石鹸', 'マスク'], color: '#4DABF7' },
+    { id: 3, name: '教育費', keywords: ['ノート', '参考書', '文具'], color: '#FCC419' },
+    { id: 4, name: '光熱費', keywords: [], color: '#51CF66' },
+    { id: 5, name: 'その他', keywords: [], color: '#ADB5BD' },
   ];
 
   for (const c of categories) {
@@ -33,12 +34,14 @@ async function main() {
       where: { id: c.id },
       update: { 
         name: c.name, 
-        keywords: c.keywords // JSON型として保存される
+        keywords: c.keywords,
+        color: c.color // 追加
       },
       create: {
         id: c.id,
         name: c.name,
-        keywords: c.keywords
+        keywords: c.keywords,
+        color: c.color // 追加
       },
     });
   }
