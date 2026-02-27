@@ -7,6 +7,7 @@ import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
+import { getCleanText } from './utils/normalizer'; // 追加
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -45,8 +46,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /**
- * 【新規追加】カテゴリー一覧取得API
- * 支出の有無に関わらず、マスター登録されている全てのカテゴリーを返します。
+ * カテゴリー一覧取得API
  */
 app.get('/api/categories', async (req, res) => {
   try {
@@ -85,7 +85,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 });
 
 /**
- * カテゴリー一覧取得（UI選択用）
+ * カテゴリー一覧修正（UI選択用）
  */
 app.patch('/api/items/:id/category', async (req, res) => {
   const { id } = req.params;
@@ -109,7 +109,7 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
- * 【Issue #14/15/16】月別カテゴリー別集計API
+ * 月別カテゴリー別集計API
  */
 app.get('/api/stats/monthly', async (req, res) => {
   const { month } = req.query; 
@@ -161,7 +161,6 @@ app.get('/api/stats/monthly', async (req, res) => {
         categoryId: s.categoryId,
         categoryName: category ? category.name : '未分類',
         totalAmount: s._sum.price || 0,
-        // colorプロパティの型エラー対策 (migrate済みなら本来不要だが安全策として)
         color: (category as any)?.color || '#999',
       };
     });
@@ -178,7 +177,7 @@ app.get('/api/stats/monthly', async (req, res) => {
 });
 
 /**
- * レシート内項目のカテゴリー修正
+ * 【Issue #13】レシート内項目のカテゴリー修正 & 学習機能 (正規化対応版)
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
@@ -193,29 +192,33 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
 
       if (!currentItem) throw new Error('Item not found');
 
-      // 修正ポイント: 戻り値の型に receipt を含めるために include に追加
+      // 1. 本体のカテゴリー更新
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: Number(categoryId) },
         include: { 
           category: true,
-          receipt: true // これにより result.receipt の赤波線が消える
+          receipt: true 
         }
       });
 
-      const storeName = currentItem.receipt?.storeName || "";
+      // --- Issue #13: カテゴリー修正時の学習 (ProductMasterへの保存) ---
+      // 統計/履歴画面での修正を次回の解析に反映させる
+      const cleanItemName = getCleanText(currentItem.name);
+      const cleanStoreName = getCleanText(currentItem.receipt?.storeName || "");
       
+      // 2. 学習マスタ (ProductMaster) へ反映 (正規化済みの名前で保存)
       await tx.productMaster.upsert({
         where: {
           name_storeName: {
-            name: currentItem.name,
-            storeName: storeName
+            name: cleanItemName,
+            storeName: cleanStoreName
           }
         },
         update: { categoryId: Number(categoryId) },
         create: {
-          name: currentItem.name,
-          storeName: storeName,
+          name: cleanItemName,
+          storeName: cleanStoreName,
           categoryId: Number(categoryId)
         }
       });
@@ -223,8 +226,7 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
       return updatedItem;
     });
 
-    // 型安全にアクセス可能
-    logger.info(`[学習成功] ItemID ${id} の修正をマスタに反映 (Store: ${result.receipt?.storeName || 'N/A'})`);
+    logger.info(`[学習成功] "${result.name}" を正規化キー "${getCleanText(result.name)}" でマスタ登録完了`);
     res.json(result);
   } catch (error: any) {
     logger.error(`[APIエラー] カテゴリー修正/学習失敗: ${error.message}`);

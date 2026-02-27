@@ -1,23 +1,20 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
 import logger from '../utils/logger';
-import { normalizeStoreName, inferCategoryId } from '../utils/normalizer';
+import { normalizeStoreName, inferCategoryId, getCleanText } from '../utils/normalizer'; // getCleanTextを追加
 
 const prisma = new PrismaClient();
 
 /**
  * AI解析済みのデータをDBに永続化する（正規化処理および画像パスの保存を含む）
- * @param memberId 家族メンバーID
- * @param parsedData Geminiからの解析結果
- * @param imagePath 保存されたレシート画像のパス (uploads/xxx.jpg)
  */
 export const saveParsedReceipt = async (
   memberId: number, 
   parsedData: ParsedReceipt, 
-  imagePath: string // [Issue #15] 引数追加
+  imagePath: string 
 ) => {
   try {
-    // 1. 店舗名の正規化
+    // 1. 店舗名の正規化（内部で正規化処理が行われる）
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
 
     // JST時刻のパース処理
@@ -32,7 +29,45 @@ export const saveParsedReceipt = async (
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 2. レシートの作成
+      // --- Issue #13: アイテムごとのカテゴリ決定ロジック ---
+      const itemsToCreate = await Promise.all(parsedData.items.map(async (item) => {
+        
+        // 【修正】検索キーを正規化して、学習時のデータと確実に一致させる
+        const cleanItemName = getCleanText(item.name);
+        const cleanStoreName = getCleanText(officialStoreName);
+
+        // --- Issue #13: ユーザーの過去修正に基づく自動カテゴリー適用 ---
+        // AIの推論結果を ProductMaster(学習データ) で補正する
+        const masteredItem = await tx.productMaster.findUnique({
+          where: {
+            name_storeName: {
+              name: cleanItemName, // 正規化後の名前で検索
+              storeName: cleanStoreName
+            }
+          }
+        });
+
+        let finalCategoryId: number | null;
+
+        if (masteredItem) {
+          // ユーザーが過去に修正したデータを優先適用
+          finalCategoryId = masteredItem.categoryId;
+          logger.info(`[学習適用] 商品: "${item.name}" (正規化キー: "${cleanItemName}") -> 過去の修正に基づき CategoryID: ${finalCategoryId} を自動設定`);
+        } else {
+          // 学習データがなければAIの推論結果を使用（内部で正規化してマッチングを行う）
+          finalCategoryId = await inferCategoryId(item.name, item.inferredCategory);
+          logger.debug(`[AI推論適用] 商品: "${item.name}" -> CategoryID: ${finalCategoryId}`);
+        }
+
+        return {
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity || 1,
+          categoryId: finalCategoryId
+        };
+      }));
+
+      // 2. レシートおよびアイテムの一括作成
       const receipt = await tx.receipt.create({
         data: {
           memberId: memberId,
@@ -40,40 +75,15 @@ export const saveParsedReceipt = async (
           date: jstDate,
           totalAmount: parsedData.totalAmount || 0,
           rawText: JSON.stringify(parsedData),
-          imagePath: imagePath, // [Issue #15] DBカラムにパスを保存
+          imagePath: imagePath,
           items: {
-            create: await Promise.all(parsedData.items.map(async (item) => {
-              // --- Issue #13: 学習データの参照ロジック ---
-              // 過去に同じ店、同じ商品名で登録された正解があるか確認
-              const masteredItem = await tx.productMaster.findUnique({
-                where: {
-                  name_storeName: {
-                    name: item.name,
-                    storeName: officialStoreName
-                  }
-                }
-              });
-
-              // 学習データがあればそのcategoryIdを優先。なければAI推論(inferCategoryId)を実行。
-              let finalCategoryId: number | null;
-              if (masteredItem) {
-                finalCategoryId = masteredItem.categoryId;
-                logger.info(`[学習適用] "${item.name}" (@${officialStoreName}) -> CategoryID: ${finalCategoryId}`);
-              } else {
-                finalCategoryId = await inferCategoryId(item.name, item.inferredCategory);
-              }
-
-              return {
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity || 1,
-                categoryId: finalCategoryId
-              };
-            })),
+            create: itemsToCreate
           },
         },
         include: {
-          items: true,
+          items: {
+            include: { category: true }
+          },
         },
       });
       return receipt;
@@ -90,10 +100,8 @@ export const saveParsedReceipt = async (
         default:
           logger.error(`[DBエラー] Prismaエラーコード: ${error.code}`, { message: error.message });
       }
-    } else if (error instanceof Prisma.PrismaClientValidationError) {
-      logger.error("[DBエラー] バリデーションエラー: スキーマ不整合", { error });
     } else {
-      logger.error("[DBエラー] 未知のデータベースエラー", { error });
+      logger.error("[DBエラー] データベース保存中に予期せぬエラーが発生しました", { error });
     }
     throw error;
   }
@@ -112,23 +120,21 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     logger.info(`[${step}] 解析開始 path: ${imagePath}`);
     parsedData = await analyzeReceiptImage(imagePath);
     
-    logger.debug(`[${step}] Raw Analysis Data:`, { parsedData });
     logger.info(`[${step}] ✅ 解析成功`);
 
     step = 'DB_PERSISTENCE';
     logger.info(`[${step}] 保存開始 memberId: ${memberId}`);
     
-    // [Issue #15] imagePath を saveParsedReceipt に渡す
     const result = await saveParsedReceipt(memberId, parsedData, imagePath);
     
     const duration = Date.now() - startTime;
     
-    logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { 
+    logger.info(`[${step}] ✅ DB保存・学習適用完了 ID: ${result.id}`, { 
       durationMs: duration,
-      imageSavedPath: result.imagePath, // ログで確認用
+      imageSavedPath: result.imagePath,
       savedItems: result.items.map(i => ({
         name: i.name,
-        categoryId: i.categoryId,
+        categoryName: i.category?.name || '未分類',
         price: i.price
       }))
     });
