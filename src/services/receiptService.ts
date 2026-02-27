@@ -6,14 +6,21 @@ import { normalizeStoreName, inferCategoryId } from '../utils/normalizer';
 const prisma = new PrismaClient();
 
 /**
- * AI解析済みのデータをDBに永続化する（正規化処理・学習ロジックを含む）
+ * AI解析済みのデータをDBに永続化する（正規化処理および画像パスの保存を含む）
+ * @param memberId 家族メンバーID
+ * @param parsedData Geminiからの解析結果
+ * @param imagePath 保存されたレシート画像のパス (uploads/xxx.jpg)
  */
-export const saveParsedReceipt = async (memberId: number, parsedData: ParsedReceipt) => {
+export const saveParsedReceipt = async (
+  memberId: number, 
+  parsedData: ParsedReceipt, 
+  imagePath: string // [Issue #15] 引数追加
+) => {
   try {
     // 1. 店舗名の正規化
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
 
-    // JST時刻の厳密なパース処理
+    // JST時刻のパース処理
     let jstDate: Date;
     if (parsedData.purchaseDate) {
       const dateStr = parsedData.purchaseDate.includes('+') 
@@ -33,6 +40,7 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
           date: jstDate,
           totalAmount: parsedData.totalAmount || 0,
           rawText: JSON.stringify(parsedData),
+          imagePath: imagePath, // [Issue #15] DBカラムにパスを保存
           items: {
             create: await Promise.all(parsedData.items.map(async (item) => {
               // --- Issue #13: 学習データの参照ロジック ---
@@ -74,13 +82,10 @@ export const saveParsedReceipt = async (memberId: number, parsedData: ParsedRece
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error.code) {
         case 'P2002':
-          logger.error(`[DBエラー] 一意制約違反: 重複したデータが存在します。target: ${error.meta?.target}`);
+          logger.error(`[DBエラー] 一意制約違反: target: ${error.meta?.target}`);
           break;
         case 'P2003':
           logger.error(`[DBエラー] 外部キー制約違反: memberId (${memberId}) が存在しません。`);
-          break;
-        case 'P2025':
-          logger.error(`[DBエラー] レコードが見つかりません。`);
           break;
         default:
           logger.error(`[DBエラー] Prismaエラーコード: ${error.code}`, { message: error.message });
@@ -112,12 +117,15 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
 
     step = 'DB_PERSISTENCE';
     logger.info(`[${step}] 保存開始 memberId: ${memberId}`);
-    const result = await saveParsedReceipt(memberId, parsedData);
+    
+    // [Issue #15] imagePath を saveParsedReceipt に渡す
+    const result = await saveParsedReceipt(memberId, parsedData, imagePath);
     
     const duration = Date.now() - startTime;
     
     logger.info(`[${step}] ✅ DB保存成功 ID: ${result.id}`, { 
       durationMs: duration,
+      imageSavedPath: result.imagePath, // ログで確認用
       savedItems: result.items.map(i => ({
         name: i.name,
         categoryId: i.categoryId,

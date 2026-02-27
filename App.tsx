@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
-// 1. 作成した HistoryScreen をインポート
 import HistoryScreen from './HistoryScreen';
+// 1. 作成した StatisticsScreen をインポート
+import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 
+type ViewType = 'main' | 'history' | 'stats';
+ 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
-  // 2. 表示画面を制御する State を追加
-  const [currentView, setCurrentView] = useState<'main' | 'history'>('main');
+  const [currentView, setCurrentView] = useState<ViewType>('main');
 
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
 
@@ -36,22 +38,31 @@ export default function App() {
     }
   };
 
+  /**
+   * カテゴリー修正 兼 学習ロジック呼び出し (Issue #13 & #14.5)
+   */
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await fetch(`${API_BASE}/items/${itemId}/category`, {
+      // Endpointを /receipt-items/:id に変更し、学習ロジックを走らせる
+      const response = await fetch(`${API_BASE}/receipt-items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryId }),
+        body: JSON.stringify({ categoryId: Number(categoryId) }),
       });
-      if (!response.ok) throw new Error('DB更新に失敗しました');
+      
+      if (!response.ok) throw new Error('学習APIの呼び出しに失敗しました');
       const updatedItem = await response.json();
+      
       setResultData((prev: any) => ({
         ...prev,
         items: prev.items.map((item: any) => 
           item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
         )
       }));
+
+      // エンジニア向けログ
+      console.log(`[Learning] Item ${itemId} learned as Category ${updatedItem.categoryId}`);
     } catch (error: any) {
       Alert.alert('エラー', error.message);
     }
@@ -78,13 +89,22 @@ export default function App() {
     }
   };
 
-  // 3. 履歴画面を表示する場合の条件分岐
+  // 画面遷移の条件分岐
   if (currentView === 'history') {
+    return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
+  }
+
+  if (currentView === 'stats') {
     return (
-      <HistoryScreen 
-        onBack={() => setCurrentView('main')} 
-        API_BASE={API_BASE} 
-      />
+      <View style={{ flex: 1 }}>
+        <StatisticsScreen />
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => setCurrentView('main')}
+        >
+          <Text style={styles.buttonText}>戻る</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -102,14 +122,22 @@ export default function App() {
         <Text style={styles.buttonText}>{uploading ? '解析中...' : 'レシートを撮影'}</Text>
       </TouchableOpacity>
 
-      {/* 4. 履歴確認ボタンの追加 */}
       {!uploading && !resultData && (
-        <TouchableOpacity 
-          style={[styles.button, { marginTop: 15, backgroundColor: '#5856D6' }]} 
-          onPress={() => setCurrentView('history')}
-        >
-          <Text style={styles.buttonText}>履歴を確認</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity 
+            style={[styles.button, { marginTop: 15, backgroundColor: '#5856D6' }]} 
+            onPress={() => setCurrentView('history')}
+          >
+            <Text style={styles.buttonText}>履歴を確認</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.button, { marginTop: 15, backgroundColor: '#FF9500' }]} 
+            onPress={() => setCurrentView('stats')}
+          >
+            <Text style={styles.buttonText}>統計を確認</Text>
+          </TouchableOpacity>
+        </>
       )}
 
       {resultData && (
@@ -117,7 +145,7 @@ export default function App() {
           <Text style={styles.storeName}>店舗: {resultData.storeName}</Text>
           <Text style={styles.total}>合計: ¥{resultData.totalAmount}</Text>
           
-          <Text style={styles.sectionTitle}>明細・カテゴリー修正</Text>
+          <Text style={styles.sectionTitle}>明細・AI学習</Text>
           
           {resultData.items.map((item: any) => (
             <View key={item.id} style={styles.itemRow}>
@@ -172,5 +200,6 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 15, color: '#333', fontWeight: '500' },
   itemPrice: { fontSize: 13, color: '#666' },
   pickerWrapper: { flex: 1, height: 40, justifyContent: 'center', backgroundColor: '#f8f9fa', borderRadius: 8, marginLeft: 10, overflow: 'hidden' },
-  picker: { width: '100%', transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }
+  picker: { width: '100%', transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] },
+  backButton: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: '#8E8E93', padding: 16, borderRadius: 12, width: 200, alignItems: 'center' }
 });

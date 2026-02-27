@@ -12,13 +12,18 @@ const app = express();
 const port = process.env.PORT || 3000;
 const prisma = new PrismaClient();
 
-// CORS設定
+// 1. CORS設定
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
+
+// 2. 【Issue #15】静的ファイル配信設定
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 app.use('/api', receiptRoutes);
 
 // アップロード先ディレクトリの確保
@@ -40,6 +45,22 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /**
+ * 【新規追加】カテゴリー一覧取得API
+ * 支出の有無に関わらず、マスター登録されている全てのカテゴリーを返します。
+ */
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await prisma.category.findMany({
+      orderBy: { id: 'asc' }
+    });
+    res.json(categories);
+  } catch (error: any) {
+    logger.error(`[APIエラー] カテゴリー取得失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+/**
  * レシートアップロード & 解析
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
@@ -47,7 +68,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: '画像がアップロードされていません。' });
     }
-    const memberId = parseInt(req.body.memberId) || 1;
+    const memberId = parseInt(req.body.memberId as string) || 1;
     const imagePath = req.file.path;
 
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
@@ -88,10 +109,10 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
- * 【Issue #14】月別カテゴリー別集計API
+ * 【Issue #14/15/16】月別カテゴリー別集計API
  */
 app.get('/api/stats/monthly', async (req, res) => {
-  const { month } = req.query;
+  const { month } = req.query; 
   try {
     const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
     const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
@@ -103,6 +124,34 @@ app.get('/api/stats/monthly', async (req, res) => {
         receipt: { date: { gte: startOfMonth, lte: endOfMonth } },
       },
       _sum: { price: true },
+    });
+
+    const latestReceipt = await prisma.receipt.findFirst({
+      where: {
+        date: { gte: startOfMonth, lte: endOfMonth },
+        imagePath: { not: null }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        imagePath: true,
+        storeName: true,
+        totalAmount: true,
+        items: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            categoryId: true,
+            category: {
+              select: {
+                name: true,
+                color: true
+              }
+            }
+          }
+        }
+      }
     });
 
     const categories = await prisma.category.findMany();
@@ -119,7 +168,8 @@ app.get('/api/stats/monthly', async (req, res) => {
 
     res.json({
       month: `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`,
-      stats: formattedStats
+      stats: formattedStats,
+      latestReceipt: latestReceipt 
     });
   } catch (error: any) {
     logger.error(`[APIエラー] 集計失敗: ${error.message}`);
@@ -128,7 +178,7 @@ app.get('/api/stats/monthly', async (req, res) => {
 });
 
 /**
- * レシート内項目のカテゴリー修正（＋学習ロジック）
+ * レシート内項目のカテゴリー修正
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
@@ -182,6 +232,6 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  logger.info(`🚀 API Server running on http://localhost:${port}`);
+app.listen(Number(port), '0.0.0.0', () => {
+  logger.info(`🚀 API Server running on http://0.0.0.0:${port}`);
 });
