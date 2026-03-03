@@ -21,7 +21,7 @@ model Category {
   color          String?         // [Issue #14] UI表示用のカラーコードを追加
   keywords       Json            @default("[]") 
   items          Item[]
-  productMasters ProductMaster[] // [Issue #13] リレーション追加
+  productMasters ProductMaster[]
 }
 
 // 店舗正規化マスタ

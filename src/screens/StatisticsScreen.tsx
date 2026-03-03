@@ -3,11 +3,11 @@ import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Imag
 import { PieChart } from 'react-native-chart-kit';
 import axios from 'axios';
 
-const T320_IP = '192.168.1.32'; 
-const BASE_URL = `http://${T320_IP}:3000`;
-const API_URL = `${BASE_URL}/api/stats/monthly`;
-const CAT_URL = `${BASE_URL}/api/categories`;
-const UPDATE_ITEM_URL = `${BASE_URL}/api/receipt-items`;
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
+const BASE_URL = API_BASE.replace(/\/api\/?$/, '');
+const API_URL = `${API_BASE}/stats/monthly`;
+const CAT_URL = `${API_BASE}/categories`;
+const UPDATE_ITEM_URL = `${API_BASE}/receipt-items`;
 const screenWidth = Dimensions.get('window').width;
 
 interface Category {
@@ -50,7 +50,9 @@ export const StatisticsScreen: React.FC = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);       // カテゴリ選択
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  const currentMonth = '2026-02'; 
+  // とりあえず当月を対象にする（必要ならUIで月選択に拡張）
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   useEffect(() => {
     fetchData();
@@ -94,7 +96,10 @@ export const StatisticsScreen: React.FC = () => {
     }
   };
 
-  const chartData = stats.map(s => ({
+  // 0円のスライスが混ざるとライブラリ側でNaNが出て落ちるケースがあるため除外する
+  const chartData = stats
+    .filter(s => (s.totalAmount ?? 0) > 0)
+    .map(s => ({
     name: s.categoryName,
     population: s.totalAmount,
     color: s.color || '#999',
@@ -113,7 +118,14 @@ export const StatisticsScreen: React.FC = () => {
           {latestReceipt?.imagePath ? (
             <TouchableOpacity style={styles.receiptPreviewBox} onPress={() => setMainModalVisible(true)}>
               <Text style={styles.subTitle}>直近のレシート（タップで詳細）</Text>
-              <Image source={{ uri: `${BASE_URL}/${latestReceipt.imagePath}` }} style={styles.receiptImage} resizeMode="cover" />
+              {/* Androidのメモリ圧迫で落ちることがあるため、可能な限り縮小デコードさせる */}
+              <Image
+                source={{ uri: `${BASE_URL}/${latestReceipt.imagePath}` }}
+                style={styles.receiptImage}
+                resizeMode="cover"
+                resizeMethod="resize"
+                onError={(e) => console.error('receipt preview image load error', e.nativeEvent)}
+              />
               <Text style={styles.receiptDetail}>{latestReceipt.storeName} : ¥{latestReceipt.totalAmount.toLocaleString()}</Text>
             </TouchableOpacity>
           ) : (
@@ -121,7 +133,7 @@ export const StatisticsScreen: React.FC = () => {
           )}
 
           <Text style={styles.subTitle}>カテゴリー別分布</Text>
-          {stats.length > 0 ? (
+          {chartData.length > 0 ? (
             <View style={styles.chartBox}>
               <PieChart
                 data={chartData}
@@ -144,7 +156,15 @@ export const StatisticsScreen: React.FC = () => {
       <Modal visible={isMainModalVisible} animationType="slide">
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>レシート詳細・修正</Text>
-          <Image source={{ uri: `${BASE_URL}/${latestReceipt?.imagePath}` }} style={styles.modalImage} resizeMode="contain" />
+          {latestReceipt?.imagePath ? (
+            <Image
+              source={{ uri: `${BASE_URL}/${latestReceipt.imagePath}` }}
+              style={styles.modalImage}
+              resizeMode="contain"
+              resizeMethod="resize"
+              onError={(e) => console.error('receipt modal image load error', e.nativeEvent)}
+            />
+          ) : null}
           <ScrollView style={styles.modalItemList}>
             {latestReceipt?.items.map((item) => (
               <View key={item.id} style={styles.itemRow}>

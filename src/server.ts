@@ -7,6 +7,7 @@ import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
+import { getCleanText } from './utils/normalizer'; // 追加
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -45,8 +46,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /**
- * 【新規追加】カテゴリー一覧取得API
- * 支出の有無に関わらず、マスター登録されている全てのカテゴリーを返します。
+ * カテゴリー一覧取得API
  */
 app.get('/api/categories', async (req, res) => {
   try {
@@ -74,9 +74,27 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
     const result = await processAndSaveReceipt(memberId, imagePath);
 
+    // モバイル向けに、巨大なフィールド（rawText）や不要な入れ子を返さない
+    const data = {
+      id: result.id,
+      memberId: result.memberId,
+      storeName: result.storeName,
+      date: result.date,
+      totalAmount: result.totalAmount,
+      imagePath: result.imagePath,
+      items: result.items.map(i => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+        categoryId: i.categoryId,
+        category: i.category ? { id: i.category.id, name: i.category.name, color: (i.category as any).color } : null
+      })),
+    };
+
     res.status(200).json({
       message: '解析および保存が完了しました。',
-      data: result
+      data
     });
   } catch (error: any) {
     logger.error(`[APIエラー] ${error.message}`);
@@ -85,7 +103,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 });
 
 /**
- * カテゴリー一覧取得（UI選択用）
+ * カテゴリー一覧修正（UI選択用）
  */
 app.patch('/api/items/:id/category', async (req, res) => {
   const { id } = req.params;
@@ -109,7 +127,7 @@ app.patch('/api/items/:id/category', async (req, res) => {
 });
 
 /**
- * 【Issue #14/15/16】月別カテゴリー別集計API
+ * 月別カテゴリー別集計API
  */
 app.get('/api/stats/monthly', async (req, res) => {
   const { month } = req.query; 
@@ -161,7 +179,7 @@ app.get('/api/stats/monthly', async (req, res) => {
         categoryId: s.categoryId,
         categoryName: category ? category.name : '未分類',
         totalAmount: s._sum.price || 0,
-        color: category ? category.color : '#999',
+        color: (category as any)?.color || '#999',
       };
     });
 
@@ -177,24 +195,60 @@ app.get('/api/stats/monthly', async (req, res) => {
 });
 
 /**
- * レシート内項目のカテゴリー修正
+ * 【Issue #13】レシート内項目のカテゴリー修正 & 学習機能 (正規化対応版)
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
 
   try {
-    const updatedItem = await prisma.item.update({
-      where: { id: Number(id) },
-      data: { categoryId: Number(categoryId) },
-      include: { category: true } 
+    const result = await prisma.$transaction(async (tx) => {
+      const currentItem = await tx.item.findUnique({
+        where: { id: Number(id) },
+        include: { receipt: true }
+      });
+
+      if (!currentItem) throw new Error('Item not found');
+
+      // 1. 本体のカテゴリー更新
+      const updatedItem = await tx.item.update({
+        where: { id: Number(id) },
+        data: { categoryId: Number(categoryId) },
+        include: { 
+          category: true,
+          receipt: true 
+        }
+      });
+
+      // --- Issue #13: カテゴリー修正時の学習 (ProductMasterへの保存) ---
+      // 統計/履歴画面での修正を次回の解析に反映させる
+      const cleanItemName = getCleanText(currentItem.name);
+      const cleanStoreName = getCleanText(currentItem.receipt?.storeName || "");
+      
+      // 2. 学習マスタ (ProductMaster) へ反映 (正規化済みの名前で保存)
+      await tx.productMaster.upsert({
+        where: {
+          name_storeName: {
+            name: cleanItemName,
+            storeName: cleanStoreName
+          }
+        },
+        update: { categoryId: Number(categoryId) },
+        create: {
+          name: cleanItemName,
+          storeName: cleanStoreName,
+          categoryId: Number(categoryId)
+        }
+      });
+
+      return updatedItem;
     });
 
-    logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> CategoryID ${categoryId}`);
-    res.json(updatedItem);
+    logger.info(`[学習成功] "${result.name}" を正規化キー "${getCleanText(result.name)}" でマスタ登録完了`);
+    res.json(result);
   } catch (error: any) {
-    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update receipt item' });
+    logger.error(`[APIエラー] カテゴリー修正/学習失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to update item and learn category' });
   }
 });
 
