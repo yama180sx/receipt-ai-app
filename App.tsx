@@ -15,7 +15,7 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
 
-  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
+  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
   useEffect(() => {
     fetch(`${API_BASE}/categories`)

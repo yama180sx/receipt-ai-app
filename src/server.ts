@@ -3,14 +3,20 @@ import multer from 'multer';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv'; // 1. 追加
 import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
-import { getCleanText } from './utils/normalizer'; // 追加
+import { getCleanText } from './utils/normalizer';
+
+// 2. 環境変数の有効化
+dotenv.config();
 
 const app = express();
+// 3. ポートとホストを環境変数から取得（Issue #17）
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0'; 
 const prisma = new PrismaClient();
 
 // 1. CORS設定
@@ -74,7 +80,6 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
     const result = await processAndSaveReceipt(memberId, imagePath);
 
-    // モバイル向けに、巨大なフィールド（rawText）や不要な入れ子を返さない
     const data = {
       id: result.id,
       memberId: result.memberId,
@@ -210,7 +215,6 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
 
       if (!currentItem) throw new Error('Item not found');
 
-      // 1. 本体のカテゴリー更新
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: Number(categoryId) },
@@ -220,12 +224,9 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
         }
       });
 
-      // --- Issue #13: カテゴリー修正時の学習 (ProductMasterへの保存) ---
-      // 統計/履歴画面での修正を次回の解析に反映させる
       const cleanItemName = getCleanText(currentItem.name);
       const cleanStoreName = getCleanText(currentItem.receipt?.storeName || "");
       
-      // 2. 学習マスタ (ProductMaster) へ反映 (正規化済みの名前で保存)
       await tx.productMaster.upsert({
         where: {
           name_storeName: {
@@ -252,6 +253,7 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
   }
 });
 
-app.listen(Number(port), '0.0.0.0', () => {
-  logger.info(`🚀 API Server running on http://0.0.0.0:${port}`);
+// 4. ホストとポートを環境変数経由に変更
+app.listen(Number(port), host, () => {
+  logger.info(`🚀 API Server running on http://${host}:${port}`);
 });
