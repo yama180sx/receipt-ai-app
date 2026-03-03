@@ -5,6 +5,8 @@ import { Picker } from '@react-native-picker/picker';
 export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void, API_BASE: string }) {
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
   // フィルタリング用ステート
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -12,6 +14,21 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
 
   // 月の選択肢（直近6ヶ月分などを生成するのが理想ですが、まずは固定または手動）
   const months = ['2026-02', '2026-01', '2025-12'];
+
+  // カテゴリーマスタ取得
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/categories`);
+        if (!res.ok) throw new Error('カテゴリー取得に失敗しました');
+        const data = await res.json();
+        setCategories(data);
+      } catch (err) {
+        console.error('カテゴリー取得失敗', err);
+      }
+    };
+    fetchCategories();
+  }, [API_BASE]);
 
   useEffect(() => {
     fetchReceipts();
@@ -32,8 +49,49 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
     }
   };
 
+  const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
+    if (!categoryId) return;
+    try {
+      const response = await fetch(`${API_BASE}/receipt-items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId: Number(categoryId) }),
+      });
+
+      if (!response.ok) throw new Error('学習APIの呼び出しに失敗しました');
+      const updatedItem = await response.json();
+
+      // 選択中レシートと全体リストを両方更新
+      setSelectedReceipt((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item: any) =>
+                item.id === itemId
+                  ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category }
+                  : item
+              ),
+            }
+          : prev
+      );
+
+      setReceipts(prev =>
+        prev.map(r => ({
+          ...r,
+          items: r.items.map((item: any) =>
+            item.id === itemId
+              ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category }
+              : item
+          ),
+        }))
+      );
+    } catch (err) {
+      console.error('カテゴリー更新失敗', err);
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={() => setSelectedReceipt(item)}>
       <View style={styles.cardHeader}>
         <Text style={styles.date}>{new Date(item.date).toLocaleDateString('ja-JP')}</Text>
         <Text style={styles.store}>{item.storeName}</Text>
@@ -88,6 +146,43 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
           contentContainerStyle={styles.list}
           ListEmptyComponent={<Text style={styles.empty}>該当する履歴がありません</Text>}
         />
+      )}
+
+      {/* レシート詳細 & カテゴリー学習UI（Issue #13） */}
+      {selectedReceipt && (
+        <View style={styles.detailContainer}>
+          <View style={styles.detailHeader}>
+            <Text style={styles.detailTitle}>
+              {new Date(selectedReceipt.date).toLocaleDateString('ja-JP')} / {selectedReceipt.storeName}
+            </Text>
+            <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
+              <Text style={styles.detailClose}>閉じる ✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.detailTotal}>合計: ¥{selectedReceipt.totalAmount.toLocaleString()}</Text>
+
+          {selectedReceipt.items.map((item: any) => (
+            <View key={item.id} style={styles.detailItemRow}>
+              <View style={styles.detailItemInfo}>
+                <Text style={styles.detailItemName}>{item.name}</Text>
+                <Text style={styles.detailItemPrice}>¥{item.price.toLocaleString()}</Text>
+              </View>
+              <View style={styles.detailPickerWrapper}>
+                <Picker
+                  selectedValue={item.categoryId}
+                  onValueChange={(val) => handleCategoryChange(item.id, val)}
+                  style={styles.detailPicker}
+                  mode="dropdown"
+                >
+                  <Picker.Item label="未分類" value={null} color="#999" />
+                  {categories.map(c => (
+                    <Picker.Item key={c.id} label={c.name} value={c.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );

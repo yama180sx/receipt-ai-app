@@ -54,12 +54,15 @@ export default function App() {
       if (!response.ok) throw new Error('学習APIの呼び出しに失敗しました');
       const updatedItem = await response.json();
       
-      setResultData((prev: any) => ({
-        ...prev,
-        items: prev.items.map((item: any) => 
-          item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-        )
-      }));
+      setResultData((prev: any) => {
+        if (!prev?.items) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item: any) =>
+            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+          ),
+        };
+      });
 
       // エンジニア向けログ
       console.log(`[Learning] Item ${itemId} learned as Category ${updatedItem.categoryId}`);
@@ -78,7 +81,12 @@ export default function App() {
       const response = await fetch(`${API_BASE}/receipts/upload`, { method: 'POST', body: formData });
       const result = await response.json();
       if (response.ok) {
-        setResultData(result.data);
+        // 念のため巨大なフィールドが混ざっていても state に載せない（Androidのメモリ圧迫対策）
+        const data = result?.data ? { ...result.data } : null;
+        if (data && 'rawText' in data) {
+          delete (data as any).rawText;
+        }
+        setResultData(data);
       } else {
         throw new Error(result.error || 'アップロード失敗');
       }
@@ -112,7 +120,9 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>レシートAI解析</Text>
       
-      {!resultData && image && <Image source={{ uri: image }} style={styles.preview} />}
+      {!resultData && image && (
+        <Image source={{ uri: image }} style={styles.preview} resizeMethod="resize" />
+      )}
       
       <TouchableOpacity 
         style={[styles.button, uploading && styles.buttonDisabled]} 

@@ -74,9 +74,27 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
     const result = await processAndSaveReceipt(memberId, imagePath);
 
+    // モバイル向けに、巨大なフィールド（rawText）や不要な入れ子を返さない
+    const data = {
+      id: result.id,
+      memberId: result.memberId,
+      storeName: result.storeName,
+      date: result.date,
+      totalAmount: result.totalAmount,
+      imagePath: result.imagePath,
+      items: result.items.map(i => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+        categoryId: i.categoryId,
+        category: i.category ? { id: i.category.id, name: i.category.name, color: (i.category as any).color } : null
+      })),
+    };
+
     res.status(200).json({
       message: '解析および保存が完了しました。',
-      data: result
+      data
     });
   } catch (error: any) {
     logger.error(`[APIエラー] ${error.message}`);
