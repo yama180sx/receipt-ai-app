@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Imag
 import { PieChart } from 'react-native-chart-kit';
 import axios from 'axios';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.32:3000/api';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const BASE_URL = API_BASE.replace(/\/api\/?$/, '');
 const API_URL = `${API_BASE}/stats/monthly`;
 const CAT_URL = `${API_BASE}/categories`;
