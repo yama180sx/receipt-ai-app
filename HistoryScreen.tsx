@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 
 export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void, API_BASE: string }) {
@@ -8,14 +8,11 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
-  // フィルタリング用ステート
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedMember, setSelectedMember] = useState('1');
 
-  // 月の選択肢（直近6ヶ月分などを生成するのが理想ですが、まずは固定または手動）
-  const months = ['2026-02', '2026-01', '2025-12'];
+  const months = ['2026-03', '2026-02', '2026-01', '2025-12'];
 
-  // カテゴリーマスタ取得
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -32,12 +29,11 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
 
   useEffect(() => {
     fetchReceipts();
-  }, [selectedMonth, selectedMember]); // フィルターが変わるたびに再取得
+  }, [selectedMonth, selectedMember]);
 
   const fetchReceipts = async () => {
     try {
       setLoading(true);
-      // クエリパラメータを構築
       const url = `${API_BASE}/receipts?memberId=${selectedMember}&month=${selectedMonth}`;
       const res = await fetch(url);
       const data = await res.json();
@@ -61,7 +57,6 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
       if (!response.ok) throw new Error('学習APIの呼び出しに失敗しました');
       const updatedItem = await response.json();
 
-      // 選択中レシートと全体リストを両方更新
       setSelectedReceipt((prev: any) =>
         prev
           ? {
@@ -90,6 +85,14 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
     }
   };
 
+  // 画像のフルURLを生成する関数（Issue #18 対策: キャッシュ破棄用のクエリ付与）
+  const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return null;
+    // サーバーのAPI_BASEから /api を除いた部分がベースURL
+    const baseUrl = API_BASE.replace('/api', '');
+    return `${baseUrl}/${imagePath}?t=${Date.now()}`;
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.card} onPress={() => setSelectedReceipt(item)}>
       <View style={styles.cardHeader}>
@@ -105,14 +108,12 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
 
   return (
     <View style={styles.container}>
-      {/* ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}><Text style={styles.backButton}>← 戻る</Text></TouchableOpacity>
         <Text style={styles.title}>レシート履歴</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* フィルタリングUI */}
       <View style={styles.filterContainer}>
         <View style={styles.pickerBox}>
           <Picker
@@ -148,40 +149,60 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
         />
       )}
 
-      {/* レシート詳細 & カテゴリー学習UI（Issue #13） */}
       {selectedReceipt && (
-        <View style={styles.detailContainer}>
-          <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>
-              {new Date(selectedReceipt.date).toLocaleDateString('ja-JP')} / {selectedReceipt.storeName}
-            </Text>
-            <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
-              <Text style={styles.detailClose}>閉じる ✕</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.detailTotal}>合計: ¥{selectedReceipt.totalAmount.toLocaleString()}</Text>
-
-          {selectedReceipt.items.map((item: any) => (
-            <View key={item.id} style={styles.detailItemRow}>
-              <View style={styles.detailItemInfo}>
-                <Text style={styles.detailItemName}>{item.name}</Text>
-                <Text style={styles.detailItemPrice}>¥{item.price.toLocaleString()}</Text>
-              </View>
-              <View style={styles.detailPickerWrapper}>
-                <Picker
-                  selectedValue={item.categoryId}
-                  onValueChange={(val) => handleCategoryChange(item.id, val)}
-                  style={styles.detailPicker}
-                  mode="dropdown"
-                >
-                  <Picker.Item label="未分類" value={null} color="#999" />
-                  {categories.map(c => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} />
-                  ))}
-                </Picker>
-              </View>
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailContainer}>
+            <View style={styles.detailHeader}>
+              <Text style={styles.detailTitle} numberOfLines={1}>
+                {new Date(selectedReceipt.date).toLocaleDateString('ja-JP')} / {selectedReceipt.storeName}
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
+                <Text style={styles.detailClose}>✕</Text>
+              </TouchableOpacity>
             </View>
-          ))}
+
+            <ScrollView style={styles.detailScroll}>
+              {/* レシート画像表示エリア (Issue #18) */}
+              {selectedReceipt.imagePath ? (
+                <View style={styles.imageWrapper}>
+                  <Image 
+                    source={{ uri: getImageUrl(selectedReceipt.imagePath) as string }}
+                    style={styles.receiptImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                <View style={[styles.imageWrapper, styles.noImage]}>
+                  <Text style={{color: '#999'}}>画像なし</Text>
+                </View>
+              )}
+
+              <Text style={styles.detailTotal}>合計: ¥{selectedReceipt.totalAmount.toLocaleString()}</Text>
+
+              {selectedReceipt.items.map((item: any) => (
+                <View key={item.id} style={styles.detailItemRow}>
+                  <View style={styles.detailItemInfo}>
+                    <Text style={styles.detailItemName}>{item.name}</Text>
+                    <Text style={styles.detailItemPrice}>¥{item.price.toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.detailPickerWrapper}>
+                    <Picker
+                      selectedValue={item.categoryId}
+                      onValueChange={(val) => handleCategoryChange(item.id, val)}
+                      style={styles.detailPicker}
+                      mode="dropdown"
+                    >
+                      <Picker.Item label="未分類" value={null} color="#999" />
+                      {categories.map(c => (
+                        <Picker.Item key={c.id} label={c.name} value={c.id} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              ))}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
         </View>
       )}
     </View>
@@ -204,5 +225,23 @@ const styles = StyleSheet.create({
   cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   amount: { fontSize: 20, fontWeight: 'bold', color: '#007AFF' },
   itemCount: { color: '#666', fontSize: 12 },
-  empty: { textAlign: 'center', marginTop: 50, color: '#999' }
+  empty: { textAlign: 'center', marginTop: 50, color: '#999' },
+  
+  // 詳細モーダル関連
+  detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', zIndex: 1000 },
+  detailContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '90%', padding: 20 },
+  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  detailTitle: { fontSize: 16, fontWeight: 'bold', flex: 1, marginRight: 10 },
+  detailClose: { fontSize: 20, color: '#999', padding: 5 },
+  detailScroll: { flex: 1 },
+  imageWrapper: { width: '100%', height: 300, backgroundColor: '#eee', borderRadius: 12, overflow: 'hidden', marginBottom: 15 },
+  noImage: { justifyContent: 'center', alignItems: 'center' },
+  receiptImage: { width: '100%', height: '100%' },
+  detailTotal: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 20, textAlign: 'right' },
+  detailItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  detailItemInfo: { flex: 1 },
+  detailItemName: { fontSize: 14, color: '#333', marginBottom: 2 },
+  detailItemPrice: { fontSize: 16, fontWeight: 'bold', color: '#007AFF' },
+  detailPickerWrapper: { width: 140, height: 40, backgroundColor: '#f8f9fa', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd' },
+  detailPicker: { width: '100%', marginTop: -5 },
 });
