@@ -3,23 +3,21 @@ import multer from 'multer';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv'; // 1. 追加
+import dotenv from 'dotenv';
+import sharp from 'sharp'; 
 import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
 import { getCleanText } from './utils/normalizer';
 
-// 2. 環境変数の有効化
 dotenv.config();
 
 const app = express();
-// 3. ポートとホストを環境変数から取得（Issue #17）
 const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 const prisma = new PrismaClient();
 
-// 1. CORS設定
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -27,28 +25,15 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
-// 2. 【Issue #15】静的ファイル配信設定
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 app.use('/api', receiptRoutes);
 
-// アップロード先ディレクトリの確保
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 /**
@@ -67,17 +52,30 @@ app.get('/api/categories', async (req, res) => {
 });
 
 /**
- * レシートアップロード & 解析
+ * レシートアップロード & 解析 (Issue #18: 回転補正強化版)
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: '画像がアップロードされていません。' });
     }
-    const memberId = parseInt(req.body.memberId as string) || 1;
-    const imagePath = req.file.path;
 
-    logger.info(`[API] 受信: ${imagePath}, memberId: ${memberId}`);
+    const memberId = parseInt(req.body.memberId as string) || 1;
+    const fileName = `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+    const imagePath = path.join(uploadDir, fileName);
+
+    // --- Sharpによる画像最適化 (回転補正の確実性を向上) ---
+    // failOnError: false -> 一部の破損したメタデータがある画像でも処理を続行
+    // rotate(): 引数なしで呼び出すことで、EXIF Orientationに基づき物理ピクセルを回転させる
+    // 最後にメタデータをあえて保持しない（デフォルト）ことで、回転済みの画像から矛盾したEXIF情報を除去
+    await sharp(req.file.buffer, { failOnError: false })
+      .rotate() 
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80, progressive: true })
+      .toFile(imagePath);
+
+    logger.info(`[Issue #18] 画像最適化・回転補正完了: ${imagePath}`);
+
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     const data = {
@@ -113,16 +111,12 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 app.patch('/api/items/:id/category', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
-
   try {
     const updatedItem = await prisma.item.update({
       where: { id: Number(id) },
-      data: { 
-        categoryId: categoryId ? Number(categoryId) : null 
-      },
+      data: { categoryId: categoryId ? Number(categoryId) : null },
       include: { category: true } 
     });
-
     logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> Category ${updatedItem.category?.name || '未分類'}`);
     res.json(updatedItem);
   } catch (error: any) {
@@ -143,35 +137,19 @@ app.get('/api/stats/monthly', async (req, res) => {
 
     const stats = await prisma.item.groupBy({
       by: ['categoryId'],
-      where: {
-        receipt: { date: { gte: startOfMonth, lte: endOfMonth } },
-      },
+      where: { receipt: { date: { gte: startOfMonth, lte: endOfMonth } } },
       _sum: { price: true },
     });
 
     const latestReceipt = await prisma.receipt.findFirst({
-      where: {
-        date: { gte: startOfMonth, lte: endOfMonth },
-        imagePath: { not: null }
-      },
+      where: { date: { gte: startOfMonth, lte: endOfMonth }, imagePath: { not: null } },
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true,
-        imagePath: true,
-        storeName: true,
-        totalAmount: true,
+        id: true, imagePath: true, storeName: true, totalAmount: true,
         items: {
           select: {
-            id: true,
-            name: true,
-            price: true,
-            categoryId: true,
-            category: {
-              select: {
-                name: true,
-                color: true
-              }
-            }
+            id: true, name: true, price: true, categoryId: true,
+            category: { select: { name: true, color: true } }
           }
         }
       }
@@ -200,51 +178,32 @@ app.get('/api/stats/monthly', async (req, res) => {
 });
 
 /**
- * 【Issue #13】レシート内項目のカテゴリー修正 & 学習機能 (正規化対応版)
+ * 【Issue #13】レシート内項目のカテゴリー修正 & 学習機能
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
-
   try {
     const result = await prisma.$transaction(async (tx) => {
       const currentItem = await tx.item.findUnique({
         where: { id: Number(id) },
         include: { receipt: true }
       });
-
       if (!currentItem) throw new Error('Item not found');
-
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: Number(categoryId) },
-        include: { 
-          category: true,
-          receipt: true 
-        }
+        include: { category: true, receipt: true }
       });
-
       const cleanItemName = getCleanText(currentItem.name);
       const cleanStoreName = getCleanText(currentItem.receipt?.storeName || "");
-      
       await tx.productMaster.upsert({
-        where: {
-          name_storeName: {
-            name: cleanItemName,
-            storeName: cleanStoreName
-          }
-        },
+        where: { name_storeName: { name: cleanItemName, storeName: cleanStoreName } },
         update: { categoryId: Number(categoryId) },
-        create: {
-          name: cleanItemName,
-          storeName: cleanStoreName,
-          categoryId: Number(categoryId)
-        }
+        create: { name: cleanItemName, storeName: cleanStoreName, categoryId: Number(categoryId) }
       });
-
       return updatedItem;
     });
-
     logger.info(`[学習成功] "${result.name}" を正規化キー "${getCleanText(result.name)}" でマスタ登録完了`);
     res.json(result);
   } catch (error: any) {
@@ -253,7 +212,6 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
   }
 });
 
-// 4. ホストとポートを環境変数経由に変更
 app.listen(Number(port), host, () => {
   logger.info(`🚀 API Server running on http://${host}:${port}`);
 });
