@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-// 最新のインポート形式に変更（取り消し線対策）
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'; 
 import { Picker } from '@react-native-picker/picker';
 import HistoryScreen from './HistoryScreen';
@@ -11,7 +10,7 @@ type ViewType = 'main' | 'history' | 'stats';
  
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
-  const [rotation, setRotation] = useState(0); // 追加：表示用の回転角
+  const [rotation, setRotation] = useState(0); 
   const [uploading, setUploading] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -26,9 +25,6 @@ export default function App() {
       .catch(err => console.error('マスタ取得失敗:', err));
   }, [API_BASE]);
 
-  /**
-   * レシート撮影 & プレビュー表示 (Issue #18)
-   */
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -36,7 +32,6 @@ export default function App() {
       return;
     }
 
-    // 方針②：切り取り（allowsEditing）を復活
     const result = await ImagePicker.launchCameraAsync({ 
       allowsEditing: true, 
       quality: 1.0 
@@ -44,28 +39,20 @@ export default function App() {
 
     if (!result.canceled) {
       setImage(result.assets[0].uri);
-      setRotation(0); // 撮影直後は 0度
+      setRotation(0); 
       setResultData(null);
     }
   };
 
-  /**
-   * 手動回転ボタンの処理
-   */
   const rotateImage = () => {
     setRotation(prev => (prev + 90) % 360);
   };
 
-  /**
-   * 加工とアップロードの統合 (方針③：安定性向上)
-   */
   const processAndUpload = async () => {
     if (!image) return;
     setUploading(true);
     
     try {
-      // 送信直前に現在の「見た目（rotation）」に従ってピクセルを物理回転
-      // 方針③：compress を 0.6 に下げてメモリ負荷を軽減
       const manipulated = await manipulateAsync(
         image,
         [{ rotate: rotation }], 
@@ -80,9 +67,6 @@ export default function App() {
     }
   };
 
-  /**
-   * カテゴリー修正 兼 学習ロジック (Issue #13)
-   */
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
@@ -107,7 +91,7 @@ export default function App() {
   };
 
   /**
-   * 画像アップロード実行
+   * 画像アップロード実行（Issue #22: 重複エラーハンドリング追加）
    */
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
@@ -119,19 +103,30 @@ export default function App() {
         method: 'POST', 
         body: formData 
       });
+
       const result = await response.json();
       
       if (response.ok) {
+        // --- 成功時 ---
         const data = result?.data ? { ...result.data } : null;
         if (data && 'rawText' in data) {
           delete (data as any).rawText;
         }
         setResultData(data);
-        setImage(null); // 成功したらプレビューを消去
+        setImage(null); 
+      } else if (response.status === 409) {
+        // --- 重複エラー (Issue #22) ---
+        Alert.alert(
+          '登録済み',
+          'このレシートは既に登録されています。\n二重登録はできません。',
+          [{ text: 'OK', onPress: () => setImage(null) }] // プレビューを閉じる
+        );
       } else {
+        // --- その他のエラー ---
         throw new Error(result.error || 'アップロード失敗');
       }
     } catch (error: any) {
+      // ネットワークエラーなどの例外処理
       Alert.alert('エラー', error.message);
     } finally {
       setUploading(false);
@@ -151,7 +146,6 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>レシートAI解析</Text>
       
-      {/* プレビューエリア：方針② 手動回転ボタンの追加 */}
       {!resultData && image && (
         <View style={styles.previewContainer}>
           <Image 
@@ -167,7 +161,6 @@ export default function App() {
         </View>
       )}
       
-      {/* 操作ボタン：状況に応じてラベルを変更 */}
       {!resultData && (
         <TouchableOpacity 
           style={[styles.button, uploading && styles.buttonDisabled]} 
@@ -182,7 +175,6 @@ export default function App() {
         </TouchableOpacity>
       )}
 
-      {/* 撮り直しボタン */}
       {image && !uploading && !resultData && (
         <TouchableOpacity 
           style={[styles.button, { marginTop: 10, backgroundColor: '#8E8E93' }]} 

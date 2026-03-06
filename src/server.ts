@@ -52,7 +52,7 @@ app.get('/api/categories', async (req, res) => {
 });
 
 /**
- * レシートアップロード & 解析 (Issue #18: 回転補正強化版)
+ * レシートアップロード & 解析 (Issue #18: 回転補正強化版 / Issue #22: 重複検知対応)
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
@@ -64,10 +64,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     const fileName = `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
     const imagePath = path.join(uploadDir, fileName);
 
-    // --- Sharpによる画像最適化 (回転補正の確実性を向上) ---
-    // failOnError: false -> 一部の破損したメタデータがある画像でも処理を続行
-    // rotate(): 引数なしで呼び出すことで、EXIF Orientationに基づき物理ピクセルを回転させる
-    // 最後にメタデータをあえて保持しない（デフォルト）ことで、回転済みの画像から矛盾したEXIF情報を除去
+    // --- Sharpによる画像最適化 ---
     await sharp(req.file.buffer, { failOnError: false })
       .rotate() 
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
@@ -76,6 +73,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 
     logger.info(`[Issue #18] 画像最適化・回転補正完了: ${imagePath}`);
 
+    // 解析および保存処理
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     const data = {
@@ -99,7 +97,18 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
       message: '解析および保存が完了しました。',
       data
     });
+    
   } catch (error: any) {
+    // --- 【Issue #22】Service層からの重複エラーをキャッチ ---
+    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
+      logger.warn(`[API] 重複登録を検知したため409を返却: memberId=${req.body.memberId}`);
+      return res.status(409).json({ 
+        error: 'このレシートは既に登録されています。',
+        code: 'DUPLICATE_RECEIPT' 
+      });
+    }
+
+    // それ以外の予期せぬエラー
     logger.error(`[APIエラー] ${error.message}`);
     res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
   }
