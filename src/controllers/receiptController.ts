@@ -1,16 +1,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import logger from '../utils/logger';
-// AI側と判定基準を統一するため、共通の正規化関数をインポート
-import { getCleanText } from '../utils/normalizer'; 
+import { saveReceiptData } from '../services/persistenceService';
 
 const prisma = new PrismaClient();
-
-/**
- * 🔍 デバッグモード・フラグ
- * 重複チェックの詳細をログに出したいときは true、不要なら false にしてください。
- */
-const DEBUG_DUPLICATE = false; 
 
 /**
  * カテゴリーマスタ一覧を取得
@@ -28,91 +21,46 @@ export const getCategories = async (_req: Request, res: Response) => {
 };
 
 /**
- * 【Issue #22】レシート登録（APIルート / 重複チェック付き）
+ * 【Issue #24】レシート登録（共通保存サービスへの統合）
+ * 重複チェック、カテゴリ学習、DB保存のロジックは persistenceService に集約されました。
  */
 export const createReceipt = async (req: Request, res: Response) => {
-  const { memberId, date, storeName, totalAmount, items, imagePath, rawText } = req.body;
-
-  if (DEBUG_DUPLICATE) {
-    logger.debug(`[CONTROLLER:DUPE_CHECK] START - Member:${memberId}, Store:"${storeName}", Amount:${totalAmount}`);
-  }
-
   try {
-    // 1. 日付の範囲設定（その日の 00:00:00 〜 23:59:59）
-    const targetDate = new Date(date);
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+    const { memberId, date, storeName, totalAmount, items, imagePath, rawText } = req.body;
 
-    if (DEBUG_DUPLICATE) {
-      logger.debug(`[CONTROLLER:RANGE] ${startOfDay.toISOString()} ～ ${endOfDay.toISOString()}`);
-    }
-
-    // 2. 重複の先行照会（インデックスの効く金額と日付で絞り込む）
-    const potentialDuplicates = await prisma.receipt.findMany({
-      where: {
-        memberId: Number(memberId),
-        totalAmount: Number(totalAmount),
-        date: { gte: startOfDay, lte: endOfDay },
-      },
-    });
-
-    if (DEBUG_DUPLICATE) {
-      logger.debug(`[CONTROLLER:DB_HITS] 候補数: ${potentialDuplicates.length}`);
-    }
-
-    // 3. 店舗名の正規化比較による最終判定（AI側と共通の getCleanText を使用）
-    const normalizedNew = getCleanText(storeName || '');
-    let duplicateRecord = null;
-
-    for (const r of potentialDuplicates) {
-      const normalizedExisting = getCleanText(r.storeName);
-      
-      if (DEBUG_DUPLICATE) {
-        logger.debug(`[CONTROLLER:COMPARE] New:"${normalizedNew}" vs Existing:"${normalizedExisting}"`);
-      }
-
-      if (normalizedExisting === normalizedNew) {
-        duplicateRecord = r;
-        break;
-      }
-    }
-
-    if (duplicateRecord) {
-      logger.warn(`[CONTROLLER:BLOCK] 重複を検知しました: ID ${duplicateRecord.id}`);
-      return res.status(409).json({
-        code: 'DUPLICATE_RECEIPT',
-        message: 'このレシートは既に登録されている可能性があります。',
-        existingReceipt: duplicateRecord
-      });
-    }
-
-    // 4. 保存処理
-    const newReceipt = await prisma.receipt.create({
-      data: {
-        memberId: Number(memberId),
-        date: new Date(date),
-        storeName,
-        totalAmount: Number(totalAmount),
-        imagePath,
-        rawText,
-        items: {
-          create: items.map((item: any) => ({
-            name: item.name,
-            price: Number(item.price),
-            quantity: item.quantity || 1,
-            categoryId: item.categoryId ? Number(item.categoryId) : null,
-          })),
-        },
-      },
-      include: { items: true }
+    // 共通サービスを呼び出して保存（内部で重複チェックとカテゴリ推論を実行）
+    const newReceipt = await saveReceiptData({
+      memberId: Number(memberId),
+      storeName,
+      date: new Date(date),
+      totalAmount: Number(totalAmount),
+      imagePath: imagePath || "",
+      rawText: rawText || "",
+      items: items.map((item: any) => ({
+        name: item.name,
+        price: Number(item.price),
+        quantity: item.quantity ? Number(item.quantity) : 1,
+        categoryId: item.categoryId ? Number(item.categoryId) : null,
+      })),
     });
 
     logger.info(`[RECEIPT_CREATED] ID: ${newReceipt.id} を登録しました`);
     res.status(201).json(newReceipt);
 
   } catch (error: any) {
+    // 409 (Conflict) などのステータスコードを透過的に扱う
+    const statusCode = error.statusCode || 500;
+    
+    if (statusCode === 409) {
+      logger.warn(`[CREATE_RECEIPT_BLOCK] 重複によりブロック: ${error.message}`);
+      return res.status(409).json({
+        code: 'DUPLICATE_RECEIPT',
+        message: 'このレシートは既に登録されている可能性があります。'
+      });
+    }
+
     logger.error(`[CREATE_RECEIPT_ERROR] ${error.message}`);
-    res.status(500).json({ error: 'レシートの保存に失敗しました' });
+    res.status(statusCode).json({ error: 'レシートの保存に失敗しました' });
   }
 };
 
