@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { saveReceiptData } from '../services/persistenceService';
+import { getCleanText } from '../utils/normalizer'; // 正規化関数をインポート
 
 const prisma = new PrismaClient();
 
@@ -22,13 +23,11 @@ export const getCategories = async (_req: Request, res: Response) => {
 
 /**
  * 【Issue #24】レシート登録（共通保存サービスへの統合）
- * 重複チェック、カテゴリ学習、DB保存のロジックは persistenceService に集約されました。
  */
 export const createReceipt = async (req: Request, res: Response) => {
   try {
     const { memberId, date, storeName, totalAmount, items, imagePath, rawText } = req.body;
 
-    // 共通サービスを呼び出して保存（内部で重複チェックとカテゴリ推論を実行）
     const newReceipt = await saveReceiptData({
       memberId: Number(memberId),
       storeName,
@@ -48,9 +47,7 @@ export const createReceipt = async (req: Request, res: Response) => {
     res.status(201).json(newReceipt);
 
   } catch (error: any) {
-    // 409 (Conflict) などのステータスコードを透過的に扱う
     const statusCode = error.statusCode || 500;
-    
     if (statusCode === 409) {
       logger.warn(`[CREATE_RECEIPT_BLOCK] 重複によりブロック: ${error.message}`);
       return res.status(409).json({
@@ -58,35 +55,70 @@ export const createReceipt = async (req: Request, res: Response) => {
         message: 'このレシートは既に登録されている可能性があります。'
       });
     }
-
     logger.error(`[CREATE_RECEIPT_ERROR] ${error.message}`);
     res.status(statusCode).json({ error: 'レシートの保存に失敗しました' });
   }
 };
 
 /**
- * アイテムのカテゴリーを個別に更新する
+ * 【Issue #20】アイテムのカテゴリーを更新し、学習マスタへ反映する
  */
 export const updateItemCategory = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id } = req.params; // Item ID
   const { categoryId } = req.body;
 
   try {
-    const updatedItem = await prisma.item.update({
-      where: { id: Number(id) },
-      data: { 
-        categoryId: categoryId ? Number(categoryId) : null 
-      },
-      include: { 
-        category: true 
+    // 1. トランザクションで「カテゴリー更新」と「学習マスタ登録」を同時に行う
+    const result = await prisma.$transaction(async (tx) => {
+      // 2. 現在のアイテムと親レシートの情報を取得（学習用）
+      const currentItem = await tx.item.findUnique({
+        where: { id: Number(id) },
+        include: { receipt: true }
+      });
+
+      if (!currentItem) {
+        throw new Error('ITEM_NOT_FOUND');
       }
+
+      // 3. アイテムのカテゴリーを更新
+      const updatedItem = await tx.item.update({
+        where: { id: Number(id) },
+        data: { categoryId: categoryId ? Number(categoryId) : null },
+        include: { category: true }
+      });
+
+      // 4. 【学習】ProductMaster へ Upsert
+      if (categoryId) {
+        const cleanItemName = getCleanText(currentItem.name);
+        const cleanStoreName = getCleanText(currentItem.receipt.storeName);
+
+        await tx.productMaster.upsert({
+          where: {
+            name_storeName: {
+              name: cleanItemName,
+              storeName: cleanStoreName,
+            }
+          },
+          update: { categoryId: Number(categoryId) },
+          create: {
+            name: cleanItemName,
+            storeName: cleanStoreName,
+            categoryId: Number(categoryId),
+          }
+        });
+        logger.debug(`[LEARNING] 学習完了: "${cleanItemName}" @ ${cleanStoreName} -> Cat:${categoryId}`);
+      }
+
+      return updatedItem;
     });
 
-    logger.info(`[ITEM_UPDATE] ID: ${id} のカテゴリーを ${updatedItem.category?.name || '未分類'} に更新しました`);
-    res.json(updatedItem);
+    logger.info(`[ITEM_UPDATE] ID: ${id} のカテゴリーを ${result.category?.name || '未分類'} に更新（学習反映済）`);
+    res.json(result);
+
   } catch (error: any) {
     logger.error(`[ITEM_UPDATE_ERROR] ${error.message}`);
-    res.status(500).json({ error: 'カテゴリーの更新に失敗しました' });
+    const status = error.message === 'ITEM_NOT_FOUND' ? 404 : 500;
+    res.status(status).json({ error: 'カテゴリーの更新または学習に失敗しました' });
   }
 };
 
