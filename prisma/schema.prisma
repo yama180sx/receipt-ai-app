@@ -9,8 +9,8 @@ datasource db {
 
 // 家族構成
 model FamilyMember {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
   receipts Receipt[]
 }
 
@@ -39,7 +39,8 @@ model Receipt {
   // PostgreSQLのTIMESTAMPTZ型を明示
   date        DateTime     @db.Timestamptz(3)
   totalAmount Int
-  rawText     String
+  // [Issue #26] String型からJson型へ変更
+  rawText     Json?
   imagePath   String?      // [Issue #12.5] 画像保存用パスを追加
   items       Item[]
   // PostgreSQLのTIMESTAMPTZ型を明示
@@ -47,24 +48,24 @@ model Receipt {
 }
 
 model Item {
-  id         Int       @id @default(autoincrement())
-  receiptId  Int
-  receipt    Receipt   @relation(fields: [receiptId], references: [id])
-  categoryId Int?
-  category   Category? @relation(fields: [categoryId], references: [id])
-  name       String
-  price      Int
-  quantity   Int       @default(1)
+  id          Int       @id @default(autoincrement())
+  receiptId   Int
+  receipt     Receipt   @relation(fields: [receiptId], references: [id])
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  name        String
+  price       Int
+  quantity    Int       @default(1)
 }
 
-// [Issue #12.5] 学習マスタの追加
+// [Issue #12.5] 学習マスタ
 model ProductMaster {
-  id         Int      @id @default(autoincrement())
-  name       String   // 商品名
-  storeName  String?  // 店舗名（特定店舗のみの限定ルールに対応可能に）
-  categoryId Int
-  category   Category @relation(fields: [categoryId], references: [id])
-  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  id          Int      @id @default(autoincrement())
+  name        String   // 商品名
+  storeName   String?  // 店舗名
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([name, storeName]) // 商品名と店舗の組み合わせでユニーク化
 }
