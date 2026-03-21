@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 家族構成
+model FamilyMember {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  receipts Receipt[]
+}
+
+// 費目カテゴリー
+model Category {
+  id             Int             @id @default(autoincrement())
+  name           String          @unique
+  color          String?         // [Issue #14] UI表示用のカラーコードを追加
+  keywords       Json            @default("[]") 
+  items          Item[]
+  productMasters ProductMaster[]
+}
+
+// 店舗正規化マスタ
+model Store {
+  id           Int    @id @default(autoincrement())
+  officialName String @unique
+  aliases      Json   @default("[]") 
+}
+
+model Receipt {
+  id          Int          @id @default(autoincrement())
+  memberId    Int
+  member      FamilyMember @relation(fields: [memberId], references: [id])
+  storeName   String
+  // PostgreSQLのTIMESTAMPTZ型を明示
+  date        DateTime     @db.Timestamptz(3)
+  totalAmount Int
+  // [Issue #26] String型からJson型へ変更
+  rawText     Json?
+  imagePath   String?      // [Issue #12.5] 画像保存用パスを追加
+  items       Item[]
+  // PostgreSQLのTIMESTAMPTZ型を明示
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+}
+
+model Item {
+  id          Int       @id @default(autoincrement())
+  receiptId   Int
+  receipt     Receipt   @relation(fields: [receiptId], references: [id])
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  name        String
+  price       Int
+  quantity    Int       @default(1)
+}
+
+// [Issue #12.5] 学習マスタ
+model ProductMaster {
+  id          Int      @id @default(autoincrement())
+  name        String   // 商品名
+  storeName   String?  // 店舗名
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, storeName]) // 商品名と店舗の組み合わせでユニーク化
+}

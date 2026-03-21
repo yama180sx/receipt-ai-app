@@ -4,3 +4,12 @@ dist/
 npm-debug.log*
 .env
 .DS_Store
+/generated/prisma
+.env
+.env.local
+test-assets/
+# Logs
+logs/
+*.log
+# Uploaded images
+uploads/
