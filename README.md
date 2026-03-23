@@ -9,7 +9,7 @@
 
 本プロジェクトは、単なる家計簿アプリではなく、以下の **「AIネイティブな開発戦略」** を具現化することを目的としています。
 
-* **Prompt Engineering over Manual Coding**: Google Gemini を「ペアプログラマ」としてフル活用し、実装速度を極限まで高める。
+* **Prompt Engineering over Manual Coding**: **Google Gemini** を「ペアプログラマ」としてフル活用し、実装速度を極限まで高める。
 * **Senior Insight**: AIが生成するコードに対し、長年の経験に基づいた「データ整合性」や「保守性」の観点から検収（Code Review）を行う。
 * **Rapid Prototyping**: 手書きのコメント整備よりも、AIによる高速なイテレーションと、Supabase を活用したサーバーレス・アーキテクチャの検証を優先。
 
@@ -21,7 +21,7 @@
 | :--- | :--- |
 | **Frontend** | React Native (Expo), TypeScript |
 | **Backend** | Supabase (Postgres, Auth, Storage, Edge Functions) |
-| **Infrastructure** | Docker (Home Server: Dell PowerEdge T320 / Ubuntu) |
+| **Infrastructure** | **Docker** (Home Server: Dell PowerEdge T320 / Ubuntu) |
 | **AI / OCR** | **Google Gemini API (Gemini 1.5 Pro / Flash)** |
 
 ---
@@ -34,17 +34,35 @@
 
 ---
 
-## 🛠 Development Setup
+## ⚙️ Development Setup
 
 本プロジェクトは、開発効率を最大化するために Docker 環境での構築を前提としています。
 
 ### 1. 開発用アセットの配置
-プライバシー保護およびリポジトリ軽量化のため、サンプル画像は Git 管理対象外としています。動作確認を行う場合は、以下の手順でアセットを配置してください。
+プライバシー保護およびリポジトリ軽量化のため、サンプル画像は Git 管理対象外としています。
 
-```bash
 # プロジェクトルートに test-assets/ ディレクトリを作成
 mkdir test-assets
 
+※ test-assets/ 内にテスト用のレシート画像を配置して動作確認を行います。
+
+2. 環境構築（Docker）
+
+# 1. リポジトリのクローン
+git clone [https://github.com/your-username/receipt-ai-classifier.git](https://github.com/your-username/receipt-ai-classifier.git)
+cd receipt-ai-classifier
+
+# 2. 環境変数の設定
+cp .env.example .env
+# ※ .env 内に Gemini API Key および Supabase の接続情報を記述してください
+
+# 3. コンテナの起動
+docker compose up -d --build
+
 📝 Developer's Note
 
-    「30年前のJava開発とは、開発の『手触り』が劇的に変わりました。今は、Geminiのような強力なAIエンジンを、長年の経験というハンドルでどう制御するかがエンジニアの介在価値だと考えています。コードの見栄え以上に、アーキテクチャの妥当性と価値提供の速度にフォーカスしています。」
+    「30年前、Javaで最初のシステムを組んだ時と比べ、開発の『手触り』は劇的に変わりました。
+
+    かつては一文字ずつコードを綴ることがエンジニアの証明でしたが、今は Geminiのような強力なAIエンジンを、長年の経験というハンドルでどう制御し、最短距離で価値を届けるか が介在価値だと考えています。
+
+    本リポジトリのコードは、あえてAIによる高速生成を優先し、人間はその『設計の妥当性』を担保することに注力しています。見栄えの良さ以上に、アーキテクチャの合理性と解決の速度を優先しています。」
