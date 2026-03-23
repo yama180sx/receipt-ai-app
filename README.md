@@ -41,6 +41,28 @@
 ### 1. 開発用アセットの配置
 プライバシー保護およびリポジトリ軽量化のため、サンプル画像は Git 管理対象外としています。
 
-```bash
 # プロジェクトルートに test-assets/ ディレクトリを作成
 mkdir test-assets
+
+---
+
+・環境構築（Docker）
+
+# 1. リポジトリのクローン
+git clone [https://github.com/your-username/receipt-ai-classifier.git](https://github.com/your-username/receipt-ai-classifier.git)
+cd receipt-ai-classifier
+
+#  2. 環境変数の設定
+cp .env.example .env
+# ※ .env 内に Gemini API Key および Supabase の接続情報を記述してください
+
+#  3. コンテナの起動
+docker compose up -d --build
+
+📝 Developer's Note
+
+    「30年前、Javaで最初のシステムを組んだ時と比べ、開発の『手触り』は劇的に変わりました。
+
+    かつては一文字ずつコードを綴ることがエンジニアの証明でしたが、今は Geminiのような強力なAIエンジンを、長年の経験というハンドルでどう制御し、最短距離で価値を届けるか が介在価値だと考えています。
+
+    本リポジトリのコードは、あえてAIによる高速生成を優先し、人間はその『設計の妥当性』を担保することに注力しています。見栄えの良さ以上に、アーキテクチャの合理性と解決の速度を優先しています。」
