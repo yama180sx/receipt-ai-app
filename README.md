@@ -41,25 +41,27 @@
 ### 1. 開発用アセットの配置
 プライバシー保護およびリポジトリ軽量化のため、サンプル画像は Git 管理対象外としています。
 
-# プロジェクトルートに test-assets/ ディレクトリを作成
+ プロジェクトルートに test-assets/ ディレクトリを作成
 mkdir test-assets
 
 ---
 
 ・環境構築（Docker）
 
-# 1. リポジトリのクローン
+###  1. リポジトリのクローン
 git clone [https://github.com/your-username/receipt-ai-classifier.git](https://github.com/your-username/receipt-ai-classifier.git)
 cd receipt-ai-classifier
 
-#  2. 環境変数の設定
+###  2. 環境変数の設定
 cp .env.example .env
-# ※ .env 内に Gemini API Key および Supabase の接続情報を記述してください
+※ .env 内に Gemini API Key および Supabase の接続情報を記述してください
 
-#  3. コンテナの起動
+###  3. コンテナの起動
 docker compose up -d --build
 
-📝 Developer's Note
+---
+
+## 📝 Developer's Note
 
     「30年前、Javaで最初のシステムを組んだ時と比べ、開発の『手触り』は劇的に変わりました。
 
