@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { saveReceiptData } from '../services/persistenceService';
 import { getCleanText } from '../utils/normalizer'; // 正規化関数をインポート
-
-const prisma = new PrismaClient();
-
+import { prisma } from '../utils/prismaClient';
+import { Prisma } from '@prisma/client'; // 型定義だけは直接インポートが必要
 /**
  * カテゴリーマスタ一覧を取得
  */
@@ -170,5 +168,24 @@ export const getReceipts = async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error(`[GET_RECEIPTS_ERROR] ${error.message}`);
     res.status(500).json({ error: 'レシート一覧の取得に失敗しました' });
+  }
+};
+
+/**
+ * レシートを削除する（連動して物理ファイルも削除される）
+ */
+export const deleteReceipt = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const deleted = await prisma.receipt.delete({
+      where: { id: Number(id) }
+    });
+
+    logger.info(`[RECEIPT_DELETED] ID: ${id} を削除しました`);
+    res.json({ message: '削除に成功しました', deleted });
+  } catch (error: any) {
+    logger.error(`[DELETE_ERROR] ${error.message}`);
+    res.status(500).json({ error: '削除に失敗しました' });
   }
 };

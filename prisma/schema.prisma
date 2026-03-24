@@ -50,7 +50,8 @@ model Receipt {
 model Item {
   id          Int       @id @default(autoincrement())
   receiptId   Int
-  receipt     Receipt   @relation(fields: [receiptId], references: [id])
+  // [Issue #19] onDelete: Cascade を追加。親のReceiptが消えたら、この明細も自動で消去されます。
+  receipt     Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   categoryId  Int?
   category    Category? @relation(fields: [categoryId], references: [id])
   name        String
