@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger';
 import { getCleanText, inferCategoryId, normalizeStoreName } from '../utils/normalizer';
-
-const prisma = new PrismaClient();
+import { prisma } from '../utils/prismaClient';
 
 export interface ReceiptInput {
   memberId: number;
