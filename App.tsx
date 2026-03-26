@@ -3,8 +3,9 @@ import { StyleSheet, View, Alert, ActivityIndicator, Image, Text, TouchableOpaci
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'; 
 import { Picker } from '@react-native-picker/picker';
+// 追加：SafeAreaProvider をインポート
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// 作成した各スクリーンのインポート
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
@@ -35,12 +36,7 @@ export default function App() {
       Alert.alert('権限エラー', 'カメラへのアクセス許可が必要です。');
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({ 
-      allowsEditing: true, 
-      quality: 1.0 
-    });
-
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1.0 });
     if (!result.canceled) {
       setImage(result.assets[0].uri);
       setRotation(0); 
@@ -52,11 +48,7 @@ export default function App() {
     if (!image) return;
     setUploading(true);
     try {
-      const manipulated = await manipulateAsync(
-        image,
-        [{ rotate: rotation }], 
-        { compress: 0.6, format: SaveFormat.JPEG }
-      );
+      const manipulated = await manipulateAsync(image, [{ rotate: rotation }], { compress: 0.6, format: SaveFormat.JPEG });
       await uploadImage(manipulated.uri);
     } catch (error) {
       setUploading(false);
@@ -68,14 +60,9 @@ export default function App() {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', '1');
-
     try {
-      const response = await fetch(`${API_BASE}/receipts/upload`, { 
-        method: 'POST', 
-        body: formData 
-      });
+      const response = await fetch(`${API_BASE}/receipts/upload`, { method: 'POST', body: formData });
       const result = await response.json();
-      
       if (response.ok) {
         setResultData(result.data);
         setImage(null); 
@@ -111,91 +98,91 @@ export default function App() {
     }
   };
 
-  // --- ナビゲーション制御 ---
-  if (currentView === 'history') {
-    return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
-  }
-  
-  if (currentView === 'stats') {
+  // 表示ロジック
+  const renderContent = () => {
+    if (currentView === 'history') {
+      return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
+    }
+    if (currentView === 'stats') {
+      return (
+        <View style={{ flex: 1 }}>
+          <StatisticsScreen />
+          <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
+            <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     return (
-      <View style={{ flex: 1 }}>
-        <StatisticsScreen />
-        <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
-          <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {resultData ? (
+          <ScrollView contentContainerStyle={styles.resultContainer}>
+            <Text style={styles.resultHeader}>解析結果</Text>
+            <View style={styles.resultCard}>
+              <Text style={styles.storeName}>{resultData.storeName}</Text>
+              <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
+              <View style={styles.divider} />
+              {resultData.items.map((item: any) => (
+                <View key={item.id} style={styles.itemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.pickerWrapper}>
+                    <Picker
+                      selectedValue={item.categoryId}
+                      onValueChange={(val) => handleCategoryChange(item.id, val)}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
+                      {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
+                    </Picker>
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity style={styles.doneButton} onPress={() => setResultData(null)}>
+                <Text style={styles.doneButtonText}>完了</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : image ? (
+          <View style={styles.previewContainer}>
+            <Image source={{ uri: image }} style={[styles.preview, { transform: [{ rotate: `${rotation}deg` }] }]} resizeMode="contain" />
+            <View style={styles.previewActions}>
+              <TouchableOpacity style={styles.subButton} onPress={() => setRotation(prev => (prev + 90) % 360)}>
+                <Text style={styles.subButtonText}>回転 ↻</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
+                {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
+                <Text style={styles.subButtonText}>撮り直す</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <HomeScreen 
+            onScan={takePhoto} 
+            onGoToHistory={() => setCurrentView('history')}
+            onGoToStats={() => setCurrentView('stats')}
+            latestReceipt={undefined}
+          />
+        )}
       </View>
     );
-  }
+  };
 
-  // --- メインビュー (HomeScreen または 撮影/解析ワークフロー) ---
+  // 全体を SafeAreaProvider で囲む
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      {resultData ? (
-        // 1. 解析結果画面（Issue #21 でのデザイン調整済み）
-        <ScrollView contentContainerStyle={styles.resultContainer}>
-          <Text style={styles.resultHeader}>解析結果</Text>
-          <View style={styles.resultCard}>
-            <Text style={styles.storeName}>{resultData.storeName}</Text>
-            <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
-            <View style={styles.divider} />
-            {resultData.items.map((item: any) => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
-                </View>
-                <View style={styles.pickerWrapper}>
-                  <Picker
-                    selectedValue={item.categoryId}
-                    onValueChange={(val) => handleCategoryChange(item.id, val)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
-                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
-                  </Picker>
-                </View>
-              </View>
-            ))}
-            <TouchableOpacity style={styles.doneButton} onPress={() => setResultData(null)}>
-              <Text style={styles.doneButtonText}>完了</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      ) : image ? (
-        // 2. プレビュー/アップロード待機画面
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: image }} style={[styles.preview, { transform: [{ rotate: `${rotation}deg` }] }]} resizeMode="contain" />
-          <View style={styles.previewActions}>
-            <TouchableOpacity style={styles.subButton} onPress={() => setRotation(prev => (prev + 90) % 360)}>
-              <Text style={styles.subButtonText}>回転 ↻</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
-              {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
-              <Text style={styles.subButtonText}>撮り直す</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        // 3. ホーム画面 (Dashboard)
-        <HomeScreen 
-          onScan={takePhoto} 
-          onGoToHistory={() => setCurrentView('history')}
-          onGoToStats={() => setCurrentView('stats')}
-          latestReceipt={undefined}
-        />
-      )}
-    </View>
+    <SafeAreaProvider>
+      {renderContent()}
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  // 共通
   floatingBackButton: { position: 'absolute', bottom: 30, alignSelf: 'center', backgroundColor: theme.colors.primary, paddingVertical: 12, paddingHorizontal: 30, borderRadius: theme.borderRadius.round, elevation: 5 },
   floatingBackButtonText: { color: 'white', fontWeight: 'bold' },
-  
-  // プレビュー画面
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   preview: { width: '90%', height: '70%', borderRadius: 10 },
   previewActions: { width: '100%', padding: 20, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', position: 'absolute', bottom: 40 },
@@ -203,8 +190,6 @@ const styles = StyleSheet.create({
   mainButtonText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
   subButton: { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 12, paddingHorizontal: 20, borderRadius: theme.borderRadius.sm },
   subButtonText: { color: 'white', fontWeight: '600' },
-
-  // 解析結果画面
   resultContainer: { padding: theme.spacing.lg, paddingTop: 60 },
   resultHeader: { ...theme.typography.h1, marginBottom: theme.spacing.lg, textAlign: 'center' },
   resultCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },

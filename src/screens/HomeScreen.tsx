@@ -1,0 +1,161 @@
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '../theme';
+
+const { width } = Dimensions.get('window');
+
+interface HomeScreenProps {
+  onScan: () => void;
+  onGoToHistory: () => void;
+  onGoToStats: () => void;
+  latestReceipt?: {
+    storeName: string;
+    totalAmount: number;
+    date: string;
+  };
+}
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({ 
+  onScan, 
+  onGoToHistory, 
+  onGoToStats, 
+  latestReceipt 
+}) => {
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 1. ヘッダー：プロダクトのアイデンティティ */}
+        <View style={styles.header}>
+          <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
+          <Text style={styles.headerTitle}>メインメニュー</Text>
+        </View>
+
+        {/* 2. メインアクション：スキャン開始ボタン */}
+        <TouchableOpacity 
+          style={styles.captureButton} 
+          activeOpacity={0.8}
+          onPress={onScan}
+        >
+          <View style={styles.iconCircle}>
+            <Text style={styles.iconText}>📷</Text>
+          </View>
+          <Text style={styles.captureButtonText}>レシートを撮影・解析</Text>
+        </TouchableOpacity>
+
+        {/* 3. クイックアクセス：履歴と統計 */}
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.menuCard} onPress={onGoToHistory}>
+            <Text style={styles.menuIcon}>📋</Text>
+            <Text style={styles.menuLabel}>履歴一覧</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuCard} onPress={onGoToStats}>
+            <Text style={styles.menuIcon}>📊</Text>
+            <Text style={styles.menuLabel}>支出統計</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. 最新の解析状況（あれば表示） */}
+        {latestReceipt && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>最近の登録</Text>
+            <View style={styles.latestCard}>
+              <View style={styles.cardInfo}>
+                <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName}</Text>
+                <Text style={styles.dateText}>{latestReceipt.date}</Text>
+              </View>
+              <Text style={styles.amountText}>¥{latestReceipt.totalAmount.toLocaleString()}</Text>
+            </View>
+          </View>
+        )}
+
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background 
+  },
+  scrollContent: { 
+    padding: theme.spacing.lg 
+  },
+  header: { 
+    marginBottom: theme.spacing.xl,
+    marginTop: theme.spacing.md
+  },
+  headerSubtitle: { 
+    ...theme.typography.caption, 
+    color: theme.colors.text.muted, 
+    textTransform: 'uppercase', 
+    letterSpacing: 1.5 
+  },
+  headerTitle: { 
+    ...theme.typography.h1, 
+    color: theme.colors.text.main, 
+    marginTop: theme.spacing.xs 
+  },
+  captureButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    ...Platform.select({
+      ios: { shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15 },
+      android: { elevation: 8 }
+    })
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md
+  },
+  iconText: { fontSize: 30 },
+  captureButtonText: { 
+    ...theme.typography.h2, 
+    color: theme.colors.text.inverse 
+  },
+  row: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: theme.spacing.xl 
+  },
+  menuCard: {
+    backgroundColor: theme.colors.surface,
+    width: (width - theme.spacing.lg * 2 - theme.spacing.md) / 2,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    elevation: 2
+  },
+  menuIcon: { fontSize: 24, marginBottom: theme.spacing.sm },
+  menuLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
+  section: { marginTop: theme.spacing.md },
+  sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.md },
+  latestCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  cardInfo: { flex: 1 },
+  storeName: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text.main },
+  dateText: { ...theme.typography.caption, color: theme.colors.text.muted },
+  amountText: { ...theme.typography.h2, color: theme.colors.primary }
+});
