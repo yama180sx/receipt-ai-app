@@ -9,6 +9,7 @@ interface HomeScreenProps {
   onScan: () => void;
   onGoToHistory: () => void;
   onGoToStats: () => void;
+  onGoToCategories: () => void; // 追加：型定義の整合性を確保
   latestReceipt?: {
     storeName: string;
     totalAmount: number;
@@ -20,6 +21,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onScan, 
   onGoToHistory, 
   onGoToStats, 
+  onGoToCategories, // 追加
   latestReceipt 
 }) => {
   return (
@@ -28,13 +30,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. ヘッダー：プロダクトのアイデンティティ */}
+        {/* 1. ヘッダー */}
         <View style={styles.header}>
           <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
           <Text style={styles.headerTitle}>メインメニュー</Text>
         </View>
 
-        {/* 2. メインアクション：スキャン開始ボタン */}
+        {/* 2. メインアクション：スキャン開始 */}
         <TouchableOpacity 
           style={styles.captureButton} 
           activeOpacity={0.8}
@@ -58,7 +60,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* 4. 最新の解析状況（あれば表示） */}
+        {/* 追加：マスター管理（カテゴリー設定） */}
+        <TouchableOpacity 
+          style={styles.settingsCard} 
+          onPress={onGoToCategories}
+          activeOpacity={0.7}
+        >
+          <View style={styles.settingsIconWrapper}>
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </View>
+          <View style={styles.settingsTextWrapper}>
+            <Text style={styles.settingsLabel}>カテゴリー設定</Text>
+            <Text style={styles.settingsSubtitle}>マスタの追加・編集・削除</Text>
+          </View>
+          <Text style={styles.arrowIcon}>›</Text>
+        </TouchableOpacity>
+
+        {/* 4. 最新の解析状況 */}
         {latestReceipt && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>最近の登録</Text>
@@ -128,7 +146,7 @@ const styles = StyleSheet.create({
   row: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    marginBottom: theme.spacing.xl 
+    marginBottom: theme.spacing.md // 下のカードとの間隔調整
   },
   menuCard: {
     backgroundColor: theme.colors.surface,
@@ -142,6 +160,34 @@ const styles = StyleSheet.create({
   },
   menuIcon: { fontSize: 24, marginBottom: theme.spacing.sm },
   menuLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
+  
+  // カテゴリー設定用カードのスタイル
+  settingsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.xl,
+    elevation: 1
+  },
+  settingsIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.md
+  },
+  settingsIcon: { fontSize: 18 },
+  settingsTextWrapper: { flex: 1 },
+  settingsLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
+  settingsSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted },
+  arrowIcon: { fontSize: 24, color: theme.colors.text.muted, paddingHorizontal: 5 },
+
   section: { marginTop: theme.spacing.md },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.md },
   latestCard: {
