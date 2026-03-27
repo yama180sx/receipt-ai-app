@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Alert, ActivityIndicator, Image, Text, TouchableOpacity, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'; 
 import { Picker } from '@react-native-picker/picker';
-// 追加：SafeAreaProvider をインポート
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -12,7 +12,14 @@ import { StatisticsScreen } from './src/screens/StatisticsScreen';
 import { theme } from './src/theme';
 
 type ViewType = 'main' | 'history' | 'stats';
- 
+
+const STORAGE_KEYS = {
+  VIEW: '@app_view',
+  IMAGE: '@app_image',
+  ROTATION: '@app_rotation',
+  RESULT: '@app_result'
+};
+
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0); 
@@ -20,8 +27,46 @@ export default function App() {
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [isReady, setIsReady] = useState(false);
 
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+  // 1. 状態の復元 (Issue #29)
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        const [v, i, r, res] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.VIEW),
+          AsyncStorage.getItem(STORAGE_KEYS.IMAGE),
+          AsyncStorage.getItem(STORAGE_KEYS.ROTATION),
+          AsyncStorage.getItem(STORAGE_KEYS.RESULT)
+        ]);
+        if (v) setCurrentView(v as ViewType);
+        if (i) setImage(i);
+        if (r) setRotation(parseInt(r, 10));
+        if (res) setResultData(JSON.parse(res));
+      } catch (e) {
+        console.error('復元失敗', e);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    restoreState();
+  }, []);
+
+  // 2. 状態の保存 (Issue #29)
+  useEffect(() => {
+    if (!isReady) return;
+    const saveState = async () => {
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
+        image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
+        AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
+        resultData ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) : AsyncStorage.removeItem(STORAGE_KEYS.RESULT)
+      ]);
+    };
+    saveState();
+  }, [currentView, image, rotation, resultData, isReady]);
 
   useEffect(() => {
     fetch(`${API_BASE}/categories`)
@@ -30,13 +75,21 @@ export default function App() {
       .catch(err => console.error('マスタ取得失敗:', err));
   }, [API_BASE]);
 
+  // 3. 入力制限によるメモリ負荷軽減 (Issue #27)
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('権限エラー', 'カメラへのアクセス許可が必要です。');
+      Alert.alert('権限エラー', 'カメラアクセスが必要です。');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1.0 });
+
+    // ImagePickerOptions に width/height は存在しないため削除
+    const result = await ImagePicker.launchCameraAsync({ 
+      allowsEditing: true, 
+      quality: 0.7, // 入力時の品質を下げてメモリ消費を抑える（これは有効）
+      // aspect: [4, 3], // 必要に応じてアスペクト比を指定
+    });
+
     if (!result.canceled) {
       setImage(result.assets[0].uri);
       setRotation(0); 
@@ -48,7 +101,12 @@ export default function App() {
     if (!image) return;
     setUploading(true);
     try {
-      const manipulated = await manipulateAsync(image, [{ rotate: rotation }], { compress: 0.6, format: SaveFormat.JPEG });
+      // 4. 重い回転処理の前にリサイズを確定させる (Issue #27)
+      const manipulated = await manipulateAsync(
+        image, 
+        [{ resize: { width: 1600 } }, { rotate: rotation }], 
+        { compress: 0.5, format: SaveFormat.JPEG }
+      );
       await uploadImage(manipulated.uri);
     } catch (error) {
       setUploading(false);
@@ -98,8 +156,9 @@ export default function App() {
     }
   };
 
-  // 表示ロジック
   const renderContent = () => {
+    if (!isReady) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
+
     if (currentView === 'history') {
       return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
     }
@@ -172,7 +231,6 @@ export default function App() {
     );
   };
 
-  // 全体を SafeAreaProvider で囲む
   return (
     <SafeAreaProvider>
       {renderContent()}
@@ -181,6 +239,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
   floatingBackButton: { position: 'absolute', bottom: 30, alignSelf: 'center', backgroundColor: theme.colors.primary, paddingVertical: 12, paddingHorizontal: 30, borderRadius: theme.borderRadius.round, elevation: 5 },
   floatingBackButtonText: { color: 'white', fontWeight: 'bold' },
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
