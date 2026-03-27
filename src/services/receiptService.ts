@@ -7,9 +7,27 @@ const prisma = new PrismaClient();
 
 /**
  * 🔍 重複チェックのデバッグモード
- * 調査時は true にしてください
  */
 const DEBUG_DUPLICATE_AI = false;
+
+/**
+ * 🛠️ 安全な日付パース関数 (Issue #27/29 対策)
+ * Invalid Date を防ぎ、失敗時は現在時刻を返す
+ */
+const parseSafeDate = (dateStr: string | null | undefined): Date => {
+  if (!dateStr) return new Date();
+
+  // タイムゾーン補正の有無を確認
+  const formattedStr = dateStr.includes('+') ? dateStr : `${dateStr}+09:00`;
+  const date = new Date(formattedStr);
+
+  // 30年選手の知恵：isNaN(date.getTime()) で Invalid Date を確実に捕捉
+  if (isNaN(date.getTime())) {
+    logger.warn(`[WARN] 無効な日付形式が検出されました: "${dateStr}"。現在時刻を代用します。`);
+    return new Date();
+  }
+  return date;
+};
 
 /**
  * AI解析済みのデータをDBに永続化する
@@ -23,31 +41,23 @@ export const saveParsedReceipt = async (
     // 1. 店舗名の正規化
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
 
-    // JST時刻のパース処理
-    let jstDate: Date;
-    if (parsedData.purchaseDate) {
-      const dateStr = parsedData.purchaseDate.includes('+') 
-        ? parsedData.purchaseDate 
-        : `${parsedData.purchaseDate}+09:00`;
-      jstDate = new Date(dateStr);
-    } else {
-      jstDate = new Date();
-    }
+    // 2. 安全な日付パースの実行
+    const jstDate = parseSafeDate(parsedData.purchaseDate);
 
-    // --- 【Issue #22 重複チェックの追加】 ---
+    // --- 【Issue #22 重複チェック】 ---
     const totalAmount = parsedData.totalAmount || 0;
     
     if (DEBUG_DUPLICATE_AI) {
       logger.debug(`[DUPE_AI:CHECK] 開始: Member:${memberId}, Store:"${officialStoreName}", Amount:${totalAmount}, Date:${jstDate.toISOString()}`);
     }
 
-    // 日付の範囲設定
+    // 3. 日付の範囲設定（パース済みの安全な Date オブジェクトを使用）
     const startOfDay = new Date(jstDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(jstDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 金額と日付で先行照会
+    // 4. 金額と日付で先行照会
     const existingReceipts = await prisma.receipt.findMany({
       where: {
         memberId: memberId,
@@ -71,7 +81,6 @@ export const saveParsedReceipt = async (
 
       if (normalizedNew === normalizedOld) {
         logger.warn(`[DUPE_AI:BLOCK] 重複を検知しました (ID: ${rec.id})`);
-        // 重複エラーを投げる
         const error = new Error('DUPLICATE_RECEIPT_DETECTED');
         (error as any).statusCode = 409;
         throw error;
@@ -113,7 +122,7 @@ export const saveParsedReceipt = async (
         data: {
           memberId: memberId,
           storeName: officialStoreName,
-          date: jstDate,
+          date: jstDate, // 安全な Date
           totalAmount: totalAmount,
           rawText: JSON.stringify(parsedData),
           imagePath: imagePath,
@@ -128,11 +137,9 @@ export const saveParsedReceipt = async (
       return receipt;
     });
   } catch (error) {
-    // 重複エラーはそのまま上に投げる
     if ((error as any).message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // (既存のエラーハンドリング...)
       logger.error(`[DBエラー] Prismaエラーコード: ${error.code}`);
     }
     throw error;
@@ -164,7 +171,6 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
     return result;
 
   } catch (error: any) {
-    // 重複エラーの場合は専用のログを出す
     if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
       logger.warn(`[PROCESS] 重複のため保存をスキップしました (Member: ${memberId})`);
       throw error;
