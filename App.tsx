@@ -9,9 +9,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
+import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
 import { theme } from './src/theme';
 
-type ViewType = 'main' | 'history' | 'stats';
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -31,6 +32,18 @@ export default function App() {
 
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+  // カテゴリー取得（useCallbackでメモ化し、子画面からの呼び出しを最適化）
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/categories`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error('マスタ取得失敗:', err);
+    }
+  }, [API_BASE]);
+
   // 1. 状態の復元 (Issue #29)
   useEffect(() => {
     const restoreState = async () => {
@@ -43,7 +56,7 @@ export default function App() {
         ]);
         if (v) setCurrentView(v as ViewType);
         if (i) setImage(i);
-        if (r) setRotation(parseInt(r, 10));
+        if (r) setRotation(parseInt(r, 10) || 0);
         if (res) setResultData(JSON.parse(res));
       } catch (e) {
         console.error('復元失敗', e);
@@ -68,28 +81,21 @@ export default function App() {
     saveState();
   }, [currentView, image, rotation, resultData, isReady]);
 
+  // 初回起動時のマスタ取得
   useEffect(() => {
-    fetch(`${API_BASE}/categories`)
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setCategories(data))
-      .catch(err => console.error('マスタ取得失敗:', err));
-  }, [API_BASE]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  // 3. 入力制限によるメモリ負荷軽減 (Issue #27)
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('権限エラー', 'カメラアクセスが必要です。');
       return;
     }
-
-    // ImagePickerOptions に width/height は存在しないため削除
     const result = await ImagePicker.launchCameraAsync({ 
       allowsEditing: true, 
-      quality: 0.7, // 入力時の品質を下げてメモリ消費を抑える（これは有効）
-      // aspect: [4, 3], // 必要に応じてアスペクト比を指定
+      quality: 0.7,
     });
-
     if (!result.canceled) {
       setImage(result.assets[0].uri);
       setRotation(0); 
@@ -101,7 +107,6 @@ export default function App() {
     if (!image) return;
     setUploading(true);
     try {
-      // 4. 重い回転処理の前にリサイズを確定させる (Issue #27)
       const manipulated = await manipulateAsync(
         image, 
         [{ resize: { width: 1600 } }, { rotate: rotation }], 
@@ -159,76 +164,88 @@ export default function App() {
   const renderContent = () => {
     if (!isReady) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
-    if (currentView === 'history') {
-      return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
-    }
-    if (currentView === 'stats') {
-      return (
-        <View style={{ flex: 1 }}>
-          <StatisticsScreen />
-          <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
-            <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        {resultData ? (
-          <ScrollView contentContainerStyle={styles.resultContainer}>
-            <Text style={styles.resultHeader}>解析結果</Text>
-            <View style={styles.resultCard}>
-              <Text style={styles.storeName}>{resultData.storeName}</Text>
-              <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
-              <View style={styles.divider} />
-              {resultData.items.map((item: any) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
-                  </View>
-                  <View style={styles.pickerWrapper}>
-                    <Picker
-                      selectedValue={item.categoryId}
-                      onValueChange={(val) => handleCategoryChange(item.id, val)}
-                      style={styles.picker}
-                    >
-                      <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
-                      {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
-                    </Picker>
-                  </View>
-                </View>
-              ))}
-              <TouchableOpacity style={styles.doneButton} onPress={() => setResultData(null)}>
-                <Text style={styles.doneButtonText}>完了</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        ) : image ? (
-          <View style={styles.previewContainer}>
-            <Image source={{ uri: image }} style={[styles.preview, { transform: [{ rotate: `${rotation}deg` }] }]} resizeMode="contain" />
-            <View style={styles.previewActions}>
-              <TouchableOpacity style={styles.subButton} onPress={() => setRotation(prev => (prev + 90) % 360)}>
-                <Text style={styles.subButtonText}>回転 ↻</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
-                {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
-                <Text style={styles.subButtonText}>撮り直す</Text>
-              </TouchableOpacity>
-            </View>
+    switch (currentView) {
+      case 'history':
+        return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
+      case 'stats':
+        return (
+          <View style={{ flex: 1 }}>
+            <StatisticsScreen />
+            <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
+              <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <HomeScreen 
-            onScan={takePhoto} 
-            onGoToHistory={() => setCurrentView('history')}
-            onGoToStats={() => setCurrentView('stats')}
-            latestReceipt={undefined}
+        );
+      case 'category_mgr':
+        return (
+          <CategoryManagementScreen 
+            onBack={() => {
+              fetchCategories(); // 戻る際にマスタを最新化
+              setCurrentView('main');
+            }} 
+            API_BASE={API_BASE} 
           />
-        )}
-      </View>
-    );
+        );
+      default:
+        return (
+          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            {resultData ? (
+              <ScrollView contentContainerStyle={styles.resultContainer}>
+                <Text style={styles.resultHeader}>解析結果</Text>
+                <View style={styles.resultCard}>
+                  <Text style={styles.storeName}>{resultData.storeName}</Text>
+                  <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
+                  <View style={styles.divider} />
+                  {resultData.items.map((item: any) => (
+                    <View key={item.id} style={styles.itemRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
+                      </View>
+                      <View style={styles.pickerWrapper}>
+                        <Picker
+                          selectedValue={item.categoryId}
+                          onValueChange={(val) => handleCategoryChange(item.id, val)}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
+                          {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
+                        </Picker>
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.doneButton} onPress={() => setResultData(null)}>
+                    <Text style={styles.doneButtonText}>完了</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : image ? (
+              <View style={styles.previewContainer}>
+                <Image source={{ uri: image }} style={[styles.preview, { transform: [{ rotate: `${rotation}deg` }] }]} resizeMode="contain" />
+                <View style={styles.previewActions}>
+                  <TouchableOpacity style={styles.subButton} onPress={() => setRotation(prev => (prev + 90) % 360)}>
+                    <Text style={styles.subButtonText}>回転 ↻</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
+                    {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
+                    <Text style={styles.subButtonText}>撮り直す</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <HomeScreen 
+                onScan={takePhoto} 
+                onGoToHistory={() => setCurrentView('main')} // 本来はhistoryへ飛ばすべき箇所があれば修正
+                onGoToStats={() => setCurrentView('stats')}
+                onGoToCategories={() => setCurrentView('category_mgr')}
+                latestReceipt={undefined}
+              />
+            )}
+          </View>
+        );
+    }
   };
 
   return (

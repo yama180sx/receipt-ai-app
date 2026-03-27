@@ -24,8 +24,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// これが JSON Body を解析するために必須です
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// 既存のレシート関連ルート
 app.use('/api', receiptRoutes);
 
 const uploadDir = 'uploads';
@@ -37,8 +40,10 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 /**
- * カテゴリー一覧取得API
+ * 📂 カテゴリー管理 API (CRUD)
  */
+
+// 1. 一覧取得 (GET)
 app.get('/api/categories', async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
@@ -51,8 +56,45 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
+// 2. 新規追加 (POST) - 【ここを追加】
+app.post('/api/categories', async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const newCategory = await prisma.category.create({
+      data: { 
+        name, 
+        color: color || '#2ecc71' 
+      }
+    });
+    logger.info(`[API] カテゴリー追加成功: ${name}`);
+    res.status(201).json(newCategory);
+  } catch (error: any) {
+    logger.error(`[APIエラー] カテゴリー追加失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// 3. 削除 (DELETE) - 【ここを追加】
+app.delete('/api/categories/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.category.delete({
+      where: { id: Number(id) }
+    });
+    logger.info(`[API] カテゴリー削除成功: ID ${id}`);
+    res.status(204).send();
+  } catch (error: any) {
+    // 30年選手の知恵：外部キー制約（既にレシートで使用中）のエラーハンドリング
+    logger.warn(`[API制限] カテゴリー削除失敗（使用中の可能性あり）: ID ${id}`);
+    res.status(400).json({ error: 'Cannot delete category in use' });
+  }
+});
+
+
 /**
- * レシートアップロード & 解析 (Issue #18: 回転補正強化版 / Issue #22: 重複検知対応)
+ * レシートアップロード & 解析
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
@@ -64,7 +106,6 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     const fileName = `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
     const imagePath = path.join(uploadDir, fileName);
 
-    // --- Sharpによる画像最適化 ---
     await sharp(req.file.buffer, { failOnError: false })
       .rotate() 
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
@@ -73,7 +114,6 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 
     logger.info(`[Issue #18] 画像最適化・回転補正完了: ${imagePath}`);
 
-    // 解析および保存処理
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     const data = {
@@ -99,7 +139,6 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     });
     
   } catch (error: any) {
-    // --- 【Issue #22】Service層からの重複エラーをキャッチ ---
     if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
       logger.warn(`[API] 重複登録を検知したため409を返却: memberId=${req.body.memberId}`);
       return res.status(409).json({ 
@@ -107,30 +146,8 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
         code: 'DUPLICATE_RECEIPT' 
       });
     }
-
-    // それ以外の予期せぬエラー
     logger.error(`[APIエラー] ${error.message}`);
     res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
-  }
-});
-
-/**
- * カテゴリー一覧修正（UI選択用）
- */
-app.patch('/api/items/:id/category', async (req, res) => {
-  const { id } = req.params;
-  const { categoryId } = req.body;
-  try {
-    const updatedItem = await prisma.item.update({
-      where: { id: Number(id) },
-      data: { categoryId: categoryId ? Number(categoryId) : null },
-      include: { category: true } 
-    });
-    logger.info(`[API] カテゴリー修正成功: ItemID ${id} -> Category ${updatedItem.category?.name || '未分類'}`);
-    res.json(updatedItem);
-  } catch (error: any) {
-    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update item category' });
   }
 });
 
@@ -187,7 +204,7 @@ app.get('/api/stats/monthly', async (req, res) => {
 });
 
 /**
- * 【Issue #13】レシート内項目のカテゴリー修正 & 学習機能
+ * レシート内項目のカテゴリー修正 & 学習機能
  */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
