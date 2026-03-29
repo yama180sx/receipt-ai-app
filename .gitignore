@@ -1,15 +1,31 @@
-node_modules/
+# --- Dependencies ---
+**/node_modules/
+**/dist/
+**/build/
 .expo/
-dist/
-npm-debug.log*
+
+# --- Environment Variables (Secret Info) ---
+**/.env
+**/.env.local
+**/.env.*
+# ルートの .env も含め全て除外
 .env
+
+# --- Backend Specific ---
+backend/logs/*.log
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+
+# --- Database ---
+postgres_data/
+
+# --- System & IDE ---
 .DS_Store
+*.code-workspace
+.vscode/
+
+# --- Misc ---
+npm-debug.log*
+yarn-error.log*
 /generated/prisma
-.env
-.env.local
-test-assets/
-# Logs
-logs/
-*.log
-# Uploaded images
-uploads/

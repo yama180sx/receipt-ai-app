@@ -237,7 +237,7 @@ export default function App() {
             ) : (
               <HomeScreen 
                 onScan={takePhoto} 
-                onGoToHistory={() => setCurrentView('main')} // 本来はhistoryへ飛ばすべき箇所があれば修正
+                onGoToHistory={() => setCurrentView('history')}
                 onGoToStats={() => setCurrentView('stats')}
                 onGoToCategories={() => setCurrentView('category_mgr')}
                 latestReceipt={undefined}
