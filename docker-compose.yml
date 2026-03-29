@@ -1,29 +1,53 @@
 services:
-  app:
-    build: .
-    # user: "root" # 一時的にrootにして権限問題をクリアする
-    # command: tail -f /dev/null
-    # ユーザーを固定
+  # --- Backend (API Server & Prisma) ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     user: "${UID}:${GID}"
-    # npxを排除し、package.jsonのscriptsを信頼する
     command: npm run dev
     volumes:
-      - .:/app
-      # - /app/node_modules
+      - ./backend:/app
+      # - /app/node_modules  # 削除：ホスト側のファイルを直接参照させ、VS Codeとの同期を優先
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "8081:8081"
       - "3000:3000"
     stdin_open: true
     tty: true
+    env_file:
+      - ./backend/.env
     environment:
       - TZ=Asia/Tokyo
-      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
-      - DATABASE_URL=${DATABASE_URL}
     depends_on:
       db:
         condition: service_healthy
+  # --- Frontend (Expo / React Native) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    user: "${UID}:${GID}"
+    command: npx expo start
+    volumes:
+      - ./frontend:/app
+      # - /app/node_modules  # 削除：ホスト側のファイルを直接参照させ、VS Codeとの同期を優先
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+    stdin_open: true
+    tty: true
+    env_file:
+      - ./frontend/.env
+    environment:
+      - TZ=Asia/Tokyo
+      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.32 # T320の物理IPを指定
+    # frontend側のAPI接続用環境変数が必要な場合はここに追加
+    # - EXPO_PUBLIC_API_URL=http://192.168.1.32:3000
 
+  # --- Database (PostgreSQL) ---
   db:
     image: postgres:latest
     environment:
