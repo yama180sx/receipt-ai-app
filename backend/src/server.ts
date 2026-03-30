@@ -24,7 +24,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// これが JSON Body を解析するために必須です
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
@@ -40,15 +39,11 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 /**
- * 📂 カテゴリー管理 API (CRUD)
+ * 📂 カテゴリー管理 API
  */
-
-// 1. 一覧取得 (GET)
 app.get('/api/categories', async (req, res) => {
   try {
-    const categories = await prisma.category.findMany({
-      orderBy: { id: 'asc' }
-    });
+    const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
     res.json(categories);
   } catch (error: any) {
     logger.error(`[APIエラー] カテゴリー取得失敗: ${error.message}`);
@@ -56,18 +51,11 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
-// 2. 新規追加 (POST) - 【ここを追加】
 app.post('/api/categories', async (req, res) => {
   try {
     const { name, color } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
-
-    const newCategory = await prisma.category.create({
-      data: { 
-        name, 
-        color: color || '#2ecc71' 
-      }
-    });
+    const newCategory = await prisma.category.create({ data: { name, color: color || '#2ecc71' } });
     logger.info(`[API] カテゴリー追加成功: ${name}`);
     res.status(201).json(newCategory);
   } catch (error: any) {
@@ -76,75 +64,61 @@ app.post('/api/categories', async (req, res) => {
   }
 });
 
-// 3. 削除 (DELETE) - 【ここを追加】
 app.delete('/api/categories/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await prisma.category.delete({
-      where: { id: Number(id) }
-    });
+    await prisma.category.delete({ where: { id: Number(id) } });
     logger.info(`[API] カテゴリー削除成功: ID ${id}`);
     res.status(204).send();
   } catch (error: any) {
-    // 30年選手の知恵：外部キー制約（既にレシートで使用中）のエラーハンドリング
     logger.warn(`[API制限] カテゴリー削除失敗（使用中の可能性あり）: ID ${id}`);
     res.status(400).json({ error: 'Cannot delete category in use' });
   }
 });
 
-
 /**
- * レシートアップロード & 解析
+ * 📂 レシートアップロード & 解析 (Issue #30 ストレージ最適化)
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: '画像がアップロードされていません。' });
-    }
+    if (!req.file) return res.status(400).json({ error: '画像がアップロードされていません。' });
 
     const memberId = parseInt(req.body.memberId as string) || 1;
-    const fileName = `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
-    const imagePath = path.join(uploadDir, fileName);
+    
+    // --- Issue #30: 保存形式を WebP に変更 ---
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1e9);
+    const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
+    const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
+    // sharp による画像処理
     await sharp(req.file.buffer, { failOnError: false })
       .rotate() 
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 80, progressive: true })
+      // 長辺を 1000px に制限（OCR 精度を保ちつつ軽量化）
+      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }) 
+      // WebP 変換 (quality 75% で 100〜200KB 程度に収まる)
+      .webp({ quality: 75, effort: 6 }) 
       .toFile(imagePath);
 
-    logger.info(`[Issue #18] 画像最適化・回転補正完了: ${imagePath}`);
+    logger.info(`[Issue #30] WebP最適化完了: ${imagePath}`);
 
+    // DB 保存
     const result = await processAndSaveReceipt(memberId, imagePath);
-
-    const data = {
-      id: result.id,
-      memberId: result.memberId,
-      storeName: result.storeName,
-      date: result.date,
-      totalAmount: result.totalAmount,
-      imagePath: result.imagePath,
-      items: result.items.map(i => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-        categoryId: i.categoryId,
-        category: i.category ? { id: i.category.id, name: i.category.name, color: (i.category as any).color } : null
-      })),
-    };
 
     res.status(200).json({
       message: '解析および保存が完了しました。',
-      data
+      data: {
+        ...result,
+        items: result.items.map(i => ({
+          ...i,
+          category: i.category ? { id: i.category.id, name: i.category.name, color: (i.category as any).color } : null
+        }))
+      }
     });
     
   } catch (error: any) {
     if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-      logger.warn(`[API] 重複登録を検知したため409を返却: memberId=${req.body.memberId}`);
-      return res.status(409).json({ 
-        error: 'このレシートは既に登録されています。',
-        code: 'DUPLICATE_RECEIPT' 
-      });
+      return res.status(409).json({ error: 'このレシートは既に登録されています。', code: 'DUPLICATE_RECEIPT' });
     }
     logger.error(`[APIエラー] ${error.message}`);
     res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
@@ -152,7 +126,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 });
 
 /**
- * 月別カテゴリー別集計API
+ * 📂 統計・カテゴリー修正 API (既存通り)
  */
 app.get('/api/stats/monthly', async (req, res) => {
   const { month } = req.query; 
@@ -173,10 +147,7 @@ app.get('/api/stats/monthly', async (req, res) => {
       select: {
         id: true, imagePath: true, storeName: true, totalAmount: true,
         items: {
-          select: {
-            id: true, name: true, price: true, categoryId: true,
-            category: { select: { name: true, color: true } }
-          }
+          select: { id: true, name: true, price: true, categoryId: true, category: { select: { name: true, color: true } } }
         }
       }
     });
@@ -203,18 +174,12 @@ app.get('/api/stats/monthly', async (req, res) => {
   }
 });
 
-/**
- * レシート内項目のカテゴリー修正 & 学習機能
- */
 app.patch('/api/receipt-items/:id', async (req, res) => {
   const { id } = req.params;
   const { categoryId } = req.body;
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const currentItem = await tx.item.findUnique({
-        where: { id: Number(id) },
-        include: { receipt: true }
-      });
+      const currentItem = await tx.item.findUnique({ where: { id: Number(id) }, include: { receipt: true } });
       if (!currentItem) throw new Error('Item not found');
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
@@ -230,11 +195,11 @@ app.patch('/api/receipt-items/:id', async (req, res) => {
       });
       return updatedItem;
     });
-    logger.info(`[学習成功] "${result.name}" を正規化キー "${getCleanText(result.name)}" でマスタ登録完了`);
+    logger.info(`[学習成功] "${result.name}" をマスタ登録完了`);
     res.json(result);
   } catch (error: any) {
-    logger.error(`[APIエラー] カテゴリー修正/学習失敗: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update item and learn category' });
+    logger.error(`[APIエラー] カテゴリー修正失敗: ${error.message}`);
+    res.status(500).json({ error: 'Failed to update item' });
   }
 });
 
