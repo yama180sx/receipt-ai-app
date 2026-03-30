@@ -3,30 +3,41 @@
 **/dist/
 **/build/
 .expo/
+web-build/
 
 # --- Environment Variables (Secret Info) ---
 **/.env
 **/.env.local
 **/.env.*
-# ルートの .env も含め全て除外
 .env
+# .env.example はリポジトリに含めるため除外対象から外す
+!**/.env.example
 
-# --- Backend Specific ---
-backend/logs/*.log
-backend/uploads/*.jpg
-backend/uploads/*.jpeg
-backend/uploads/*.png
-backend/uploads/*.webp
+# --- Backend & Logging (Issue #30 対応) ---
+# ログディレクトリ全体と監査ファイルを除外
+backend/logs/
+*.log
+*-audit.json
 
-# --- Database ---
+# アップロード画像 (WebP を含む全画像形式を除外)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# --- Database & Prisma ---
 postgres_data/
+/backend/prisma/generated-client/
+/backend/src/generated/
 
 # --- System & IDE ---
 .DS_Store
+Thumbs.db
 *.code-workspace
 .vscode/
+.idea/
 
 # --- Misc ---
 npm-debug.log*
 yarn-error.log*
-/generated/prisma
+.serverless/
+.fusebox/
+.dynamodb/
