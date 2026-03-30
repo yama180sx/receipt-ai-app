@@ -13,6 +13,7 @@
     "@react-native-picker/picker": "2.11.1",
     "axios": "^1.13.5",
     "expo": "~54.0.32",
+    "expo-file-system": "~19.0.21",
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.10",
     "expo-status-bar": "~3.0.9",

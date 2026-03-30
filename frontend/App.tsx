@@ -6,6 +6,10 @@ import { Picker } from '@react-native-picker/picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// --- Issue #30: TSの波線とTypeErrorを回避するための修正 ---
+// @ts-ignore: SDK 54 の型定義不整合を回避するために legacy を使用
+import * as FileSystem from 'expo-file-system/legacy';
+
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
@@ -32,7 +36,18 @@ export default function App() {
 
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-  // カテゴリー取得（useCallbackでメモ化し、子画面からの呼び出しを最適化）
+  // --- Issue #30: ファイル削除ロジック（確実に動作する legacy API） ---
+  const deleteTempFile = async (uri: string | null) => {
+    if (!uri) return;
+    try {
+      // idempotent: true により、ファイルが存在しなくてもエラーにならず正常終了します
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+      console.log(`[Cleanup] Successfully processed: ${uri}`);
+    } catch (e) {
+      console.warn('[Cleanup] Failed to delete temp file:', e);
+    }
+  };
+
   const fetchCategories = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/categories`);
@@ -44,7 +59,6 @@ export default function App() {
     }
   }, [API_BASE]);
 
-  // 1. 状態の復元 (Issue #29)
   useEffect(() => {
     const restoreState = async () => {
       try {
@@ -67,7 +81,6 @@ export default function App() {
     restoreState();
   }, []);
 
-  // 2. 状態の保存 (Issue #29)
   useEffect(() => {
     if (!isReady) return;
     const saveState = async () => {
@@ -81,12 +94,13 @@ export default function App() {
     saveState();
   }, [currentView, image, rotation, resultData, isReady]);
 
-  // 初回起動時のマスタ取得
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
   const takePhoto = async () => {
+    if (image) await deleteTempFile(image);
+
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('権限エラー', 'カメラアクセスが必要です。');
@@ -106,16 +120,25 @@ export default function App() {
   const processAndUpload = async () => {
     if (!image) return;
     setUploading(true);
+    let manipulatedUri: string | null = null;
     try {
       const manipulated = await manipulateAsync(
         image, 
-        [{ resize: { width: 1600 } }, { rotate: rotation }], 
-        { compress: 0.5, format: SaveFormat.JPEG }
+        [{ resize: { width: 1200 } }, { rotate: rotation }], 
+        { compress: 0.6, format: SaveFormat.JPEG }
       );
-      await uploadImage(manipulated.uri);
+      manipulatedUri = manipulated.uri;
+
+      await uploadImage(manipulatedUri);
+
+      await deleteTempFile(manipulatedUri);
+      await deleteTempFile(image);
+      setImage(null);
+
     } catch (error) {
       setUploading(false);
       Alert.alert('エラー', '画像処理に失敗しました。');
+      if (manipulatedUri) await deleteTempFile(manipulatedUri);
     }
   };
 
@@ -128,14 +151,13 @@ export default function App() {
       const result = await response.json();
       if (response.ok) {
         setResultData(result.data);
-        setImage(null); 
       } else if (response.status === 409) {
-        Alert.alert('登録済み', 'このレシートは既に登録されています。', [{ text: 'OK', onPress: () => setImage(null) }]);
+        Alert.alert('登録済み', 'このレシートは既に登録されています。');
       } else {
         throw new Error(result.error || 'アップロード失敗');
       }
     } catch (error: any) {
-      Alert.alert('エラー', error.message);
+      throw error;
     } finally {
       setUploading(false);
     }
@@ -180,7 +202,7 @@ export default function App() {
         return (
           <CategoryManagementScreen 
             onBack={() => {
-              fetchCategories(); // 戻る際にマスタを最新化
+              fetchCategories();
               setCurrentView('main');
             }} 
             API_BASE={API_BASE} 
@@ -229,7 +251,10 @@ export default function App() {
                   <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
                     {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
+                  <TouchableOpacity style={styles.subButton} onPress={async () => {
+                    await deleteTempFile(image);
+                    setImage(null);
+                  }}>
                     <Text style={styles.subButtonText}>撮り直す</Text>
                   </TouchableOpacity>
                 </View>

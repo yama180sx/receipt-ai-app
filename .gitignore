@@ -16,6 +16,7 @@ backend/logs/*.log
 backend/uploads/*.jpg
 backend/uploads/*.jpeg
 backend/uploads/*.png
+backend/uploads/*.webp
 
 # --- Database ---
 postgres_data/
