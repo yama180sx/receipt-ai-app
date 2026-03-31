@@ -5,7 +5,8 @@ export const theme = {
     accent: '#f59e0b',      // アクセント：注意や未分類
     background: '#f8fafc',  // 全体背景：清潔感のあるオフホワイト
     surface: '#ffffff',     // カード/パネル：純白
-    error: '#ef4444',       // エラー/削除
+    error: '#ef4444',       // エラー/削除/支出増
+    success: '#10b981',     // 追加：成功/支出減 (Emerald-500相当)
     border: '#e2e8f0',      // 境界線
     text: {
       main: '#0f172a',      // 本文
