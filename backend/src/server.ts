@@ -91,18 +91,14 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
     const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
     const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-    // sharp による画像処理
     await sharp(req.file.buffer, { failOnError: false })
       .rotate() 
-      // 長辺を 1000px に制限（OCR 精度を保ちつつ軽量化）
       .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }) 
-      // WebP 変換 (quality 75% で 100〜200KB 程度に収まる)
       .webp({ quality: 75, effort: 6 }) 
       .toFile(imagePath);
 
     logger.info(`[Issue #30] WebP最適化完了: ${imagePath}`);
 
-    // DB 保存
     const result = await processAndSaveReceipt(memberId, imagePath);
 
     res.status(200).json({
@@ -126,23 +122,39 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 });
 
 /**
- * 📂 統計・カテゴリー修正 API (既存通り)
+ * 📂 統計 API (Issue #31: 月別選択 & 期間比較対応)
  */
 app.get('/api/stats/monthly', async (req, res) => {
-  const { month } = req.query; 
+  const { month, memberId } = req.query; 
   try {
+    // 1. 対象月（targetDate）の設定
     const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
+    
+    // 2. 当月および前月の期間計算
     const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
     const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+    
+    const startOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 0, 23, 59, 59);
 
+    const mId = Number(memberId || 1);
+
+    // 3. 当月のカテゴリ別集計
     const stats = await prisma.item.groupBy({
       by: ['categoryId'],
-      where: { receipt: { date: { gte: startOfMonth, lte: endOfMonth } } },
+      where: { receipt: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth } } },
       _sum: { price: true },
     });
 
+    // 4. 前月の総計（比較用）
+    const prevMonthTotal = await prisma.item.aggregate({
+      where: { receipt: { memberId: mId, date: { gte: startOfPrevMonth, lte: endOfPrevMonth } } },
+      _sum: { price: true },
+    });
+
+    // 5. 直近のレシート取得 (既存ロジック維持)
     const latestReceipt = await prisma.receipt.findFirst({
-      where: { date: { gte: startOfMonth, lte: endOfMonth }, imagePath: { not: null } },
+      where: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth }, imagePath: { not: null } },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, imagePath: true, storeName: true, totalAmount: true,
@@ -152,6 +164,7 @@ app.get('/api/stats/monthly', async (req, res) => {
       }
     });
 
+    // 6. カテゴリマスタとマージして整形
     const categories = await prisma.category.findMany();
     const formattedStats = stats.map(s => {
       const category = categories.find(c => c.id === s.categoryId);
@@ -163,8 +176,16 @@ app.get('/api/stats/monthly', async (req, res) => {
       };
     });
 
+    // 7. 合計値と差分の計算
+    const currentTotal = formattedStats.reduce((sum, s) => sum + s.totalAmount, 0);
+    const prevTotal = prevMonthTotal._sum.price || 0;
+
     res.json({
       month: `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`,
+      totalAmount: currentTotal,
+      prevTotal: prevTotal,
+      diffAmount: currentTotal - prevTotal,
+      diffPercentage: prevTotal !== 0 ? Math.round(((currentTotal - prevTotal) / prevTotal) * 100) : 0,
       stats: formattedStats,
       latestReceipt: latestReceipt 
     });
