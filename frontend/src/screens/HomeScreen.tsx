@@ -9,7 +9,7 @@ interface HomeScreenProps {
   onScan: () => void;
   onGoToHistory: () => void;
   onGoToStats: () => void;
-  onGoToCategories: () => void; // 追加：型定義の整合性を確保
+  onGoToCategories: () => void; 
   latestReceipt?: {
     storeName: string;
     totalAmount: number;
@@ -21,7 +21,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onScan, 
   onGoToHistory, 
   onGoToStats, 
-  onGoToCategories, // 追加
+  onGoToCategories,
   latestReceipt 
 }) => {
   return (
@@ -30,13 +30,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. ヘッダー */}
         <View style={styles.header}>
           <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
           <Text style={styles.headerTitle}>メインメニュー</Text>
         </View>
 
-        {/* 2. メインアクション：スキャン開始 */}
         <TouchableOpacity 
           style={styles.captureButton} 
           activeOpacity={0.8}
@@ -48,7 +46,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.captureButtonText}>レシートを撮影・解析</Text>
         </TouchableOpacity>
 
-        {/* 3. クイックアクセス：履歴と統計 */}
         <View style={styles.row}>
           <TouchableOpacity style={styles.menuCard} onPress={onGoToHistory}>
             <Text style={styles.menuIcon}>📋</Text>
@@ -60,7 +57,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* 追加：マスター管理（カテゴリー設定） */}
         <TouchableOpacity 
           style={styles.settingsCard} 
           onPress={onGoToCategories}
@@ -76,7 +72,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.arrowIcon}>›</Text>
         </TouchableOpacity>
 
-        {/* 4. 最新の解析状況 */}
         {latestReceipt && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>最近の登録</Text>
@@ -89,35 +84,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: theme.colors.background 
-  },
-  scrollContent: { 
-    padding: theme.spacing.lg 
-  },
-  header: { 
-    marginBottom: theme.spacing.xl,
-    marginTop: theme.spacing.md
-  },
-  headerSubtitle: { 
-    ...theme.typography.caption, 
-    color: theme.colors.text.muted, 
-    textTransform: 'uppercase', 
-    letterSpacing: 1.5 
-  },
-  headerTitle: { 
-    ...theme.typography.h1, 
-    color: theme.colors.text.main, 
-    marginTop: theme.spacing.xs 
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { padding: theme.spacing.lg },
+  header: { marginBottom: theme.spacing.xl, marginTop: theme.spacing.md },
+  headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: 1.5 },
+  headerTitle: { ...theme.typography.h1, color: theme.colors.text.main, marginTop: theme.spacing.xs },
   captureButton: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.lg,
@@ -129,25 +106,10 @@ const styles = StyleSheet.create({
       android: { elevation: 8 }
     })
   },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md
-  },
+  iconCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: theme.spacing.md },
   iconText: { fontSize: 30 },
-  captureButtonText: { 
-    ...theme.typography.h2, 
-    color: theme.colors.text.inverse 
-  },
-  row: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginBottom: theme.spacing.md // 下のカードとの間隔調整
-  },
+  captureButtonText: { ...theme.typography.h2, color: theme.colors.text.inverse },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md },
   menuCard: {
     backgroundColor: theme.colors.surface,
     width: (width - theme.spacing.lg * 2 - theme.spacing.md) / 2,
@@ -160,46 +122,16 @@ const styles = StyleSheet.create({
   },
   menuIcon: { fontSize: 24, marginBottom: theme.spacing.sm },
   menuLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
-  
-  // カテゴリー設定用カードのスタイル
-  settingsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.xl,
-    elevation: 1
-  },
-  settingsIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md
-  },
+  settingsCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: theme.spacing.md, borderRadius: theme.borderRadius.md, borderWidth: 1, borderColor: theme.colors.border, marginBottom: theme.spacing.xl, elevation: 1 },
+  settingsIconWrapper: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   settingsIcon: { fontSize: 18 },
   settingsTextWrapper: { flex: 1 },
   settingsLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
   settingsSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted },
   arrowIcon: { fontSize: 24, color: theme.colors.text.muted, paddingHorizontal: 5 },
-
   section: { marginTop: theme.spacing.md },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.md },
-  latestCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border
-  },
+  latestCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
   cardInfo: { flex: 1 },
   storeName: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text.main },
   dateText: { ...theme.typography.caption, color: theme.colors.text.muted },

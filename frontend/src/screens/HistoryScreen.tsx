@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Image, ScrollView, Modal, Platform } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Image, ScrollView, Modal, Platform, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import apiClient from '../utils/apiClient'; // apiClient をインポート
 import { theme } from '../theme';
 
-export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void, API_BASE: string }) {
+// Props から API_BASE を削除
+export default function HistoryScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -12,53 +14,58 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedMember, setSelectedMember] = useState('1');
 
-  // 無限ループ防止用のキー
   const cacheKey = useMemo(() => Date.now(), []);
   const months = ['2026-03', '2026-02', '2026-01', '2025-12'];
+
+  // 画像表示用ベースURLの構築
+  const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
+  const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
   // カテゴリーマスタ取得
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch(`${API_BASE}/categories`);
-        const data = await res.json();
-        setCategories(data);
+        const res = await apiClient.get('/categories');
+        setCategories(res.data);
       } catch (err) {
         console.error('カテゴリー取得失敗', err);
       }
     };
     fetchCategories();
-  }, [API_BASE]);
+  }, []);
 
   // レシート一覧取得
-  useEffect(() => {
-    fetchReceipts();
-  }, [selectedMonth, selectedMember]);
-
-  const fetchReceipts = async () => {
+  const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
-      const url = `${API_BASE}/receipts?memberId=${selectedMember}&month=${selectedMonth}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setReceipts(data);
+      // axios の params を利用してクエリパラメータを渡す
+      const res = await apiClient.get('/receipts', {
+        params: {
+          memberId: selectedMember,
+          month: selectedMonth
+        }
+      });
+      setReceipts(res.data);
     } catch (err) {
       console.error('履歴取得失敗', err);
+      Alert.alert('エラー', '履歴の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth, selectedMember]);
+
+  useEffect(() => {
+    fetchReceipts();
+  }, [fetchReceipts]);
 
   // 明細のカテゴリー更新
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await fetch(`${API_BASE}/receipt-items/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryId: Number(categoryId) }),
+      const response = await apiClient.patch(`/receipt-items/${itemId}`, {
+        categoryId: Number(categoryId)
       });
-      const updatedItem = await response.json();
+      const updatedItem = response.data;
 
       // 詳細モーダルのステート更新
       setSelectedReceipt((prev: any) =>
@@ -79,14 +86,14 @@ export default function HistoryScreen({ onBack, API_BASE }: { onBack: () => void
       })));
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
+      Alert.alert('エラー', '更新に失敗しました');
     }
   };
 
   const getImageUrl = useCallback((imagePath: string) => {
     if (!imagePath) return null;
-    const baseUrl = API_BASE.replace('/api', '');
-    return `${baseUrl}/${imagePath}?v=${cacheKey}`;
-  }, [API_BASE, cacheKey]);
+    return `${BASE_URL}/${imagePath}?v=${cacheKey}`;
+  }, [BASE_URL, cacheKey]);
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
@@ -279,7 +286,6 @@ const styles = StyleSheet.create({
   itemCountBadge: { backgroundColor: theme.colors.background, paddingHorizontal: theme.spacing.sm, paddingVertical: 2, borderRadius: theme.borderRadius.round },
   itemCountText: { ...theme.typography.caption, color: theme.colors.secondary },
   empty: { textAlign: 'center', marginTop: 50, color: theme.colors.text.muted },
-  
   modalContent: { flex: 1, backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingHorizontal: theme.spacing.lg },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg, paddingBottom: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailTitle: { ...theme.typography.h2, flex: 1, color: theme.colors.text.main },

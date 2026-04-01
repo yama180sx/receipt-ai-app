@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Alert, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
-import { Picker } from '@react-native-picker/picker'; // 追加: expo install @react-native-picker/picker が必要
-import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
+import apiClient from '../utils/apiClient'; // axios から apiClient に変更
 import { theme } from '../theme';
 
 const screenWidth = Dimensions.get('window').width;
@@ -38,7 +38,6 @@ interface ReceiptInfo {
   items: ReceiptItem[];
 }
 
-// Issue #31 用のレスポンス型
 interface MonthlyData {
   month: string;
   totalAmount: number;
@@ -59,9 +58,9 @@ export const StatisticsScreen: React.FC = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-  const BASE_URL = API_BASE.replace(/\/api\/?$/, '');
-  const UPDATE_ITEM_URL = `${API_BASE}/receipt-items`;
+  // 画像表示用にベースURLを保持（末尾の /api を除去）
+  const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+  const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
   // 過去12ヶ月の選択肢生成
   const monthOptions = Array.from({ length: 12 }).map((_, i) => {
@@ -73,18 +72,20 @@ export const StatisticsScreen: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      // apiClient を使用。baseURL が設定されているため相対パスで指定。
       const [statsRes, catRes] = await Promise.all([
-        axios.get(`${API_BASE}/stats/monthly?month=${selectedMonth}`),
-        axios.get(`${API_BASE}/categories`)
+        apiClient.get<MonthlyData>(`/stats/monthly?month=${selectedMonth}`),
+        apiClient.get<Category[]>('/categories')
       ]);
       setData(statsRes.data);
       setAllCategories(catRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
+      Alert.alert("エラー", "データの取得に失敗しました");
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, API_BASE]);
+  }, [selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -93,7 +94,8 @@ export const StatisticsScreen: React.FC = () => {
   const handleUpdateCategory = async (categoryId: number) => {
     if (!selectedItemId) return;
     try {
-      await axios.patch(`${UPDATE_ITEM_URL}/${selectedItemId}`, { categoryId });
+      // apiClient.patch を使用
+      await apiClient.patch(`/receipt-items/${selectedItemId}`, { categoryId });
       setPickerVisible(false);
       await fetchData();
       Alert.alert("完了", "カテゴリーを更新しました");
@@ -118,7 +120,6 @@ export const StatisticsScreen: React.FC = () => {
         
         <View style={styles.header}>
           <Text style={styles.headerSubtitle}>収支分析レポート</Text>
-          {/* 月選択 Picker */}
           <View style={styles.monthPickerContainer}>
             <Picker
               selectedValue={selectedMonth}
@@ -137,7 +138,6 @@ export const StatisticsScreen: React.FC = () => {
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <>
-            {/* Issue #31: 前月比サマリーカード */}
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>合計支出</Text>
               <Text style={styles.totalValue}>¥{data?.totalAmount.toLocaleString()}</Text>
@@ -204,7 +204,6 @@ export const StatisticsScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* 詳細モーダル (変更なし、data.latestReceipt を参照するように微修正) */}
       <Modal visible={isMainModalVisible} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -249,7 +248,6 @@ export const StatisticsScreen: React.FC = () => {
           </ScrollView>
         </SafeAreaView>
 
-        {/* カテゴリ選択サブモーダル */}
         <Modal visible={isPickerVisible} transparent={true} animationType="fade">
           <View style={styles.pickerOverlay}>
             <View style={styles.pickerWindow}>
@@ -293,8 +291,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   monthPicker: { width: '100%' },
-  
-  // サマリーカード (Issue #31 新設)
   summaryCard: {
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.lg,
@@ -310,7 +306,6 @@ const styles = StyleSheet.create({
   comparisonRow: { flexDirection: 'row', alignItems: 'center' },
   comparisonLabel: { ...theme.typography.caption, marginRight: 8 },
   diffValue: { fontWeight: '700', fontSize: 16 },
-
   section: { marginBottom: theme.spacing.xl },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.md },
   chartCard: { 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import apiClient from '../utils/apiClient'; // apiClient をインポート
 import { theme } from '../theme';
 
 interface Category {
@@ -8,19 +9,21 @@ interface Category {
   color: string;
 }
 
-export const CategoryManagementScreen = ({ onBack, API_BASE }: { onBack: () => void, API_BASE: string }) => {
+// Props から API_BASE を削除
+export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => { 
+    fetchCategories(); 
+  }, []);
 
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/categories`);
-      const data = await res.json();
-      setCategories(data);
+      const res = await apiClient.get('/categories');
+      setCategories(res.data);
     } catch (e) {
       Alert.alert("エラー", "カテゴリーの取得に失敗しました。");
     } finally {
@@ -31,15 +34,13 @@ export const CategoryManagementScreen = ({ onBack, API_BASE }: { onBack: () => v
   const addCategory = async () => {
     if (!newName.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/categories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, color: '#2ecc71' }), 
+      // apiClient を使用 (Content-Type 指定は不要)
+      await apiClient.post('/categories', { 
+        name: newName, 
+        color: '#2ecc71' 
       });
-      if (res.ok) {
-        setNewName('');
-        fetchCategories();
-      }
+      setNewName('');
+      fetchCategories();
     } catch (e) {
       Alert.alert("エラー", "追加に失敗しました。");
     }
@@ -50,11 +51,14 @@ export const CategoryManagementScreen = ({ onBack, API_BASE }: { onBack: () => v
       { text: "キャンセル" },
       { text: "削除", style: 'destructive', onPress: async () => {
           try {
-            const res = await fetch(`${API_BASE}/categories/${id}`, { method: 'DELETE' });
-            if (res.ok) fetchCategories();
-            else Alert.alert("制限", "このカテゴリーは既に使用されているため削除できません。");
-          } catch (e) {
-            Alert.alert("エラー", "削除に失敗しました。");
+            await apiClient.delete(`/categories/${id}`);
+            fetchCategories();
+          } catch (e: any) {
+            if (e.response?.status === 400 || e.response?.status === 409) {
+              Alert.alert("制限", "このカテゴリーは既に使用されているため削除できません。");
+            } else {
+              Alert.alert("エラー", "削除に失敗しました。");
+            }
           }
       }}
     ]);

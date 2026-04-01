@@ -6,9 +6,12 @@ import { Picker } from '@react-native-picker/picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// --- Issue #30: TSの波線とTypeErrorを回避するための修正 ---
-// @ts-ignore: SDK 54 の型定義不整合を回避するために legacy を使用
+// Issue #30 用の修正（legacy APIを使用）
+// @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
+
+// 共通APIクライアントをインポート
+import apiClient from './src/utils/apiClient';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -34,13 +37,10 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [isReady, setIsReady] = useState(false);
 
-  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-  // --- Issue #30: ファイル削除ロジック（確実に動作する legacy API） ---
+  // --- Issue #30: ファイル削除ロジック ---
   const deleteTempFile = async (uri: string | null) => {
     if (!uri) return;
     try {
-      // idempotent: true により、ファイルが存在しなくてもエラーにならず正常終了します
       await FileSystem.deleteAsync(uri, { idempotent: true });
       console.log(`[Cleanup] Successfully processed: ${uri}`);
     } catch (e) {
@@ -48,16 +48,15 @@ export default function App() {
     }
   };
 
+  // fetch を apiClient.get に変更
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/categories`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setCategories(data);
+      const res = await apiClient.get('/categories');
+      setCategories(res.data);
     } catch (err) {
       console.error('マスタ取得失敗:', err);
     }
-  }, [API_BASE]);
+  }, []);
 
   useEffect(() => {
     const restoreState = async () => {
@@ -142,36 +141,36 @@ export default function App() {
     }
   };
 
+  // fetch (POST) を apiClient.post に変更
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', '1');
     try {
-      const response = await fetch(`${API_BASE}/receipts/upload`, { method: 'POST', body: formData });
-      const result = await response.json();
-      if (response.ok) {
-        setResultData(result.data);
-      } else if (response.status === 409) {
+      const response = await apiClient.post('/receipts/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setResultData(response.data.data);
+    } catch (error: any) {
+      if (error.response?.status === 409) {
         Alert.alert('登録済み', 'このレシートは既に登録されています。');
       } else {
-        throw new Error(result.error || 'アップロード失敗');
+        Alert.alert('エラー', error.response?.data?.error || 'アップロード失敗');
       }
-    } catch (error: any) {
       throw error;
     } finally {
       setUploading(false);
     }
   };
 
+  // fetch (PATCH) を apiClient.patch に変更
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await fetch(`${API_BASE}/receipt-items/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryId: Number(categoryId) }),
+      const response = await apiClient.patch(`/receipt-items/${itemId}`, { 
+        categoryId: Number(categoryId) 
       });
-      const updatedItem = await response.json();
+      const updatedItem = response.data;
       setResultData((prev: any) => ({
         ...prev,
         items: prev.items.map((item: any) =>
@@ -179,7 +178,7 @@ export default function App() {
         ),
       }));
     } catch (error: any) {
-      Alert.alert('エラー', error.message);
+      Alert.alert('エラー', error.response?.data?.error || '更新に失敗しました');
     }
   };
 
@@ -188,7 +187,8 @@ export default function App() {
 
     switch (currentView) {
       case 'history':
-        return <HistoryScreen onBack={() => setCurrentView('main')} API_BASE={API_BASE} />;
+        // HistoryScreen も apiClient を使うようにリファクタリング前提のため、API_BASE の渡航は不要に
+        return <HistoryScreen onBack={() => setCurrentView('main')} />;
       case 'stats':
         return (
           <View style={{ flex: 1 }}>
@@ -205,7 +205,6 @@ export default function App() {
               fetchCategories();
               setCurrentView('main');
             }} 
-            API_BASE={API_BASE} 
           />
         );
       default:
