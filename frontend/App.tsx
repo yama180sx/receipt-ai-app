@@ -48,7 +48,6 @@ export default function App() {
     }
   };
 
-  // fetch を apiClient.get に変更
   const fetchCategories = useCallback(async () => {
     try {
       const res = await apiClient.get('/categories');
@@ -141,21 +140,34 @@ export default function App() {
     }
   };
 
-  // fetch (POST) を apiClient.post に変更
+  // --- Issue #34 & #39 修正箇所 ---
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', '1');
+
     try {
       const response = await apiClient.post('/receipts/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setResultData(response.data.data);
+
+      // 防御的コーディング：階層構造をチェックし、安全にデータをセット
+      const responseData = response.data;
+      if (responseData && responseData.data) {
+        setResultData(responseData.data);
+      } else {
+        console.error('APIレスポンスの構造が不正です:', responseData);
+        throw new Error('解析データの取得に失敗しました');
+      }
+
     } catch (error: any) {
-      if (error.response?.status === 409) {
+      const status = error.response?.status;
+      const errorMessage = error.response?.data?.error || 'アップロード失敗';
+
+      if (status === 409) {
         Alert.alert('登録済み', 'このレシートは既に登録されています。');
       } else {
-        Alert.alert('エラー', error.response?.data?.error || 'アップロード失敗');
+        Alert.alert('エラー', errorMessage);
       }
       throw error;
     } finally {
@@ -163,20 +175,25 @@ export default function App() {
     }
   };
 
-  // fetch (PATCH) を apiClient.patch に変更
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
       const response = await apiClient.patch(`/receipt-items/${itemId}`, { 
         categoryId: Number(categoryId) 
       });
+      
       const updatedItem = response.data;
-      setResultData((prev: any) => ({
-        ...prev,
-        items: prev.items.map((item: any) =>
-          item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-        ),
-      }));
+      if (!updatedItem) return;
+
+      setResultData((prev: any) => {
+        if (!prev || !prev.items) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item: any) =>
+            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+          ),
+        };
+      });
     } catch (error: any) {
       Alert.alert('エラー', error.response?.data?.error || '更新に失敗しました');
     }
@@ -187,7 +204,6 @@ export default function App() {
 
     switch (currentView) {
       case 'history':
-        // HistoryScreen も apiClient を使うようにリファクタリング前提のため、API_BASE の渡航は不要に
         return <HistoryScreen onBack={() => setCurrentView('main')} />;
       case 'stats':
         return (
@@ -210,18 +226,19 @@ export default function App() {
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            {resultData ? (
+            {/* resultData および resultData.items が存在する場合のみ表示 */}
+            {resultData && resultData.items ? (
               <ScrollView contentContainerStyle={styles.resultContainer}>
                 <Text style={styles.resultHeader}>解析結果</Text>
                 <View style={styles.resultCard}>
-                  <Text style={styles.storeName}>{resultData.storeName}</Text>
-                  <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
+                  <Text style={styles.storeName}>{resultData.storeName || '不明な店舗'}</Text>
+                  <Text style={styles.totalAmount}>¥{(resultData.totalAmount || 0).toLocaleString()}</Text>
                   <View style={styles.divider} />
                   {resultData.items.map((item: any) => (
                     <View key={item.id} style={styles.itemRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemName}>{item.name}</Text>
-                        <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
+                        <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
                       </View>
                       <View style={styles.pickerWrapper}>
                         <Picker
