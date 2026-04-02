@@ -18,10 +18,23 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 const prisma = new PrismaClient();
 
+// --- Issue #34: CORS 制限の厳格化 ---
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // 1. origin が無い場合（サーバー間通信やPostman等）は許可
+    // 2. 許可リストに含まれる場合は許可
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      logger.warn(`[CORS Blocked]: 許可されていないオリジンからのアクセスです: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
@@ -85,7 +98,6 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 
     const memberId = parseInt(req.body.memberId as string) || 1;
     
-    // --- Issue #30: 保存形式を WebP に変更 ---
     const timestamp = Date.now();
     const randomSuffix = Math.round(Math.random() * 1e9);
     const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
@@ -127,10 +139,8 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 app.get('/api/stats/monthly', async (req, res) => {
   const { month, memberId } = req.query; 
   try {
-    // 1. 対象月（targetDate）の設定
     const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
     
-    // 2. 当月および前月の期間計算
     const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
     const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
     
@@ -139,20 +149,17 @@ app.get('/api/stats/monthly', async (req, res) => {
 
     const mId = Number(memberId || 1);
 
-    // 3. 当月のカテゴリ別集計
     const stats = await prisma.item.groupBy({
       by: ['categoryId'],
       where: { receipt: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth } } },
       _sum: { price: true },
     });
 
-    // 4. 前月の総計（比較用）
     const prevMonthTotal = await prisma.item.aggregate({
       where: { receipt: { memberId: mId, date: { gte: startOfPrevMonth, lte: endOfPrevMonth } } },
       _sum: { price: true },
     });
 
-    // 5. 直近のレシート取得 (既存ロジック維持)
     const latestReceipt = await prisma.receipt.findFirst({
       where: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth }, imagePath: { not: null } },
       orderBy: { createdAt: 'desc' },
@@ -164,7 +171,6 @@ app.get('/api/stats/monthly', async (req, res) => {
       }
     });
 
-    // 6. カテゴリマスタとマージして整形
     const categories = await prisma.category.findMany();
     const formattedStats = stats.map(s => {
       const category = categories.find(c => c.id === s.categoryId);
@@ -176,7 +182,6 @@ app.get('/api/stats/monthly', async (req, res) => {
       };
     });
 
-    // 7. 合計値と差分の計算
     const currentTotal = formattedStats.reduce((sum, s) => sum + s.totalAmount, 0);
     const prevTotal = prevMonthTotal._sum.price || 0;
 
