@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import logger from '../utils/logger';
 import { saveReceiptData } from '../services/persistenceService';
-import { getCleanText } from '../utils/normalizer'; // 正規化関数をインポート
+import { getCleanText } from '../utils/normalizer';
 import { prisma } from '../utils/prismaClient';
-import { Prisma } from '@prisma/client'; // 型定義だけは直接インポートが必要
+import { Prisma } from '@prisma/client';
+
 /**
  * カテゴリーマスタ一覧を取得
  */
@@ -20,7 +21,7 @@ export const getCategories = async (_req: Request, res: Response) => {
 };
 
 /**
- * 【Issue #24】レシート登録（共通保存サービスへの統合）
+ * 【Issue #24】レシート登録
  */
 export const createReceipt = async (req: Request, res: Response) => {
   try {
@@ -62,13 +63,11 @@ export const createReceipt = async (req: Request, res: Response) => {
  * 【Issue #20】アイテムのカテゴリーを更新し、学習マスタへ反映する
  */
 export const updateItemCategory = async (req: Request, res: Response) => {
-  const { id } = req.params; // Item ID
+  const { id } = req.params;
   const { categoryId } = req.body;
 
   try {
-    // 1. トランザクションで「カテゴリー更新」と「学習マスタ登録」を同時に行う
     const result = await prisma.$transaction(async (tx) => {
-      // 2. 現在のアイテムと親レシートの情報を取得（学習用）
       const currentItem = await tx.item.findUnique({
         where: { id: Number(id) },
         include: { receipt: true }
@@ -78,14 +77,12 @@ export const updateItemCategory = async (req: Request, res: Response) => {
         throw new Error('ITEM_NOT_FOUND');
       }
 
-      // 3. アイテムのカテゴリーを更新
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: categoryId ? Number(categoryId) : null },
         include: { category: true }
       });
 
-      // 4. 【学習】ProductMaster へ Upsert
       if (categoryId) {
         const cleanItemName = getCleanText(currentItem.name);
         const cleanStoreName = getCleanText(currentItem.receipt.storeName);
@@ -172,7 +169,52 @@ export const getReceipts = async (req: Request, res: Response) => {
 };
 
 /**
- * レシートを削除する（連動して物理ファイルも削除される）
+ * 【Issue #35】最新のレシート1件を取得
+ */
+export const getLatestReceipt = async (req: Request, res: Response) => {
+  try {
+    const { memberId } = req.query;
+    
+    if (!memberId) {
+      return res.status(400).json({ error: 'memberId が必要です' });
+    }
+
+    const latest = await prisma.receipt.findFirst({
+      where: { memberId: Number(memberId) },
+      select: {
+        id: true,
+        memberId: true,
+        storeName: true,
+        date: true,
+        totalAmount: true,
+        imagePath: true,
+        items: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            quantity: true,
+            categoryId: true,
+            category: {
+              select: { id: true, name: true, color: true }
+            }
+          }
+        }
+      },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }]
+    });
+
+    // データがない場合は null を返す（フロントエンドで 404 エラー扱いにならないよう配慮）
+    res.json(latest || null);
+
+  } catch (error: any) {
+    logger.error(`[GET_LATEST_ERROR] ${error.message}`);
+    res.status(500).json({ error: '最新レシートの取得に失敗しました' });
+  }
+};
+
+/**
+ * レシートを削除する
  */
 export const deleteReceipt = async (req: Request, res: Response) => {
   const { id } = req.params;

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Imag
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
-import apiClient from '../utils/apiClient'; // axios から apiClient に変更
+import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
 
 const screenWidth = Dimensions.get('window').width;
@@ -48,7 +48,12 @@ interface MonthlyData {
   latestReceipt: ReceiptInfo | null;
 }
 
-export const StatisticsScreen: React.FC = () => {
+// Props インターフェースを追加
+interface StatisticsScreenProps {
+  currentMemberId: number;
+}
+
+export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId }) => {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [data, setData] = useState<MonthlyData | null>(null);
@@ -58,23 +63,26 @@ export const StatisticsScreen: React.FC = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  // 画像表示用にベースURLを保持（末尾の /api を除去）
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
-  // 過去12ヶ月の選択肢生成
   const monthOptions = Array.from({ length: 12 }).map((_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     return d.toISOString().slice(0, 7);
   });
 
+  // memberId をクエリパラメータに追加
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      // apiClient を使用。baseURL が設定されているため相対パスで指定。
       const [statsRes, catRes] = await Promise.all([
-        apiClient.get<MonthlyData>(`/stats/monthly?month=${selectedMonth}`),
+        apiClient.get<MonthlyData>(`/stats/monthly`, {
+          params: { 
+            month: selectedMonth,
+            memberId: currentMemberId 
+          }
+        }),
         apiClient.get<Category[]>('/categories')
       ]);
       setData(statsRes.data);
@@ -85,7 +93,7 @@ export const StatisticsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, currentMemberId]); // currentMemberId を依存配列に追加
 
   useEffect(() => {
     fetchData();
@@ -94,7 +102,6 @@ export const StatisticsScreen: React.FC = () => {
   const handleUpdateCategory = async (categoryId: number) => {
     if (!selectedItemId) return;
     try {
-      // apiClient.patch を使用
       await apiClient.patch(`/receipt-items/${selectedItemId}`, { categoryId });
       setPickerVisible(false);
       await fetchData();
@@ -119,7 +126,9 @@ export const StatisticsScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>収支分析レポート</Text>
+          <Text style={styles.headerSubtitle}>
+            {currentMemberId === 1 ? '自分の収支分析レポート' : 'その他の収支分析レポート'}
+          </Text>
           <View style={styles.monthPickerContainer}>
             <Picker
               selectedValue={selectedMonth}
