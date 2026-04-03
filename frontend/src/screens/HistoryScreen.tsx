@@ -1,23 +1,28 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Image, ScrollView, Modal, Platform, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import apiClient from '../utils/apiClient'; // apiClient をインポート
+import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
 
-// Props から API_BASE を削除
-export default function HistoryScreen({ onBack }: { onBack: () => void }) {
+interface HistoryScreenProps {
+  onBack: () => void;
+  currentMemberId: number; // App.tsx から受け取る
+}
+
+export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
   const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedMember, setSelectedMember] = useState('1');
+  // 初期値を App.tsx で選択されている世帯 ID に設定
+  const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
 
   const cacheKey = useMemo(() => Date.now(), []);
   const months = ['2026-03', '2026-02', '2026-01', '2025-12'];
 
-  // 画像表示用ベースURLの構築
+  // 画像表示用ベースURL
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
@@ -38,7 +43,6 @@ export default function HistoryScreen({ onBack }: { onBack: () => void }) {
   const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
-      // axios の params を利用してクエリパラメータを渡す
       const res = await apiClient.get('/receipts', {
         params: {
           memberId: selectedMember,
@@ -58,6 +62,11 @@ export default function HistoryScreen({ onBack }: { onBack: () => void }) {
     fetchReceipts();
   }, [fetchReceipts]);
 
+  // App.tsx 側で世帯が切り替わった場合、履歴画面の選択状態も同期させる
+  useEffect(() => {
+    setSelectedMember(currentMemberId.toString());
+  }, [currentMemberId]);
+
   // 明細のカテゴリー更新
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
@@ -67,7 +76,7 @@ export default function HistoryScreen({ onBack }: { onBack: () => void }) {
       });
       const updatedItem = response.data;
 
-      // 詳細モーダルのステート更新
+      // ステート更新
       setSelectedReceipt((prev: any) =>
         prev ? {
           ...prev,
@@ -77,7 +86,6 @@ export default function HistoryScreen({ onBack }: { onBack: () => void }) {
         } : prev
       );
 
-      // 一覧側のステート更新
       setReceipts(prev => prev.map(r => ({
         ...r,
         items: r.items.map((item: any) =>
@@ -146,8 +154,9 @@ export default function HistoryScreen({ onBack }: { onBack: () => void }) {
             style={styles.filterPicker}
             dropdownIconColor={theme.colors.primary}
           >
-            <Picker.Item label="メンバー1" value="1" />
-            <Picker.Item label="メンバー2" value="2" />
+            {/* ラベルを「自分」「その他」に変更 */}
+            <Picker.Item label="自分" value="1" />
+            <Picker.Item label="その他" value="2" />
           </Picker>
         </View>
       </View>

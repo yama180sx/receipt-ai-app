@@ -37,6 +37,9 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [isReady, setIsReady] = useState(false);
 
+  // --- Issue #35: 世帯管理の状態を追加 (1: 自分, 2: その他) ---
+  const [currentMemberId, setCurrentMemberId] = useState<number>(1);
+
   // --- Issue #30: ファイル削除ロジック ---
   const deleteTempFile = async (uri: string | null) => {
     if (!uri) return;
@@ -48,7 +51,6 @@ export default function App() {
     }
   };
 
-  // fetch を apiClient.get に変更
   const fetchCategories = useCallback(async () => {
     try {
       const res = await apiClient.get('/categories');
@@ -141,21 +143,33 @@ export default function App() {
     }
   };
 
-  // fetch (POST) を apiClient.post に変更
+  // --- Issue #35: 選択中の memberId を送信するように修正 ---
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
-    formData.append('memberId', '1');
+    formData.append('memberId', currentMemberId.toString());
+
     try {
       const response = await apiClient.post('/receipts/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setResultData(response.data.data);
+
+      const responseData = response.data;
+      if (responseData && responseData.data) {
+        setResultData(responseData.data);
+      } else {
+        console.error('APIレスポンスの構造が不正です:', responseData);
+        throw new Error('解析データの取得に失敗しました');
+      }
+
     } catch (error: any) {
-      if (error.response?.status === 409) {
+      const status = error.response?.status;
+      const errorMessage = error.response?.data?.error || 'アップロード失敗';
+
+      if (status === 409) {
         Alert.alert('登録済み', 'このレシートは既に登録されています。');
       } else {
-        Alert.alert('エラー', error.response?.data?.error || 'アップロード失敗');
+        Alert.alert('エラー', errorMessage);
       }
       throw error;
     } finally {
@@ -163,36 +177,58 @@ export default function App() {
     }
   };
 
-  // fetch (PATCH) を apiClient.patch に変更
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
       const response = await apiClient.patch(`/receipt-items/${itemId}`, { 
         categoryId: Number(categoryId) 
       });
+      
       const updatedItem = response.data;
-      setResultData((prev: any) => ({
-        ...prev,
-        items: prev.items.map((item: any) =>
-          item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-        ),
-      }));
+      if (!updatedItem) return;
+
+      setResultData((prev: any) => {
+        if (!prev || !prev.items) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item: any) =>
+            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+          ),
+        };
+      });
     } catch (error: any) {
       Alert.alert('エラー', error.response?.data?.error || '更新に失敗しました');
     }
   };
+
+  // --- Issue #35: 世帯切替UI ---
+  const HouseholdSwitcher = () => (
+    <View style={styles.switcherContainer}>
+      <TouchableOpacity 
+        style={[styles.switchButton, currentMemberId === 1 && styles.activeSwitch]} 
+        onPress={() => setCurrentMemberId(1)}
+      >
+        <Text style={[styles.switchText, currentMemberId === 1 && styles.activeSwitchText]}>自分</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.switchButton, currentMemberId === 2 && styles.activeSwitch]} 
+        onPress={() => setCurrentMemberId(2)}
+      >
+        <Text style={[styles.switchText, currentMemberId === 2 && styles.activeSwitchText]}>その他</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const renderContent = () => {
     if (!isReady) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
     switch (currentView) {
       case 'history':
-        // HistoryScreen も apiClient を使うようにリファクタリング前提のため、API_BASE の渡航は不要に
-        return <HistoryScreen onBack={() => setCurrentView('main')} />;
+        return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
       case 'stats':
         return (
           <View style={{ flex: 1 }}>
-            <StatisticsScreen />
+            <StatisticsScreen currentMemberId={currentMemberId}/>
             <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
               <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
             </TouchableOpacity>
@@ -210,18 +246,21 @@ export default function App() {
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            {resultData ? (
+            {/* 解析中やプレビュー中でない時のみ切替スイッチを表示 */}
+            {!resultData && !image && <HouseholdSwitcher />}
+
+            {resultData && resultData.items ? (
               <ScrollView contentContainerStyle={styles.resultContainer}>
                 <Text style={styles.resultHeader}>解析結果</Text>
                 <View style={styles.resultCard}>
-                  <Text style={styles.storeName}>{resultData.storeName}</Text>
-                  <Text style={styles.totalAmount}>¥{resultData.totalAmount.toLocaleString()}</Text>
+                  <Text style={styles.storeName}>{resultData.storeName || '不明な店舗'}</Text>
+                  <Text style={styles.totalAmount}>¥{(resultData.totalAmount || 0).toLocaleString()}</Text>
                   <View style={styles.divider} />
                   {resultData.items.map((item: any) => (
                     <View key={item.id} style={styles.itemRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemName}>{item.name}</Text>
-                        <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
+                        <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
                       </View>
                       <View style={styles.pickerWrapper}>
                         <Picker
@@ -264,7 +303,8 @@ export default function App() {
                 onGoToHistory={() => setCurrentView('history')}
                 onGoToStats={() => setCurrentView('stats')}
                 onGoToCategories={() => setCurrentView('category_mgr')}
-                latestReceipt={undefined}
+                // HomeScreenにも現在の世帯IDを渡す
+                currentMemberId={currentMemberId}
               />
             )}
           </View>
@@ -302,5 +342,36 @@ const styles = StyleSheet.create({
   pickerWrapper: { width: 120, height: 40, backgroundColor: theme.colors.background, borderRadius: theme.borderRadius.sm, overflow: 'hidden' },
   picker: { width: '100%' },
   doneButton: { backgroundColor: theme.colors.primary, padding: 16, borderRadius: theme.borderRadius.md, alignItems: 'center', marginTop: theme.spacing.xl },
-  doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+  // 世帯切替UIスタイル
+  switcherContainer: {
+    flexDirection: 'row',
+    paddingTop: 50, // SafeArea相当の余白
+    paddingBottom: 15,
+    backgroundColor: theme.colors.surface,
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  switchButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    marginHorizontal: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  activeSwitch: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  switchText: {
+    color: theme.colors.text.muted,
+    fontWeight: 'bold',
+  },
+  activeSwitchText: {
+    color: '#fff',
+  },
 });
