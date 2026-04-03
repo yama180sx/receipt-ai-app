@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
+import apiClient from '../utils/apiClient';
 
 const { width } = Dimensions.get('window');
 
@@ -10,11 +11,7 @@ interface HomeScreenProps {
   onGoToHistory: () => void;
   onGoToStats: () => void;
   onGoToCategories: () => void; 
-  latestReceipt?: {
-    storeName: string;
-    totalAmount: number;
-    date: string;
-  };
+  currentMemberId: number; // App.tsx から受け取る
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
@@ -22,8 +19,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToHistory, 
   onGoToStats, 
   onGoToCategories,
-  latestReceipt 
+  currentMemberId 
 }) => {
+  const [latestReceipt, setLatestReceipt] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 世帯 ID に基づいて最新のレシートを取得
+  const fetchLatestReceipt = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/receipts/latest', {
+        params: { memberId: currentMemberId }
+      });
+      setLatestReceipt(response.data);
+    } catch (error) {
+      console.error('最新レシート取得失敗:', error);
+      setLatestReceipt(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentMemberId]);
+
+  useEffect(() => {
+    fetchLatestReceipt();
+  }, [fetchLatestReceipt]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -32,7 +52,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={styles.header}>
           <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
-          <Text style={styles.headerTitle}>メインメニュー</Text>
+          <Text style={styles.headerTitle}>
+            {currentMemberId === 1 ? '自分のメニュー' : 'その他のメニュー'}
+          </Text>
         </View>
 
         <TouchableOpacity 
@@ -72,9 +94,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.arrowIcon}>›</Text>
         </TouchableOpacity>
 
-        {latestReceipt && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>最近の登録</Text>
+        {/* 最近の登録セクション（動的取得） */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>最近の登録</Text>
+          {loading ? (
+            <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 10 }} />
+          ) : latestReceipt ? (
             <View style={styles.latestCard}>
               <View style={styles.cardInfo}>
                 <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName}</Text>
@@ -82,8 +107,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
               <Text style={styles.amountText}>¥{latestReceipt.totalAmount.toLocaleString()}</Text>
             </View>
-          </View>
-        )}
+          ) : (
+            <View style={[styles.latestCard, { justifyContent: 'center' }]}>
+              <Text style={styles.dateText}>表示できるデータがありません</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

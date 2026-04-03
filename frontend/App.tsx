@@ -37,6 +37,9 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [isReady, setIsReady] = useState(false);
 
+  // --- Issue #35: 世帯管理の状態を追加 (1: 自分, 2: その他) ---
+  const [currentMemberId, setCurrentMemberId] = useState<number>(1);
+
   // --- Issue #30: ファイル削除ロジック ---
   const deleteTempFile = async (uri: string | null) => {
     if (!uri) return;
@@ -140,18 +143,17 @@ export default function App() {
     }
   };
 
-  // --- Issue #34 & #39 修正箇所 ---
+  // --- Issue #35: 選択中の memberId を送信するように修正 ---
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
-    formData.append('memberId', '1');
+    formData.append('memberId', currentMemberId.toString());
 
     try {
       const response = await apiClient.post('/receipts/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // 防御的コーディング：階層構造をチェックし、安全にデータをセット
       const responseData = response.data;
       if (responseData && responseData.data) {
         setResultData(responseData.data);
@@ -199,16 +201,34 @@ export default function App() {
     }
   };
 
+  // --- Issue #35: 世帯切替UI ---
+  const HouseholdSwitcher = () => (
+    <View style={styles.switcherContainer}>
+      <TouchableOpacity 
+        style={[styles.switchButton, currentMemberId === 1 && styles.activeSwitch]} 
+        onPress={() => setCurrentMemberId(1)}
+      >
+        <Text style={[styles.switchText, currentMemberId === 1 && styles.activeSwitchText]}>自分</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.switchButton, currentMemberId === 2 && styles.activeSwitch]} 
+        onPress={() => setCurrentMemberId(2)}
+      >
+        <Text style={[styles.switchText, currentMemberId === 2 && styles.activeSwitchText]}>その他</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderContent = () => {
     if (!isReady) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
     switch (currentView) {
       case 'history':
-        return <HistoryScreen onBack={() => setCurrentView('main')} />;
+        return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
       case 'stats':
         return (
           <View style={{ flex: 1 }}>
-            <StatisticsScreen />
+            <StatisticsScreen currentMemberId={currentMemberId}/>
             <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
               <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
             </TouchableOpacity>
@@ -226,7 +246,9 @@ export default function App() {
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            {/* resultData および resultData.items が存在する場合のみ表示 */}
+            {/* 解析中やプレビュー中でない時のみ切替スイッチを表示 */}
+            {!resultData && !image && <HouseholdSwitcher />}
+
             {resultData && resultData.items ? (
               <ScrollView contentContainerStyle={styles.resultContainer}>
                 <Text style={styles.resultHeader}>解析結果</Text>
@@ -281,7 +303,8 @@ export default function App() {
                 onGoToHistory={() => setCurrentView('history')}
                 onGoToStats={() => setCurrentView('stats')}
                 onGoToCategories={() => setCurrentView('category_mgr')}
-                latestReceipt={undefined}
+                // HomeScreenにも現在の世帯IDを渡す
+                currentMemberId={currentMemberId}
               />
             )}
           </View>
@@ -319,5 +342,36 @@ const styles = StyleSheet.create({
   pickerWrapper: { width: 120, height: 40, backgroundColor: theme.colors.background, borderRadius: theme.borderRadius.sm, overflow: 'hidden' },
   picker: { width: '100%' },
   doneButton: { backgroundColor: theme.colors.primary, padding: 16, borderRadius: theme.borderRadius.md, alignItems: 'center', marginTop: theme.spacing.xl },
-  doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+  // 世帯切替UIスタイル
+  switcherContainer: {
+    flexDirection: 'row',
+    paddingTop: 50, // SafeArea相当の余白
+    paddingBottom: 15,
+    backgroundColor: theme.colors.surface,
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  switchButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    marginHorizontal: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  activeSwitch: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  switchText: {
+    color: theme.colors.text.muted,
+    fontWeight: 'bold',
+  },
+  activeSwitchText: {
+    color: '#fff',
+  },
 });
