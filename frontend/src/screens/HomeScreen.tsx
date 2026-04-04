@@ -11,7 +11,8 @@ interface HomeScreenProps {
   onGoToHistory: () => void;
   onGoToStats: () => void;
   onGoToCategories: () => void; 
-  currentMemberId: number; // App.tsx から受け取る
+  onGoToProductMaster: () => void; // --- [Issue #36] 追加 ---
+  currentMemberId: number;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
@@ -19,12 +20,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToHistory, 
   onGoToStats, 
   onGoToCategories,
+  onGoToProductMaster, // --- [Issue #36] 追加 ---
   currentMemberId 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // 世帯 ID に基づいて最新のレシートを取得
   const fetchLatestReceipt = useCallback(async () => {
     setLoading(true);
     try {
@@ -79,6 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
+        {/* カテゴリー設定 */}
         <TouchableOpacity 
           style={styles.settingsCard} 
           onPress={onGoToCategories}
@@ -94,7 +96,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.arrowIcon}>›</Text>
         </TouchableOpacity>
 
-        {/* 最近の登録セクション（動的取得） */}
+        {/* --- [Issue #36] 学習マスタ管理への導線を追加 --- */}
+        <TouchableOpacity 
+          style={[styles.settingsCard, { marginTop: -15 }]} 
+          onPress={onGoToProductMaster}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.settingsIconWrapper, { backgroundColor: '#E3F2FD' }]}>
+            <Text style={styles.settingsIcon}>🧠</Text>
+          </View>
+          <View style={styles.settingsTextWrapper}>
+            <Text style={styles.settingsLabel}>学習マスタ管理</Text>
+            <Text style={styles.settingsSubtitle}>AIの学習データ修正・店舗名統合</Text>
+          </View>
+          <Text style={styles.arrowIcon}>›</Text>
+        </TouchableOpacity>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最近の登録</Text>
           {loading ? (

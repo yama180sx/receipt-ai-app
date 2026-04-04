@@ -17,9 +17,12 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
+// --- Issue #36: 学習マスタ管理画面をインポート ---
+import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
 import { theme } from './src/theme';
 
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr';
+// product_master を追加
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -143,7 +146,6 @@ export default function App() {
     }
   };
 
-  // --- Issue #35: 選択中の memberId を送信するように修正 ---
   const uploadImage = async (uri: string) => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
@@ -201,7 +203,6 @@ export default function App() {
     }
   };
 
-  // --- Issue #35: 世帯切替UI ---
   const HouseholdSwitcher = () => (
     <View style={styles.switcherContainer}>
       <TouchableOpacity 
@@ -243,10 +244,16 @@ export default function App() {
             }} 
           />
         );
+      // --- Issue #36: 学習マスタ管理画面のケースを追加 ---
+      case 'product_master':
+        return (
+          <ProductMasterScreen 
+            onBack={() => setCurrentView('main')} 
+          />
+        );
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            {/* 解析中やプレビュー中でない時のみ切替スイッチを表示 */}
             {!resultData && !image && <HouseholdSwitcher />}
 
             {resultData && resultData.items ? (
@@ -303,7 +310,8 @@ export default function App() {
                 onGoToHistory={() => setCurrentView('history')}
                 onGoToStats={() => setCurrentView('stats')}
                 onGoToCategories={() => setCurrentView('category_mgr')}
-                // HomeScreenにも現在の世帯IDを渡す
+                // --- Issue #36: 学習マスタ画面への遷移を追加 ---
+                onGoToProductMaster={() => setCurrentView('product_master')}
                 currentMemberId={currentMemberId}
               />
             )}
