@@ -9,9 +9,12 @@ import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
-// --- Issue #36: 追加 ---
 import productMasterRoutes from './routes/productMasterRoutes'; 
 import { getCleanText } from './utils/normalizer';
+
+// --- Issue #37: Zodバリデーション関連のインポート ---
+import { validate } from './middlewares/validate';
+import { createReceiptSchema, uploadReceiptSchema } from './schemas/receiptSchema';
 
 dotenv.config();
 
@@ -20,6 +23,7 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 const prisma = new PrismaClient();
 
+// --- Issue #34: CORS 制限の厳格化 ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 
 app.use(cors({
@@ -39,10 +43,8 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// 既存のレシート関連ルート
+// 既存のルート登録
 app.use('/api', receiptRoutes);
-
-// --- Issue #36: 学習マスタ関連ルートを追加 ---
 app.use('/api/product-master', productMasterRoutes);
 
 const uploadDir = 'uploads';
@@ -92,48 +94,59 @@ app.delete('/api/categories/:id', async (req, res) => {
 });
 
 /**
- * 📂 レシートアップロード & 解析
+ * 📂 レシートアップロード & 解析 (Issue #37: Zodバリデーション適用)
  */
-app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: '画像がアップロードされていません。' });
+app.post(
+  '/api/receipts/upload', 
+  upload.single('image'), 
+  validate(uploadReceiptSchema), // ここでバリデーションと型変換を実行
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: '画像がアップロードされていません。' });
 
-    const memberId = parseInt(req.body.memberId as string) || 1;
-    
-    const timestamp = Date.now();
-    const randomSuffix = Math.round(Math.random() * 1e9);
-    const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
-    const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
+      // validate() 内の parseAsync により、req.body.memberId は既に number 型に変換されています
+      const { memberId } = req.body;
 
-    await sharp(req.file.buffer, { failOnError: false })
-      .rotate() 
-      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }) 
-      .webp({ quality: 75, effort: 6 }) 
-      .toFile(imagePath);
+      // --- 追加: DB整合性チェック ---
+      const memberExists = await prisma.familyMember.findUnique({
+        where: { id: memberId }
+      });
 
-    logger.info(`[Issue #30] WebP最適化完了: ${imagePath}`);
-
-    const result = await processAndSaveReceipt(memberId, imagePath);
-
-    res.status(200).json({
-      message: '解析および保存が完了しました。',
-      data: {
-        ...result,
-        items: result.items.map(i => ({
-          ...i,
-          category: i.category ? { id: i.category.id, name: i.category.name, color: (i.category as any).color } : null
-        }))
+      if (!memberExists) {
+        logger.warn(`[Validation Error]: 存在しない世帯IDです (ID: ${memberId})`);
+        return res.status(400).json({ error: '指定された世帯IDが存在しません。' });
       }
-    });
-    
-  } catch (error: any) {
-    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-      return res.status(409).json({ error: 'このレシートは既に登録されています。', code: 'DUPLICATE_RECEIPT' });
+      // ----------------------------
+
+      const timestamp = Date.now();
+      const randomSuffix = Math.round(Math.random() * 1e9);
+      const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
+      const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
+
+      await sharp(req.file.buffer, { failOnError: false })
+        .rotate() 
+        .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }) 
+        .webp({ quality: 75, effort: 6 }) 
+        .toFile(imagePath);
+
+      logger.info(`[Issue #30] WebP最適化完了: ${imagePath}`);
+
+      const result = await processAndSaveReceipt(memberId, imagePath);
+
+      res.status(200).json({
+        message: '解析および保存が完了しました。',
+        data: result
+      });
+      
+    } catch (error: any) {
+      if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
+        return res.status(409).json({ error: 'このレシートは既に登録されています。', code: 'DUPLICATE_RECEIPT' });
+      }
+      logger.error(`[APIエラー] ${error.message}`);
+      res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
     }
-    logger.error(`[APIエラー] ${error.message}`);
-    res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
   }
-});
+);
 
 /**
  * 📂 統計 API
@@ -142,10 +155,8 @@ app.get('/api/stats/monthly', async (req, res) => {
   const { month, memberId } = req.query; 
   try {
     const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
-    
     const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
     const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
-    
     const startOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() - 1, 1);
     const endOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 0, 23, 59, 59);
 
