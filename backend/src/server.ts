@@ -9,6 +9,8 @@ import { processAndSaveReceipt } from './services/receiptService';
 import logger from './utils/logger';
 import { PrismaClient } from '@prisma/client';
 import receiptRoutes from './routes/receiptRoutes';
+// --- Issue #36: 追加 ---
+import productMasterRoutes from './routes/productMasterRoutes'; 
 import { getCleanText } from './utils/normalizer';
 
 dotenv.config();
@@ -18,13 +20,10 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 const prisma = new PrismaClient();
 
-// --- Issue #34: CORS 制限の厳格化 ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // 1. origin が無い場合（サーバー間通信やPostman等）は許可
-    // 2. 許可リストに含まれる場合は許可
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -42,6 +41,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // 既存のレシート関連ルート
 app.use('/api', receiptRoutes);
+
+// --- Issue #36: 学習マスタ関連ルートを追加 ---
+app.use('/api/product-master', productMasterRoutes);
 
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
@@ -90,7 +92,7 @@ app.delete('/api/categories/:id', async (req, res) => {
 });
 
 /**
- * 📂 レシートアップロード & 解析 (Issue #30 ストレージ最適化)
+ * 📂 レシートアップロード & 解析
  */
 app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
   try {
@@ -134,7 +136,7 @@ app.post('/api/receipts/upload', upload.single('image'), async (req, res) => {
 });
 
 /**
- * 📂 統計 API (Issue #31: 月別選択 & 期間比較対応)
+ * 📂 統計 API
  */
 app.get('/api/stats/monthly', async (req, res) => {
   const { month, memberId } = req.query; 
