@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import apiClient from '../utils/apiClient'; // apiClient をインポート
+import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
 
 interface Category {
@@ -9,7 +9,6 @@ interface Category {
   color: string;
 }
 
-// Props から API_BASE を削除
 export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState('');
@@ -23,7 +22,14 @@ export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => 
     setLoading(true);
     try {
       const res = await apiClient.get('/categories');
-      setCategories(res.data);
+      /**
+       * ★ 修正ポイント: [Issue #40] 
+       * バックエンドのレスポンス形式 { success: true, data: Category[] } に合わせ、
+       * res.data.data を取得します。
+       */
+      if (res.data && res.data.success) {
+        setCategories(res.data.data || []);
+      }
     } catch (e) {
       Alert.alert("エラー", "カテゴリーの取得に失敗しました。");
     } finally {
@@ -34,7 +40,6 @@ export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => 
   const addCategory = async () => {
     if (!newName.trim()) return;
     try {
-      // apiClient を使用 (Content-Type 指定は不要)
       await apiClient.post('/categories', { 
         name: newName, 
         color: '#2ecc71' 
@@ -54,6 +59,7 @@ export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => 
             await apiClient.delete(`/categories/${id}`);
             fetchCategories();
           } catch (e: any) {
+            // ステータスコードに応じたエラーハンドリングを維持
             if (e.response?.status === 400 || e.response?.status === 409) {
               Alert.alert("制限", "このカテゴリーは既に使用されているため削除できません。");
             } else {
@@ -93,6 +99,7 @@ export const CategoryManagementScreen = ({ onBack }: { onBack: () => void }) => 
           data={categories}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
+          ListEmptyComponent={<Text style={styles.emptyText}>登録されているカテゴリーはありません</Text>}
           renderItem={({ item }) => (
             <View style={styles.itemRow}>
               <View style={[styles.colorBadge, { backgroundColor: item.color }]} />
@@ -123,5 +130,6 @@ const styles = StyleSheet.create({
   colorBadge: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
   categoryName: { flex: 1, ...theme.typography.body, fontWeight: '600' },
   deleteButton: { padding: 8 },
-  deleteText: { color: theme.colors.error, fontSize: 14, fontWeight: '700' }
+  deleteText: { color: theme.colors.error, fontSize: 14, fontWeight: '700' },
+  emptyText: { textAlign: 'center', marginTop: 30, color: theme.colors.text.muted }
 });

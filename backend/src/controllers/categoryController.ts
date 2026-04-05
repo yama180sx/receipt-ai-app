@@ -1,44 +1,79 @@
+import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { AppError } from '../utils/appError';
 import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
 
-// 一覧取得
-export const getCategories = async (req: any, res: any) => {
+/**
+ * 📂 カテゴリー一覧取得
+ */
+export const getCategories = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
-    res.json(categories);
+    const categories = await prisma.category.findMany({ 
+      orderBy: { id: 'asc' } 
+    });
+    
+    // Issue #40: レスポンス形式の統一
+    res.json({
+      success: true,
+      data: categories
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch' });
+    next(error);
   }
 };
 
-// 新規追加
-export const createCategory = async (req: any, res: any) => {
+/**
+ * 📂 カテゴリー新規追加
+ */
+export const createCategory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, color } = req.body;
-    // バリデーション
-    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    if (!name) {
+      return next(new AppError('Name is required', 400));
+    }
 
     const category = await prisma.category.create({
-      data: { name, color: color || '#2ecc71' }
+      data: { 
+        name, 
+        color: color || '#2ecc71' 
+      }
     });
+
     logger.info(`[CATEGORY] Created: ${name}`);
-    res.status(201).json(category);
+
+    res.status(201).json({
+      success: true,
+      data: category
+    });
   } catch (error) {
-    logger.error('[CATEGORY] Create Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(error);
   }
 };
 
-// 削除
-export const deleteCategory = async (req: any, res: any) => {
+/**
+ * 📂 カテゴリー削除
+ */
+export const deleteCategory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    await prisma.category.delete({ where: { id: Number(id) } });
-    res.status(204).send();
-  } catch (error) {
-    // 30年選手の知恵：外部キー制約（レシートで使用中）の場合は 400 を返す
-    res.status(400).json({ error: 'Category in use' });
+
+    await prisma.category.delete({
+      where: { id: Number(id) }
+    });
+
+    logger.info(`[CATEGORY] Deleted: ID ${id}`);
+
+    // 削除成功時は data なしで success のみを返す（既存コードの 204 を踏襲する場合は res.status(204).send() でも可）
+    res.json({
+      success: true
+    });
+  } catch (error: any) {
+    if (error.code === 'P2003') {
+      return next(new AppError('このカテゴリーは既に使用されているため削除できません。', 400));
+    }
+    next(error);
   }
 };

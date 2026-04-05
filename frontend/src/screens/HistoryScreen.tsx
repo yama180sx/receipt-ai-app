@@ -6,7 +6,7 @@ import { theme } from '../theme';
 
 interface HistoryScreenProps {
   onBack: () => void;
-  currentMemberId: number; // App.tsx から受け取る
+  currentMemberId: number; 
 }
 
 export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
@@ -16,13 +16,23 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
   const [selectedMonth, setSelectedMonth] = useState('');
-  // 初期値を App.tsx で選択されている世帯 ID に設定
   const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
 
   const cacheKey = useMemo(() => Date.now(), []);
-  const months = ['2026-03', '2026-02', '2026-01', '2025-12'];
 
-  // 画像表示用ベースURL
+  /**
+   * ★ 修正ポイント: [2026-04 対応]
+   * 現在の日付から過去6ヶ月分を動的に生成します。
+   * これにより 2026-04 が自動的にリストの先頭に現れます。
+   */
+  const months = useMemo(() => {
+    return Array.from({ length: 6 }).map((_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      return d.toISOString().slice(0, 7); // YYYY-MM
+    });
+  }, []);
+
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
@@ -31,7 +41,9 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     const fetchCategories = async () => {
       try {
         const res = await apiClient.get('/categories');
-        setCategories(res.data);
+        if (res.data && res.data.success) {
+          setCategories(res.data.data);
+        }
       } catch (err) {
         console.error('カテゴリー取得失敗', err);
       }
@@ -49,7 +61,13 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
           month: selectedMonth
         }
       });
-      setReceipts(res.data);
+      /**
+       * ★ 修正ポイント: [Issue #40]
+       * res.data.data 階層を正しくセットします。
+       */
+      if (res.data && res.data.success) {
+        setReceipts(res.data.data);
+      }
     } catch (err) {
       console.error('履歴取得失敗', err);
       Alert.alert('エラー', '履歴の取得に失敗しました');
@@ -62,7 +80,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     fetchReceipts();
   }, [fetchReceipts]);
 
-  // App.tsx 側で世帯が切り替わった場合、履歴画面の選択状態も同期させる
   useEffect(() => {
     setSelectedMember(currentMemberId.toString());
   }, [currentMemberId]);
@@ -74,24 +91,26 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       const response = await apiClient.patch(`/receipt-items/${itemId}`, {
         categoryId: Number(categoryId)
       });
-      const updatedItem = response.data;
+      
+      if (response.data && response.data.success) {
+        const updatedItem = response.data.data;
 
-      // ステート更新
-      setSelectedReceipt((prev: any) =>
-        prev ? {
-          ...prev,
-          items: prev.items.map((item: any) =>
+        setSelectedReceipt((prev: any) =>
+          prev ? {
+            ...prev,
+            items: prev.items.map((item: any) =>
+              item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+            ),
+          } : prev
+        );
+
+        setReceipts(prev => prev.map(r => ({
+          ...r,
+          items: r.items.map((item: any) =>
             item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
           ),
-        } : prev
-      );
-
-      setReceipts(prev => prev.map(r => ({
-        ...r,
-        items: r.items.map((item: any) =>
-          item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-        ),
-      })));
+        })));
+      }
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
       Alert.alert('エラー', '更新に失敗しました');
@@ -110,16 +129,16 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.date}>{new Date(item.date).toLocaleDateString('ja-JP')}</Text>
-        <Text style={styles.store} numberOfLines={1}>{item.storeName}</Text>
+        <Text style={styles.date}>{item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '日付不明'}</Text>
+        <Text style={styles.store} numberOfLines={1}>{item.storeName || '店名不明'}</Text>
       </View>
       <View style={styles.cardBody}>
         <View>
           <Text style={styles.label}>合計</Text>
-          <Text style={styles.amount}>¥{item.totalAmount.toLocaleString()}</Text>
+          <Text style={styles.amount}>¥{(item.totalAmount || 0).toLocaleString()}</Text>
         </View>
         <View style={styles.itemCountBadge}>
-          <Text style={styles.itemCountText}>{item.items.length} 点</Text>
+          <Text style={styles.itemCountText}>{(item.items?.length || 0)} 点</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -144,7 +163,9 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
             dropdownIconColor={theme.colors.primary}
           >
             <Picker.Item label="全期間" value="" />
-            {months.map(m => <Picker.Item key={m} label={m} value={m} />)}
+            {months.map(m => (
+              <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
+            ))}
           </Picker>
         </View>
         <View style={styles.pickerBox}>
@@ -154,7 +175,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
             style={styles.filterPicker}
             dropdownIconColor={theme.colors.primary}
           >
-            {/* ラベルを「自分」「その他」に変更 */}
             <Picker.Item label="自分" value="1" />
             <Picker.Item label="その他" value="2" />
           </Picker>
@@ -182,7 +202,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       >
         <View style={styles.modalContent}>
           <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle} numberOfLines={1}>{selectedReceipt?.storeName}</Text>
+            <Text style={styles.detailTitle} numberOfLines={1}>{selectedReceipt?.storeName || '店名不明'}</Text>
             <TouchableOpacity onPress={() => setSelectedReceipt(null)} hitSlop={{top: 20, bottom: 20, left: 20, right: 20}}>
               <Text style={styles.detailClose}>✕</Text>
             </TouchableOpacity>
@@ -201,16 +221,16 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
             <View style={styles.detailTotalContainer}>
               <Text style={styles.detailTotalLabel}>合計金額（税込）</Text>
-              <Text style={styles.detailTotalValue}>¥{selectedReceipt?.totalAmount.toLocaleString()}</Text>
+              <Text style={styles.detailTotalValue}>¥{(selectedReceipt?.totalAmount || 0).toLocaleString()}</Text>
             </View>
 
             <View style={styles.itemsSection}>
               <Text style={styles.itemsSectionTitle}>明細・カテゴリ設定</Text>
-              {selectedReceipt?.items.map((item: any) => (
+              {selectedReceipt?.items?.map((item: any) => (
                 <View key={item.id} style={styles.detailItemRow}>
                   <View style={styles.detailItemInfo}>
                     <Text style={styles.detailItemName}>{item.name}</Text>
-                    <Text style={styles.detailItemPrice}>¥{item.price.toLocaleString()}</Text>
+                    <Text style={styles.detailItemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
                   </View>
                   <View style={styles.detailPickerWrapper}>
                     <Picker
@@ -233,59 +253,17 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   );
 }
 
+// styles は以前と同様のため省略（そのまま使用してください）
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: theme.colors.background, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 20 
-  },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: theme.spacing.lg, 
-    marginBottom: theme.spacing.md 
-  },
-  backButton: { 
-    ...theme.typography.body,
-    color: theme.colors.primary, 
-    fontWeight: '700' 
-  },
-  title: { 
-    ...theme.typography.h2,
-    color: theme.colors.text.main 
-  },
-  filterContainer: { 
-    flexDirection: 'row', 
-    paddingHorizontal: theme.spacing.md, 
-    marginBottom: theme.spacing.md, 
-    justifyContent: 'space-between' 
-  },
-  pickerBox: { 
-    flex: 1, 
-    height: 48, 
-    backgroundColor: theme.colors.surface, 
-    borderRadius: theme.borderRadius.sm, 
-    marginHorizontal: theme.spacing.xs, 
-    justifyContent: 'center', 
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    elevation: 1 
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
+  backButton: { ...theme.typography.body, color: theme.colors.primary, fontWeight: '700' },
+  title: { ...theme.typography.h2, color: theme.colors.text.main },
+  filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, justifyContent: 'space-between' },
+  pickerBox: { flex: 1, height: 48, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.sm, marginHorizontal: theme.spacing.xs, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, elevation: 1 },
   filterPicker: { width: '100%' },
   list: { paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.xl },
-  card: { 
-    backgroundColor: theme.colors.surface, 
-    borderRadius: theme.borderRadius.md, 
-    padding: theme.spacing.md, 
-    marginBottom: theme.spacing.sm, 
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-      android: { elevation: 2 }
-    })
-  },
+  card: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, marginBottom: theme.spacing.sm, borderWidth: 1, borderColor: theme.colors.border, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }, android: { elevation: 2 } }) },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.sm },
   date: { ...theme.typography.caption, color: theme.colors.text.muted },
   store: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text.main, flex: 1, marginLeft: theme.spacing.sm, textAlign: 'right' },
