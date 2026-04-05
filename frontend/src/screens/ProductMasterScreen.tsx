@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
 
@@ -23,27 +23,49 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
-  
   const [categories, setCategories] = useState<Category[]>([]);
 
+  // マスタデータ取得
   const fetchMasters = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiClient.get('/product-master', {
         params: { q: searchQuery, store: storeFilter }
       });
-      setMasters(res.data);
+      
+      /**
+       * ★ 修正ポイント: [Issue #40] 
+       * バックエンドのレスポンス形式 { success: true, data: T } に合わせ、
+       * res.data.data を取得します。
+       */
+      if (res.data && res.data.success) {
+        setMasters(res.data.data || []);
+      } else {
+        setMasters([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Fetch Masters Error:', err);
       Alert.alert('エラー', 'マスタの取得に失敗しました');
     } finally {
       setLoading(false);
     }
   }, [searchQuery, storeFilter]);
 
+  // 初回ロードとカテゴリー取得
   useEffect(() => {
     fetchMasters();
-    apiClient.get('/categories').then(res => setCategories(res.data));
+    
+    const loadCategories = async () => {
+      try {
+        const res = await apiClient.get('/categories');
+        if (res.data && res.data.success) {
+          setCategories(res.data.data || []);
+        }
+      } catch (err) {
+        console.error('Category fetch error:', err);
+      }
+    };
+    loadCategories();
   }, [fetchMasters]);
 
   const handleDelete = (id: number) => {
@@ -61,8 +83,6 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
   };
 
   const handleMergeStores = () => {
-    // React NativeのAlert.promptはiOSのみ対応です
-    // Androidでも動かす場合はModalで自作が必要ですが、まずは簡易実装にします
     if (Platform.OS === 'ios') {
       Alert.prompt(
         "店舗名の統合",
@@ -102,7 +122,7 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
     <View style={styles.card}>
       <View style={styles.cardInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.storeName}>店舗: {item.storeName}</Text>
+        <Text style={styles.storeName}>店舗: {item.storeName || '共通'}</Text>
         <View style={[styles.badge, { backgroundColor: item.category?.color || '#ccc' }]}>
           <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
         </View>
@@ -117,6 +137,7 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <View style={styles.container}>
+      {/* 他の画面と統一したヘッダーデザイン */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{top:10, bottom:10, left:10, right:10}}>
           <Text style={styles.backText}>← 戻る</Text>
@@ -134,6 +155,7 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
           value={searchQuery} 
           onChangeText={setSearchQuery} 
           clearButtonMode="while-editing"
+          placeholderTextColor={theme.colors.text.muted}
         />
         <TextInput 
           placeholder="店舗名..." 
@@ -141,6 +163,7 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
           value={storeFilter} 
           onChangeText={setStoreFilter} 
           clearButtonMode="while-editing"
+          placeholderTextColor={theme.colors.text.muted}
         />
       </View>
 
@@ -151,8 +174,9 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
           data={masters}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={<Text style={styles.empty}>データがありません</Text>}
+          initialNumToRender={15}
         />
       )}
     </View>
@@ -161,13 +185,45 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 15, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    paddingBottom: 15, 
+    alignItems: 'center', 
+    borderBottomWidth: 1, 
+    borderBottomColor: theme.colors.border 
+  },
   backText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   mergeText: { color: theme.colors.secondary, fontWeight: 'bold' },
   searchBar: { padding: 10, flexDirection: 'row', backgroundColor: theme.colors.surface },
-  input: { flex: 1, backgroundColor: '#fff', marginHorizontal: 5, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
-  card: { backgroundColor: '#fff', marginHorizontal: 15, marginTop: 10, padding: 15, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', borderWidth: 1, borderColor: theme.colors.border },
+  input: { 
+    flex: 1, 
+    backgroundColor: '#fff', 
+    marginHorizontal: 5, 
+    padding: 12, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: theme.colors.border,
+    color: theme.colors.text.main 
+  },
+  listContent: { paddingBottom: 40 },
+  card: { 
+    backgroundColor: '#fff', 
+    marginHorizontal: 15, 
+    marginTop: 10, 
+    padding: 15, 
+    borderRadius: 10, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    borderWidth: 1, 
+    borderColor: theme.colors.border,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+      android: { elevation: 2 }
+    })
+  },
   cardInfo: { flex: 1 },
   itemName: { fontWeight: 'bold', fontSize: 16, color: theme.colors.text.main },
   storeName: { color: theme.colors.text.muted, fontSize: 13, marginVertical: 4 },

@@ -1,32 +1,35 @@
 import winston from 'winston';
 import 'winston-daily-rotate-file';
 
-const { combine, timestamp, printf, colorize, errors, json } = winston.format;
+const { combine, timestamp, printf, colorize, errors, json, metadata } = winston.format;
 
 /**
- * [Issue #25] 環境変数からログレベルを取得
- * デフォルトは 'info'。開発時は .env で 'debug' に設定可能。
+ * 環境変数からログレベルを取得
  */
 const logLevel = process.env.LOG_LEVEL || 'info';
 
-// ログフォーマット（コンソール用：人間が読みやすい形式）
+// ログフォーマット（コンソール用：スタックトレースや詳細を表示）
 const consoleFormat = combine(
   colorize(),
   timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  printf(({ level, message, timestamp, stack }) => {
-    return `${timestamp} [${level}]: ${stack || message}`;
+  errors({ stack: true }), // エラーオブジェクトのパース
+  printf(({ level, message, timestamp, stack, details }) => {
+    // details（Zodのバリデーションエラー等）があれば文字列化して表示
+    const detailStr = details ? `\nDetails: ${JSON.stringify(details, null, 2)}` : '';
+    return `${timestamp} [${level}]: ${stack || message}${detailStr}`;
   })
 );
 
 const logger = winston.createLogger({
-  level: logLevel, // ★ ここを環境変数に連動
+  level: logLevel,
   format: combine(
     timestamp(),
     errors({ stack: true }),
-    json()
+    metadata({ fillExcept: ['message', 'level', 'timestamp', 'label'] }), // 余分なプロパティをmetadataに集約
+    json() // ファイル出力は解析しやすいJSON形式
   ),
   transports: [
-    // エラーログ（常に error レベルのみ）
+    // エラーログ：DailyRotate
     new winston.transports.DailyRotateFile({
       filename: 'logs/error-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
@@ -34,7 +37,7 @@ const logger = winston.createLogger({
       maxSize: '20m',
       maxFiles: '14d',
     }),
-    // 全ログ（指定した logLevel に基づく）
+    // 全ログ：DailyRotate
     new winston.transports.DailyRotateFile({
       filename: 'logs/combined-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
@@ -44,12 +47,11 @@ const logger = winston.createLogger({
   ],
 });
 
-// コンソール出力の判定
-// Docker環境や開発環境では標準出力(stdout)が重要なため、productionでも出力するように調整
+// コンソール出力設定
 if (process.env.NODE_ENV !== 'production' || process.env.CONSOLE_LOG === 'true') {
   logger.add(new winston.transports.Console({
     format: consoleFormat,
-    level: logLevel // コンソールも指定レベルに合わせる
+    level: logLevel
   }));
 }
 

@@ -1,29 +1,29 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { saveReceiptData } from '../services/persistenceService';
 import { getCleanText } from '../utils/normalizer';
 import { prisma } from '../utils/prismaClient';
 import { Prisma } from '@prisma/client';
+import { AppError } from '../utils/appError';
 
 /**
- * カテゴリーマスタ一覧を取得
+ * 📂 カテゴリーマスタ一覧を取得
  */
-export const getCategories = async (_req: Request, res: Response) => {
+export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const categories = await prisma.category.findMany({
       orderBy: { id: 'asc' }
     });
-    res.json(categories);
+    res.json({ success: true, data: categories });
   } catch (error) {
-    logger.error(`[GET_CATEGORIES_ERROR] ${error}`);
-    res.status(500).json({ error: 'カテゴリー一覧の取得に失敗しました' });
+    next(error);
   }
 };
 
 /**
- * 【Issue #24】レシート登録
+ * 📂 レシート登録
  */
-export const createReceipt = async (req: Request, res: Response) => {
+export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId, date, storeName, totalAmount, items, imagePath, rawText } = req.body;
 
@@ -43,26 +43,21 @@ export const createReceipt = async (req: Request, res: Response) => {
     });
 
     logger.info(`[RECEIPT_CREATED] ID: ${newReceipt.id} を登録しました`);
-    res.status(201).json(newReceipt);
+    res.status(201).json({ success: true, data: newReceipt });
 
   } catch (error: any) {
-    const statusCode = error.statusCode || 500;
-    if (statusCode === 409) {
-      logger.warn(`[CREATE_RECEIPT_BLOCK] 重複によりブロック: ${error.message}`);
-      return res.status(409).json({
-        code: 'DUPLICATE_RECEIPT',
-        message: 'このレシートは既に登録されている可能性があります。'
-      });
+    // 重複エラー（409）のハンドリングを共通エラー形式へ
+    if (error.statusCode === 409) {
+      return next(new AppError('このレシートは既に登録されている可能性があります。', 409, { code: 'DUPLICATE_RECEIPT' }));
     }
-    logger.error(`[CREATE_RECEIPT_ERROR] ${error.message}`);
-    res.status(statusCode).json({ error: 'レシートの保存に失敗しました' });
+    next(error);
   }
 };
 
 /**
- * 【Issue #20】アイテムのカテゴリーを更新し、学習マスタへ反映する
+ * 📂 アイテムのカテゴリーを更新し、学習マスタへ反映する
  */
-export const updateItemCategory = async (req: Request, res: Response) => {
+export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { categoryId } = req.body;
 
@@ -74,7 +69,7 @@ export const updateItemCategory = async (req: Request, res: Response) => {
       });
 
       if (!currentItem) {
-        throw new Error('ITEM_NOT_FOUND');
+        throw new AppError('指定されたアイテムが見つかりません', 404);
       }
 
       const updatedItem = await tx.item.update({
@@ -107,20 +102,18 @@ export const updateItemCategory = async (req: Request, res: Response) => {
       return updatedItem;
     });
 
-    logger.info(`[ITEM_UPDATE] ID: ${id} のカテゴリーを ${result.category?.name || '未分類'} に更新（学習反映済）`);
-    res.json(result);
+    logger.info(`[ITEM_UPDATE] ID: ${id} のカテゴリーを更新しました`);
+    res.json({ success: true, data: result });
 
-  } catch (error: any) {
-    logger.error(`[ITEM_UPDATE_ERROR] ${error.message}`);
-    const status = error.message === 'ITEM_NOT_FOUND' ? 404 : 500;
-    res.status(status).json({ error: 'カテゴリーの更新または学習に失敗しました' });
+  } catch (error) {
+    next(error);
   }
 };
 
 /**
- * レシート一覧を取得
+ * 📂 レシート一覧を取得（履歴一覧画面用）
  */
-export const getReceipts = async (req: Request, res: Response) => {
+export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId, month } = req.query;
     const where: Prisma.ReceiptWhereInput = {};
@@ -161,22 +154,22 @@ export const getReceipts = async (req: Request, res: Response) => {
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }]
     });
 
-    res.json(receipts);
-  } catch (error: any) {
-    logger.error(`[GET_RECEIPTS_ERROR] ${error.message}`);
-    res.status(500).json({ error: 'レシート一覧の取得に失敗しました' });
+    // ★ ここが履歴一覧表示の鍵
+    res.json({ success: true, data: receipts });
+  } catch (error) {
+    next(error);
   }
 };
 
 /**
- * 【Issue #35】最新のレシート1件を取得
+ * 📂 最新のレシート1件を取得
  */
-export const getLatestReceipt = async (req: Request, res: Response) => {
+export const getLatestReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId } = req.query;
     
     if (!memberId) {
-      return res.status(400).json({ error: 'memberId が必要です' });
+      return next(new AppError('memberId が必要です', 400));
     }
 
     const latest = await prisma.receipt.findFirst({
@@ -204,19 +197,17 @@ export const getLatestReceipt = async (req: Request, res: Response) => {
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }]
     });
 
-    // データがない場合は null を返す（フロントエンドで 404 エラー扱いにならないよう配慮）
-    res.json(latest || null);
+    res.json({ success: true, data: latest || null });
 
-  } catch (error: any) {
-    logger.error(`[GET_LATEST_ERROR] ${error.message}`);
-    res.status(500).json({ error: '最新レシートの取得に失敗しました' });
+  } catch (error) {
+    next(error);
   }
 };
 
 /**
- * レシートを削除する
+ * 📂 レシートを削除する
  */
-export const deleteReceipt = async (req: Request, res: Response) => {
+export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
 
   try {
@@ -225,9 +216,75 @@ export const deleteReceipt = async (req: Request, res: Response) => {
     });
 
     logger.info(`[RECEIPT_DELETED] ID: ${id} を削除しました`);
-    res.json({ message: '削除に成功しました', deleted });
-  } catch (error: any) {
-    logger.error(`[DELETE_ERROR] ${error.message}`);
-    res.status(500).json({ error: '削除に失敗しました' });
+    res.json({ success: true, data: { id: deleted.id } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 📂 月次統計を取得
+ */
+export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
+  const { month, memberId } = req.query; 
+  try {
+    const targetDate = month ? new Date(`${month as string}-01T00:00:00Z`) : new Date();
+    const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+    const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+    const startOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 0, 23, 59, 59);
+
+    const mId = Number(memberId || 1);
+
+    const stats = await prisma.item.groupBy({
+      by: ['categoryId'],
+      where: { receipt: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth } } },
+      _sum: { price: true },
+    });
+
+    const prevMonthTotal = await prisma.item.aggregate({
+      where: { receipt: { memberId: mId, date: { gte: startOfPrevMonth, lte: endOfPrevMonth } } },
+      _sum: { price: true },
+    });
+
+    const latestReceipt = await prisma.receipt.findFirst({
+      where: { memberId: mId, date: { gte: startOfMonth, lte: endOfMonth }, imagePath: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, imagePath: true, storeName: true, totalAmount: true,
+        items: {
+          select: { id: true, name: true, price: true, categoryId: true, category: { select: { name: true, color: true } } }
+        }
+      }
+    });
+
+    const categories = await prisma.category.findMany();
+    const formattedStats = stats.map(s => {
+      const category = categories.find(c => c.id === s.categoryId);
+      return {
+        categoryId: s.categoryId,
+        categoryName: category ? category.name : '未分類',
+        totalAmount: s._sum.price || 0,
+        color: (category as any)?.color || '#999',
+      };
+    });
+
+    const currentTotal = formattedStats.reduce((sum, s) => sum + s.totalAmount, 0);
+    const prevTotal = prevMonthTotal._sum.price || 0;
+
+    res.json({
+      success: true,
+      data: {
+        month: `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}`,
+        totalAmount: currentTotal,
+        prevTotal: prevTotal,
+        diffAmount: currentTotal - prevTotal,
+        diffPercentage: prevTotal !== 0 ? Math.round(((currentTotal - prevTotal) / prevTotal) * 100) : 0,
+        stats: formattedStats,
+        latestReceipt: latestReceipt 
+      }
+    });
+  } catch (error) {
+    next(error);
   }
 };
