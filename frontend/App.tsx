@@ -57,7 +57,14 @@ export default function App() {
   const fetchCategories = useCallback(async () => {
     try {
       const res = await apiClient.get('/categories');
-      setCategories(res.data);
+      /**
+       * ★ 修正ポイント: [Issue #40]
+       * バックエンドのレスポンスが { success: true, data: Category[] } になったため、
+       * res.data.data を参照します。
+       */
+      if (res.data && res.data.success) {
+        setCategories(res.data.data);
+      }
     } catch (err) {
       console.error('マスタ取得失敗:', err);
     }
@@ -156,11 +163,15 @@ export default function App() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const responseData = response.data;
-      if (responseData && responseData.data) {
-        setResultData(responseData.data);
+      /**
+       * ★ 修正ポイント: [Issue #40]
+       * レスポンス形式を統一したため、response.data.data を取得します。
+       */
+      const responseBody = response.data;
+      if (responseBody && responseBody.success) {
+        setResultData(responseBody.data);
       } else {
-        console.error('APIレスポンスの構造が不正です:', responseData);
+        console.error('APIレスポンスの構造が不正です:', responseBody);
         throw new Error('解析データの取得に失敗しました');
       }
 
@@ -186,18 +197,23 @@ export default function App() {
         categoryId: Number(categoryId) 
       });
       
-      const updatedItem = response.data;
-      if (!updatedItem) return;
+      /**
+       * ★ 修正ポイント: [Issue #40]
+       * response.data.data (更新後の単一アイテム) を参照。
+       */
+      if (response.data && response.data.success) {
+        const updatedItem = response.data.data;
 
-      setResultData((prev: any) => {
-        if (!prev || !prev.items) return prev;
-        return {
-          ...prev,
-          items: prev.items.map((item: any) =>
-            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-          ),
-        };
-      });
+        setResultData((prev: any) => {
+          if (!prev || !prev.items) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((item: any) =>
+              item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+            ),
+          };
+        });
+      }
     } catch (error: any) {
       Alert.alert('エラー', error.response?.data?.error || '更新に失敗しました');
     }
@@ -227,14 +243,12 @@ export default function App() {
       case 'history':
         return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
       case 'stats':
-        return (
-          <View style={{ flex: 1 }}>
-            <StatisticsScreen currentMemberId={currentMemberId}/>
-            <TouchableOpacity style={styles.floatingBackButton} onPress={() => setCurrentView('main')}>
-              <Text style={styles.floatingBackButtonText}>ホームに戻る</Text>
-            </TouchableOpacity>
-          </View>
-        );
+        /**
+         * ★ 修正ポイント: 
+         * StatisticsScreen 内部で「戻る」ボタンを表示させるため、onBack を渡します。
+         * App.tsx 側のフローティングボタンは削除しました。
+         */
+        return <StatisticsScreen currentMemberId={currentMemberId} onBack={() => setCurrentView('main')} />;
       case 'category_mgr':
         return (
           <CategoryManagementScreen 
@@ -244,7 +258,6 @@ export default function App() {
             }} 
           />
         );
-      // --- Issue #36: 学習マスタ管理画面のケースを追加 ---
       case 'product_master':
         return (
           <ProductMasterScreen 
@@ -310,7 +323,6 @@ export default function App() {
                 onGoToHistory={() => setCurrentView('history')}
                 onGoToStats={() => setCurrentView('stats')}
                 onGoToCategories={() => setCurrentView('category_mgr')}
-                // --- Issue #36: 学習マスタ画面への遷移を追加 ---
                 onGoToProductMaster={() => setCurrentView('product_master')}
                 currentMemberId={currentMemberId}
               />
@@ -329,8 +341,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  floatingBackButton: { position: 'absolute', bottom: 30, alignSelf: 'center', backgroundColor: theme.colors.primary, paddingVertical: 12, paddingHorizontal: 30, borderRadius: theme.borderRadius.round, elevation: 5 },
-  floatingBackButtonText: { color: 'white', fontWeight: 'bold' },
+  // floatingBackButton は削除しました
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   preview: { width: '90%', height: '70%', borderRadius: 10 },
   previewActions: { width: '100%', padding: 20, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', position: 'absolute', bottom: 40 },
@@ -351,11 +362,9 @@ const styles = StyleSheet.create({
   picker: { width: '100%' },
   doneButton: { backgroundColor: theme.colors.primary, padding: 16, borderRadius: theme.borderRadius.md, alignItems: 'center', marginTop: theme.spacing.xl },
   doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-
-  // 世帯切替UIスタイル
   switcherContainer: {
     flexDirection: 'row',
-    paddingTop: 50, // SafeArea相当の余白
+    paddingTop: 50, 
     paddingBottom: 15,
     backgroundColor: theme.colors.surface,
     justifyContent: 'center',

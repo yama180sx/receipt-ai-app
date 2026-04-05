@@ -1,11 +1,12 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
+import { AppError } from '../utils/appError';
 
 /**
- * 学習マスタ一覧取得（検索・ページネーション対応）
+ * 📂 学習マスタ一覧取得（検索・ページネーション対応）
  */
-export const getProductMasters = async (req: Request, res: Response) => {
+export const getProductMasters = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q, store } = req.query;
     
@@ -20,16 +21,20 @@ export const getProductMasters = async (req: Request, res: Response) => {
       take: 100 // ひとまず100件
     });
 
-    res.json(masters);
+    // Issue #40: レスポンス形式の統一
+    res.json({
+      success: true,
+      data: masters
+    });
   } catch (error) {
-    res.status(500).json({ error: 'マスタ取得失敗' });
+    next(error);
   }
 };
 
 /**
- * マスタの個別更新
+ * 📂 マスタの個別更新
  */
-export const updateProductMaster = async (req: Request, res: Response) => {
+export const updateProductMaster = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { name, storeName, categoryId } = req.body;
 
@@ -42,58 +47,72 @@ export const updateProductMaster = async (req: Request, res: Response) => {
         categoryId: Number(categoryId) 
       }
     });
-    res.json(updated);
+
+    res.json({
+      success: true,
+      data: updated
+    });
   } catch (error) {
-    res.status(500).json({ error: 'マスタ更新失敗' });
+    next(error);
   }
 };
 
 /**
- * 店舗名の統合ロジック（エイリアス整理）
- * 例: "セブン" を "セブン-イレブン" に統合する
+ * 📂 店舗名の統合ロジック
  */
-export const mergeStoreNames = async (req: Request, res: Response) => {
+export const mergeStoreNames = async (req: Request, res: Response, next: NextFunction) => {
   const { sourceStoreName, targetStoreName } = req.body;
 
   if (!sourceStoreName || !targetStoreName) {
-    return res.status(400).json({ error: '統合元と統合先の指定が必要です' });
+    return next(new AppError('統合元と統合先の指定が必要です', 400));
   }
 
   try {
-    // トランザクションで一括更新
     const result = await prisma.$transaction(async (tx) => {
       // 1. ProductMaster 内の店舗名を一括置換
-      const updatedCount = await tx.productMaster.updateMany({
+      const updateResult = await tx.productMaster.updateMany({
         where: { storeName: sourceStoreName },
         data: { storeName: targetStoreName }
       });
 
-      // 2. 必要に応じて過去の Receipt データの店舗名も書き換える（任意）
+      // 2. 過去の Receipt データの店舗名も書き換える
       await tx.receipt.updateMany({
         where: { storeName: sourceStoreName },
         data: { storeName: targetStoreName }
       });
 
-      return updatedCount;
+      return updateResult;
     });
 
     logger.info(`[STORE_MERGE] ${sourceStoreName} -> ${targetStoreName} (${result.count} items)`);
-    res.json({ message: '統合が完了しました', count: result.count });
+    
+    res.json({
+      success: true,
+      data: {
+        message: '統合が完了しました',
+        count: result.count
+      }
+    });
   } catch (error) {
-    logger.error(`[STORE_MERGE_ERROR] ${error}`);
-    res.status(500).json({ error: '統合処理に失敗しました' });
+    next(error);
   }
 };
 
 /**
- * マスタ削除
+ * 📂 マスタ削除
  */
-export const deleteProductMaster = async (req: Request, res: Response) => {
+export const deleteProductMaster = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   try {
-    await prisma.productMaster.delete({ where: { id: Number(id) } });
-    res.json({ message: '削除しました' });
+    await prisma.productMaster.delete({ 
+      where: { id: Number(id) } 
+    });
+
+    res.json({
+      success: true,
+      message: '削除しました'
+    });
   } catch (error) {
-    res.status(500).json({ error: '削除失敗' });
+    next(error);
   }
 };

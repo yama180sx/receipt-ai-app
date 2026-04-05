@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Alert, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
@@ -8,54 +8,22 @@ import { theme } from '../theme';
 
 const screenWidth = Dimensions.get('window').width;
 
-// インターフェース定義
-interface Category {
-  id: number;
-  name: string;
-  color: string;
+// --- interface 定義 ---
+interface Category { id: number; name: string; color: string; }
+interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number; color: string; }
+interface ReceiptItem { id: number; name: string; price: number; categoryId: number; category?: { name: string; color: string }; }
+interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; }
+interface MonthlyData { month: string; totalAmount: number; prevTotal: number; diffAmount: number; diffPercentage: number; stats: StatItem[]; latestReceipt: ReceiptInfo | null; }
+
+// ★ Props に onBack を追加
+interface StatisticsScreenProps { 
+  currentMemberId: number; 
+  onBack: () => void;
 }
 
-interface StatItem {
-  categoryId: number | null;
-  categoryName: string;
-  totalAmount: number;
-  color: string;
-}
-
-interface ReceiptItem {
-  id: number;
-  name: string;
-  price: number;
-  categoryId: number;
-  category?: { name: string; color: string };
-}
-
-interface ReceiptInfo {
-  id: number;
-  imagePath: string | null;
-  storeName: string;
-  totalAmount: number;
-  items: ReceiptItem[];
-}
-
-interface MonthlyData {
-  month: string;
-  totalAmount: number;
-  prevTotal: number;
-  diffAmount: number;
-  diffPercentage: number;
-  stats: StatItem[];
-  latestReceipt: ReceiptInfo | null;
-}
-
-// Props インターフェースを追加
-interface StatisticsScreenProps {
-  currentMemberId: number;
-}
-
-export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId }) => {
+export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [data, setData] = useState<MonthlyData | null>(null);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   
@@ -66,34 +34,44 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
-  const monthOptions = Array.from({ length: 12 }).map((_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    return d.toISOString().slice(0, 7);
-  });
+  // 12ヶ月分の日付リストを生成
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 12 }).map((_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      return d.toISOString().slice(0, 7);
+    });
+  }, []);
 
-  // memberId をクエリパラメータに追加
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [statsRes, catRes] = await Promise.all([
-        apiClient.get<MonthlyData>(`/stats/monthly`, {
-          params: { 
-            month: selectedMonth,
-            memberId: currentMemberId 
-          }
+        apiClient.get(`/stats/monthly`, {
+          params: { month: selectedMonth, memberId: currentMemberId }
         }),
-        apiClient.get<Category[]>('/categories')
+        apiClient.get('/categories')
       ]);
-      setData(statsRes.data);
-      setAllCategories(catRes.data);
+
+      /**
+       * ★ 修正ポイント: [Issue #40] 
+       * res.data.data を参照
+       */
+      if (statsRes.data && statsRes.data.success) {
+        setData(statsRes.data.data);
+      }
+      
+      if (catRes.data && catRes.data.success) {
+        setAllCategories(catRes.data.data);
+      }
+
     } catch (error) {
       console.error('Fetch error:', error);
       Alert.alert("エラー", "データの取得に失敗しました");
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, currentMemberId]); // currentMemberId を依存配列に追加
+  }, [selectedMonth, currentMemberId]);
 
   useEffect(() => {
     fetchData();
@@ -123,11 +101,19 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ★ 他画面と統一したヘッダー構成 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+          <Text style={styles.backButton}>← 戻る</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>収支統計</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
-        <View style={styles.header}>
+        <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>
-            {currentMemberId === 1 ? '自分の収支分析レポート' : 'その他の収支分析レポート'}
+            {currentMemberId === 1 ? '自分の分析レポート' : 'その他の分析レポート'}
           </Text>
           <View style={styles.monthPickerContainer}>
             <Picker
@@ -149,7 +135,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>合計支出</Text>
-              <Text style={styles.totalValue}>¥{data?.totalAmount.toLocaleString()}</Text>
+              <Text style={styles.totalValue}>¥{(data?.totalAmount || 0).toLocaleString()}</Text>
               
               <View style={styles.comparisonRow}>
                 <Text style={styles.comparisonLabel}>前月比:</Text>
@@ -158,7 +144,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                   { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success }
                 ]}>
                   {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(data?.diffAmount || 0).toLocaleString()} 
-                  ({(data?.diffPercentage || 0) > 0 ? '+' : ''}{data?.diffPercentage}%)
+                  ({(data?.diffPercentage || 0) > 0 ? '+' : ''}{data?.diffPercentage || 0}%)
                 </Text>
               </View>
             </View>
@@ -199,8 +185,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     resizeMode="cover"
                   />
                   <View style={styles.receiptInfoOverlay}>
-                    <Text style={styles.receiptStoreName}>{data.latestReceipt.storeName}</Text>
-                    <Text style={styles.receiptAmount}>¥{data.latestReceipt.totalAmount.toLocaleString()}</Text>
+                    <Text style={styles.receiptStoreName}>{data.latestReceipt.storeName || '店名不明'}</Text>
+                    <Text style={styles.receiptAmount}>¥{(data.latestReceipt.totalAmount || 0).toLocaleString()}</Text>
                   </View>
                 </TouchableOpacity>
               ) : (
@@ -213,6 +199,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
+      {/* モーダル類は以前と同様 */}
       <Modal visible={isMainModalVisible} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -239,7 +226,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 <View key={item.id} style={styles.itemRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemPrice}>¥{item.price.toLocaleString()}</Text>
+                    <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
                   </View>
                   <TouchableOpacity 
                     style={[styles.categoryBadge, { backgroundColor: item.category?.color || theme.colors.secondary }]}
@@ -287,8 +274,21 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
+  // ヘッダースタイル（他画面と統一）
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: theme.spacing.lg, 
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border
+  },
+  backButton: { ...theme.typography.body, color: theme.colors.primary, fontWeight: '700' },
+  headerTitle: { ...theme.typography.h2, color: theme.colors.text.main },
+  
   scrollContent: { padding: theme.spacing.lg },
-  header: { marginBottom: theme.spacing.md },
+  topInfo: { marginBottom: theme.spacing.md },
   headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: 1 },
   monthPickerContainer: { 
     backgroundColor: theme.colors.surface, 
@@ -332,10 +332,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
-      android: { elevation: 4 }
-    })
+    elevation: 4
   },
   receiptImage: { width: '100%', height: 160, backgroundColor: theme.colors.border },
   receiptInfoOverlay: {

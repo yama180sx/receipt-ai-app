@@ -11,7 +11,7 @@ interface HomeScreenProps {
   onGoToHistory: () => void;
   onGoToStats: () => void;
   onGoToCategories: () => void; 
-  onGoToProductMaster: () => void; // --- [Issue #36] 追加 ---
+  onGoToProductMaster: () => void; 
   currentMemberId: number;
 }
 
@@ -20,7 +20,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToHistory, 
   onGoToStats, 
   onGoToCategories,
-  onGoToProductMaster, // --- [Issue #36] 追加 ---
+  onGoToProductMaster,
   currentMemberId 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
@@ -32,7 +32,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const response = await apiClient.get('/receipts/latest', {
         params: { memberId: currentMemberId }
       });
-      setLatestReceipt(response.data);
+
+      /**
+       * ★ 修正ポイント: [Issue #40] 
+       * バックエンドのレスポンス形式 { success: true, data: Receipt } に合わせ、
+       * response.data.data を取得します。
+       */
+      if (response.data && response.data.success) {
+        setLatestReceipt(response.data.data);
+      } else {
+        setLatestReceipt(null);
+      }
     } catch (error) {
       console.error('最新レシート取得失敗:', error);
       setLatestReceipt(null);
@@ -80,7 +90,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* カテゴリー設定 */}
         <TouchableOpacity 
           style={styles.settingsCard} 
           onPress={onGoToCategories}
@@ -96,7 +105,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.arrowIcon}>›</Text>
         </TouchableOpacity>
 
-        {/* --- [Issue #36] 学習マスタ管理への導線を追加 --- */}
         <TouchableOpacity 
           style={[styles.settingsCard, { marginTop: -15 }]} 
           onPress={onGoToProductMaster}
@@ -119,10 +127,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ) : latestReceipt ? (
             <View style={styles.latestCard}>
               <View style={styles.cardInfo}>
-                <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName}</Text>
-                <Text style={styles.dateText}>{latestReceipt.date}</Text>
+                <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName || '店名不明'}</Text>
+                <Text style={styles.dateText}>
+                  {latestReceipt.date ? new Date(latestReceipt.date).toLocaleDateString('ja-JP') : '日付不明'}
+                </Text>
               </View>
-              <Text style={styles.amountText}>¥{latestReceipt.totalAmount.toLocaleString()}</Text>
+              <Text style={styles.amountText}>
+                ¥{(latestReceipt.totalAmount || 0).toLocaleString()}
+              </Text>
             </View>
           ) : (
             <View style={[styles.latestCard, { justifyContent: 'center' }]}>

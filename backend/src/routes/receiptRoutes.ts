@@ -1,29 +1,31 @@
-import { Router } from 'express';
+import express from 'express';
 import { 
-  getCategories, 
-  updateItemCategory, 
   getReceipts, 
-  deleteReceipt,
-  getLatestReceipt // ← 追加
+  createReceipt, 
+  deleteReceipt, 
+  getLatestReceipt, 
+  updateItemCategory,
+  getMonthlyStats // ★ 追加
 } from '../controllers/receiptController';
-import { authMiddleware } from '../middlewares/auth';
 
-const router = Router();
+const router = express.Router();
 
-// GET /api/categories
-router.get('/categories', authMiddleware, getCategories);
+// GET /api/receipts
+router.get('/receipts', getReceipts);
 
-// PATCH /api/items/:id/category
-router.patch('/items/:id/category', authMiddleware, updateItemCategory);
+// GET /api/receipts/latest
+router.get('/receipts/latest', getLatestReceipt);
 
-// --- [Issue #35] 最新レシート取得を追加 ---
-// ※ /receipts/:id 形式のルートより上に記述してください
-router.get('/receipts/latest', authMiddleware, getLatestReceipt);
+// GET /api/stats/monthly ★ これが 404 の原因でした
+router.get('/stats/monthly', getMonthlyStats);
 
-// レシート一覧取得 (フィルタリング対応)
-router.get('/receipts', authMiddleware, getReceipts);
+// POST /api/receipts
+router.post('/receipts', createReceipt);
 
-// [Issue #19] レシート削除
-router.delete('/receipts/:id', authMiddleware, deleteReceipt);
+// DELETE /api/receipts/:id
+router.delete('/receipts/:id', deleteReceipt);
+
+// PATCH /api/receipt-items/:id
+router.patch('/receipt-items/:id', updateItemCategory);
 
 export default router;
