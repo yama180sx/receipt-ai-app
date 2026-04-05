@@ -1,29 +1,22 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
+import { estimateCategoryId } from './categoryService';
 import logger from '../utils/logger';
-import { normalizeStoreName, inferCategoryId, getCleanText } from '../utils/normalizer';
+import { normalizeStoreName, getCleanText } from '../utils/normalizer';
 
 const prisma = new PrismaClient();
 
-/**
- * 🔍 重複チェックのデバッグモード
- */
 const DEBUG_DUPLICATE_AI = false;
 
 /**
- * 🛠️ 安全な日付パース関数 (Issue #27/29 対策)
- * Invalid Date を防ぎ、失敗時は現在時刻を返す
+ * 🛠️ 安全な日付パース関数
  */
 const parseSafeDate = (dateStr: string | null | undefined): Date => {
   if (!dateStr) return new Date();
-
-  // タイムゾーン補正の有無を確認
   const formattedStr = dateStr.includes('+') ? dateStr : `${dateStr}+09:00`;
   const date = new Date(formattedStr);
-
-  // 30年選手の知恵：isNaN(date.getTime()) で Invalid Date を確実に捕捉
   if (isNaN(date.getTime())) {
-    logger.warn(`[WARN] 無効な日付形式が検出されました: "${dateStr}"。現在時刻を代用します。`);
+    logger.warn(`[WARN] 無効な日付形式: "${dateStr}"。現在時刻を代用します。`);
     return new Date();
   }
   return date;
@@ -38,26 +31,16 @@ export const saveParsedReceipt = async (
   imagePath: string 
 ) => {
   try {
-    // 1. 店舗名の正規化
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
-
-    // 2. 安全な日付パースの実行
     const jstDate = parseSafeDate(parsedData.purchaseDate);
-
-    // --- 【Issue #22 重複チェック】 ---
     const totalAmount = parsedData.totalAmount || 0;
     
-    if (DEBUG_DUPLICATE_AI) {
-      logger.debug(`[DUPE_AI:CHECK] 開始: Member:${memberId}, Store:"${officialStoreName}", Amount:${totalAmount}, Date:${jstDate.toISOString()}`);
-    }
-
-    // 3. 日付の範囲設定（パース済みの安全な Date オブジェクトを使用）
+    // --- 重複チェック ---
     const startOfDay = new Date(jstDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(jstDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 4. 金額と日付で先行照会
     const existingReceipts = await prisma.receipt.findMany({
       where: {
         memberId: memberId,
@@ -66,49 +49,24 @@ export const saveParsedReceipt = async (
       }
     });
 
-    if (DEBUG_DUPLICATE_AI) {
-      logger.debug(`[DUPE_AI:DB_HITS] 候補数: ${existingReceipts.length}`);
-    }
-
-    // 店舗名の揺れを考慮した比較
     const normalizedNew = getCleanText(officialStoreName);
     for (const rec of existingReceipts) {
-      const normalizedOld = getCleanText(rec.storeName);
-      
-      if (DEBUG_DUPLICATE_AI) {
-        logger.debug(`[DUPE_AI:COMPARE] New:"${normalizedNew}" vs Existing:"${normalizedOld}"`);
-      }
-
-      if (normalizedNew === normalizedOld) {
-        logger.warn(`[DUPE_AI:BLOCK] 重複を検知しました (ID: ${rec.id})`);
+      if (getCleanText(rec.storeName) === normalizedNew) {
+        logger.warn(`[DUPE_AI:BLOCK] 重複検知 (ID: ${rec.id})`);
         const error = new Error('DUPLICATE_RECEIPT_DETECTED');
         (error as any).statusCode = 409;
         throw error;
       }
     }
-    // --- 【重複チェック終了】 ---
 
+    // --- DB登録処理 (Transaction) ---
     return await prisma.$transaction(async (tx) => {
       const itemsToCreate = await Promise.all(parsedData.items.map(async (item) => {
         const cleanItemName = getCleanText(item.name);
         const cleanStoreName = getCleanText(officialStoreName);
 
-        const masteredItem = await tx.productMaster.findUnique({
-          where: {
-            name_storeName: {
-              name: cleanItemName,
-              storeName: cleanStoreName
-            }
-          }
-        });
-
-        let finalCategoryId: number | null;
-        if (masteredItem) {
-          finalCategoryId = masteredItem.categoryId;
-          logger.info(`[学習適用] 商品: "${item.name}" -> CategoryID: ${finalCategoryId}`);
-        } else {
-          finalCategoryId = await inferCategoryId(item.name, item.inferredCategory);
-        }
+        // [Issue #39] カテゴリーを推定
+        const finalCategoryId = await estimateCategoryId(cleanItemName, cleanStoreName, tx);
 
         return {
           name: item.name,
@@ -118,11 +76,11 @@ export const saveParsedReceipt = async (
         };
       }));
 
-      const receipt = await tx.receipt.create({
+      return await tx.receipt.create({
         data: {
           memberId: memberId,
           storeName: officialStoreName,
-          date: jstDate, // 安全な Date
+          date: jstDate,
           totalAmount: totalAmount,
           rawText: JSON.stringify(parsedData),
           imagePath: imagePath,
@@ -134,51 +92,34 @@ export const saveParsedReceipt = async (
           items: { include: { category: true } },
         },
       });
-      return receipt;
     });
   } catch (error) {
     if ((error as any).message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      logger.error(`[DBエラー] Prismaエラーコード: ${error.code}`);
-    }
+    logger.error(`[DBエラー] ${error}`);
     throw error;
   }
 };
 
 /**
- * 画像解析からDB保存までを統合する
+ * 画像解析からDB保存までを統合
  */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
   let step = 'INITIALIZING';
-  let parsedData: ParsedReceipt | null = null;
   const startTime = Date.now();
 
   try {
     step = 'GEMINI_ANALYSIS';
-    logger.info(`[${step}] 解析開始 path: ${imagePath}`);
-    parsedData = await analyzeReceiptImage(imagePath);
-    logger.info(`[${step}] ✅ 解析成功`);
+    const parsedData = await analyzeReceiptImage(imagePath);
 
     step = 'DB_PERSISTENCE';
-    logger.info(`[${step}] 保存開始 memberId: ${memberId}`);
-    
     const result = await saveParsedReceipt(memberId, parsedData, imagePath);
     
-    const duration = Date.now() - startTime;
-    logger.info(`[${step}] ✅ DB保存完了 ID: ${result.id}`, { durationMs: duration });
-
+    logger.info(`[${step}] ✅ 完了 ID: ${result.id}`, { durationMs: Date.now() - startTime });
     return result;
 
   } catch (error: any) {
-    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-      logger.warn(`[PROCESS] 重複のため保存をスキップしました (Member: ${memberId})`);
-      throw error;
-    }
-
-    logger.error(`[ERROR] ${step} フェーズで失敗しました。`, { 
-      step, errorMessage: error.message 
-    });
+    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
+    logger.error(`[ERROR] ${step} フェーズで失敗: ${error.message}`);
     throw error;
   }
 };
