@@ -18,16 +18,24 @@ apiClient.interceptors.request.use((config) => {
   return config;
 }, (error) => Promise.reject(error));
 
-// --- レスポンスインターセプター: [Issue #40] 加工をせずエラーハンドリングのみに集中 ---
+/**
+ * --- レスポンスインターセプター ---
+ * [Issue #42] エラーレスポンスのキーを 'message' に統一し、
+ * かつコンテキスト（response/status）を維持するために元の error を加工して返します。
+ */
 apiClient.interceptors.response.use(
   (response) => {
-    // 構造は変えず、そのまま返す。これで res.data.data が維持されます。
     return response;
   },
   (error) => {
     if (error.response && error.response.data) {
-      const message = error.response.data.error || error.message;
-      return Promise.reject(new Error(message));
+      // 1. バックエンドの統一キー 'message' から文言を抽出
+      const serverMessage = error.response.data.message || error.message;
+      
+      // 2. 元のエラーオブジェクトの message を書き換える
+      // これにより、catch(error) 側で error.message で文言が取れ、
+      // かつ error.response.status で HTTP 409 等の判定も可能になります。
+      error.message = serverMessage;
     }
     return Promise.reject(error);
   }

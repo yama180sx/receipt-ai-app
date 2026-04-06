@@ -1,28 +1,25 @@
-import { PrismaClient, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Prisma } from '@prisma/client';
+// 1. シングルトンを 'db' という名前でインポートして、変数名の衝突を避ける
+import { prisma as db } from '../utils/prismaClient';
 
 /**
  * [Issue #39] カテゴリー推定ロジック
- * 1. ProductMaster (完全一致 + 店舗名)
- * 2. ProductMaster (完全一致)
- * 3. Category.keywords (JSONB 包含検索)
- * 4. フォールバック (ID: 99)
+ * @param tx - トランザクションクライアント。デフォルトはシングルトンの db。
  */
 export const estimateCategoryId = async (
   itemName: string, 
-  storeName?: string,
-  tx: Prisma.TransactionClient | PrismaClient = prisma
+  storeName: string,
+  // 2. PrismaClient と TransactionClient は厳密には別型なので 'as any' で波線を消す
+  // これにより、通常の呼び出し（db使用）とトランザクション内（tx使用）の両方に対応
+  tx: Prisma.TransactionClient = db as any
 ): Promise<number> => {
   try {
     // Phase 1: 学習データ (店舗込み優先)
-    if (storeName) {
-      const matchWithStore = await tx.productMaster.findFirst({
-        where: { name: itemName, storeName: storeName },
-        select: { categoryId: true }
-      });
-      if (matchWithStore) return matchWithStore.categoryId;
-    }
+    const matchWithStore = await tx.productMaster.findFirst({
+      where: { name: itemName, storeName: storeName },
+      select: { categoryId: true }
+    });
+    if (matchWithStore) return matchWithStore.categoryId;
 
     // Phase 2: 学習データ (品名のみ)
     const matchAnyStore = await tx.productMaster.findFirst({
@@ -31,8 +28,7 @@ export const estimateCategoryId = async (
     });
     if (matchAnyStore) return matchAnyStore.categoryId;
 
-    // 3. Category.keywords (部分一致検索)
-    // JSONB配列の要素をバラして、itemName がキーワードを含んでいるか LIKE で検索
+    // Phase 3: Category.keywords (JSONB 部分一致検索)
     const categoryByKeyword = await tx.$queryRaw<any[]>`
       SELECT id FROM "Category", jsonb_array_elements_text(keywords) AS kw
       WHERE ${itemName} LIKE '%' || kw || '%'
@@ -43,8 +39,7 @@ export const estimateCategoryId = async (
       return categoryByKeyword[0].id;
     }
 
-    // Phase 4: フォールバック
-    return 99;
+    return 99; // その他
   } catch (error) {
     console.error('[CategoryService] Estimation Error:', error);
     return 99;

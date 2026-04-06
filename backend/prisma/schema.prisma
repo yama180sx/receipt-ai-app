@@ -9,8 +9,8 @@ datasource db {
 
 // 家族構成
 model FamilyMember {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
   receipts Receipt[]
 }
 
@@ -18,7 +18,7 @@ model FamilyMember {
 model Category {
   id             Int             @id @default(autoincrement())
   name           String          @unique
-  color          String?         // [Issue #14] UI表示用のカラーコードを追加
+  color          String?         // [Issue #14] UI表示用のカラーコード
   keywords       Json            @default("[]") 
   items          Item[]
   productMasters ProductMaster[]
@@ -32,25 +32,21 @@ model Store {
 }
 
 model Receipt {
-  id          Int          @id @default(autoincrement())
-  memberId    Int
-  member      FamilyMember @relation(fields: [memberId], references: [id])
-  storeName   String
-  // PostgreSQLのTIMESTAMPTZ型を明示
-  date        DateTime     @db.Timestamptz(3)
-  totalAmount Int
-  // [Issue #26] String型からJson型へ変更
-  rawText     Json?
-  imagePath   String?      // [Issue #12.5] 画像保存用パスを追加
-  items       Item[]
-  // PostgreSQLのTIMESTAMPTZ型を明示
-  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  id           Int          @id @default(autoincrement())
+  memberId     Int
+  member       FamilyMember @relation(fields: [memberId], references: [id])
+  storeName    String
+  date         DateTime     @db.Timestamptz(3)
+  totalAmount  Int
+  rawText      Json?
+  imagePath    String?      
+  items        Item[]
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
 }
 
 model Item {
   id          Int       @id @default(autoincrement())
   receiptId   Int
-  // [Issue #19] onDelete: Cascade を追加。親のReceiptが消えたら、この明細も自動で消去されます。
   receipt     Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   categoryId  Int?
   category    Category? @relation(fields: [categoryId], references: [id])
@@ -59,14 +55,14 @@ model Item {
   quantity    Int       @default(1)
 }
 
-// [Issue #12.5] 学習マスタ
+// 学習マスタ
 model ProductMaster {
   id          Int      @id @default(autoincrement())
-  name        String   // 商品名
-  storeName   String?  // 店舗名
+  name        String   
+  storeName   String?  
   categoryId  Int
   category    Category @relation(fields: [categoryId], references: [id])
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  @@unique([name, storeName]) // 商品名と店舗の組み合わせでユニーク化
+  @@unique([name, storeName]) 
 }

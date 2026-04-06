@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { saveReceiptData } from '../services/persistenceService';
+import { processAndSaveReceipt } from '../services/receiptService'; // AIフロー用をインポート
 import { getCleanText } from '../utils/normalizer';
 import { prisma } from '../utils/prismaClient';
 import { Prisma } from '@prisma/client';
@@ -21,7 +22,35 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
 };
 
 /**
- * 📂 レシート登録
+ * 📂 レシート解析・登録 (Gemini AI フロー)
+ * [Issue #42] 重複時は確定的なメッセージを返す
+ */
+export const analyzeReceipt = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { memberId } = req.body;
+    const imagePath = req.file?.path;
+
+    if (!imagePath) {
+      throw new AppError('画像がアップロードされていません', 400);
+    }
+
+    // receiptService.ts の hash対応済み関数を呼び出し
+    const result = await processAndSaveReceipt(Number(memberId), imagePath);
+
+    logger.info(`[AI_ANALYSIS_SUCCESS] Receipt ID: ${result.id} を登録しました`);
+    res.status(201).json({ success: true, data: result });
+
+  } catch (error: any) {
+    // 重複エラー (409 Conflict) のハンドリング
+    if (error.statusCode === 409) {
+      return next(new AppError('このレシートは既に登録済みです。', 409, { code: 'DUPLICATE_RECEIPT' }));
+    }
+    next(error);
+  }
+};
+
+/**
+ * 📂 レシート手動登録
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -46,16 +75,15 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
     res.status(201).json({ success: true, data: newReceipt });
 
   } catch (error: any) {
-    // 重複エラー（409）のハンドリングを共通エラー形式へ
     if (error.statusCode === 409) {
-      return next(new AppError('このレシートは既に登録されている可能性があります。', 409, { code: 'DUPLICATE_RECEIPT' }));
+      return next(new AppError('このレシートは既に登録済みです。', 409, { code: 'DUPLICATE_RECEIPT' }));
     }
     next(error);
   }
 };
 
 /**
- * 📂 アイテムのカテゴリーを更新し、学習マスタへ反映する
+ * 📂 アイテムのカテゴリーを更新し、学習マスタへ反映
  */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
@@ -102,16 +130,14 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       return updatedItem;
     });
 
-    logger.info(`[ITEM_UPDATE] ID: ${id} のカテゴリーを更新しました`);
     res.json({ success: true, data: result });
-
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * 📂 レシート一覧を取得（履歴一覧画面用）
+ * 📂 レシート一覧を取得
  */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -154,7 +180,6 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }]
     });
 
-    // ★ ここが履歴一覧表示の鍵
     res.json({ success: true, data: receipts });
   } catch (error) {
     next(error);
@@ -198,23 +223,20 @@ export const getLatestReceipt = async (req: Request, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: latest || null });
-
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * 📂 レシートを削除する
+ * 📂 レシートを削除
  */
 export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
-
   try {
     const deleted = await prisma.receipt.delete({
       where: { id: Number(id) }
     });
-
     logger.info(`[RECEIPT_DELETED] ID: ${id} を削除しました`);
     res.json({ success: true, data: { id: deleted.id } });
   } catch (error) {

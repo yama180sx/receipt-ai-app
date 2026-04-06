@@ -6,22 +6,18 @@ import { Picker } from '@react-native-picker/picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Issue #30 用の修正（legacy APIを使用）
 // @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
 
-// 共通APIクライアントをインポート
 import apiClient from './src/utils/apiClient';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
-// --- Issue #36: 学習マスタ管理画面をインポート ---
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
 import { theme } from './src/theme';
 
-// product_master を追加
 type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master';
 
 const STORAGE_KEYS = {
@@ -39,16 +35,12 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [isReady, setIsReady] = useState(false);
-
-  // --- Issue #35: 世帯管理の状態を追加 (1: 自分, 2: その他) ---
   const [currentMemberId, setCurrentMemberId] = useState<number>(1);
 
-  // --- Issue #30: ファイル削除ロジック ---
   const deleteTempFile = async (uri: string | null) => {
     if (!uri) return;
     try {
       await FileSystem.deleteAsync(uri, { idempotent: true });
-      console.log(`[Cleanup] Successfully processed: ${uri}`);
     } catch (e) {
       console.warn('[Cleanup] Failed to delete temp file:', e);
     }
@@ -57,11 +49,6 @@ export default function App() {
   const fetchCategories = useCallback(async () => {
     try {
       const res = await apiClient.get('/categories');
-      /**
-       * ★ 修正ポイント: [Issue #40]
-       * バックエンドのレスポンスが { success: true, data: Category[] } になったため、
-       * res.data.data を参照します。
-       */
       if (res.data && res.data.success) {
         setCategories(res.data.data);
       }
@@ -111,16 +98,12 @@ export default function App() {
 
   const takePhoto = async () => {
     if (image) await deleteTempFile(image);
-
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('権限エラー', 'カメラアクセスが必要です。');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ 
-      allowsEditing: true, 
-      quality: 0.7,
-    });
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
     if (!result.canceled) {
       setImage(result.assets[0].uri);
       setRotation(0); 
@@ -128,10 +111,15 @@ export default function App() {
     }
   };
 
+  /**
+   * [Issue #42] 解析・アップロードの統合フロー
+   * バックエンドのメッセージを優先して表示するように強化
+   */
   const processAndUpload = async () => {
     if (!image) return;
     setUploading(true);
     let manipulatedUri: string | null = null;
+
     try {
       const manipulated = await manipulateAsync(
         image, 
@@ -146,9 +134,24 @@ export default function App() {
       await deleteTempFile(image);
       setImage(null);
 
-    } catch (error) {
+    } catch (error: any) {
+      const status = error.response?.status;
+      
+      // バックエンドから返ってくるメッセージを抽出（messageまたはerrorキー）
+      const serverMessage = 
+        error.response?.data?.message || 
+        error.response?.data?.error;
+
+      if (status === 409) {
+        // 重複エラー：バックエンドで設定した「既に登録済みです」を表示
+        Alert.alert('登録済み', serverMessage || 'このレシートは既に登録されています。');
+        setImage(null);
+      } else {
+        // その他のエラー
+        Alert.alert('エラー', serverMessage || '解析に失敗しました。再度お試しください。');
+      }
+    } finally {
       setUploading(false);
-      Alert.alert('エラー', '画像処理に失敗しました。');
       if (manipulatedUri) await deleteTempFile(manipulatedUri);
     }
   };
@@ -158,52 +161,23 @@ export default function App() {
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', currentMemberId.toString());
 
-    try {
-      const response = await apiClient.post('/receipts/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+    const response = await apiClient.post('/receipts/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
 
-      /**
-       * ★ 修正ポイント: [Issue #40]
-       * レスポンス形式を統一したため、response.data.data を取得します。
-       */
-      const responseBody = response.data;
-      if (responseBody && responseBody.success) {
-        setResultData(responseBody.data);
-      } else {
-        console.error('APIレスポンスの構造が不正です:', responseBody);
-        throw new Error('解析データの取得に失敗しました');
-      }
-
-    } catch (error: any) {
-      const status = error.response?.status;
-      const errorMessage = error.response?.data?.error || 'アップロード失敗';
-
-      if (status === 409) {
-        Alert.alert('登録済み', 'このレシートは既に登録されています。');
-      } else {
-        Alert.alert('エラー', errorMessage);
-      }
-      throw error;
-    } finally {
-      setUploading(false);
+    if (response.data && response.data.success) {
+      setResultData(response.data.data);
+    } else {
+      throw new Error('解析データの取得に失敗しました');
     }
   };
 
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await apiClient.patch(`/receipt-items/${itemId}`, { 
-        categoryId: Number(categoryId) 
-      });
-      
-      /**
-       * ★ 修正ポイント: [Issue #40]
-       * response.data.data (更新後の単一アイテム) を参照。
-       */
+      const response = await apiClient.patch(`/receipt-items/${itemId}`, { categoryId: Number(categoryId) });
       if (response.data && response.data.success) {
         const updatedItem = response.data.data;
-
         setResultData((prev: any) => {
           if (!prev || !prev.items) return prev;
           return {
@@ -215,22 +189,16 @@ export default function App() {
         });
       }
     } catch (error: any) {
-      Alert.alert('エラー', error.response?.data?.error || '更新に失敗しました');
+      Alert.alert('エラー', error.response?.data?.message || error.response?.data?.error || '更新に失敗しました');
     }
   };
 
   const HouseholdSwitcher = () => (
     <View style={styles.switcherContainer}>
-      <TouchableOpacity 
-        style={[styles.switchButton, currentMemberId === 1 && styles.activeSwitch]} 
-        onPress={() => setCurrentMemberId(1)}
-      >
+      <TouchableOpacity style={[styles.switchButton, currentMemberId === 1 && styles.activeSwitch]} onPress={() => setCurrentMemberId(1)}>
         <Text style={[styles.switchText, currentMemberId === 1 && styles.activeSwitchText]}>自分</Text>
       </TouchableOpacity>
-      <TouchableOpacity 
-        style={[styles.switchButton, currentMemberId === 2 && styles.activeSwitch]} 
-        onPress={() => setCurrentMemberId(2)}
-      >
+      <TouchableOpacity style={[styles.switchButton, currentMemberId === 2 && styles.activeSwitch]} onPress={() => setCurrentMemberId(2)}>
         <Text style={[styles.switchText, currentMemberId === 2 && styles.activeSwitchText]}>その他</Text>
       </TouchableOpacity>
     </View>
@@ -240,35 +208,14 @@ export default function App() {
     if (!isReady) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
     switch (currentView) {
-      case 'history':
-        return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
-      case 'stats':
-        /**
-         * ★ 修正ポイント: 
-         * StatisticsScreen 内部で「戻る」ボタンを表示させるため、onBack を渡します。
-         * App.tsx 側のフローティングボタンは削除しました。
-         */
-        return <StatisticsScreen currentMemberId={currentMemberId} onBack={() => setCurrentView('main')} />;
-      case 'category_mgr':
-        return (
-          <CategoryManagementScreen 
-            onBack={() => {
-              fetchCategories();
-              setCurrentView('main');
-            }} 
-          />
-        );
-      case 'product_master':
-        return (
-          <ProductMasterScreen 
-            onBack={() => setCurrentView('main')} 
-          />
-        );
+      case 'history': return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
+      case 'stats': return <StatisticsScreen currentMemberId={currentMemberId} onBack={() => setCurrentView('main')} />;
+      case 'category_mgr': return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} />;
+      case 'product_master': return <ProductMasterScreen onBack={() => setCurrentView('main')} />;
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
             {!resultData && !image && <HouseholdSwitcher />}
-
             {resultData && resultData.items ? (
               <ScrollView contentContainerStyle={styles.resultContainer}>
                 <Text style={styles.resultHeader}>解析結果</Text>
@@ -283,11 +230,7 @@ export default function App() {
                         <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
                       </View>
                       <View style={styles.pickerWrapper}>
-                        <Picker
-                          selectedValue={item.categoryId}
-                          onValueChange={(val) => handleCategoryChange(item.id, val)}
-                          style={styles.picker}
-                        >
+                        <Picker selectedValue={item.categoryId} onValueChange={(val) => handleCategoryChange(item.id, val)} style={styles.picker}>
                           <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
                           {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
                         </Picker>
@@ -309,10 +252,7 @@ export default function App() {
                   <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
                     {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.subButton} onPress={async () => {
-                    await deleteTempFile(image);
-                    setImage(null);
-                  }}>
+                  <TouchableOpacity style={styles.subButton} onPress={async () => { await deleteTempFile(image); setImage(null); }}>
                     <Text style={styles.subButtonText}>撮り直す</Text>
                   </TouchableOpacity>
                 </View>
@@ -341,7 +281,6 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  // floatingBackButton は削除しました
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   preview: { width: '90%', height: '70%', borderRadius: 10 },
   previewActions: { width: '100%', padding: 20, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', position: 'absolute', bottom: 40 },

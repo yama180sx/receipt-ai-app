@@ -6,8 +6,6 @@ import { normalizeStoreName, getCleanText } from '../utils/normalizer';
 
 const prisma = new PrismaClient();
 
-const DEBUG_DUPLICATE_AI = false;
-
 /**
  * 🛠️ 安全な日付パース関数
  */
@@ -24,6 +22,7 @@ const parseSafeDate = (dateStr: string | null | undefined): Date => {
 
 /**
  * AI解析済みのデータをDBに永続化する
+ * [Issue #42 改訂版] ハッシュ値を廃止し、ビジネスルール（同日・同金額）で重複を判定
  */
 export const saveParsedReceipt = async (
   memberId: number, 
@@ -34,29 +33,31 @@ export const saveParsedReceipt = async (
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
     const jstDate = parseSafeDate(parsedData.purchaseDate);
     const totalAmount = parsedData.totalAmount || 0;
-    
-    // --- 重複チェック ---
+
+    // --- 重複チェックロジック ---
+    // 「同じメンバー」が「同じ日」に「同じ合計金額」のレシートを登録しようとしたらブロック
     const startOfDay = new Date(jstDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(jstDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const existingReceipts = await prisma.receipt.findMany({
+    const existing = await prisma.receipt.findFirst({
       where: {
         memberId: memberId,
         totalAmount: totalAmount,
-        date: { gte: startOfDay, lte: endOfDay }
-      }
+        date: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      select: { id: true }
     });
 
-    const normalizedNew = getCleanText(officialStoreName);
-    for (const rec of existingReceipts) {
-      if (getCleanText(rec.storeName) === normalizedNew) {
-        logger.warn(`[DUPE_AI:BLOCK] 重複検知 (ID: ${rec.id})`);
-        const error = new Error('DUPLICATE_RECEIPT_DETECTED');
-        (error as any).statusCode = 409;
-        throw error;
-      }
+    if (existing) {
+      logger.warn(`[DUPE_CHECK:BLOCK] 同一日・同一金額の重複を検知 (ExistingID: ${existing.id})`);
+      const error = new Error('DUPLICATE_RECEIPT_DETECTED');
+      (error as any).statusCode = 409;
+      throw error;
     }
 
     // --- DB登録処理 (Transaction) ---
@@ -84,6 +85,7 @@ export const saveParsedReceipt = async (
           totalAmount: totalAmount,
           rawText: JSON.stringify(parsedData),
           imagePath: imagePath,
+          // contentHash カラムへの代入を削除
           items: {
             create: itemsToCreate
           },
@@ -92,9 +94,9 @@ export const saveParsedReceipt = async (
           items: { include: { category: true } },
         },
       });
-    });
-  } catch (error) {
-    if ((error as any).message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
+    }, { timeout: 10000 });
+  } catch (error: any) {
+    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
     logger.error(`[DBエラー] ${error}`);
     throw error;
   }
