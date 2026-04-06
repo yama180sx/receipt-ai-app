@@ -6,8 +6,9 @@ import {
   getLatestReceipt, 
   updateItemCategory,
   getMonthlyStats,
-  getJobStatus // ★ [Issue #43] 追加
+  getJobStatus
 } from '../controllers/receiptController';
+import { getAdvancedStats } from '../controllers/receiptController';
 
 const router = express.Router();
 
@@ -37,5 +38,8 @@ router.delete('/receipts/:id', deleteReceipt);
 
 // PATCH /api/receipt-items/:id (明細カテゴリ修正)
 router.patch('/receipt-items/:id', updateItemCategory);
+
+//
+router.get('/stats/advanced', getAdvancedStats);
 
 export default router;

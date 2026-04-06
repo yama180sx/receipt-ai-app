@@ -290,3 +290,53 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
     next(error);
   }
 };
+
+/**
+ * 📂 高度な家計分析統計の取得
+ */
+export const getAdvancedStats = async (req: Request, res: Response, next: NextFunction) => {
+  const { memberId } = req.query;
+  const mId = Number(memberId || 1);
+
+  try {
+    // 1. 前月比推移 (MoM)
+    const trend = await prisma.$queryRaw`
+      SELECT 
+        TO_CHAR(date_trunc('month', date), 'YYYY-MM') AS period,
+        SUM("totalAmount")::int AS total,
+        LAG(SUM("totalAmount")) OVER (ORDER BY date_trunc('month', date))::int AS prev_total
+      FROM "Receipt"
+      WHERE "memberId" = ${mId}
+      GROUP BY date_trunc('month', date)
+      ORDER BY period DESC
+      LIMIT 6;
+    `;
+
+    // 2. 費目別Pareto分析 (当月)
+    const pareto = await prisma.$queryRaw`
+      WITH CategoryTotals AS (
+        SELECT c.name, SUM(i.price) as amount
+        FROM "Item" i
+        JOIN "Category" c ON i."categoryId" = c.id
+        JOIN "Receipt" r ON i."receiptId" = r.id
+        WHERE r.date >= date_trunc('month', CURRENT_DATE) AND r."memberId" = ${mId}
+        GROUP BY c.name
+      ),
+      TotalSum AS (SELECT SUM(amount) FROM CategoryTotals)
+      SELECT 
+        name, 
+        amount::int,
+        ROUND(amount * 100.0 / (SELECT * FROM TotalSum), 1)::float as ratio,
+        ROUND(SUM(amount) OVER (ORDER BY amount DESC) * 100.0 / (SELECT * FROM TotalSum), 1)::float as cumulative_ratio
+      FROM CategoryTotals
+      ORDER BY amount DESC;
+    `;
+
+    res.json({
+      success: true,
+      data: { trend, pareto }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
