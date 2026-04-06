@@ -31,6 +31,7 @@ export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0); 
   const [uploading, setUploading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('解析中...');
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
@@ -112,12 +113,44 @@ export default function App() {
   };
 
   /**
-   * [Issue #42] 解析・アップロードの統合フロー
-   * バックエンドのメッセージを優先して表示するように強化
+   * [Issue #43] 非同期ポーリング処理
+   */
+  const pollJobStatus = async (jobId: string): Promise<any> => {
+    let attempts = 0;
+    const maxAttempts = 30; // 最大60秒
+    const interval = 2000;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      setLoadingMessage(`解析中... (${attempts * 2}秒経過)`);
+
+      const res = await apiClient.get(`/receipts/status/${jobId}`);
+      const { state, result, error } = res.data.data;
+
+      if (state === 'completed') {
+        // ★ 修正：Worker内部で重複を検知して success: false が返ってきた場合
+        if (result && result.success === false) {
+          throw new Error(result.message || '既に登録されているレシートです');
+        }
+        return result; 
+      }
+      
+      if (state === 'failed') {
+        throw new Error(error || '解析に失敗しました。');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    throw new Error('解析がタイムアウトしました。');
+  };
+
+  /**
+   * [Issue #43] 解析・アップロード統合フロー
    */
   const processAndUpload = async () => {
     if (!image) return;
     setUploading(true);
+    setLoadingMessage('画像加工中...');
     let manipulatedUri: string | null = null;
 
     try {
@@ -128,27 +161,28 @@ export default function App() {
       );
       manipulatedUri = manipulated.uri;
 
-      await uploadImage(manipulatedUri);
+      setLoadingMessage('アップロード中...');
+      const jobId = await uploadImage(manipulatedUri);
+
+      setLoadingMessage('T320で解析中...');
+      const finalResult = await pollJobStatus(jobId);
+
+      setResultData(finalResult);
 
       await deleteTempFile(manipulatedUri);
       await deleteTempFile(image);
       setImage(null);
 
     } catch (error: any) {
+      const serverMessage = error.response?.data?.message || error.message;
       const status = error.response?.status;
-      
-      // バックエンドから返ってくるメッセージを抽出（messageまたはerrorキー）
-      const serverMessage = 
-        error.response?.data?.message || 
-        error.response?.data?.error;
 
-      if (status === 409) {
-        // 重複エラー：バックエンドで設定した「既に登録済みです」を表示
+      // 409(同期的な重複チェック) または Worker内での重複メッセージを拾う
+      if (status === 409 || serverMessage.includes('登録')) {
         Alert.alert('登録済み', serverMessage || 'このレシートは既に登録されています。');
         setImage(null);
       } else {
-        // その他のエラー
-        Alert.alert('エラー', serverMessage || '解析に失敗しました。再度お試しください。');
+        Alert.alert('エラー', serverMessage || '処理に失敗しました。');
       }
     } finally {
       setUploading(false);
@@ -156,7 +190,7 @@ export default function App() {
     }
   };
 
-  const uploadImage = async (uri: string) => {
+  const uploadImage = async (uri: string): Promise<string> => {
     const formData = new FormData();
     formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
     formData.append('memberId', currentMemberId.toString());
@@ -165,16 +199,17 @@ export default function App() {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
-    if (response.data && response.data.success) {
-      setResultData(response.data.data);
+    if (response.data?.success && response.data.data?.jobId) {
+      return response.data.data.jobId;
     } else {
-      throw new Error('解析データの取得に失敗しました');
+      throw new Error('ジョブの登録に失敗しました');
     }
   };
 
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
+      // ★ 修正：id -> itemId に変更
       const response = await apiClient.patch(`/receipt-items/${itemId}`, { categoryId: Number(categoryId) });
       if (response.data && response.data.success) {
         const updatedItem = response.data.data;
@@ -189,7 +224,7 @@ export default function App() {
         });
       }
     } catch (error: any) {
-      Alert.alert('エラー', error.response?.data?.message || error.response?.data?.error || '更新に失敗しました');
+      Alert.alert('エラー', error.response?.data?.message || '更新に失敗しました');
     }
   };
 
@@ -250,7 +285,12 @@ export default function App() {
                     <Text style={styles.subButtonText}>回転 ↻</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
-                    {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
+                    {uploading ? (
+                      <View style={{ alignItems: 'center' }}>
+                        <ActivityIndicator color="white" />
+                        <Text style={{ color: 'white', fontSize: 10, marginTop: 4 }}>{loadingMessage}</Text>
+                      </View>
+                    ) : <Text style={styles.mainButtonText}>解析開始</Text>}
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.subButton} onPress={async () => { await deleteTempFile(image); setImage(null); }}>
                     <Text style={styles.subButtonText}>撮り直す</Text>
@@ -284,7 +324,7 @@ const styles = StyleSheet.create({
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   preview: { width: '90%', height: '70%', borderRadius: 10 },
   previewActions: { width: '100%', padding: 20, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', position: 'absolute', bottom: 40 },
-  mainButton: { backgroundColor: theme.colors.primary, paddingVertical: 16, paddingHorizontal: 32, borderRadius: theme.borderRadius.md, minWidth: 140, alignItems: 'center' },
+  mainButton: { backgroundColor: theme.colors.primary, paddingVertical: 16, paddingHorizontal: 20, borderRadius: theme.borderRadius.md, minWidth: 140, alignItems: 'center' },
   mainButtonText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
   subButton: { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 12, paddingHorizontal: 20, borderRadius: theme.borderRadius.sm },
   subButtonText: { color: 'white', fontWeight: '600' },
