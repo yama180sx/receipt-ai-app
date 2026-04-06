@@ -6,16 +6,20 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import sharp from 'sharp'; 
 
-import { processAndSaveReceipt } from './services/receiptService';
-import logger from './utils/logger';
-import { PrismaClient } from '@prisma/client';
+// --- [Issue #43] BullMQ & Redis インポート ---
+import { receiptQueue } from './queues/receiptQueue';
+import './workers/receiptWorker'; // Workerをインポートしてプロセスを起動
 
-// --- ルーターのインポート ---
+// --- ユーティリティ・シングルトン ---
+import logger from './utils/logger';
+import { prisma } from './utils/prismaClient'; // シングルトン版を使用
+
+// --- ルーター ---
 import receiptRoutes from './routes/receiptRoutes';
 import productMasterRoutes from './routes/productMasterRoutes'; 
-import categoryRoutes from './routes/categoryRoutes'; // ★ 追加
+import categoryRoutes from './routes/categoryRoutes';
 
-// --- Issue #40: エラーハンドリング・標準化 ---
+// --- エラーハンドリング ---
 import { AppError } from './utils/appError';
 import { errorHandler } from './middlewares/errorHandler';
 import { validate } from './middlewares/validate';
@@ -26,9 +30,8 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
-const prisma = new PrismaClient();
 
-// --- CORS 制限 ---
+// --- CORS 設定 ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 app.use(cors({
   origin: (origin, callback) => {
@@ -47,11 +50,10 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// --- ルート登録の整理 ---
-// インラインで書いていたハンドラーを各ルーターへ委譲します
-app.use('/api/categories', categoryRoutes);      // /api/categories/*
-app.use('/api/product-master', productMasterRoutes); // /api/product-master/*
-app.use('/api', receiptRoutes);                  // /api/receipts/*, /api/receipt-items/*
+// --- ルート登録 ---
+app.use('/api/categories', categoryRoutes);
+app.use('/api/product-master', productMasterRoutes);
+app.use('/api', receiptRoutes);
 
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
@@ -62,7 +64,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 /**
- * 📂 レシートアップロード & 解析 (この特殊な処理のみ server.ts に残すか、receiptRoutes に移動)
+ * 📂 [Issue #43] レシートアップロード & 非同期ジョブ受付
  */
 app.post(
   '/api/receipts/upload', 
@@ -73,15 +75,18 @@ app.post(
       if (!req.file) throw new AppError('画像がアップロードされていません。', 400);
 
       const { memberId } = req.body;
+      const parsedMemberId = parseInt(memberId, 10);
 
+      // 同期チェック: 世帯メンバーの存在確認
       const memberExists = await prisma.familyMember.findUnique({
-        where: { id: memberId }
+        where: { id: parsedMemberId }
       });
 
       if (!memberExists) {
         throw new AppError('指定された世帯IDが存在しません。', 400);
       }
 
+      // 1. 画像加工 (Sharp) - これは高速なので同期的に処理し、ディスクへ保存
       const timestamp = Date.now();
       const randomSuffix = Math.round(Math.random() * 1e9);
       const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
@@ -93,34 +98,37 @@ app.post(
         .webp({ quality: 75, effort: 6 }) 
         .toFile(imagePath);
 
-      const result = await processAndSaveReceipt(memberId, imagePath);
+      // 2. [Issue #43] ジョブキューに投入
+      // 重いGemini解析と保存処理は Worker が T320 のバックグラウンドで行う
+      const job = await receiptQueue.add('analyze-receipt', {
+        memberId: parsedMemberId,
+        imagePath: imagePath,
+      });
 
-      // Issue #40 形式でレスポンス
-      res.status(200).json({
+      logger.info(`[Queue] ジョブを登録しました: ID ${job.id} (Member: ${parsedMemberId})`);
+
+      // 3. 即座に応答（202 Accepted）
+      res.status(202).json({
         success: true,
-        message: '解析および保存が完了しました。',
-        data: result
+        message: '解析リクエストを受け付けました。バックグラウンドで処理を開始します。',
+        data: {
+          jobId: job.id,
+          status: 'queued'
+        }
       });
       
     } catch (error: any) {
-      if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-        return next(new AppError('このレシートは既に登録されています。', 409, { code: 'DUPLICATE_RECEIPT' }));
-      }
       next(error);
     }
   }
 );
 
-/**
- * 404 ハンドラー
- */
+// 404 ハンドラー
 app.use((req, res, next) => {
   next(new AppError(`Not Found - ${req.originalUrl}`, 404));
 });
 
-/**
- * 📂 グローバルエラーハンドラー (必ず最後に配置)
- */
+// グローバルエラーハンドラー
 app.use(errorHandler);
 
 app.listen(Number(port), host, () => {
