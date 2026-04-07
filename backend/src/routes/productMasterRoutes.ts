@@ -5,7 +5,7 @@ import {
   deleteProductMaster,
   mergeStoreNames // 店舗名統合用
 } from '../controllers/productMasterController';
-import { authMiddleware } from '../middlewares/auth';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 

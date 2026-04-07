@@ -15,7 +15,6 @@ interface ReceiptItem { id: number; name: string; price: number; categoryId: num
 interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; }
 interface MonthlyData { month: string; totalAmount: number; prevTotal: number; diffAmount: number; diffPercentage: number; stats: StatItem[]; latestReceipt: ReceiptInfo | null; }
 
-// ★ [Issue #44] 追加分インターフェース
 interface TrendData { period: string; total: number; prev_total: number | null; }
 interface ParetoData { name: string; amount: number; ratio: number; cumulative_ratio: number; }
 interface AdvancedStats { trend: TrendData[]; pareto: ParetoData[]; }
@@ -29,7 +28,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [data, setData] = useState<MonthlyData | null>(null);
-  const [advancedData, setAdvancedData] = useState<AdvancedStats | null>(null); // ★ 追加
+  const [advancedData, setAdvancedData] = useState<AdvancedStats | null>(null);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   
   const [isMainModalVisible, setMainModalVisible] = useState(false);
@@ -47,20 +46,32 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     });
   }, []);
 
+  /**
+   * [Issue #44 & #45] データ取得
+   * すべてのリクエストに x-member-id ヘッダーを付与し、世帯分離を徹底します。
+   */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const headers = { 'x-member-id': currentMemberId.toString() };
+
       const [statsRes, advRes, catRes] = await Promise.all([
-        apiClient.get(`/stats/monthly`, { params: { month: selectedMonth, memberId: currentMemberId } }),
-        apiClient.get(`/stats/advanced`, { params: { memberId: currentMemberId } }), // ★ 追加エンドポイント
-        apiClient.get('/categories')
+        apiClient.get(`/stats/monthly`, { 
+          params: { month: selectedMonth, memberId: currentMemberId },
+          headers 
+        }),
+        apiClient.get(`/stats/advanced`, { 
+          params: { memberId: currentMemberId },
+          headers 
+        }),
+        apiClient.get('/categories', { headers })
       ]);
 
       if (statsRes.data?.success) setData(statsRes.data.data);
       if (advRes.data?.success) setAdvancedData(advRes.data.data);
       if (catRes.data?.success) setAllCategories(catRes.data.data);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Fetch error:', error);
       Alert.alert("エラー", "データの取得に失敗しました");
     } finally {
@@ -72,12 +83,18 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     fetchData();
   }, [fetchData]);
 
+  /**
+   * カテゴリー更新処理
+   */
   const handleUpdateCategory = async (categoryId: number) => {
     if (!selectedItemId) return;
     try {
-      await apiClient.patch(`/receipt-items/${selectedItemId}`, { categoryId });
+      await apiClient.patch(`/receipt-items/${selectedItemId}`, 
+        { categoryId },
+        { headers: { 'x-member-id': currentMemberId.toString() } }
+      );
       setPickerVisible(false);
-      await fetchData();
+      await fetchData(); // 再フェッチしてグラフを更新
       Alert.alert("完了", "カテゴリーを更新しました");
     } catch (error) {
       Alert.alert("エラー", "更新に失敗しました");
@@ -106,7 +123,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* --- 1. 月次サマリー & 円グラフ --- */}
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
           <View style={styles.monthPickerContainer}>
@@ -128,12 +144,12 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               <View style={styles.comparisonRow}>
                 <Text style={styles.comparisonLabel}>前月比:</Text>
                 <Text style={[styles.diffValue, { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success }]}>
-                  {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(data?.diffAmount || 0).toLocaleString()} ({data?.diffPercentage}% )
+                  {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(data?.diffAmount || 0).toLocaleString()} ({data?.diffPercentage || 0}%)
                 </Text>
               </View>
             </View>
 
-            {/* --- 2. [Issue #44] トレンド分析 (Window関数利用) --- */}
+            {/* --- 2. [Issue #44] トレンド分析 --- */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
               <View style={styles.statsCard}>
@@ -144,7 +160,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                       <Text style={styles.trendPeriod}>{t.period}</Text>
                       <Text style={styles.trendAmount}>¥{t.total.toLocaleString()}</Text>
                       <Text style={[styles.trendDiff, { color: diff > 0 ? theme.colors.error : theme.colors.success }]}>
-                        {t.prev_total ? `${diff > 0 ? '+' : ''}${diff.toLocaleString()}` : '-'}
+                        {t.prev_total !== null ? `${diff > 0 ? '+' : ''}${diff.toLocaleString()}` : '-'}
                       </Text>
                     </View>
                   );
@@ -152,7 +168,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 3. [Issue #44] パレート分析 (累積構成比) --- */}
+            {/* --- 3. [Issue #44] パレート分析 --- */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>費目別パレート分析 (Pareto)</Text>
               <View style={styles.statsCard}>
@@ -175,7 +191,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 4. 既存: 円グラフ --- */}
+            {/* --- 4. 円グラフ --- */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>支出内訳</Text>
               <View style={styles.chartCard}>
@@ -194,7 +210,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 5. 既存: 直近レシート --- */}
+            {/* --- 5. 最新レシート --- */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>最新の解析レシート</Text>
               {data?.latestReceipt?.imagePath ? (
@@ -211,7 +227,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
-      {/* 詳細モーダル (既存維持) */}
+      {/* 詳細モーダル */}
       <Modal visible={isMainModalVisible} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -244,7 +260,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         </SafeAreaView>
       </Modal>
 
-      {/* カテゴリ選択ピッカー (既存維持) */}
+      {/* カテゴリ選択ピッカー */}
       <Modal visible={isPickerVisible} transparent={true} animationType="fade">
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerWindow}>
