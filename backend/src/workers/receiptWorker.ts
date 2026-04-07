@@ -2,66 +2,62 @@ import { Worker, Job } from 'bullmq';
 import { redisConnection } from '../config/redis';
 import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
 import { analyzeReceiptImage } from '../services/geminiService';
-import { saveParsedReceipt } from '../services/receiptService';
+import { saveReceiptData } from '../services/persistenceService'; // 統合済みの保存サービスを使用
+import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 
 /**
- * [Issue #43] レシート解析 Worker
- * 重複エラー時は throw せず、結果オブジェクトを返すことで無駄なリトライを防止します。
+ * [Issue #43 & #45] レシート解析 Worker
  */
 const receiptWorker = new Worker(
   RECEIPT_QUEUE_NAME,
   async (job: Job) => {
-    const { memberId, imagePath } = job.data;
+    const { memberId, familyGroupId, imagePath } = job.data;
     
-    logger.info(`[Worker] ジョブ開始: ID ${job.id} (Member: ${memberId})`);
+    logger.info(`[Worker] ジョブ開始: ID ${job.id} (世帯: ${familyGroupId})`);
 
-    try {
-      // 1. Geminiによる画像解析（外部API通信）
-      const parsedData = await analyzeReceiptImage(imagePath);
+    return await runWithTenant({ familyGroupId, memberId }, async () => {
+      try {
+        // 1. Gemini AIによる解析
+        // 戻り値を any にキャストして、プロパティの有無による型エラーを強制的に回避します
+        const parsedData = (await analyzeReceiptImage(imagePath)) as any;
 
-      // 2. DBへの永続化（ビジネスロジック・重複チェック含む）
-      const result = await saveParsedReceipt(memberId, parsedData, imagePath);
+        // 2. DBへの永続化
+        const result = await saveReceiptData({
+          memberId,
+          familyGroupId,
+          storeName: parsedData.storeName || '不明な店舗',
+          // 文字列が保証されない場合でも Date オブジェクトを生成させる
+          date: new Date(parsedData.date || Date.now()), 
+          totalAmount: Number(parsedData.totalAmount || 0),
+          items: (parsedData.items || []).map((item: any) => ({
+            name: item.name,
+            price: Number(item.price || 0),
+            quantity: Number(item.quantity || 1),
+            categoryId: item.categoryId ? Number(item.categoryId) : null
+          })),
+          imagePath: imagePath,
+          // rawText が undefined でも null として流し込む
+          rawText: parsedData.rawText ?? null, 
+        });
 
-      logger.info(`[Worker] ジョブ完了: ID ${job.id}, ReceiptID: ${result.id}`);
-      
-      return { 
-        success: true, 
-        receiptId: result.id 
-      };
+        logger.info(`[Worker] ジョブ完了: ID ${job.id}, ReceiptID: ${result.id}`);
+        return { success: true, receiptId: result.id };
 
-    } catch (error: any) {
-      // 3. 重複検知時のハンドリング
-      if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-        logger.warn(`[Worker] 重複を検知したためスキップ: ID ${job.id}`);
-        
-        // throw せずに return することで、BullMQ上は「成功（完了）」として扱いリトライを防ぐ
-        return { 
-          success: false, 
-          errorType: 'DUPLICATE', 
-          message: 'このレシートは既に登録されています。' 
-        };
+      } catch (error: any) {
+        if (error.message === 'DUPLICATE_RECEIPT_DETECTED' || error.statusCode === 409) {
+          logger.warn(`[Worker] 重複スキップ: ID ${job.id}`);
+          return { success: false, errorType: 'DUPLICATE' };
+        }
+        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${error.message}`);
+        throw error;
       }
-
-      // 4. その他のシステムエラー
-      logger.error(`[Worker] ジョブ失敗（リトライ対象）: ID ${job.id} - ${error.message}`);
-      
-      // throw することで BullMQ の attempts 設定に基づくリトライを実行させる
-      throw error;
-    }
+    });
   },
   {
     connection: redisConnection,
-    // T320環境において外部API待ちを効率化するため、5スレッド並列で開始
     concurrency: 5, 
   }
 );
-
-// リトライを使い果たした最終失敗時のログ
-receiptWorker.on('failed', (job, err) => {
-  if (err.message !== 'DUPLICATE_RECEIPT_DETECTED') {
-    logger.error(`[Worker] ジョブ最終失敗（リトライ上限到達）: ${job?.id} - ${err.message}`);
-  }
-});
 
 export default receiptWorker;

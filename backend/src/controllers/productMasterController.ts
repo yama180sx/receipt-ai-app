@@ -2,26 +2,28 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
 import { AppError } from '../utils/appError';
+import { getFamilyGroupId } from '../utils/context';
 
 /**
- * 📂 学習マスタ一覧取得（検索・ページネーション対応）
+ * 📂 学習マスタ一覧取得
  */
 export const getProductMasters = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q, store } = req.query;
+    const familyGroupId = getFamilyGroupId();
     
-    const where: any = {};
+    const where: any = { familyGroupId };
     if (q) where.name = { contains: String(q), mode: 'insensitive' };
     if (store) where.storeName = { contains: String(store), mode: 'insensitive' };
 
     const masters = await prisma.productMaster.findMany({
       where,
       include: { category: true },
-      orderBy: { updatedAt: 'desc' },
-      take: 100 // ひとまず100件
+      // ★ 修正: updatedAt は存在しないため id で降順ソート
+      orderBy: { id: 'desc' },
+      take: 100 
     });
 
-    // Issue #40: レスポンス形式の統一
     res.json({
       success: true,
       data: masters
@@ -58,10 +60,11 @@ export const updateProductMaster = async (req: Request, res: Response, next: Nex
 };
 
 /**
- * 📂 店舗名の統合ロジック
+ * 📂 店舗名の統合ロジック (世帯分離対応)
  */
 export const mergeStoreNames = async (req: Request, res: Response, next: NextFunction) => {
   const { sourceStoreName, targetStoreName } = req.body;
+  const familyGroupId = getFamilyGroupId();
 
   if (!sourceStoreName || !targetStoreName) {
     return next(new AppError('統合元と統合先の指定が必要です', 400));
@@ -69,22 +72,28 @@ export const mergeStoreNames = async (req: Request, res: Response, next: NextFun
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. ProductMaster 内の店舗名を一括置換
+      // 1. [Issue #45] 当該世帯の ProductMaster のみ置換
       const updateResult = await tx.productMaster.updateMany({
-        where: { storeName: sourceStoreName },
+        where: { 
+          storeName: sourceStoreName,
+          familyGroupId 
+        },
         data: { storeName: targetStoreName }
       });
 
-      // 2. 過去の Receipt データの店舗名も書き換える
+      // 2. [Issue #45] 当該世帯の Receipt データのみ書き換え
       await tx.receipt.updateMany({
-        where: { storeName: sourceStoreName },
+        where: { 
+          storeName: sourceStoreName,
+          familyGroupId
+        },
         data: { storeName: targetStoreName }
       });
 
       return updateResult;
     });
 
-    logger.info(`[STORE_MERGE] ${sourceStoreName} -> ${targetStoreName} (${result.count} items)`);
+    logger.info(`[STORE_MERGE] Family:${familyGroupId} | ${sourceStoreName} -> ${targetStoreName}`);
     
     res.json({
       success: true,

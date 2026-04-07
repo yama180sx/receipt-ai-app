@@ -21,9 +21,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const cacheKey = useMemo(() => Date.now(), []);
 
   /**
-   * ★ 修正ポイント: [2026-04 対応]
-   * 現在の日付から過去6ヶ月分を動的に生成します。
-   * これにより 2026-04 が自動的にリストの先頭に現れます。
+   * 過去6ヶ月分の月リスト生成
    */
   const months = useMemo(() => {
     return Array.from({ length: 6 }).map((_, i) => {
@@ -36,22 +34,31 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
-  // カテゴリーマスタ取得
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await apiClient.get('/categories');
-        if (res.data && res.data.success) {
-          setCategories(res.data.data);
-        }
-      } catch (err) {
-        console.error('カテゴリー取得失敗', err);
+  /**
+   * [Issue #45] カテゴリーマスタ取得
+   * 世帯ごとのマスタ（もしあれば）を取得するためヘッダーを付与
+   */
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/categories', {
+        headers: { 'x-member-id': selectedMember }
+      });
+      if (res.data && res.data.success) {
+        setCategories(res.data.data);
       }
-    };
-    fetchCategories();
-  }, []);
+    } catch (err) {
+      console.error('カテゴリー取得失敗', err);
+    }
+  }, [selectedMember]);
 
-  // レシート一覧取得
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  /**
+   * [Issue #45] レシート一覧取得
+   * params に加え、Middlewareが要求する headers にも memberId をセットします
+   */
   const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
@@ -59,12 +66,12 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         params: {
           memberId: selectedMember,
           month: selectedMonth
+        },
+        headers: {
+          'x-member-id': selectedMember // 世帯特定用
         }
       });
-      /**
-       * ★ 修正ポイント: [Issue #40]
-       * res.data.data 階層を正しくセットします。
-       */
+
       if (res.data && res.data.success) {
         setReceipts(res.data.data);
       }
@@ -80,17 +87,22 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     fetchReceipts();
   }, [fetchReceipts]);
 
+  // 親コンポーネントの切り替えを反映
   useEffect(() => {
     setSelectedMember(currentMemberId.toString());
   }, [currentMemberId]);
 
-  // 明細のカテゴリー更新
+  /**
+   * [Issue #45] 明細のカテゴリー更新
+   * 学習用マスタ（ProductMaster）の世帯分離のため、ヘッダーが必須です
+   */
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await apiClient.patch(`/receipt-items/${itemId}`, {
-        categoryId: Number(categoryId)
-      });
+      const response = await apiClient.patch(`/receipt-items/${itemId}`, 
+        { categoryId: Number(categoryId) },
+        { headers: { 'x-member-id': selectedMember } }
+      );
       
       if (response.data && response.data.success) {
         const updatedItem = response.data.data;
@@ -253,7 +265,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   );
 }
 
-// styles は以前と同様のため省略（そのまま使用してください）
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },

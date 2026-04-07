@@ -24,7 +24,8 @@ const STORAGE_KEYS = {
   VIEW: '@app_view',
   IMAGE: '@app_image',
   ROTATION: '@app_rotation',
-  RESULT: '@app_result'
+  RESULT: '@app_result',
+  MEMBER_ID: '@app_member_id' // ★追加
 };
 
 export default function App() {
@@ -47,30 +48,37 @@ export default function App() {
     }
   };
 
+  /**
+   * [Issue #45] マスタ取得時にも世帯IDを付与
+   */
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await apiClient.get('/categories');
+      const res = await apiClient.get('/categories', {
+        headers: { 'x-member-id': currentMemberId.toString() }
+      });
       if (res.data && res.data.success) {
         setCategories(res.data.data);
       }
     } catch (err) {
       console.error('マスタ取得失敗:', err);
     }
-  }, []);
+  }, [currentMemberId]);
 
   useEffect(() => {
     const restoreState = async () => {
       try {
-        const [v, i, r, res] = await Promise.all([
+        const [v, i, r, res, mid] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
           AsyncStorage.getItem(STORAGE_KEYS.IMAGE),
           AsyncStorage.getItem(STORAGE_KEYS.ROTATION),
-          AsyncStorage.getItem(STORAGE_KEYS.RESULT)
+          AsyncStorage.getItem(STORAGE_KEYS.RESULT),
+          AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
         ]);
         if (v) setCurrentView(v as ViewType);
         if (i) setImage(i);
         if (r) setRotation(parseInt(r, 10) || 0);
         if (res) setResultData(JSON.parse(res));
+        if (mid) setCurrentMemberId(parseInt(mid, 10) || 1);
       } catch (e) {
         console.error('復元失敗', e);
       } finally {
@@ -87,15 +95,16 @@ export default function App() {
         AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
         image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
         AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
-        resultData ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) : AsyncStorage.removeItem(STORAGE_KEYS.RESULT)
+        resultData ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) : AsyncStorage.removeItem(STORAGE_KEYS.RESULT),
+        AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, currentMemberId.toString())
       ]);
     };
     saveState();
-  }, [currentView, image, rotation, resultData, isReady]);
+  }, [currentView, image, rotation, resultData, isReady, currentMemberId]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    if (isReady) fetchCategories();
+  }, [fetchCategories, isReady]);
 
   const takePhoto = async () => {
     if (image) await deleteTempFile(image);
@@ -113,7 +122,7 @@ export default function App() {
   };
 
   /**
-   * [Issue #43] 非同期ポーリング処理
+   * [Issue #43 & #45] 非同期ポーリング処理
    */
   const pollJobStatus = async (jobId: string): Promise<any> => {
     let attempts = 0;
@@ -122,13 +131,17 @@ export default function App() {
 
     while (attempts < maxAttempts) {
       attempts++;
-      setLoadingMessage(`解析中... (${attempts * 2}秒経過)`);
+      setLoadingMessage(`解析中... (${attempts * 2}s)`);
 
-      const res = await apiClient.get(`/receipts/status/${jobId}`);
+      // エンドポイントを /status/ に統一
+      const res = await apiClient.get(`/receipts/status/${jobId}`, {
+        headers: { 'x-member-id': currentMemberId.toString() }
+      });
+      
       const { state, result, error } = res.data.data;
 
       if (state === 'completed') {
-        // ★ 修正：Worker内部で重複を検知して success: false が返ってきた場合
+        // Worker側の業務エラー（重複等）をハンドリング
         if (result && result.success === false) {
           throw new Error(result.message || '既に登録されているレシートです');
         }
@@ -141,12 +154,9 @@ export default function App() {
 
       await new Promise(resolve => setTimeout(resolve, interval));
     }
-    throw new Error('解析がタイムアウトしました。');
+    throw new Error('解析がタイムアウトしました。T320の負荷を確認してください。');
   };
 
-  /**
-   * [Issue #43] 解析・アップロード統合フロー
-   */
   const processAndUpload = async () => {
     if (!image) return;
     setUploading(true);
@@ -164,7 +174,7 @@ export default function App() {
       setLoadingMessage('アップロード中...');
       const jobId = await uploadImage(manipulatedUri);
 
-      setLoadingMessage('T320で解析中...');
+      setLoadingMessage('解析待ち...');
       const finalResult = await pollJobStatus(jobId);
 
       setResultData(finalResult);
@@ -174,15 +184,10 @@ export default function App() {
       setImage(null);
 
     } catch (error: any) {
-      const serverMessage = error.response?.data?.message || error.message;
-      const status = error.response?.status;
-
-      // 409(同期的な重複チェック) または Worker内での重複メッセージを拾う
-      if (status === 409 || serverMessage.includes('登録')) {
-        Alert.alert('登録済み', serverMessage || 'このレシートは既に登録されています。');
+      const serverMessage = error.response?.data?.error || error.message;
+      Alert.alert('お知らせ', serverMessage);
+      if (serverMessage.includes('重複') || serverMessage.includes('登録')) {
         setImage(null);
-      } else {
-        Alert.alert('エラー', serverMessage || '処理に失敗しました。');
       }
     } finally {
       setUploading(false);
@@ -192,11 +197,15 @@ export default function App() {
 
   const uploadImage = async (uri: string): Promise<string> => {
     const formData = new FormData();
-    formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
+    // @ts-ignore
+    formData.append('image', { uri, name: 'receipt.jpg', type: 'image/jpeg' });
     formData.append('memberId', currentMemberId.toString());
 
     const response = await apiClient.post('/receipts/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+        'x-member-id': currentMemberId.toString() // ★追加
+      },
     });
 
     if (response.data?.success && response.data.data?.jobId) {
@@ -207,10 +216,11 @@ export default function App() {
   };
 
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
-    if (!categoryId) return;
     try {
-      // ★ 修正：id -> itemId に変更
-      const response = await apiClient.patch(`/receipt-items/${itemId}`, { categoryId: Number(categoryId) });
+      const response = await apiClient.patch(`/receipt-items/${itemId}`, 
+        { categoryId: categoryId ? Number(categoryId) : null },
+        { headers: { 'x-member-id': currentMemberId.toString() } } // ★追加
+      );
       if (response.data && response.data.success) {
         const updatedItem = response.data.data;
         setResultData((prev: any) => {
@@ -246,7 +256,7 @@ export default function App() {
       case 'history': return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
       case 'stats': return <StatisticsScreen currentMemberId={currentMemberId} onBack={() => setCurrentView('main')} />;
       case 'category_mgr': return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} />;
-      case 'product_master': return <ProductMasterScreen onBack={() => setCurrentView('main')} />;
+      case 'product_master': return <ProductMasterScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId} />;
       default:
         return (
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>

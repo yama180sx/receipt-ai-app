@@ -18,26 +18,28 @@ interface Category {
   color: string;
 }
 
-export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
+// [Issue #45] currentMemberId を Props に追加
+export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () => void, currentMemberId: number }) => {
   const [masters, setMasters] = useState<ProductMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
 
-  // マスタデータ取得
+  // 共通ヘッダー生成
+  const headers = { 'x-member-id': currentMemberId.toString() };
+
+  /**
+   * [Issue #45] マスタデータ取得 (世帯分離対応)
+   */
   const fetchMasters = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiClient.get('/product-master', {
-        params: { q: searchQuery, store: storeFilter }
+        params: { q: searchQuery, store: storeFilter },
+        headers // ヘッダー付与
       });
       
-      /**
-       * ★ 修正ポイント: [Issue #40] 
-       * バックエンドのレスポンス形式 { success: true, data: T } に合わせ、
-       * res.data.data を取得します。
-       */
       if (res.data && res.data.success) {
         setMasters(res.data.data || []);
       } else {
@@ -49,15 +51,17 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, storeFilter]);
+  }, [searchQuery, storeFilter, currentMemberId]);
 
-  // 初回ロードとカテゴリー取得
+  /**
+   * 初回ロードとカテゴリー取得
+   */
   useEffect(() => {
     fetchMasters();
     
     const loadCategories = async () => {
       try {
-        const res = await apiClient.get('/categories');
+        const res = await apiClient.get('/categories', { headers });
         if (res.data && res.data.success) {
           setCategories(res.data.data || []);
         }
@@ -66,14 +70,17 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
       }
     };
     loadCategories();
-  }, [fetchMasters]);
+  }, [fetchMasters, currentMemberId]);
 
+  /**
+   * [Issue #45] 削除処理 (世帯分離対応)
+   */
   const handleDelete = (id: number) => {
     Alert.alert('確認', 'この学習データを削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
       { text: '削除', style: 'destructive', onPress: async () => {
         try {
-          await apiClient.delete(`/product-master/${id}`);
+          await apiClient.delete(`/product-master/${id}`, { headers });
           fetchMasters();
         } catch (e) {
           Alert.alert('エラー', '削除に失敗しました');
@@ -82,6 +89,9 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
     ]);
   };
 
+  /**
+   * [Issue #45] 店舗名統合 (世帯分離対応)
+   */
   const handleMergeStores = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
@@ -98,10 +108,10 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
                 { text: "実行", onPress: async (target: string | undefined) => {
                   if (!target) return;
                   try {
-                    await apiClient.post('/product-master/merge-stores', {
-                      sourceStoreName: source,
-                      targetStoreName: target
-                    });
+                    await apiClient.post('/product-master/merge-stores', 
+                      { sourceStoreName: source, targetStoreName: target },
+                      { headers } // 世帯を特定して統合
+                    );
                     Alert.alert("完了", "統合完了しました");
                     fetchMasters();
                   } catch (e) {
@@ -137,12 +147,11 @@ export const ProductMasterScreen = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <View style={styles.container}>
-      {/* 他の画面と統一したヘッダーデザイン */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{top:10, bottom:10, left:10, right:10}}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>学習マスタ管理</Text>
+        <Text style={styles.title}>学習マスタ管理 ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
         <TouchableOpacity onPress={handleMergeStores}>
           <Text style={styles.mergeText}>店舗統合</Text>
         </TouchableOpacity>
