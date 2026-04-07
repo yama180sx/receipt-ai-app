@@ -7,24 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 家族構成
-model FamilyMember {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique
-  receipts Receipt[]
+// [Issue #45] 世帯（テナント）最上位テーブル
+model FamilyGroup {
+  id             Int            @id @default(autoincrement())
+  name           String         // 世帯名 (例: 山本家)
+  inviteCode     String         @unique @default(cuid()) // 家族招待用のコード
+  members        FamilyMember[]
+  receipts       Receipt[]
+  productMasters ProductMaster[]
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
 }
 
-// 費目カテゴリー
+// 家族構成
+model FamilyMember {
+  id            Int         @id @default(autoincrement())
+  name          String
+  familyGroupId Int         // ★ 所属世帯
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  receipts      Receipt[]
+
+  @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
+}
+
+// 費目カテゴリー (共通マスタ)
 model Category {
   id             Int             @id @default(autoincrement())
   name           String          @unique
-  color          String?         // [Issue #14] UI表示用のカラーコードを追加
+  color          String?         
   keywords       Json            @default("[]") 
   items          Item[]
   productMasters ProductMaster[]
 }
 
-// 店舗正規化マスタ
+// 店舗正規化マスタ (共通マスタ)
 model Store {
   id           Int    @id @default(autoincrement())
   officialName String @unique
@@ -32,41 +47,44 @@ model Store {
 }
 
 model Receipt {
-  id          Int          @id @default(autoincrement())
-  memberId    Int
-  member      FamilyMember @relation(fields: [memberId], references: [id])
-  storeName   String
-  // PostgreSQLのTIMESTAMPTZ型を明示
-  date        DateTime     @db.Timestamptz(3)
-  totalAmount Int
-  // [Issue #26] String型からJson型へ変更
-  rawText     Json?
-  imagePath   String?      // [Issue #12.5] 画像保存用パスを追加
-  items       Item[]
-  // PostgreSQLのTIMESTAMPTZ型を明示
-  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  id            Int          @id @default(autoincrement())
+  familyGroupId Int          // ★ 世帯ID (論理分離の主軸)
+  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
+  memberId      Int
+  member        FamilyMember @relation(fields: [memberId], references: [id])
+  storeName     String
+  date          DateTime     @db.Timestamptz(3)
+  totalAmount   Int
+  rawText       Json?
+  imagePath     String?      
+  items         Item[]
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, date]) // 検索効率化
 }
 
 model Item {
-  id          Int       @id @default(autoincrement())
-  receiptId   Int
-  // [Issue #19] onDelete: Cascade を追加。親のReceiptが消えたら、この明細も自動で消去されます。
-  receipt     Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  categoryId  Int?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  name        String
-  price       Int
-  quantity    Int       @default(1)
+  id         Int       @id @default(autoincrement())
+  receiptId  Int
+  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  name       String
+  price      Int
+  quantity   Int       @default(1)
 }
 
-// [Issue #12.5] 学習マスタ
+// 学習マスタ (世帯ごとに学習結果を分離)
 model ProductMaster {
-  id          Int      @id @default(autoincrement())
-  name        String   // 商品名
-  storeName   String?  // 店舗名
-  categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id])
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id            Int          @id @default(autoincrement())
+  name          String
+  storeName     String
+  categoryId    Int
+  familyGroupId Int
+  
+  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
+  category      Category     @relation(fields: [categoryId], references: [id])
 
-  @@unique([name, storeName]) // 商品名と店舗の組み合わせでユニーク化
+  // コントローラーで使用している名前と一致させる
+  @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
 }

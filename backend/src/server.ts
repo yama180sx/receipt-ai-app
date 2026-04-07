@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import path from 'path';
@@ -6,19 +6,25 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import sharp from 'sharp'; 
 
-import { processAndSaveReceipt } from './services/receiptService';
-import logger from './utils/logger';
-import { PrismaClient } from '@prisma/client';
+// --- [Issue #43] BullMQ & Redis ---
+import { receiptQueue } from './queues/receiptQueue';
+import './workers/receiptWorker'; 
 
-// --- ルーターのインポート ---
+// --- ユーティリティ ---
+import logger from './utils/logger';
+import { prisma } from './utils/prismaClient'; 
+import { tenantMiddleware } from './middleware/tenantMiddleware';
+import { getFamilyGroupId } from './utils/context';
+
+// --- ルーター ---
 import receiptRoutes from './routes/receiptRoutes';
 import productMasterRoutes from './routes/productMasterRoutes'; 
-import categoryRoutes from './routes/categoryRoutes'; // ★ 追加
+import categoryRoutes from './routes/categoryRoutes';
 
-// --- Issue #40: エラーハンドリング・標準化 ---
+// --- エラーハンドリング ---
 import { AppError } from './utils/appError';
-import { errorHandler } from './middlewares/errorHandler';
-import { validate } from './middlewares/validate';
+import { errorHandler } from './middleware/errorHandler';
+import { validate } from './middleware/validate';
 import { uploadReceiptSchema } from './schemas/receiptSchema';
 
 dotenv.config();
@@ -26,32 +32,26 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
-const prisma = new PrismaClient();
 
-// --- CORS 制限 ---
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+// --- CORS 設定 (x-member-id ヘッダーを許可) ---
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      logger.warn(`[CORS Blocked]: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: (origin, callback) => callback(null, true),
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-member-id'],
   credentials: true
 }));
 
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// --- ルート登録の整理 ---
-// インラインで書いていたハンドラーを各ルーターへ委譲します
-app.use('/api/categories', categoryRoutes);      // /api/categories/*
-app.use('/api/product-master', productMasterRoutes); // /api/product-master/*
-app.use('/api', receiptRoutes);                  // /api/receipts/*, /api/receipt-items/*
+// --- [Issue #45] 世帯分離ミドルウェアを適用 ---
+// ルーティングの前に配置し、すべての API でコンテキストを有効化します
+app.use(tenantMiddleware);
+
+// --- ルート登録 ---
+app.use('/api/categories', categoryRoutes);
+app.use('/api/product-master', productMasterRoutes);
+app.use('/api', receiptRoutes);
 
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
@@ -62,65 +62,67 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 /**
- * 📂 レシートアップロード & 解析 (この特殊な処理のみ server.ts に残すか、receiptRoutes に移動)
+ * 📂 [Issue #43 & #45] レシートアップロード (Sharp + Job Queue)
  */
 app.post(
   '/api/receipts/upload', 
   upload.single('image'), 
   validate(uploadReceiptSchema),
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!req.file) throw new AppError('画像がアップロードされていません。', 400);
+      // Multer の型定義波線回避
+      const file = req.file as Express.Multer.File; 
+      if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
       const { memberId } = req.body;
+      const parsedMemberId = parseInt(memberId, 10);
+      
+      // コンテキストから世帯IDを取得
+      const familyGroupId = getFamilyGroupId();
 
+      // 世帯メンバーの存在確認
       const memberExists = await prisma.familyMember.findUnique({
-        where: { id: memberId }
+        where: { id: parsedMemberId }
       });
 
-      if (!memberExists) {
-        throw new AppError('指定された世帯IDが存在しません。', 400);
-      }
+      if (!memberExists) throw new AppError('指定されたメンバーが存在しません。', 400);
 
+      // 1. 画像加工 (T320のCPUパワーを活かしてWebP変換)
       const timestamp = Date.now();
-      const randomSuffix = Math.round(Math.random() * 1e9);
-      const baseFileName = `receipt-${timestamp}-${randomSuffix}`;
+      const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
       const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-      await sharp(req.file.buffer, { failOnError: false })
+      await sharp(file.buffer)
         .rotate() 
         .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }) 
         .webp({ quality: 75, effort: 6 }) 
         .toFile(imagePath);
 
-      const result = await processAndSaveReceipt(memberId, imagePath);
+      // 2. [Issue #45] ジョブキューに familyGroupId も渡す
+      // これにより、バックグラウンドの Worker が正しい世帯に保存できます
+      const job = await receiptQueue.add('analyze-receipt', {
+        memberId: parsedMemberId,
+        familyGroupId: familyGroupId, // ★追加
+        imagePath: imagePath,
+      });
 
-      // Issue #40 形式でレスポンス
-      res.status(200).json({
+      logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId})`);
+
+      res.status(202).json({
         success: true,
-        message: '解析および保存が完了しました。',
-        data: result
+        data: { jobId: job.id, status: 'queued' }
       });
       
-    } catch (error: any) {
-      if (error.message === 'DUPLICATE_RECEIPT_DETECTED') {
-        return next(new AppError('このレシートは既に登録されています。', 409, { code: 'DUPLICATE_RECEIPT' }));
-      }
+    } catch (error) {
       next(error);
     }
   }
 );
 
-/**
- * 404 ハンドラー
- */
-app.use((req, res, next) => {
-  next(new AppError(`Not Found - ${req.originalUrl}`, 404));
-});
+// 404 ハンドラー
+app.use((req, res, next) => next(new AppError(`Not Found - ${req.originalUrl}`, 404)));
 
-/**
- * 📂 グローバルエラーハンドラー (必ず最後に配置)
- */
+// グローバルエラーハンドラー
 app.use(errorHandler);
 
 app.listen(Number(port), host, () => {
