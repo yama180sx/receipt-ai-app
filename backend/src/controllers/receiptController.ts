@@ -10,7 +10,7 @@ import { saveReceiptData } from '../services/persistenceService';
 import { getFamilyGroupId } from '../utils/context';
 
 /**
- * [Issue #43] ジョブステータス取得 (ポーリング用)
+ * [Issue #43] ジョブステータス取得
  */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
@@ -31,7 +31,7 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
 };
 
 /**
- * [Issue #45] カテゴリ一覧取得 (世帯共通マスタ)
+ * [Issue #45] カテゴリ一覧取得
  */
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -41,12 +41,10 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
 };
 
 /**
- * [Issue #43 & #45] レシートアップロード (ジョブ登録)
- * 修正内容: memberId を req.body ではなく req.headers から取得するように変更
+ * [Issue #43 & #45] レシートアップロード
  */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // ★ 重要: Multipart/form-data では body よりも header (x-member-id) の方が確実に取得できます
     const memberId = req.headers['x-member-id'];
     const imagePath = req.file?.path;
 
@@ -55,7 +53,7 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
     const job = await receiptQueue.add('analyze-receipt', {
       memberId: Number(memberId),
-      familyGroupId: getFamilyGroupId(), // Middlewareがセットしたコンテキストを使用
+      familyGroupId: getFamilyGroupId(),
       imagePath,
     });
 
@@ -68,7 +66,6 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 手動登録は通常の JSON POST なので body から取得、念のため header もフォールバック
     const memberId = req.body.memberId || req.headers['x-member-id'];
     const { date, storeName, totalAmount, items, imagePath, rawText } = req.body;
 
@@ -87,7 +84,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * [Issue #45] 明細カテゴリ更新 ＋ 世帯別学習
+ * 明細カテゴリ更新 ＋ 世帯別学習
  */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
@@ -110,7 +107,6 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       });
 
       if (categoryId) {
-        // [Issue #45] 世帯別の学習マスタに保存
         await (tx.productMaster as any).upsert({
           where: {
             name_storeName_familyGroupId: {
@@ -189,31 +185,68 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 月別統計
+ * [Issue #50] 月別統計 (カテゴリー内訳対応)
  */
-export const getMonthlyStats = async (_req: Request, res: Response, next: NextFunction) => {
-  const fId = getFamilyGroupId();
+export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
+  const familyGroupId = getFamilyGroupId();
+  const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+
   try {
-    const stats = await prisma.$queryRaw`
-      SELECT 
-        TO_CHAR(date, 'YYYY-MM') as month, 
-        SUM("totalAmount")::int as total 
-      FROM "Receipt" 
-      WHERE "familyGroupId" = ${fId} 
-      GROUP BY month 
-      ORDER BY month DESC
+    // 1. 指定月の合計支出
+    const totalRes = await prisma.$queryRaw<any[]>`
+      SELECT SUM("totalAmount")::int as total
+      FROM "Receipt"
+      WHERE "familyGroupId" = ${familyGroupId}
+      AND TO_CHAR(date, 'YYYY-MM') = ${month}
     `;
-    res.json({ success: true, data: stats });
+    const totalAmount = totalRes[0]?.total || 0;
+
+    // 2. カテゴリー別の集計 (JOIN Item & Category)
+    const categoryStats = await prisma.$queryRaw<any[]>`
+      SELECT 
+        c.id as "categoryId",
+        c.name as "categoryName",
+        c.color as "color",
+        SUM(i.price * i.quantity)::int as "totalAmount"
+      FROM "Item" i
+      JOIN "Receipt" r ON i."receiptId" = r.id
+      LEFT JOIN "Category" c ON i."categoryId" = c.id
+      WHERE r."familyGroupId" = ${familyGroupId}
+      AND TO_CHAR(r.date, 'YYYY-MM') = ${month}
+      GROUP BY c.id, c.name, c.color
+      ORDER BY "totalAmount" DESC
+    `;
+
+    // 3. 最新のレシート1件
+    const latestReceipt = await prisma.receipt.findFirst({
+      where: { familyGroupId, AND: { date: { gte: new Date(`${month}-01`), lt: new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)) } } },
+      orderBy: { date: 'desc' },
+      include: { items: { include: { category: true } } }
+    });
+
+    res.json({ 
+      success: true, 
+      data: {
+        month,
+        totalAmount,
+        stats: categoryStats.map(s => ({
+          ...s,
+          categoryName: s.categoryName || '未分類'
+        })),
+        latestReceipt
+      }
+    });
   } catch (error) { next(error); }
 };
 
 /**
- * 高度な統計 (トレンド分析)
+ * [Issue #50] 高度な統計 (パレート分析データ対応)
  */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
   try {
-    const trend = await prisma.$queryRaw`
+    // トレンド (過去6ヶ月)
+    const trend = await prisma.$queryRaw<any[]>`
       SELECT 
         TO_CHAR(date, 'YYYY-MM') as period, 
         SUM("totalAmount")::int as total 
@@ -223,6 +256,34 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
       ORDER BY period DESC 
       LIMIT 6
     `;
-    res.json({ success: true, data: { trend, pareto: [] } });
+
+    // パレート分析用 (当月のカテゴリー別割合)
+    const month = new Date().toISOString().slice(0, 7);
+    const paretoRaw = await prisma.$queryRaw<any[]>`
+      SELECT 
+        COALESCE(c.name, '未分類') as name,
+        SUM(i.price * i.quantity)::int as amount
+      FROM "Item" i
+      JOIN "Receipt" r ON i."receiptId" = r.id
+      LEFT JOIN "Category" c ON i."categoryId" = c.id
+      WHERE r."familyGroupId" = ${fId}
+      AND TO_CHAR(r.date, 'YYYY-MM') = ${month}
+      GROUP BY c.name
+      ORDER BY amount DESC
+    `;
+
+    const total = paretoRaw.reduce((sum, item) => sum + (item.amount || 0), 0);
+    let cumulative = 0;
+    const pareto = paretoRaw.map(item => {
+      const ratio = total > 0 ? Math.round((item.amount / total) * 100) : 0;
+      cumulative += ratio;
+      return {
+        ...item,
+        ratio,
+        cumulative_ratio: cumulative > 100 ? 100 : cumulative
+      };
+    });
+
+    res.json({ success: true, data: { trend, pareto } });
   } catch (error) { next(error); }
 };
