@@ -255,7 +255,7 @@ export default function App() {
     switch (currentView) {
       case 'history': return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId}/>;
       case 'stats': return <StatisticsScreen currentMemberId={currentMemberId} onBack={() => setCurrentView('main')} />;
-      case 'category_mgr': return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} />;
+      case 'category_mgr': return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} currentMemberId={currentMemberId} />;
       case 'product_master': return <ProductMasterScreen onBack={() => setCurrentView('main')} currentMemberId={currentMemberId} />;
       default:
         return (
