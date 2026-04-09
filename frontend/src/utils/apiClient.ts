@@ -1,8 +1,16 @@
 import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
+/**
+ * [Issue #52] 401エラー時に App.tsx 等の UI 側でログアウト処理を発火させるためのハンドラ
+ */
+let onUnauthorizedHandler: (() => void) | null = null;
+
+export const setOnUnauthorized = (handler: () => void) => {
+  onUnauthorizedHandler = handler;
+};
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-// 開発用トークン（Issue #52 完了後は SecureStore から取得するように移行）
-const API_TOKEN = process.env.EXPO_PUBLIC_API_TOKEN;
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -11,40 +19,49 @@ const apiClient = axios.create({
   },
 });
 
-// --- リクエストインターセプター ---
-apiClient.interceptors.request.use((config) => {
-  // 1. JWT 認証トークンの付与
-  if (API_TOKEN) {
-    config.headers.Authorization = `Bearer ${API_TOKEN}`;
-  }
+// --- リクエストインターセプター：送信前に認証情報を自動注入 ---
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    // 1. JWTトークンの取得と付与
+    const token = await SecureStore.getItemAsync('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-  // 2. [Issue #51/52 準備] 
-  // TODO: Issue #52 にて AsyncStorage/SecureStore から取得した 
-  // currentMemberId を自動で headers['x-member-id'] にセットする処理をここに追加予定
+    // 2. [Issue #51/52] メンバーIDの取得と付与 (x-member-id)
+    // これにより、各 Screen で headers を手動設定する必要がなくなります
+    const memberId = await SecureStore.getItemAsync('currentMemberId');
+    if (memberId) {
+      config.headers['x-member-id'] = memberId;
+    }
+  } catch (error) {
+    console.error('[API-AUTH] SecureStore 取得失敗:', error);
+  }
   
   return config;
 }, (error) => Promise.reject(error));
 
 /**
- * --- レスポンスインターセプター ---
- * [Issue #42 & #51] エラーハンドリングの統一
+ * --- レスポンスインターセプター：エラーの統一ハンドリング ---
  */
 apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
+  (response) => response,
+  async (error) => {
     if (error.response && error.response.data) {
-      // バックエンドの AppError が返す { success, message, code } 構造に対応
+      // バックエンドの AppError 構造からメッセージを抽出
       const serverMessage = error.response.data.message || error.message;
       const errorCode = error.response.data.code;
       
       error.message = serverMessage;
 
-      // [Issue #51] 認証エラー (401) の共通処理
+      // [Issue #51/52] 認証エラー (401) のハンドリング
       if (error.response.status === 401) {
-        console.warn(`[API] Unauthorized: ${errorCode}`);
-        // ここでグローバルな通知やログイン画面への遷移トリガーを引くことが可能です
+        console.warn(`[API] Unauthorized: ${errorCode || 'TOKEN_EXPIRED'}`);
+        
+        // App.tsx で登録されたログアウト関数を実行し、UIをログイン画面に切り替える
+        if (onUnauthorizedHandler) {
+          onUnauthorizedHandler();
+        }
       }
     }
     return Promise.reject(error);
