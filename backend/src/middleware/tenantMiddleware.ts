@@ -1,54 +1,65 @@
 import { Request, Response, NextFunction } from 'express';
 import { runWithTenant } from '../utils/context';
-import { prisma } from '../utils/prismaClient'; // シングルトン版
+import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
 
 /**
- * [Issue #45] 世帯コンテキスト特定ミドルウェア
- * * 1. リクエストから memberId を抽出
- * 2. DBから所属する familyGroupId を特定
- * 3. AsyncLocalStorage にコンテキストを保存して後続の処理(next)へ移譲
+ * [Issue #51] 世帯コンテキスト特定ミドルウェア
+ * authMiddleware でセットされた req.user を優先し、
+ * なければヘッダーの x-member-id を参照します（移行期間用）。
  */
 export const tenantMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-  // 1. memberId の抽出 (Header, Query, Body の順)
-  const memberIdStr = 
-    req.headers['x-member-id'] || 
-    req.query.memberId || 
-    (req.body && req.body.memberId);
-    
-  const memberId = Number(memberIdStr);
+  // 認証済みのユーザーIDを優先取得
+  const user = (req as any).user;
+  const rawMemberId = user?.id || req.headers['x-member-id'];
+  const memberId = Number(rawMemberId);
 
-  // 認証不要なルートや ID 不足時はデフォルト処理へ（または 401 制御）
-  if (!memberId || isNaN(memberId)) {
-    return next();
+  if (!rawMemberId || isNaN(memberId)) {
+    logger.warn(`[TENANT] 401 Unauthorized: memberId is missing. Path: ${req.path}`);
+    return res.status(401).json({ 
+      success: false, 
+      code: 'MEMBER_ID_REQUIRED',
+      message: 'メンバー情報の特定に失敗しました' 
+    });
   }
 
   try {
-    // 2. メンバーの存在確認と世帯IDの取得
-    // ※ パフォーマンス向上のため select で必要なフィールドのみに絞り込む
+    // DBからメンバーの所属世帯を特定
     const member = await prisma.familyMember.findUnique({
       where: { id: memberId },
-      select: { familyGroupId: true }
+      select: { id: true, familyGroupId: true }
     });
 
     if (!member) {
-      logger.warn(`[TENANT] 無効な memberId: ${memberId} (IP: ${req.ip})`);
-      return res.status(403).json({ 
+      logger.error(`[TENANT] Member ID ${memberId} not found in database.`);
+      return res.status(401).json({ 
         success: false, 
-        error: '指定されたメンバーが見つかりません。' 
+        message: '指定されたメンバーが存在しません' 
       });
     }
 
-    // 3. コンテキストを保存して実行
-    // context.ts で定義した runWithTenant ヘルパーを使用
+    // セキュリティチェック: トークンの familyGroupId と DB の値が一致するか（もしペイロードにあれば）
+    if (user?.familyGroupId && user.familyGroupId !== member.familyGroupId) {
+      logger.warn(`[TENANT] Security Alert: Family Group Mismatch for Member ${memberId}`);
+      return res.status(403).json({ 
+        success: false, 
+        message: '不正なアクセスです' 
+      });
+    }
+
+    // 成功時: ALSにコンテキストを保存して次へ
+    logger.info(`[TENANT] Context Set: Member ${memberId} (Group: ${member.familyGroupId})`);
+    
     runWithTenant(
-      { familyGroupId: member.familyGroupId, memberId },
+      { familyGroupId: member.familyGroupId, memberId: member.id },
       () => next()
     );
 
   } catch (error) {
-    logger.error(`[TENANT] Middleware Error: ${error}`);
-    // エラーハンドラーへ委譲
-    next(error);
+    logger.error(`[TENANT] Database Error: ${error}`);
+    res.status(500).json({ 
+      success: false, 
+      message: 'サーバー内部エラーが発生しました' 
+    });
   }
 };

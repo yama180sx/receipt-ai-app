@@ -3,16 +3,14 @@ import {
   getProductMasters, 
   updateProductMaster, 
   deleteProductMaster,
-  mergeStoreNames // 店舗名統合用
+  mergeStoreNames 
 } from '../controllers/productMasterController';
-import { authMiddleware } from '../middleware/auth';
+
+// ★[Issue #51] server.ts で一括適用したため、ここでの個別の tenantMiddleware は削除しました
 
 const router = Router();
 
-// 全て認証必須
-router.use(authMiddleware);
-
-// 一覧取得（クエリで品名・店舗名の検索に対応させる）
+// 一覧取得（クエリで品名・店舗名の検索に対応）
 router.get('/', getProductMasters);
 
 // 単一更新

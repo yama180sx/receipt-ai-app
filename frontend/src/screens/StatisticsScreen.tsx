@@ -10,7 +10,7 @@ const screenWidth = Dimensions.get('window').width;
 
 // --- interface 定義 ---
 interface Category { id: number; name: string; color: string; }
-interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number; color: string; }
+interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number | string; color: string; }
 interface ReceiptItem { id: number; name: string; price: number; categoryId: number; category?: { name: string; color: string }; }
 interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; }
 interface MonthlyData { month: string; totalAmount: number; prevTotal: number; diffAmount: number; diffPercentage: number; stats: StatItem[]; latestReceipt: ReceiptInfo | null; }
@@ -47,32 +47,48 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   }, []);
 
   /**
-   * [Issue #44 & #45] データ取得
-   * すべてのリクエストに x-member-id ヘッダーを付与し、世帯分離を徹底します。
+   * [Issue #50] データ取得ロジック
+   * 1. 全リクエストに x-member-id を付与 (401対策)
+   * 2. 受信データが配列で届くケースに対応
    */
   const fetchData = useCallback(async () => {
+    if (!currentMemberId) return;
+    
     try {
       setLoading(true);
       const headers = { 'x-member-id': currentMemberId.toString() };
 
       const [statsRes, advRes, catRes] = await Promise.all([
-        apiClient.get(`/stats/monthly`, { 
-          params: { month: selectedMonth, memberId: currentMemberId },
-          headers 
-        }),
-        apiClient.get(`/stats/advanced`, { 
-          params: { memberId: currentMemberId },
-          headers 
-        }),
+        apiClient.get(`/stats/monthly`, { params: { month: selectedMonth }, headers }),
+        apiClient.get(`/stats/advanced`, { headers }),
         apiClient.get('/categories', { headers })
       ]);
 
-      if (statsRes.data?.success) setData(statsRes.data.data);
+      // --- [修正] MonthlyData のパース ---
+      if (statsRes.data?.success) {
+        const raw = statsRes.data.data;
+        if (Array.isArray(raw)) {
+          // 配列（現在のバックエンド仕様）を MonthlyData 型にアダプト
+          const target = raw.find(item => item.month === selectedMonth) || raw[0];
+          setData({
+            month: target?.month || selectedMonth,
+            totalAmount: Number(target?.total || 0),
+            prevTotal: 0,
+            diffAmount: 0,
+            diffPercentage: 0,
+            stats: target?.stats || [], // カテゴリー別内訳
+            latestReceipt: target?.latestReceipt || null
+          });
+        } else {
+          setData(raw);
+        }
+      }
+
       if (advRes.data?.success) setAdvancedData(advRes.data.data);
       if (catRes.data?.success) setAllCategories(catRes.data.data);
 
     } catch (error: any) {
-      console.error('Fetch error:', error);
+      console.error('[DEBUG-STATS] Fetch Error:', error);
       Alert.alert("エラー", "データの取得に失敗しました");
     } finally {
       setLoading(false);
@@ -83,36 +99,39 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     fetchData();
   }, [fetchData]);
 
-  /**
-   * カテゴリー更新処理
-   */
   const handleUpdateCategory = async (categoryId: number) => {
     if (!selectedItemId) return;
     try {
-      await apiClient.patch(`/receipt-items/${selectedItemId}`, 
-        { categoryId },
-        { headers: { 'x-member-id': currentMemberId.toString() } }
-      );
+      await apiClient.patch(`/receipt-items/${selectedItemId}`, { categoryId }, { headers: { 'x-member-id': currentMemberId.toString() } });
       setPickerVisible(false);
-      await fetchData(); // 再フェッチしてグラフを更新
+      await fetchData();
       Alert.alert("完了", "カテゴリーを更新しました");
-    } catch (error) {
-      Alert.alert("エラー", "更新に失敗しました");
-    }
+    } catch (error) { Alert.alert("エラー", "更新に失敗しました"); }
   };
 
-  const chartData = (data?.stats || [])
-    .filter(s => (s.totalAmount ?? 0) > 0)
-    .map(s => ({
-      name: s.categoryName,
-      population: s.totalAmount,
-      color: s.color || theme.colors.secondary,
-      legendFontColor: theme.colors.text.main,
-      legendFontSize: 12,
-    }));
+  /**
+   * [Issue #50] 円グラフ用データの生成 (型変換処理)
+   */
+  const chartData = useMemo(() => {
+    if (!data?.stats || !Array.isArray(data.stats)) return [];
+    
+    return data.stats
+      .map(s => {
+        const val = Number(s.totalAmount);
+        return {
+          name: s.categoryName || '未分類',
+          population: isNaN(val) ? 0 : val,
+          color: s.color || theme.colors.secondary,
+          legendFontColor: theme.colors.text.main,
+          legendFontSize: 12,
+        };
+      })
+      .filter(s => s.population > 0);
+  }, [data?.stats]);
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
           <Text style={styles.backButton}>← 戻る</Text>
@@ -122,7 +141,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
+        {/* 月選択セクション */}
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
           <View style={styles.monthPickerContainer}>
@@ -138,9 +157,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <>
+            {/* サマリーカード */}
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>当月合計支出</Text>
-              <Text style={styles.totalValue}>¥{(data?.totalAmount || 0).toLocaleString()}</Text>
+              <Text style={styles.totalValue}>¥{(Number(data?.totalAmount) || 0).toLocaleString()}</Text>
               <View style={styles.comparisonRow}>
                 <Text style={styles.comparisonLabel}>前月比:</Text>
                 <Text style={[styles.diffValue, { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success }]}>
@@ -149,7 +169,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 2. [Issue #44] トレンド分析 --- */}
+            {/* トレンド分析 */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
               <View style={styles.statsCard}>
@@ -168,7 +188,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 3. [Issue #44] パレート分析 --- */}
+            {/* パレート分析 */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>費目別パレート分析 (Pareto)</Text>
               <View style={styles.statsCard}>
@@ -187,11 +207,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     </View>
                   </View>
                 ))}
-                <Text style={styles.paretoNote}>※ 青色の費目が全体支出の80%を占める主要項目です</Text>
               </View>
             </View>
 
-            {/* --- 4. 円グラフ --- */}
+            {/* 円グラフ */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>支出内訳</Text>
               <View style={styles.chartCard}>
@@ -199,18 +218,18 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                   <PieChart
                     data={chartData}
                     width={screenWidth - 60}
-                    height={200}
+                    height={220}
                     chartConfig={{ color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})` }}
                     accessor={"population"}
                     backgroundColor={"transparent"}
                     paddingLeft={"15"}
                     absolute
                   />
-                ) : <Text style={styles.noDataText}>データなし</Text>}
+                ) : <Text style={styles.noDataText}>カテゴリー別データがありません</Text>}
               </View>
             </View>
 
-            {/* --- 5. 最新レシート --- */}
+            {/* 最新レシート */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>最新の解析レシート</Text>
               {data?.latestReceipt?.imagePath ? (
@@ -287,23 +306,23 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backButton: { ...theme.typography.body, color: theme.colors.primary, fontWeight: '700' },
-  headerTitle: { ...theme.typography.h2, color: theme.colors.text.main },
-  scrollContent: { padding: theme.spacing.lg },
-  topInfo: { marginBottom: theme.spacing.md },
-  headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, letterSpacing: 1 },
-  monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  backButton: { color: theme.colors.primary, fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold' },
+  scrollContent: { padding: 20 },
+  topInfo: { marginBottom: 15 },
+  headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
+  monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
   monthPicker: { width: '100%' },
-  summaryCard: { backgroundColor: theme.colors.surface, padding: theme.spacing.lg, borderRadius: theme.borderRadius.lg, marginBottom: theme.spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, elevation: 3 },
-  summaryLabel: { ...theme.typography.caption, color: theme.colors.text.muted },
-  totalValue: { ...theme.typography.h1, fontSize: 36, color: theme.colors.primary, marginVertical: 4 },
+  summaryCard: { backgroundColor: theme.colors.surface, padding: 20, borderRadius: 15, marginBottom: 25, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, elevation: 3 },
+  summaryLabel: { fontSize: 12, color: theme.colors.text.muted },
+  totalValue: { fontSize: 36, fontWeight: 'bold', color: theme.colors.primary, marginVertical: 4 },
   comparisonRow: { flexDirection: 'row', alignItems: 'center' },
-  comparisonLabel: { ...theme.typography.caption, marginRight: 8 },
+  comparisonLabel: { fontSize: 12, marginRight: 8 },
   diffValue: { fontWeight: '700', fontSize: 16 },
-  section: { marginBottom: theme.spacing.xl },
-  sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.md, borderLeftWidth: 4, borderLeftColor: theme.colors.primary, paddingLeft: 8 },
-  statsCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border },
+  section: { marginBottom: 25 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, borderLeftWidth: 4, borderLeftColor: theme.colors.primary, paddingLeft: 8 },
+  statsCard: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, borderWidth: 1, borderColor: theme.colors.border },
   trendRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.colors.background },
   trendPeriod: { flex: 1, fontWeight: '700' },
   trendAmount: { flex: 1, textAlign: 'right' },
@@ -315,33 +334,32 @@ const styles = StyleSheet.create({
   paretoBarContainer: { height: 16, backgroundColor: '#E9ECEF', borderRadius: 8, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   paretoBar: { height: '100%' },
   cumText: { fontSize: 10, position: 'absolute', right: 8, fontWeight: '700', color: theme.colors.text.main },
-  paretoNote: { fontSize: 11, color: theme.colors.text.muted, marginTop: 8, fontStyle: 'italic' },
-  chartCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  receiptPreviewCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, elevation: 4 },
+  chartCard: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, minHeight: 220, justifyContent: 'center' },
+  noDataText: { fontSize: 12, color: theme.colors.text.muted },
+  receiptPreviewCard: { backgroundColor: theme.colors.surface, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border },
   receiptImage: { width: '100%', height: 160, backgroundColor: theme.colors.border },
-  receiptInfoOverlay: { padding: theme.spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  receiptStoreName: { ...theme.typography.body, fontWeight: '700' },
-  receiptAmount: { ...theme.typography.h2, color: theme.colors.primary },
-  noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: theme.borderRadius.md, justifyContent: 'center', alignItems: 'center' },
-  noDataText: { ...theme.typography.caption, color: theme.colors.text.muted },
+  receiptInfoOverlay: { padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  receiptStoreName: { fontWeight: '700' },
+  receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary },
+  noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   modalContainer: { flex: 1, backgroundColor: theme.colors.background },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  modalTitle: { ...theme.typography.h2 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
   modalCloseText: { color: theme.colors.error, fontWeight: '600' },
   modalScroll: { flex: 1 },
-  modalImage: { width: '100%', height: 300, marginVertical: theme.spacing.md },
-  itemListContainer: { paddingHorizontal: theme.spacing.lg },
-  itemRow: { flexDirection: 'row', paddingVertical: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border, alignItems: 'center' },
-  itemName: { ...theme.typography.body },
-  itemPrice: { ...theme.typography.body, fontWeight: '700', color: theme.colors.primary },
-  categoryBadge: { paddingHorizontal: theme.spacing.md, paddingVertical: 6, borderRadius: theme.borderRadius.round },
-  categoryBadgeText: { color: 'white', fontWeight: '700', fontSize: 12 },
+  modalImage: { width: '100%', height: 300, marginVertical: 15 },
+  itemListContainer: { paddingHorizontal: 20 },
+  itemRow: { flexDirection: 'row', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border, alignItems: 'center' },
+  itemName: { flex: 1 },
+  itemPrice: { fontWeight: '700', color: theme.colors.primary },
+  categoryBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginLeft: 10 },
+  categoryBadgeText: { color: 'white', fontWeight: '700', fontSize: 10 },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  pickerWindow: { width: '85%', maxHeight: '70%', backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg },
-  pickerHeader: { ...theme.typography.h2, marginBottom: theme.spacing.md, textAlign: 'center' },
-  pickerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: theme.spacing.md },
-  pickerItemText: { ...theme.typography.body },
-  pickerCancel: { marginTop: theme.spacing.md, alignItems: 'center' },
+  pickerWindow: { width: '85%', maxHeight: '70%', backgroundColor: theme.colors.surface, borderRadius: 15, padding: 20 },
+  pickerHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
+  pickerItemText: { fontSize: 16 },
+  pickerCancel: { marginTop: 15, alignItems: 'center' },
   pickerCancelText: { color: theme.colors.error, fontWeight: '700' }
 });

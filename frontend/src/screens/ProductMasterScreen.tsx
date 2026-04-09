@@ -18,26 +18,36 @@ interface Category {
   color: string;
 }
 
-// [Issue #45] currentMemberId を Props に追加
-export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () => void, currentMemberId: number }) => {
+// [Issue #45] Props の型を number | null に拡張（App.tsx からの null 渡しを許容）
+export const ProductMasterScreen = ({ 
+  onBack, 
+  currentMemberId 
+}: { 
+  onBack: () => void, 
+  currentMemberId: number | null 
+}) => {
   const [masters, setMasters] = useState<ProductMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
 
-  // 共通ヘッダー生成
-  const headers = { 'x-member-id': currentMemberId.toString() };
+  // ヘッダー生成関数（currentMemberId が確定している時のみ生成）
+  const getHeaders = useCallback(() => {
+    return currentMemberId ? { 'x-member-id': currentMemberId.toString() } : {};
+  }, [currentMemberId]);
 
   /**
    * [Issue #45] マスタデータ取得 (世帯分離対応)
    */
   const fetchMasters = useCallback(async () => {
+    if (!currentMemberId) return; // IDがない場合は実行しない
+
     try {
       setLoading(true);
       const res = await apiClient.get('/product-master', {
         params: { q: searchQuery, store: storeFilter },
-        headers // ヘッダー付与
+        headers: getHeaders()
       });
       
       if (res.data && res.data.success) {
@@ -47,30 +57,32 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
       }
     } catch (err) {
       console.error('Fetch Masters Error:', err);
-      Alert.alert('エラー', 'マスタの取得に失敗しました');
+      // 401エラー時は再試行を促すか、ログアウト状態を確認
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, storeFilter, currentMemberId]);
+  }, [searchQuery, storeFilter, currentMemberId, getHeaders]);
 
   /**
    * 初回ロードとカテゴリー取得
    */
   useEffect(() => {
-    fetchMasters();
-    
-    const loadCategories = async () => {
-      try {
-        const res = await apiClient.get('/categories', { headers });
-        if (res.data && res.data.success) {
-          setCategories(res.data.data || []);
+    if (currentMemberId) {
+      fetchMasters();
+      
+      const loadCategories = async () => {
+        try {
+          const res = await apiClient.get('/categories', { headers: getHeaders() });
+          if (res.data && res.data.success) {
+            setCategories(res.data.data || []);
+          }
+        } catch (err) {
+          console.error('Category fetch error:', err);
         }
-      } catch (err) {
-        console.error('Category fetch error:', err);
-      }
-    };
-    loadCategories();
-  }, [fetchMasters, currentMemberId]);
+      };
+      loadCategories();
+    }
+  }, [fetchMasters, currentMemberId, getHeaders]);
 
   /**
    * [Issue #45] 削除処理 (世帯分離対応)
@@ -80,7 +92,7 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
       { text: 'キャンセル', style: 'cancel' },
       { text: '削除', style: 'destructive', onPress: async () => {
         try {
-          await apiClient.delete(`/product-master/${id}`, { headers });
+          await apiClient.delete(`/product-master/${id}`, { headers: getHeaders() });
           fetchMasters();
         } catch (e) {
           Alert.alert('エラー', '削除に失敗しました');
@@ -110,7 +122,7 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
                   try {
                     await apiClient.post('/product-master/merge-stores', 
                       { sourceStoreName: source, targetStoreName: target },
-                      { headers } // 世帯を特定して統合
+                      { headers: getHeaders() }
                     );
                     Alert.alert("完了", "統合完了しました");
                     fetchMasters();
@@ -124,7 +136,7 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
         ]
       );
     } else {
-      Alert.alert("通知", "店舗統合機能（Prompt）は現在iOSのみの簡易実装です。");
+      Alert.alert("通知", "店舗統合機能は現在iOSのみの対応です。");
     }
   };
 
@@ -151,7 +163,7 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
         <TouchableOpacity onPress={onBack} hitSlop={{top:10, bottom:10, left:10, right:10}}>
           <Text style={styles.backText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>学習マスタ管理 ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
+        <Text style={styles.title}>学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
         <TouchableOpacity onPress={handleMergeStores}>
           <Text style={styles.mergeText}>店舗統合</Text>
         </TouchableOpacity>
@@ -176,7 +188,9 @@ export const ProductMasterScreen = ({ onBack, currentMemberId }: { onBack: () =>
         />
       </View>
 
-      {loading ? (
+      {!currentMemberId ? (
+        <Text style={styles.empty}>メンバーを選択してください</Text>
+      ) : loading ? (
         <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 20 }} />
       ) : (
         <FlatList
