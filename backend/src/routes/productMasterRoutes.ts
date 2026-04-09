@@ -3,17 +3,12 @@ import {
   getProductMasters, 
   updateProductMaster, 
   deleteProductMaster,
-  mergeStoreNames // 店舗名統合用
+  mergeStoreNames 
 } from '../controllers/productMasterController';
-import { tenantMiddleware } from '../middleware/tenantMiddleware'; // 世帯分離用
+
+// ★[Issue #51] server.ts で一括適用したため、ここでの個別の tenantMiddleware は削除しました
 
 const router = Router();
-
-/**
- * [Issue #45] 世帯分離コンテキストの適用
- * 開発中の JWT 期限切れ回避のため、authMiddleware は一時的に除外しています。
- */
-router.use(tenantMiddleware);
 
 // 一覧取得（クエリで品名・店舗名の検索に対応）
 router.get('/', getProductMasters);

@@ -4,60 +4,62 @@ import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
 
 /**
- * [Issue #45] 世帯コンテキスト特定ミドルウェア (デバッグ強化版)
+ * [Issue #51] 世帯コンテキスト特定ミドルウェア
+ * authMiddleware でセットされた req.user を優先し、
+ * なければヘッダーの x-member-id を参照します（移行期間用）。
  */
 export const tenantMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-  // 1. 受信した全ヘッダーの確認 (必要に応じてコメントアウトを外してください)
-  // console.log('[DEBUG-AUTH] Full Headers:', req.headers);
+  // 認証済みのユーザーIDを優先取得
+  const user = (req as any).user;
+  const rawMemberId = user?.id || req.headers['x-member-id'];
+  const memberId = Number(rawMemberId);
 
-  const memberIdHeader = req.headers['x-member-id'];
-  const memberIdQuery = req.query.memberId;
-  const memberIdBody = req.body?.memberId;
-
-  // ログ出力: どこから値を取得しようとしているか可視化
-  console.log(`[DEBUG-TENANT] Incoming -> Header: "${memberIdHeader}", Query: "${memberIdQuery}", Body: "${memberIdBody}"`);
-
-  const rawId = memberIdHeader || memberIdQuery || memberIdBody;
-  const memberId = Number(rawId);
-
-  // 2. IDが取得できない、または数値でない場合
-  if (!rawId || isNaN(memberId)) {
-    logger.warn(`[TENANT] 401 Unauthorized: memberId is missing or NaN. Path: ${req.path}`);
+  if (!rawMemberId || isNaN(memberId)) {
+    logger.warn(`[TENANT] 401 Unauthorized: memberId is missing. Path: ${req.path}`);
     return res.status(401).json({ 
       success: false, 
-      message: `メンバーIDが未指定です (Received: ${rawId})`,
-      debug_path: req.path
+      code: 'MEMBER_ID_REQUIRED',
+      message: 'メンバー情報の特定に失敗しました' 
     });
   }
 
   try {
-    // 3. DB問い合わせの直前ログ
-    console.log(`[DEBUG-TENANT] Querying DB for memberId: ${memberId}`);
-
+    // DBからメンバーの所属世帯を特定
     const member = await prisma.familyMember.findUnique({
       where: { id: memberId },
       select: { id: true, familyGroupId: true }
     });
 
-    // 4. DBに存在しない場合
     if (!member) {
-      logger.error(`[TENANT] 401 Unauthorized: Member ID ${memberId} NOT FOUND in database.`);
+      logger.error(`[TENANT] Member ID ${memberId} not found in database.`);
       return res.status(401).json({ 
         success: false, 
-        message: `ID ${memberId} のメンバーがデータベースに存在しません。` 
+        message: '指定されたメンバーが存在しません' 
       });
     }
 
-    // 5. 成功ログ
-    logger.info(`[TENANT] Auth OK: Member ${memberId} (Group: ${member.familyGroupId}) -> ${req.method} ${req.path}`);
+    // セキュリティチェック: トークンの familyGroupId と DB の値が一致するか（もしペイロードにあれば）
+    if (user?.familyGroupId && user.familyGroupId !== member.familyGroupId) {
+      logger.warn(`[TENANT] Security Alert: Family Group Mismatch for Member ${memberId}`);
+      return res.status(403).json({ 
+        success: false, 
+        message: '不正なアクセスです' 
+      });
+    }
 
+    // 成功時: ALSにコンテキストを保存して次へ
+    logger.info(`[TENANT] Context Set: Member ${memberId} (Group: ${member.familyGroupId})`);
+    
     runWithTenant(
       { familyGroupId: member.familyGroupId, memberId: member.id },
       () => next()
     );
 
   } catch (error) {
-    logger.error(`[TENANT] 500 Internal Server Error: ${error}`);
-    res.status(500).json({ success: false, message: 'ミドルウェアでデータベースエラーが発生しました。' });
+    logger.error(`[TENANT] Database Error: ${error}`);
+    res.status(500).json({ 
+      success: false, 
+      message: 'サーバー内部エラーが発生しました' 
+    });
   }
 };
