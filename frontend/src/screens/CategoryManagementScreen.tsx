@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
@@ -9,7 +9,6 @@ interface Category {
   color: string;
 }
 
-// [Issue #45] currentMemberId を Props に追加し、マルチテナントに対応
 export const CategoryManagementScreen = ({ 
   onBack, 
   currentMemberId 
@@ -23,12 +22,12 @@ export const CategoryManagementScreen = ({
   const [optimizing, setOptimizing] = useState(false);
 
   /**
-   * ヘッダー生成ヘルパー
-   * バックエンドの tenantMiddleware で必要な ID を付与します
+   * [Issue #51 & #52] 
+   * バックエンドが JWT 認証（Bearer Token）を優先するように修正されたため、
+   * 手動の x-member-id 付与は「移行期間用」として最小限に留めます。
+   * ※Issue #52 完了後は、このヘルパー自体を削除し apiClient に任せます。
    */
-  const getHeaders = useCallback(() => {
-    return currentMemberId ? { 'x-member-id': currentMemberId.toString() } : {};
-  }, [currentMemberId]);
+  const getHeaders = () => (currentMemberId ? { 'x-member-id': currentMemberId.toString() } : {});
 
   useEffect(() => { 
     if (currentMemberId) fetchCategories(); 
@@ -42,9 +41,12 @@ export const CategoryManagementScreen = ({
       if (res.data && res.data.success) {
         setCategories(res.data.data || []);
       }
-    } catch (e) {
-      console.error(e);
-      Alert.alert("エラー", "カテゴリーの取得に失敗しました。");
+    } catch (e: any) {
+      if (e.response?.status === 401) {
+        Alert.alert("セッション切れ", "再度ログインしてください。");
+      } else {
+        Alert.alert("エラー", "カテゴリーの取得に失敗しました。");
+      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,8 @@ export const CategoryManagementScreen = ({
             await apiClient.delete(`/categories/${id}`, { headers: getHeaders() });
             fetchCategories();
           } catch (e: any) {
-            if (e.response?.status === 400 || e.response?.status === 409) {
+            const status = e.response?.status;
+            if (status === 400 || status === 409) {
               Alert.alert("制限", "このカテゴリーは既に使用されているため削除できません。");
             } else {
               Alert.alert("エラー", "削除に失敗しました。");
@@ -82,10 +85,6 @@ export const CategoryManagementScreen = ({
     ]);
   };
 
-  /**
-   * [Issue #48] カテゴリーキーワードの統計的最適化を実行
-   * ProductMaster の学習データからキーワードを自動生成します
-   */
   const handleOptimize = async () => {
     Alert.alert(
       "マスタ最適化",
@@ -103,7 +102,6 @@ export const CategoryManagementScreen = ({
                 fetchCategories();
               }
             } catch (e) {
-              console.error(e);
               Alert.alert("エラー", "最適化処理に失敗しました。");
             } finally {
               setOptimizing(false);
@@ -128,7 +126,7 @@ export const CategoryManagementScreen = ({
           style={styles.input} 
           value={newName} 
           onChangeText={setNewName} 
-          placeholder="新しいカテゴリー（例: 趣味）"
+          placeholder="新しいカテゴリー"
           placeholderTextColor={theme.colors.text.muted}
         />
         <TouchableOpacity style={styles.addButton} onPress={addCategory}>
@@ -136,7 +134,6 @@ export const CategoryManagementScreen = ({
         </TouchableOpacity>
       </View>
 
-      {/* [Issue #48] 最適化アクションボタン */}
       <TouchableOpacity 
         style={[styles.optimizeButton, optimizing && styles.buttonDisabled]} 
         onPress={handleOptimize}
@@ -145,7 +142,7 @@ export const CategoryManagementScreen = ({
         {optimizing ? (
           <ActivityIndicator size="small" color="white" />
         ) : (
-          <Text style={styles.optimizeButtonText}>🪄 カテゴリーキーワードを自動最適化</Text>
+          <Text style={styles.optimizeButtonText}>🪄 キーワード自動最適化</Text>
         )}
       </TouchableOpacity>
 
@@ -158,7 +155,6 @@ export const CategoryManagementScreen = ({
           data={categories}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.emptyText}>登録されているカテゴリーはありません</Text>}
           renderItem={({ item }) => (
             <View style={styles.itemRow}>
               <View style={[styles.colorBadge, { backgroundColor: item.color }]} />
@@ -182,24 +178,13 @@ const styles = StyleSheet.create({
   title: { ...theme.typography.h1, marginLeft: 15 },
   inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10 },
   input: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: theme.colors.border, color: theme.colors.text.main },
-  addButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 25, justifyContent: 'center', borderRadius: 10, elevation: 2 },
+  addButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 25, justifyContent: 'center', borderRadius: 10 },
   addButtonText: { color: 'white', fontWeight: 'bold' },
-  
-  optimizeButton: { 
-    backgroundColor: theme.colors.secondary || '#6c5ce7', 
-    padding: 12, 
-    borderRadius: 10, 
-    marginBottom: 20, 
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    elevation: 1
-  },
-  optimizeButtonText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  optimizeButton: { backgroundColor: '#6c5ce7', padding: 12, borderRadius: 10, marginBottom: 20, alignItems: 'center', justifyContent: 'center' },
+  optimizeButtonText: { color: 'white', fontWeight: 'bold' },
   buttonDisabled: { opacity: 0.6 },
-
   list: { paddingBottom: 40 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border, elevation: 1 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border },
   colorBadge: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
   categoryName: { flex: 1, ...theme.typography.body, fontWeight: '600' },
   deleteButton: { padding: 8 },
