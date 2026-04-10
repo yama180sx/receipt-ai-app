@@ -10,7 +10,6 @@ import * as SecureStore from 'expo-secure-store';
 // @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
 
-// ★ apiClientからインターセプター制御用の関数をインポート
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService'; 
 
@@ -35,6 +34,9 @@ export default function App() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
 
+  // --- [Issue #54] 認証用ステート ---
+  const [loginPassword, setLoginPassword] = useState('');
+
   // メイン機能用ステート
   const [image, setImage] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0); 
@@ -45,7 +47,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
 
   /**
-   * 1. [Issue #52] 認証状態とアプリ状態の復元
+   * 1. 状態復元
    */
   useEffect(() => {
     const initializeApp = async () => {
@@ -81,7 +83,7 @@ export default function App() {
   }, []);
 
   /**
-   * 2. [Issue #52] 401エラー（トークン切れ）の自動ハンドリング登録
+   * 2. 認証エラーハンドリング
    */
   useEffect(() => {
     setOnUnauthorized(() => {
@@ -91,35 +93,42 @@ export default function App() {
   }, []);
 
   /**
-   * 3. [Issue #52] ログイン処理（バックエンドAPI連携）
+   * 3. [Issue #54] ログイン処理 (パスワード照合版)
    */
   const handleLogin = async (memberId: number) => {
+    if (!loginPassword) {
+      Alert.alert("入力エラー", "パスワードを入力してください。");
+      return;
+    }
+
     try {
-      // T320のバックエンドに対して本物のJWTを要求
-      const response = await apiClient.post('/auth/login', { memberId });
+      // パスワードを body に含めて送信
+      const response = await apiClient.post('/auth/login', { 
+        memberId, 
+        password: loginPassword 
+      });
       
       if (response.data && response.data.success) {
         const { token, member } = response.data.data;
 
-        // SecureStore へ保存（永続化）
         await authService.saveToken(token);
         await SecureStore.setItemAsync('currentMemberId', member.id.toString());
         
-        // ステート更新（UIが切り替わる）
         setUserToken(token);
         setCurrentMemberId(member.id);
-
-        // ログイン直後のデータフェッチ
+        setLoginPassword(''); // ログイン成功時にパスワード入力をクリア
         fetchCategories();
       }
     } catch (e: any) {
       const errorMsg = e.response?.data?.message || "ログインに失敗しました。";
       Alert.alert("認証エラー", errorMsg);
+      // 失敗時もセキュリティのため一旦パスワードをクリア
+      setLoginPassword('');
     }
   };
 
   /**
-   * 4. [Issue #52] ログアウト処理
+   * 4. ログアウト処理
    */
   const handleLogout = async () => {
     await authService.logout();
@@ -129,6 +138,7 @@ export default function App() {
     setCurrentView('main');
     setResultData(null);
     setImage(null);
+    setLoginPassword('');
   };
 
   /**
@@ -262,17 +272,30 @@ export default function App() {
     );
   }
 
-  // 非ログイン時はログイン画面を表示
+  // --- [Issue #54] パスワード入力を含むログインUI ---
   if (!userToken) {
     return (
       <View style={styles.loginContainer}>
         <Text style={styles.loginTitle}>家計簿アプリ</Text>
-        <Text style={styles.loginSub}>メンバーを選択して開始</Text>
+        <Text style={styles.loginSub}>パスワードを入力して開始</Text>
+        
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="パスワードを入力"
+            placeholderTextColor="rgba(255,255,255,0.6)"
+            secureTextEntry={true}
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            autoCapitalize="none"
+          />
+        </View>
+
         <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
-          <Text style={styles.loginButtonText}>自分 (ID: 1)</Text>
+          <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(2)}>
-          <Text style={styles.loginButtonText}>その他 (ID: 2)</Text>
+          <Text style={styles.loginButtonText}>その他 (ID: 2) でログイン</Text>
         </TouchableOpacity>
       </View>
     );
@@ -363,9 +386,19 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
   loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.primary, padding: 40 },
   loginTitle: { fontSize: 32, fontWeight: 'bold', color: 'white', marginBottom: 10 },
-  loginSub: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 40 },
+  loginSub: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 30 },
+  inputWrapper: { width: '100%', marginBottom: 20 },
+  passwordInput: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
+    padding: 15,
+    color: 'white',
+    fontSize: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
   loginButton: { backgroundColor: 'white', width: '100%', padding: 18, borderRadius: 15, marginBottom: 15, alignItems: 'center' },
-  loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 18 },
+  loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
   logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
   previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
