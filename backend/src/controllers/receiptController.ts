@@ -1,12 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
-
 import logger from '../utils/logger';
 import { prisma } from '../utils/prismaClient'; 
 import { AppError } from '../utils/appError';
 import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveReceiptData } from '../services/persistenceService';
+import { saveParsedReceipt } from '../services/receiptService'; // ★ persistenceService から変更
 import { getFamilyGroupId } from '../utils/context';
 
 /**
@@ -41,7 +39,7 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
 };
 
 /**
- * [Issue #43 & #45] レシートアップロード
+ * [Issue #43 & #45] レシートアップロード (AI解析)
  */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -62,25 +60,40 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 手動登録
+ * 手動登録 (receiptService に一本化)
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memberId = req.body.memberId || req.headers['x-member-id'];
+    const familyGroupId = getFamilyGroupId();
     const { date, storeName, totalAmount, items, imagePath, rawText } = req.body;
 
-    const newReceipt = await saveReceiptData({
-      memberId: Number(memberId),
-      familyGroupId: getFamilyGroupId(),
-      storeName,
-      date: new Date(date),
-      totalAmount: Number(totalAmount),
-      imagePath: imagePath || "",
-      rawText: rawText || "",
-      items: items.map((i: any) => ({ ...i, price: Number(i.price) })),
-    });
+    // persistenceService.saveReceiptData を廃止し、
+    // 重複チェックとバリデーションが含まれる receiptService.saveParsedReceipt を使用。
+    // 手動登録なので isSuspicious は false (または入力値に応じたバリデーション) とする。
+    const newReceipt = await saveParsedReceipt(
+      Number(memberId),
+      familyGroupId,
+      {
+        storeName,
+        purchaseDate: date, // 内部の parseSafeDate でパースされる
+        totalAmount: Number(totalAmount),
+        items: items.map((i: any) => ({
+          name: i.name,
+          price: Number(i.price),
+          quantity: Number(i.quantity || 1)
+        }))
+      },
+      imagePath || "",
+      false, // 手動登録は不整合チェック(AI用)を一旦スルー
+      []
+    );
+
     res.status(201).json({ success: true, data: newReceipt });
-  } catch (error) { next(error); }
+  } catch (error: any) { 
+    if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
+    next(error); 
+  }
 };
 
 /**
@@ -107,6 +120,7 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       });
 
       if (categoryId) {
+        // 世帯別 ProductMaster への upsert
         await (tx.productMaster as any).upsert({
           where: {
             name_storeName_familyGroupId: {
@@ -185,14 +199,13 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * [Issue #50] 月別統計 (カテゴリー内訳対応)
+ * [Issue #50] 月別統計
  */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
   const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
 
   try {
-    // 1. 指定月の合計支出
     const totalRes = await prisma.$queryRaw<any[]>`
       SELECT SUM("totalAmount")::int as total
       FROM "Receipt"
@@ -201,7 +214,6 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
     `;
     const totalAmount = totalRes[0]?.total || 0;
 
-    // 2. カテゴリー別の集計 (JOIN Item & Category)
     const categoryStats = await prisma.$queryRaw<any[]>`
       SELECT 
         c.id as "categoryId",
@@ -217,9 +229,14 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
       ORDER BY "totalAmount" DESC
     `;
 
-    // 3. 最新のレシート1件
     const latestReceipt = await prisma.receipt.findFirst({
-      where: { familyGroupId, AND: { date: { gte: new Date(`${month}-01`), lt: new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)) } } },
+      where: { 
+        familyGroupId, 
+        date: { 
+          gte: new Date(`${month}-01`), 
+          lt: new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)) 
+        } 
+      },
       orderBy: { date: 'desc' },
       include: { items: { include: { category: true } } }
     });
@@ -240,12 +257,11 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * [Issue #50] 高度な統計 (パレート分析データ対応)
+ * [Issue #50] 高度な統計
  */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
   try {
-    // トレンド (過去6ヶ月)
     const trend = await prisma.$queryRaw<any[]>`
       SELECT 
         TO_CHAR(date, 'YYYY-MM') as period, 
@@ -257,7 +273,6 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
       LIMIT 6
     `;
 
-    // パレート分析用 (当月のカテゴリー別割合)
     const month = new Date().toISOString().slice(0, 7);
     const paretoRaw = await prisma.$queryRaw<any[]>`
       SELECT 
