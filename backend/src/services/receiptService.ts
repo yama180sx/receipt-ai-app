@@ -1,127 +1,108 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
 import { estimateCategoryId } from './categoryService';
+import { validateReceiptItems } from './validationService'; 
 import logger from '../utils/logger';
 import { normalizeStoreName, getCleanText } from '../utils/normalizer';
 
 const prisma = new PrismaClient();
 
-/**
- * 🛠️ 安全な日付パース関数
- */
 const parseSafeDate = (dateStr: string | null | undefined): Date => {
   if (!dateStr) return new Date();
-  const formattedStr = dateStr.includes('+') ? dateStr : `${dateStr}+09:00`;
-  const date = new Date(formattedStr);
-  if (isNaN(date.getTime())) {
-    logger.warn(`[WARN] 無効な日付形式: "${dateStr}"。現在時刻を代用します。`);
-    return new Date();
+  const match = dateStr.match(/(\d{4})[-\/\.](\d{2})[-\/\.](\d{2})/);
+  if (match) {
+    const y = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const d = parseInt(match[3], 10);
+    const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+    if (!isNaN(date.getTime())) {
+      logger.info(`[DATE_CHECK] パース成功: ${date.toLocaleDateString('ja-JP')}`);
+      return date;
+    }
   }
-  return date;
+  logger.error(`[DATE_CHECK] パース失敗: "${dateStr}"。今日の日付を使用。`);
+  return new Date();
 };
 
-/**
- * AI解析済みのデータをDBに永続化する
- * [Issue #42 改訂版] ハッシュ値を廃止し、ビジネスルール（同日・同金額）で重複を判定
- */
 export const saveParsedReceipt = async (
   memberId: number, 
+  familyGroupId: number,
   parsedData: ParsedReceipt, 
-  imagePath: string 
+  imagePath: string,
+  isSuspicious: boolean, 
+  warnings: string[] 
 ) => {
   try {
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
+    const cleanStore = getCleanText(officialStoreName);
     const jstDate = parseSafeDate(parsedData.purchaseDate);
-    const totalAmount = parsedData.totalAmount || 0;
+    const totalAmount = Number(parsedData.totalAmount || 0);
 
-    // --- 重複チェックロジック ---
-    // 「同じメンバー」が「同じ日」に「同じ合計金額」のレシートを登録しようとしたらブロック
-    const startOfDay = new Date(jstDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(jstDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // 重複チェック
+    const startOfDay = new Date(jstDate); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(jstDate); endOfDay.setHours(23, 59, 59, 999);
 
     const existing = await prisma.receipt.findFirst({
-      where: {
-        memberId: memberId,
-        totalAmount: totalAmount,
-        date: {
-          gte: startOfDay,
-          lte: endOfDay
-        }
-      },
-      select: { id: true }
+      where: { familyGroupId, totalAmount, date: { gte: startOfDay, lte: endOfDay } },
+      select: { id: true, storeName: true }
     });
 
-    if (existing) {
-      logger.warn(`[DUPE_CHECK:BLOCK] 同一日・同一金額の重複を検知 (ExistingID: ${existing.id})`);
+    if (existing && getCleanText(existing.storeName) === cleanStore) {
+      logger.warn(`[FINAL_FIX_DUPE] 重複検知: ID ${existing.id} / ${jstDate.toLocaleDateString()}`);
       const error = new Error('DUPLICATE_RECEIPT_DETECTED');
       (error as any).statusCode = 409;
       throw error;
     }
 
-    // --- DB登録処理 (Transaction) ---
-    return await prisma.$transaction(async (tx) => {
+    const savedId = await prisma.$transaction(async (tx) => {
       const itemsToCreate = await Promise.all(parsedData.items.map(async (item) => {
-        const cleanItemName = getCleanText(item.name);
-        const cleanStoreName = getCleanText(officialStoreName);
-
-        // [Issue #39] カテゴリーを推定
-        const finalCategoryId = await estimateCategoryId(cleanItemName, cleanStoreName, tx);
+        const cleanName = getCleanText(item.name);
+        // ProductMaster (世帯別学習データ) を検索
+        const mastered = await tx.productMaster.findUnique({
+          where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } }
+        });
+        
+        const finalCategoryId = mastered ? mastered.categoryId : await estimateCategoryId(cleanName, cleanStore, tx);
 
         return {
           name: item.name,
-          price: item.price,
-          quantity: item.quantity || 1,
+          price: Number(item.price || 0),
+          quantity: Number(item.quantity || 1),
           categoryId: finalCategoryId
         };
       }));
 
-      return await tx.receipt.create({
+      const created = await tx.receipt.create({
         data: {
-          memberId: memberId,
-          storeName: officialStoreName,
-          date: jstDate,
-          totalAmount: totalAmount,
-          rawText: JSON.stringify(parsedData),
-          imagePath: imagePath,
-          // contentHash カラムへの代入を削除
-          items: {
-            create: itemsToCreate
-          },
+          memberId, familyGroupId, storeName: officialStoreName, date: jstDate,
+          totalAmount, imagePath, items: { create: itemsToCreate },
+          rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
         },
-        include: {
-          items: { include: { category: true } },
-        },
+        select: { id: true }
       });
-    }, { timeout: 10000 });
+      return created.id;
+    }, { timeout: 15000 });
+
+    const final = await prisma.receipt.findUnique({
+      where: { id: savedId },
+      include: { items: { include: { category: true } } }
+    });
+
+    return { ...JSON.parse(JSON.stringify(final)), isSuspicious, warnings };
+
   } catch (error: any) {
     if (error.message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
-    logger.error(`[DBエラー] ${error}`);
+    logger.error(`[DB_ERROR] ${error}`);
     throw error;
   }
 };
 
-/**
- * 画像解析からDB保存までを統合
- */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
-  let step = 'INITIALIZING';
-  const startTime = Date.now();
+  const member = await prisma.familyMember.findUnique({ where: { id: memberId }, select: { familyGroupId: true } });
+  if (!member) throw new Error('MEMBER_NOT_FOUND');
 
-  try {
-    step = 'GEMINI_ANALYSIS';
-    const parsedData = await analyzeReceiptImage(imagePath);
-
-    step = 'DB_PERSISTENCE';
-    const result = await saveParsedReceipt(memberId, parsedData, imagePath);
-    
-    logger.info(`[${step}] ✅ 完了 ID: ${result.id}`, { durationMs: Date.now() - startTime });
-    return result;
-
-  } catch (error: any) {
-    if (error.message === 'DUPLICATE_RECEIPT_DETECTED') throw error;
-    logger.error(`[ERROR] ${step} フェーズで失敗: ${error.message}`);
-    throw error;
-  }
+  const parsedData = await analyzeReceiptImage(imagePath);
+  const validation = validateReceiptItems(parsedData.items);
+  
+  return await saveParsedReceipt(memberId, member.familyGroupId, parsedData, imagePath, validation.isSuspicious, validation.warnings);
 };

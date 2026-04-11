@@ -22,6 +22,7 @@ model FamilyGroup {
 model FamilyMember {
   id            Int         @id @default(autoincrement())
   name          String
+  password_hash String?
   familyGroupId Int         // ★ 所属世帯
   familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
