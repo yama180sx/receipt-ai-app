@@ -34,7 +34,7 @@ export default function App() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
 
-  // --- [Issue #54] 認証用ステート ---
+  // 認証用ステート
   const [loginPassword, setLoginPassword] = useState('');
 
   // メイン機能用ステート
@@ -71,7 +71,16 @@ export default function App() {
         if (v) setCurrentView(v as ViewType);
         if (i) setImage(i);
         if (r) setRotation(parseInt(r, 10) || 0);
-        if (res) setResultData(JSON.parse(res));
+
+        // ★ 復元時にデータの妥当性をチェック。itemsが無い不完全なデータは破棄する。
+        if (res) {
+          const parsed = JSON.parse(res);
+          if (parsed && Array.isArray(parsed.items)) {
+            setResultData(parsed);
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEYS.RESULT);
+          }
+        }
 
       } catch (e) {
         console.error('初期化失敗', e);
@@ -93,7 +102,7 @@ export default function App() {
   }, []);
 
   /**
-   * 3. [Issue #54] ログイン処理 (パスワード照合版)
+   * 3. ログイン処理
    */
   const handleLogin = async (memberId: number) => {
     if (!loginPassword) {
@@ -102,7 +111,6 @@ export default function App() {
     }
 
     try {
-      // パスワードを body に含めて送信
       const response = await apiClient.post('/auth/login', { 
         memberId, 
         password: loginPassword 
@@ -110,19 +118,17 @@ export default function App() {
       
       if (response.data && response.data.success) {
         const { token, member } = response.data.data;
-
         await authService.saveToken(token);
         await SecureStore.setItemAsync('currentMemberId', member.id.toString());
         
         setUserToken(token);
         setCurrentMemberId(member.id);
-        setLoginPassword(''); // ログイン成功時にパスワード入力をクリア
+        setLoginPassword('');
         fetchCategories();
       }
     } catch (e: any) {
       const errorMsg = e.response?.data?.message || "ログインに失敗しました。";
       Alert.alert("認証エラー", errorMsg);
-      // 失敗時もセキュリティのため一旦パスワードをクリア
       setLoginPassword('');
     }
   };
@@ -163,12 +169,19 @@ export default function App() {
   useEffect(() => {
     if (!isReady || !userToken) return;
     const saveState = async () => {
-      await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
-        image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
-        AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
-        resultData ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) : AsyncStorage.removeItem(STORAGE_KEYS.RESULT),
-      ]);
+      try {
+        await Promise.all([
+          AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
+          image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
+          AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
+          // ★ 保存時も妥当性をチェック
+          resultData && Array.isArray(resultData.items) 
+            ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) 
+            : AsyncStorage.removeItem(STORAGE_KEYS.RESULT),
+        ]);
+      } catch (e) {
+        console.error('保存失敗', e);
+      }
     };
     saveState();
   }, [currentView, image, rotation, resultData, isReady, userToken]);
@@ -203,7 +216,15 @@ export default function App() {
       setLoadingMessage(`解析中... (${attempts * 2}s)`);
       const res = await apiClient.get(`/receipts/status/${jobId}`);
       const { state, result, error } = res.data.data;
-      if (state === 'completed') return result; 
+      
+      if (state === 'completed') {
+        // ★ バックエンドから期待通りのデータ（items配列）が来ているかチェック
+        if (result && Array.isArray(result.items)) {
+          return result;
+        }
+        throw new Error('解析結果が不完全です。もう一度お試しください。');
+      } 
+      
       if (state === 'failed') throw new Error(error || '解析に失敗しました。');
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
@@ -236,6 +257,7 @@ export default function App() {
       setImage(null);
     } catch (error: any) {
       Alert.alert('お知らせ', error.message);
+      setResultData(null); // エラー時は残存データをクリア
     } finally {
       setUploading(false);
       if (manipulatedUri) await deleteTempFile(manipulatedUri);
@@ -249,21 +271,21 @@ export default function App() {
       });
       if (response.data?.success) {
         const updatedItem = response.data.data;
-        setResultData((prev: any) => ({
-          ...prev,
-          items: prev.items.map((item: any) =>
-            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-          ),
-        }));
+        setResultData((prev: any) => {
+          if (!prev?.items) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((item: any) =>
+              item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
+            ),
+          };
+        });
       }
     } catch (error: any) {
       Alert.alert('エラー', error.message);
     }
   };
 
-  /**
-   * 5. 画面レンダリングの分岐
-   */
   if (!isReady) {
     return (
       <View style={styles.loadingContainer}>
@@ -272,13 +294,11 @@ export default function App() {
     );
   }
 
-  // --- [Issue #54] パスワード入力を含むログインUI ---
   if (!userToken) {
     return (
       <View style={styles.loginContainer}>
         <Text style={styles.loginTitle}>家計簿アプリ</Text>
         <Text style={styles.loginSub}>パスワードを入力して開始</Text>
-        
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.passwordInput}
@@ -290,7 +310,6 @@ export default function App() {
             autoCapitalize="none"
           />
         </View>
-
         <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
           <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
         </TouchableOpacity>
@@ -301,7 +320,6 @@ export default function App() {
     );
   }
 
-  // ログイン済みのメインコンテンツ
   const renderMainContent = () => {
     const memberId = currentMemberId!;
 
@@ -317,18 +335,31 @@ export default function App() {
               <Text style={styles.logoutText}>ログアウト</Text>
             </TouchableOpacity>
 
-            {resultData ? (
+            {/* ★ resultData が存在し、かつ items が配列である場合のみ表示 */}
+            {resultData && Array.isArray(resultData.items) ? (
               <ScrollView contentContainerStyle={styles.resultContainer}>
                 <Text style={styles.resultHeader}>解析結果</Text>
-                <View style={styles.resultCard}>
+
+                {resultData.isSuspicious && (
+                  <View style={styles.warningContainer}>
+                    <Text style={styles.warningTitle}>⚠️ 数値の不整合・異常の疑い</Text>
+                    {resultData.warnings?.map((w: string, idx: number) => (
+                      <Text key={idx} style={styles.warningText}>・{w}</Text>
+                    ))}
+                    <Text style={styles.warningHint}>内容が正しいか、各明細の単価と数量を必ず確認してください。</Text>
+                  </View>
+                )}
+
+                <View style={[styles.resultCard, resultData.isSuspicious && styles.suspiciousCard]}>
                   <Text style={styles.storeName}>{resultData.storeName || '不明'}</Text>
                   <Text style={styles.totalAmount}>¥{(resultData.totalAmount || 0).toLocaleString()}</Text>
                   <View style={styles.divider} />
-                  {resultData.items.map((item: any) => (
+                  {/* ★ Optional Chaining を使用 */}
+                  {resultData.items?.map((item: any) => (
                     <View key={item.id} style={styles.itemRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemName}>{item.name}</Text>
-                        <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
+                        <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()} (x{item.quantity})</Text>
                       </View>
                       <View style={styles.pickerWrapper}>
                         <Picker selectedValue={item.categoryId} onValueChange={(val) => handleCategoryChange(item.id, val)} style={styles.picker}>
@@ -410,6 +441,11 @@ const styles = StyleSheet.create({
   subButtonText: { color: 'white', fontWeight: '600' },
   resultContainer: { padding: theme.spacing.lg, paddingTop: 60 },
   resultHeader: { ...theme.typography.h1, marginBottom: theme.spacing.lg, textAlign: 'center' },
+  warningContainer: { backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FFC0C0', borderRadius: 10, padding: 15, marginBottom: 20 },
+  warningTitle: { color: '#D00000', fontWeight: 'bold', fontSize: 16, marginBottom: 8 },
+  warningText: { color: '#600000', fontSize: 14, lineHeight: 20 },
+  warningHint: { color: '#D00000', fontSize: 12, marginTop: 10, fontStyle: 'italic' },
+  suspiciousCard: { borderColor: '#FFC0C0', borderWidth: 2 },
   resultCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },
   storeName: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: 5 },
   totalAmount: { ...theme.typography.h1, color: theme.colors.primary, marginBottom: theme.spacing.md },
