@@ -27,11 +27,16 @@ jobs:
           echo "COMPOSE_PROJECT_NAME=receipt-stable" >> .env
           echo "BACKEND_PORT=${{ secrets.STABLE_BACKEND_PORT }}" >> .env
           echo "FRONTEND_PORT=${{ secrets.STABLE_FRONTEND_PORT }}" >> .env
+          
+          # Expo用ポートの競合回避設定を追加
+          echo "EXPO_PORT_1=${{ secrets.STABLE_EXPO_PORT_1 }}" >> .env
+          echo "EXPO_PORT_2=${{ secrets.STABLE_EXPO_PORT_2 }}" >> .env
+          
           echo "DB_PORT=${{ secrets.STABLE_DB_PORT }}" >> .env
           echo "REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}" >> .env
           echo "T320_IP=192.168.1.32" >> .env
           
-          # 各サービスディレクトリの.envもシンボリックリンクまたはコピーで対応
+          # 各サービスディレクトリへ展開
           cp .env ./backend/.env
           cp .env ./frontend/.env
 
