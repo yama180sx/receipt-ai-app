@@ -10,7 +10,7 @@ services:
       - ./backend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:3000" # ホスト側ポートを可変に
     stdin_open: true
     tty: true
     env_file:
@@ -34,9 +34,9 @@ services:
       - ./frontend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "8081:8081"
-      - "19000:19000"
-      - "19001:19001"
+      - "${FRONTEND_PORT:-8081}:8081"   # 開発用:8081 / Stable用:8082等
+      - "${EXPO_PORT_1:-19000}:19000"
+      - "${EXPO_PORT_2:-19001}:19001"
     stdin_open: true
     tty: true
     env_file:
@@ -44,23 +44,24 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
-      - REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.32 # T320の物理IPを指定
+      - REACT_NATIVE_PACKAGER_HOSTNAME=${T320_IP:-192.168.1.32}
 
   # --- Database (PostgreSQL) ---
   db:
     image: postgres:latest
+    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-db" # プロジェクト名で識別
     environment:
       - TZ=Asia/Tokyo
-      - POSTGRES_USER=cntadm
-      - POSTGRES_DB=receipt_db
+      - POSTGRES_USER=${DB_USER:-cntadm}
+      - POSTGRES_DB=${DB_NAME:-receipt_db}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432" # ホスト側ポートを可変に
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cntadm -d receipt_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cntadm} -d ${DB_NAME:-receipt_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -68,14 +69,14 @@ services:
   # --- Redis (BullMQ Backend) ---
   redis:
     image: redis:7-alpine
-    container_name: receipt-redis
+    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-redis" # 固定名を回避
     environment:
       - TZ=Asia/Tokyo
     volumes:
       - redis_data:/data
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -83,5 +84,6 @@ services:
       retries: 5
 
 volumes:
+  # 名前付きボリュームはプロジェクトごとに独立するため、データは混ざりません
   postgres_data:
   redis_data:
