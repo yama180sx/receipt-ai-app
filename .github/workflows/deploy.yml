@@ -20,7 +20,7 @@ jobs:
       - name: Create Stable .env
         run: |
           cd ~/stable/receipt-ai-app
-          # GitHub Secretsから.envを生成
+          # 1. ルートの.env生成（Docker Composeがポートマッピングに使用）
           echo "UID=$(id -u)" > .env
           echo "GID=$(id -g)" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
@@ -33,17 +33,17 @@ jobs:
           echo "REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}" >> .env
           echo "T320_IP=192.168.1.32" >> .env
           
-          # --- 内部通信用(DB/Redis)の設定を追加 ---
-          # Prisma用: ホスト名はサービス名、ポートは内部の5432
-          echo "DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@db:5432/postgres?schema=public" >> .env
-          
-          # Redis用: ホスト名はサービス名、ポートは内部の6379
-          echo "REDIS_HOST=redis" >> .env
-          echo "REDIS_PORT_INTERNAL=6379" >> .env
-          
-          # 各サービスディレクトリへ展開
-          cp .env ./backend/.env
+          # 2. 各サービスへ展開
           cp .env ./frontend/.env
+          cp .env ./backend/.env
+
+          # 3. バックエンド用の設定をコンテナ内部通信用に最適化
+          # Prisma用URLの追記
+          echo "DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@db:5432/postgres?schema=public" >> ./backend/.env
+          # Redis接続設定の上書き
+          echo "REDIS_HOST=redis" >> ./backend/.env
+          # ホスト公開用(6380)を、コンテナ内部の標準ポート(6379)へ置換
+          sed -i 's/^REDIS_PORT=.*/REDIS_PORT=6379/' ./backend/.env
 
       - name: Install dependencies
         run: |
