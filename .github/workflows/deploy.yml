@@ -33,6 +33,9 @@ jobs:
           echo "REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}" >> .env
           echo "T320_IP=192.168.1.32" >> .env
           
+          # --- Prisma用の接続URLを追加 ---
+          echo "DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@db:5432/postgres?schema=public" >> .env
+          
           # 各サービスディレクトリへ展開
           cp .env ./backend/.env
           cp .env ./frontend/.env
