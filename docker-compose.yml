@@ -9,8 +9,10 @@ services:
     volumes:
       - ./backend:/app
       - /etc/localtime:/etc/localtime:ro
+      # レシート画像の永続化（明示的なバインドマウント）
+      - ./uploads:/app/uploads
     ports:
-      - "${BACKEND_PORT:-3000}:3000" # ホスト側ポートを可変に
+      - "${BACKEND_PORT:-3000}:3000"
     stdin_open: true
     tty: true
     env_file:
@@ -34,7 +36,7 @@ services:
       - ./frontend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${FRONTEND_PORT:-8081}:8081"   # 開発用:8081 / Stable用:8082等
+      - "${FRONTEND_PORT:-8081}:8081"
       - "${EXPO_PORT_1:-19000}:19000"
       - "${EXPO_PORT_2:-19001}:19001"
     stdin_open: true
@@ -49,17 +51,18 @@ services:
   # --- Database (PostgreSQL) ---
   db:
     image: postgres:latest
-    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-db" # プロジェクト名で識別
+    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-db"
     environment:
       - TZ=Asia/Tokyo
       - POSTGRES_USER=${DB_USER:-cntadm}
       - POSTGRES_DB=${DB_NAME:-receipt_db}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql
+      # 名前付きボリュームではなく、カレントディレクトリの pgdata に保存
+      - ./pgdata:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${DB_PORT:-5432}:5432" # ホスト側ポートを可変に
+      - "${DB_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cntadm} -d ${DB_NAME:-receipt_db}"]
       interval: 5s
@@ -69,11 +72,12 @@ services:
   # --- Redis (BullMQ Backend) ---
   redis:
     image: redis:7-alpine
-    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-redis" # 固定名を回避
+    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-redis"
     environment:
       - TZ=Asia/Tokyo
     volumes:
-      - redis_data:/data
+      # redisdata ディレクトリに永続化
+      - ./redisdata:/data
       - /etc/localtime:/etc/localtime:ro
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -83,7 +87,4 @@ services:
       timeout: 5s
       retries: 5
 
-volumes:
-  # 名前付きボリュームはプロジェクトごとに独立するため、データは混ざりません
-  postgres_data:
-  redis_data:
+# 名前付きボリューム定義は不要になったため削除

@@ -15,12 +15,19 @@ jobs:
       - name: Sync to Stable directory
         run: |
           mkdir -p ~/stable/receipt-ai-app
-          rsync -av --delete --exclude '.git' --exclude 'node_modules' ./ ~/stable/receipt-ai-app/
+          # ★修正: 永続化データ(pgdata, redisdata, uploads)を同期(削除)対象から除外
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude 'pgdata' \
+            --exclude 'redisdata' \
+            --exclude 'uploads' \
+            ./ ~/stable/receipt-ai-app/
 
       - name: Create Stable .env
         run: |
           cd ~/stable/receipt-ai-app
-          # 1. ルートの.env生成（Docker Composeがポートマッピングに使用）
+          # 1. 共通の.env生成
           echo "UID=$(id -u)" > .env
           echo "GID=$(id -g)" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
@@ -33,16 +40,23 @@ jobs:
           echo "REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}" >> .env
           echo "T320_IP=192.168.1.32" >> .env
           
+          # Expo / CORS 用
+          echo "EXPO_PACKAGER_PROXY_URL=http://192.168.1.32:8082" >> .env
+          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}" >> .env
+          echo "ALLOWED_ORIGINS=http://192.168.1.32:8082,http://localhost:8082" >> .env
+
+          # 実行用シークレット
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "NODE_ENV=production" >> .env
+
           # 2. 各サービスへ展開
           cp .env ./frontend/.env
           cp .env ./backend/.env
 
           # 3. バックエンド用の設定をコンテナ内部通信用に最適化
-          # Prisma用URLの追記
           echo "DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@db:5432/postgres?schema=public" >> ./backend/.env
-          # Redis接続設定の上書き
           echo "REDIS_HOST=redis" >> ./backend/.env
-          # ホスト公開用(6380)を、コンテナ内部の標準ポート(6379)へ置換
           sed -i 's/^REDIS_PORT=.*/REDIS_PORT=6379/' ./backend/.env
 
       - name: Install dependencies
@@ -56,6 +70,12 @@ jobs:
         run: |
           cd ~/stable/receipt-ai-app
           docker compose up -d --build
+
+      - name: Prisma Migrate (Stable DB)
+        run: |
+          cd ~/stable/receipt-ai-app
+          # コンテナ内でマイグレーションを実行
+          docker compose exec -T backend npx prisma migrate deploy
           
       - name: Cleanup
         run: docker image prune -f

@@ -18,7 +18,7 @@ import { tenantMiddleware } from './middleware/tenantMiddleware';
 import { getFamilyGroupId, getMemberId } from './utils/context';
 
 // --- ルーター ---
-import authRoutes from './routes/authRoutes'; // ★追加: ログイン用
+import authRoutes from './routes/authRoutes'; 
 import receiptRoutes from './routes/receiptRoutes';
 import productMasterRoutes from './routes/productMasterRoutes'; 
 import categoryRoutes from './routes/categoryRoutes';
@@ -36,8 +36,19 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 
 // --- 1. 基本ミドルウェア設定 ---
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : [];
+
 app.use(cors({
-  origin: (origin, callback) => callback(null, true),
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      logger.warn(`[CORS] Rejected origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-member-id'],
   credentials: true
@@ -46,24 +57,9 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// --- 2. [Issue #52] ルート登録：認証の「境界線」を定義 ---
-
-/**
- * A. 認証不要ルート (Public API)
- * ログインエンドポイントなどは、authMiddleware の前に定義します。
- */
+// --- 2. [Issue #52] ルート登録 ---
 app.use('/api/auth', authRoutes);
-
-/**
- * B. 認証・世帯分離ミドルウェアの適用
- * これ以降に登録される /api 配下の全ルートに、一括でガードを適用します。
- */
 app.use('/api', authMiddleware, tenantMiddleware);
-
-/**
- * C. 認証済みルート (Protected API)
- * ここに登録するルートは、有効な JWT がなければ到達できません。
- */
 app.use('/api/categories', categoryRoutes);
 app.use('/api/product-master', productMasterRoutes);
 app.use('/api', receiptRoutes);
@@ -76,9 +72,6 @@ if (!fs.existsSync(uploadDir)) {
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-/**
- * 📂 [Issue #43 & #45 & #51] レシートアップロード
- */
 app.post(
   '/api/receipts/upload', 
   upload.single('image'), 
@@ -124,7 +117,6 @@ app.post(
   }
 );
 
-// --- 4. エラーハンドリング ---
 app.use((req, res, next) => next(new AppError(`Not Found - ${req.originalUrl}`, 404)));
 app.use(errorHandler);
 
