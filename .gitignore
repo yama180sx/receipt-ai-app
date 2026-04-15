@@ -13,18 +13,21 @@ web-build/
 # .env.example はリポジトリに含めるため除外対象から外す
 !**/.env.example
 
+# --- Persistent Storage (Docker Bind Mounts) ---
+# DB、Redisの物理データおよびアップロードディレクトリ
+pgdata/
+redisdata/
+uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # --- Backend & Logging (Issue #30 対応) ---
 # ログディレクトリ全体と監査ファイルを除外
 backend/logs/
 *.log
 *-audit.json
 
-# アップロード画像 (WebP を含む全画像形式を除外)
-backend/uploads/*
-!backend/uploads/.gitkeep
-
 # --- Database & Prisma ---
-postgres_data/
 /backend/prisma/generated-client/
 /backend/src/generated/
 
