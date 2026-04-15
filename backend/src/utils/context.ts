@@ -10,7 +10,6 @@ export const tenantStorage = new AsyncLocalStorage<TenantContext>();
 
 /**
  * 現在のコンテキストから世帯IDを取得
- * @throws {Error} コンテキストが設定されていない場合
  */
 export const getFamilyGroupId = (): number => {
   const store = tenantStorage.getStore();
@@ -23,7 +22,6 @@ export const getFamilyGroupId = (): number => {
 
 /**
  * 現在のコンテキストからメンバーIDを取得
- * @throws {Error} コンテキストが設定されていない場合
  */
 export const getMemberId = (): number => {
   const store = tenantStorage.getStore();
@@ -36,6 +34,9 @@ export const getMemberId = (): number => {
 
 export const hasContext = (): boolean => !!tenantStorage.getStore();
 
+/**
+ * ALC内で関数を実行するためのラッパー
+ */
 export const runWithTenant = <T>(context: TenantContext, fn: () => T): T => {
   return tenantStorage.run(context, fn);
 };
