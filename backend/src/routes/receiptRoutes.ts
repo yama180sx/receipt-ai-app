@@ -1,5 +1,16 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
+import path from 'path';
+import sharp from 'sharp';
+import { receiptQueue } from '../queues/receiptQueue';
+import logger from '../utils/logger';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { tenantMiddleware } from '../middleware/tenantMiddleware';
+import { getFamilyGroupId, getMemberId } from '../utils/context';
+import { validate } from '../middleware/validate';
+import { uploadReceiptSchema } from '../schemas/receiptSchema';
+import { AppError } from '../utils/appError';
+
 import { 
   getReceipts, 
   createReceipt, 
@@ -7,56 +18,83 @@ import {
   getLatestReceipt, 
   updateItemCategory,
   getMonthlyStats,
-  getJobStatus,      // [Issue #43] ステータス確認
-  uploadReceipt,     // [Issue #43] 非同期アップロード
-  getAdvancedStats   // 高度な統計
+  getJobStatus,
+  getAdvancedStats 
 } from '../controllers/receiptController';
 
 const router = express.Router();
 
+// Sharpで処理するためメモリ上に保存
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB制限
+});
+
 /**
- * [Issue #43] Multer設定
- * アップロードされた画像を一時的に uploads/ ディレクトリに保存します
+ * [Issue #46 修正] 非同期アップロード
+ * コンテキスト消失を防ぐため、multerの後に auth/tenant ミドルウェアを配置します。
  */
-const upload = multer({ dest: 'uploads/' });
+router.post(
+  '/receipts/upload',
+  upload.single('image'), // 1. ファイルをパース（非同期境界）
+  authMiddleware,         // 2. ユーザー認証
+  tenantMiddleware,       // 3. テナントコンテキスト開始（ここから ALC が有効）
+  validate(uploadReceiptSchema), // 4. スキーマ検証
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const file = req.file as Express.Multer.File;
+      if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
-// --- [Issue #43] 非同期解析フロー ---
+      const familyGroupId = getFamilyGroupId();
+      const memberId = getMemberId();
 
-/**
- * POST /api/receipts/upload
- * 1. upload.single('image'): Multipartデータを解析しファイルを保存
- * 2. uploadReceipt: ジョブをキュー(BullMQ)に追加
- */
-router.post('/receipts/upload', upload.single('image'), uploadReceipt);
+      if (!familyGroupId || !memberId) {
+        throw new AppError('テナントコンテキストが設定されていません。', 401);
+      }
 
-// GET /api/receipts/status/:jobId (解析ジョブの状態確認)
-router.get('/receipts/status/:jobId', getJobStatus);
+      const timestamp = Date.now();
+      const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
+      const uploadDir = 'uploads';
+      const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
+      // 画像処理
+      await sharp(file.buffer)
+        .rotate()
+        .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75, effort: 6 })
+        .toFile(imagePath);
 
-// --- [Issue #45] データ取得系 (世帯分離対応済) ---
+      // キュー登録
+      const job = await receiptQueue.add('analyze-receipt', {
+        memberId: memberId,
+        familyGroupId: familyGroupId,
+        imagePath: imagePath,
+      });
 
-// GET /api/receipts (全件取得)
+      logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
+
+      res.status(202).json({
+        success: true,
+        data: { jobId: job.id, status: 'queued' }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// --- [Issue #45] 共通ミドルウェア適用ルート ---
+// これ以降のルートは一括でミドルウェアを適用
+router.use(authMiddleware, tenantMiddleware);
+
 router.get('/receipts', getReceipts);
-
-// GET /api/receipts/latest (最新1件)
 router.get('/receipts/latest', getLatestReceipt);
-
-// GET /api/stats/monthly (月別統計)
+router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
-
-// GET /api/stats/advanced (トレンド分析)
 router.get('/stats/advanced', getAdvancedStats);
-
-
-// --- 更新・削除・手動作成系 ---
-
-// POST /api/receipts (手動登録用)
 router.post('/receipts', createReceipt);
-
-// DELETE /api/receipts/:id (削除)
 router.delete('/receipts/:id', deleteReceipt);
-
-// PATCH /api/receipt-items/:id (明細カテゴリ修正)
 router.patch('/receipt-items/:id', updateItemCategory);
 
 export default router;
