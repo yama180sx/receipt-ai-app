@@ -42,7 +42,7 @@ jobs:
           
           # Expo / CORS 用
           echo "EXPO_PACKAGER_PROXY_URL=http://192.168.1.32:8082" >> .env
-          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}" >> .env
+          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}/api" >> .env
           echo "ALLOWED_ORIGINS=http://192.168.1.32:8082,http://localhost:8082" >> .env
 
           # 実行用シークレット
