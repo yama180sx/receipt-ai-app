@@ -45,9 +45,9 @@ jobs:
           echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}/api" >> .env
           echo "ALLOWED_ORIGINS=http://192.168.1.32:8082,http://localhost:8082" >> .env
 
-          # 実行用シークレット (GOOGLE_API_KEY に修正)
+          # 実行用シークレット
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           echo "NODE_ENV=production" >> .env
 
           # 2. 各サービスへ展開
