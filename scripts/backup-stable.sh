@@ -8,7 +8,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
 # Docker設定
-CONTAINER_NAME="receipt-stable-db-1"
+CONTAINER_NAME="receipt-stable-db"
 DB_USER="cntadm"
 DB_NAME="receipt_db"
 
