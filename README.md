@@ -23,14 +23,15 @@
 | **Backend** | Supabase (Postgres, Auth, Storage, Edge Functions) |
 | **Infrastructure** | **Docker** (Home Server: Dell PowerEdge T320 / Ubuntu) |
 | **AI / OCR** | **Google Gemini API (Gemini 1.5 Pro / Flash)** |
+| **Monitoring** | **Discord Webhook Alert System** |
 
 ---
 
 ## 💡 Key Features
 
 * **AI Receipt Parsing**: レシート画像から品目・金額・日付を **Gemini** で高精度に抽出。
-* **Multi-Family Classification**: 「自分の家族」と「娘の家族」の経費を AI が自動判定・分類。
-* **Hybrid Deployment**: 自宅サーバー上の Docker 環境とクラウド（Supabase）を組み合わせたハイブリッド構成。
+* **Multi-Family Classification**: 「自分の家庭」と「その他の家庭」の経費を分けて管理。
+* **Hybrid Deployment**: 自宅サーバー上の Docker 環境とクラウドサービスを適材適所で組み合わせた構成。
 
 ---
 
@@ -56,8 +57,22 @@ cd receipt-ai-classifier
 cp .env.example .env
 ※ .env 内に Gemini API Key および Supabase の接続情報を記述してください
 
-###  3. コンテナの起動
-docker compose up -d --build
+---
+
+### 🛠️ Operation & Maintenance
+
+プロジェクトの継続的な運用を担保するため、以下の管理体制を構築しています。
+1. バックアップ戦略 (Backup Strategy)
+    対象:
+        データベース (PostgreSQL): .sql.gz 形式
+        ユーザーアップロード画像: .tar.gz 形式
+    世代管理: 過去7日分をローテーション保持
+2. 監視・アラート (Monitoring)
+    通知先: Discord Webhook (#alerts チャンネル)
+    通知タイミング:
+        バックアップスクリプト実行時のエラー検知
+        データベースコンテナの停止
+        その他、運用上のクリティカルな例外発生時
 
 ---
 
