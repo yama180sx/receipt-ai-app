@@ -97,12 +97,48 @@ export const saveParsedReceipt = async (
   }
 };
 
+/**
+ * レシートの解析からDB保存、トークンログの紐付けまでを制御します
+ */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
-  const member = await prisma.familyMember.findUnique({ where: { id: memberId }, select: { familyGroupId: true } });
+  const member = await prisma.familyMember.findUnique({ 
+    where: { id: memberId }, 
+    select: { familyGroupId: true } 
+  });
   if (!member) throw new Error('MEMBER_NOT_FOUND');
 
-  const parsedData = await analyzeReceiptImage(imagePath);
+  // 1. Geminiで解析（トークンログは geminiService 内で作成される）
+  const parsedData = await analyzeReceiptImage(imagePath, memberId);
+  
+  // 2. バリデーション
   const validation = validateReceiptItems(parsedData.items);
   
-  return await saveParsedReceipt(memberId, member.familyGroupId, parsedData, imagePath, validation.isSuspicious, validation.warnings);
+  // 3. レシートデータを保存
+  const result = await saveParsedReceipt(
+    memberId, 
+    member.familyGroupId, 
+    parsedData, 
+    imagePath, 
+    validation.isSuspicious, 
+    validation.warnings
+  );
+
+  // 4. [Issue #59] 作成されたレシートIDをトークンログに紐付ける
+  // 直近(1分以内)に作成された、このユーザーの未紐付けログを更新
+  try {
+    await prisma.apiUsageLog.updateMany({
+      where: {
+        familyMemberId: memberId,
+        receiptId: null,
+        createdAt: { gte: new Date(Date.now() - 60 * 1000) } // 1分以内のログ
+      },
+      data: {
+        receiptId: result.id
+      }
+    });
+  } catch (logError) {
+    logger.error(`[LOG_LINK_ERROR] ログの紐付けに失敗しました: ${logError}`);
+  }
+  
+  return result;
 };
