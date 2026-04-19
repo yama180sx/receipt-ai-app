@@ -9,23 +9,24 @@ datasource db {
 
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
-  id             Int            @id @default(autoincrement())
-  name           String         // 世帯名 (例: 山本家)
-  inviteCode     String         @unique @default(cuid()) // 家族招待用のコード
+  id             Int             @id @default(autoincrement())
+  name           String          // 世帯名 (例: 山本家)
+  inviteCode     String          @unique @default(cuid()) // 家族招待用のコード
   members        FamilyMember[]
   receipts       Receipt[]
   productMasters ProductMaster[]
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
 }
 
 // 家族構成
 model FamilyMember {
-  id            Int         @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   name          String
   password_hash String?
-  familyGroupId Int         // ★ 所属世帯
-  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  familyGroupId Int            // ★ 所属世帯
+  familyGroup   FamilyGroup    @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
+  apiUsageLogs  ApiUsageLog[]  // [Issue #59] トークンログとのリレーション
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
 }
@@ -48,31 +49,32 @@ model Store {
 }
 
 model Receipt {
-  id            Int          @id @default(autoincrement())
-  familyGroupId Int          // ★ 世帯ID (論理分離の主軸)
-  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
+  id            Int            @id @default(autoincrement())
+  familyGroupId Int            // ★ 世帯ID (論理分離の主軸)
+  familyGroup   FamilyGroup    @relation(fields: [familyGroupId], references: [id])
   memberId      Int
-  member        FamilyMember @relation(fields: [memberId], references: [id])
+  member        FamilyMember   @relation(fields: [memberId], references: [id])
   storeName     String
-  date          DateTime     @db.Timestamptz(3)
+  date          DateTime       @db.Timestamptz(3)
   totalAmount   Int
   rawText       Json?
-  imagePath     String?      
+  imagePath     String?        
   items         Item[]
-  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  apiUsageLogs  ApiUsageLog[]  // [Issue #59] トークンログとのリレーション
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
 
   @@index([familyGroupId, date]) // 検索効率化
 }
 
 model Item {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   receiptId  Int
-  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receipt    Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   categoryId Int?
   category   Category? @relation(fields: [categoryId], references: [id])
   name       String
   price      Int
-  quantity   Int       @default(1)
+  quantity   Int      @default(1)
 }
 
 // 学習マスタ (世帯ごとに学習結果を分離)
@@ -88,4 +90,21 @@ model ProductMaster {
 
   // コントローラーで使用している名前と一致させる
   @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
+}
+
+// [Issue #59] Gemini API トークン使用量トラッキング
+model ApiUsageLog {
+  id               Int          @id @default(autoincrement())
+  familyMemberId   Int?         // 実行したユーザー
+  familyMember     FamilyMember? @relation(fields: [familyMemberId], references: [id])
+  receiptId        Int?         // 関連するレシート (解析失敗時などは null)
+  receipt          Receipt?     @relation(fields: [receiptId], references: [id])
+  modelId          String       // 例: "gemini-1.5-flash"
+  promptTokens     Int          // 入力トークン
+  candidatesTokens Int          // 出力トークン
+  totalTokens      Int          // 合計トークン
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([familyMemberId])
+  @@index([createdAt])
 }
