@@ -1,5 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as fs from "fs";
+import { PrismaClient } from "@prisma/client";
+
+// Prisma インスタンスのインポート（プロジェクトの構成に合わせてパスを調整してください）
+// 一般的な構成を想定しています
+const prisma = new PrismaClient();
 
 export interface ParsedItem {
   name: string;
@@ -35,14 +40,23 @@ async function withRetry<T>(
   }
 }
 
-export const analyzeReceiptImage = async (imagePath: string): Promise<ParsedReceipt> => {
+/**
+ * レシート画像を解析し、トークン使用量をDBに記録します
+ * @param imagePath 画像のフルパス
+ * @param familyMemberId 実行したユーザーのID（ログ記録用）
+ */
+export const analyzeReceiptImage = async (
+  imagePath: string, 
+  familyMemberId?: number
+): Promise<ParsedReceipt> => {
   const task = async () => {
+    const modelId = "gemini-flash-latest"; // 変数化してログで使用
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest", 
+      model: modelId, 
       generationConfig: { responseMimeType: "application/json" }
     });
 
-  const prompt = `
+    const prompt = `
         レシート画像を解析し、以下のJSON形式でデータのみを返してください。
 
         【計算と精度の指示】
@@ -71,8 +85,32 @@ export const analyzeReceiptImage = async (imagePath: string): Promise<ParsedRece
       },
     };
 
+    // API呼び出し
     const result = await model.generateContent([prompt, imageData]);
-    const text = result.response.text();
+    const response = await result.response;
+    
+    // --- [Issue #59] トークン使用量の記録開始 ---
+    const usage = response.usageMetadata;
+    if (usage) {
+      try {
+        await prisma.apiUsageLog.create({
+          data: {
+            familyMemberId: familyMemberId || null,
+            modelId: modelId,
+            promptTokens: usage.promptTokenCount,
+            candidatesTokens: usage.candidatesTokenCount,
+            totalTokens: usage.totalTokenCount,
+            // receiptId はこの時点では未確定（保存前）のため、ここでは null
+          }
+        });
+      } catch (logError) {
+        // ログ保存の失敗で本体の解析処理を止めてはいけない
+        console.error("❌ ApiUsageLog の保存に失敗しました:", logError);
+      }
+    }
+    // --- 記録終了 ---
+
+    const text = response.text();
     
     try {
       const data = JSON.parse(text) as ParsedReceipt;
