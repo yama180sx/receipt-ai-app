@@ -36,7 +36,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
   /**
    * [Issue #45] カテゴリーマスタ取得
-   * 世帯ごとのマスタ（もしあれば）を取得するためヘッダーを付与
    */
   const fetchCategories = useCallback(async () => {
     try {
@@ -57,7 +56,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
   /**
    * [Issue #45] レシート一覧取得
-   * params に加え、Middlewareが要求する headers にも memberId をセットします
    */
   const fetchReceipts = useCallback(async () => {
     try {
@@ -68,7 +66,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
           month: selectedMonth
         },
         headers: {
-          'x-member-id': selectedMember // 世帯特定用
+          'x-member-id': selectedMember
         }
       });
 
@@ -87,14 +85,12 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     fetchReceipts();
   }, [fetchReceipts]);
 
-  // 親コンポーネントの切り替えを反映
   useEffect(() => {
     setSelectedMember(currentMemberId.toString());
   }, [currentMemberId]);
 
   /**
    * [Issue #45] 明細のカテゴリー更新
-   * 学習用マスタ（ProductMaster）の世帯分離のため、ヘッダーが必須です
    */
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
@@ -241,8 +237,16 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
               {selectedReceipt?.items?.map((item: any) => (
                 <View key={item.id} style={styles.detailItemRow}>
                   <View style={styles.detailItemInfo}>
-                    <Text style={styles.detailItemName}>{item.name}</Text>
-                    <Text style={styles.detailItemPrice}>¥{(item.price || 0).toLocaleString()}</Text>
+                    <Text style={styles.detailItemName} numberOfLines={1}>{item.name}</Text>
+                    {/* [Issue #65] 単価・数量・小計の表示 */}
+                    <View style={styles.detailPriceContainer}>
+                      <Text style={styles.detailItemPrice}>
+                        ¥{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                      </Text>
+                      <Text style={styles.detailItemSub}>
+                        （¥{(item.price || 0).toLocaleString()} × {item.quantity || 1}）
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.detailPickerWrapper}>
                     <Picker
@@ -299,7 +303,11 @@ const styles = StyleSheet.create({
   detailItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailItemInfo: { flex: 1 },
   detailItemName: { ...theme.typography.body, fontSize: 14, color: theme.colors.text.main },
-  detailItemPrice: { ...theme.typography.body, fontWeight: '700', color: theme.colors.primary, marginTop: 2 },
+  // 修正箇所：価格表示を横並びにするコンテナ
+  detailPriceContainer: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
+  detailItemPrice: { ...theme.typography.body, fontWeight: '700', color: theme.colors.primary },
+  // 追加箇所：単価・数量の補助テキスト
+  detailItemSub: { ...theme.typography.caption, color: theme.colors.text.muted, marginLeft: 4 },
   detailPickerWrapper: { width: 140, height: 40, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.sm, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   detailPicker: { width: '100%' },
 });
