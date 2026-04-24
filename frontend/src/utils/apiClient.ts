@@ -1,5 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 /**
  * [Issue #52] 401エラー時に App.tsx 等の UI 側でログアウト処理を発火させるためのハンドラ
@@ -22,20 +24,24 @@ const apiClient = axios.create({
 // --- リクエストインターセプター：送信前に認証情報を自動注入 ---
 apiClient.interceptors.request.use(async (config) => {
   try {
-    // 1. JWTトークンの取得と付与
-    const token = await SecureStore.getItemAsync('userToken');
+    // [Web対応] 環境に応じて取得先を切り替え
+    const token = Platform.OS === 'web'
+      ? await AsyncStorage.getItem('userToken')
+      : await SecureStore.getItemAsync('userToken');
+      
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // 2. [Issue #51/52] メンバーIDの取得と付与 (x-member-id)
-    // これにより、各 Screen で headers を手動設定する必要がなくなります
-    const memberId = await SecureStore.getItemAsync('currentMemberId');
+    const memberId = Platform.OS === 'web'
+      ? await AsyncStorage.getItem('currentMemberId')
+      : await SecureStore.getItemAsync('currentMemberId');
+
     if (memberId) {
       config.headers['x-member-id'] = memberId;
     }
   } catch (error) {
-    console.error('[API-AUTH] SecureStore 取得失敗:', error);
+    console.error('[API-AUTH] ストレージ取得失敗:', error);
   }
   
   return config;
@@ -58,7 +64,7 @@ apiClient.interceptors.response.use(
       if (error.response.status === 401) {
         console.warn(`[API] Unauthorized: ${errorCode || 'TOKEN_EXPIRED'}`);
         
-        // App.tsx で登録されたログアウト関数を実行し、UIをログイン画面に切り替える
+        // App.tsx で登録されたログアウト関数を実行
         if (onUnauthorizedHandler) {
           onUnauthorizedHandler();
         }

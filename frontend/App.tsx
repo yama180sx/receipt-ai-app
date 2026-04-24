@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Alert, ActivityIndicator, Image, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { StyleSheet, View, Alert, ActivityIndicator, Image, Text, TouchableOpacity, ScrollView, TextInput, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'; 
 import { Picker } from '@react-native-picker/picker';
@@ -20,6 +20,9 @@ import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
 import { theme } from './src/theme';
 
+// [Issue #49-2] レスポンシブコンテナの追加
+import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+
 type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master';
 
 const STORAGE_KEYS = {
@@ -27,6 +30,7 @@ const STORAGE_KEYS = {
   IMAGE: '@app_image',
   ROTATION: '@app_rotation',
   RESULT: '@app_result',
+  MEMBER_ID: 'currentMemberId', // SecureStore/AsyncStorage 共通キー
 };
 
 export default function App() {
@@ -48,14 +52,17 @@ export default function App() {
 
   /**
    * 1. 状態復元
+   * [Web対応] SecureStoreがWebで未定義のため、AsyncStorageへフォールバック
    */
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const [token, midStr] = await Promise.all([
-          authService.getToken(),
-          SecureStore.getItemAsync('currentMemberId')
-        ]);
+        const token = await authService.getToken();
+        
+        // Webブラウザの場合は AsyncStorage、モバイルの場合は SecureStore を使用
+        const midStr = Platform.OS === 'web'
+          ? await AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
+          : await SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID);
 
         if (token) {
           setUserToken(token);
@@ -72,7 +79,6 @@ export default function App() {
         if (i) setImage(i);
         if (r) setRotation(parseInt(r, 10) || 0);
 
-        // ★ 復元時にデータの妥当性をチェック。itemsが無い不完全なデータは破棄する。
         if (res) {
           const parsed = JSON.parse(res);
           if (parsed && Array.isArray(parsed.items)) {
@@ -119,7 +125,13 @@ export default function App() {
       if (response.data && response.data.success) {
         const { token, member } = response.data.data;
         await authService.saveToken(token);
-        await SecureStore.setItemAsync('currentMemberId', member.id.toString());
+
+        // [Web対応] メンバーIDの保存先をプラットフォームで切り替え
+        if (Platform.OS === 'web') {
+          await AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, member.id.toString());
+        } else {
+          await SecureStore.setItemAsync(STORAGE_KEYS.MEMBER_ID, member.id.toString());
+        }
         
         setUserToken(token);
         setCurrentMemberId(member.id);
@@ -138,7 +150,14 @@ export default function App() {
    */
   const handleLogout = async () => {
     await authService.logout();
-    await SecureStore.deleteItemAsync('currentMemberId');
+    
+    // [Web対応] メンバーIDの削除
+    if (Platform.OS === 'web') {
+      await AsyncStorage.removeItem(STORAGE_KEYS.MEMBER_ID);
+    } else {
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.MEMBER_ID);
+    }
+
     setUserToken(null);
     setCurrentMemberId(null);
     setCurrentView('main');
@@ -147,9 +166,6 @@ export default function App() {
     setLoginPassword('');
   };
 
-  /**
-   * 業務ロジック
-   */
   const fetchCategories = useCallback(async () => {
     if (!userToken) return;
     try {
@@ -174,7 +190,6 @@ export default function App() {
           AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
           image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
           AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
-          // ★ 保存時も妥当性をチェック
           resultData && Array.isArray(resultData.items) 
             ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) 
             : AsyncStorage.removeItem(STORAGE_KEYS.RESULT),
@@ -218,7 +233,6 @@ export default function App() {
       const { state, result, error } = res.data.data;
       
       if (state === 'completed') {
-        // ★ バックエンドから期待通りのデータ（items配列）が来ているかチェック
         if (result && Array.isArray(result.items)) {
           return result;
         }
@@ -257,7 +271,7 @@ export default function App() {
       setImage(null);
     } catch (error: any) {
       Alert.alert('お知らせ', error.message);
-      setResultData(null); // エラー時は残存データをクリア
+      setResultData(null);
     } finally {
       setUploading(false);
       if (manipulatedUri) await deleteTempFile(manipulatedUri);
@@ -296,27 +310,29 @@ export default function App() {
 
   if (!userToken) {
     return (
-      <View style={styles.loginContainer}>
-        <Text style={styles.loginTitle}>家計簿アプリ</Text>
-        <Text style={styles.loginSub}>パスワードを入力して開始</Text>
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="パスワードを入力"
-            placeholderTextColor="rgba(255,255,255,0.6)"
-            secureTextEntry={true}
-            value={loginPassword}
-            onChangeText={setLoginPassword}
-            autoCapitalize="none"
-          />
+      <ResponsiveContainer>
+        <View style={styles.loginContainer}>
+          <Text style={styles.loginTitle}>家計簿アプリ</Text>
+          <Text style={styles.loginSub}>パスワードを入力して開始</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="パスワードを入力"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              secureTextEntry={true}
+              value={loginPassword}
+              onChangeText={setLoginPassword}
+              autoCapitalize="none"
+            />
+          </View>
+          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
+            <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(2)}>
+            <Text style={styles.loginButtonText}>その他 (ID: 2) でログイン</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
-          <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(2)}>
-          <Text style={styles.loginButtonText}>その他 (ID: 2) でログイン</Text>
-        </TouchableOpacity>
-      </View>
+      </ResponsiveContainer>
     );
   }
 
@@ -335,9 +351,8 @@ export default function App() {
               <Text style={styles.logoutText}>ログアウト</Text>
             </TouchableOpacity>
 
-            {/* ★ resultData が存在し、かつ items が配列である場合のみ表示 */}
             {resultData && Array.isArray(resultData.items) ? (
-              <ScrollView contentContainerStyle={styles.resultContainer}>
+              <ScrollView contentContainerStyle={styles.resultContainer} showsVerticalScrollIndicator={false}>
                 <Text style={styles.resultHeader}>解析結果</Text>
 
                 {resultData.isSuspicious && (
@@ -354,12 +369,18 @@ export default function App() {
                   <Text style={styles.storeName}>{resultData.storeName || '不明'}</Text>
                   <Text style={styles.totalAmount}>¥{(resultData.totalAmount || 0).toLocaleString()}</Text>
                   <View style={styles.divider} />
-                  {/* ★ Optional Chaining を使用 */}
                   {resultData.items?.map((item: any) => (
                     <View key={item.id} style={styles.itemRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        <Text style={styles.itemPrice}>¥{(item.price || 0).toLocaleString()} (x{item.quantity})</Text>
+                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                        <View style={styles.itemPriceDetailRow}>
+                          <Text style={styles.itemPrice}>
+                            ¥{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                          </Text>
+                          <Text style={styles.itemSubText}>
+                            (¥{(item.price || 0).toLocaleString()} × {item.quantity || 1})
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.pickerWrapper}>
                         <Picker selectedValue={item.categoryId} onValueChange={(val) => handleCategoryChange(item.id, val)} style={styles.picker}>
@@ -406,9 +427,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        {renderMainContent()}
-      </View>
+      <ResponsiveContainer>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+          {renderMainContent()}
+        </View>
+      </ResponsiveContainer>
     </SafeAreaProvider>
   );
 }
@@ -439,7 +462,7 @@ const styles = StyleSheet.create({
   mainButtonText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
   subButton: { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 12, paddingHorizontal: 20, borderRadius: theme.borderRadius.sm },
   subButtonText: { color: 'white', fontWeight: '600' },
-  resultContainer: { padding: theme.spacing.lg, paddingTop: 60 },
+  resultContainer: { padding: theme.spacing.lg, paddingTop: 80, paddingBottom: 40 },
   resultHeader: { ...theme.typography.h1, marginBottom: theme.spacing.lg, textAlign: 'center' },
   warningContainer: { backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FFC0C0', borderRadius: 10, padding: 15, marginBottom: 20 },
   warningTitle: { color: '#D00000', fontWeight: 'bold', fontSize: 16, marginBottom: 8 },
@@ -452,7 +475,9 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: theme.colors.border, marginBottom: theme.spacing.md },
   itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.background },
   itemName: { ...theme.typography.body, fontSize: 14 },
-  itemPrice: { ...theme.typography.caption, fontWeight: '700' },
+  itemPriceDetailRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
+  itemPrice: { ...theme.typography.caption, fontWeight: '700', color: theme.colors.primary },
+  itemSubText: { fontSize: 10, color: theme.colors.text.muted, marginLeft: 4 },
   pickerWrapper: { width: 120, height: 40, backgroundColor: theme.colors.background, borderRadius: theme.borderRadius.sm, overflow: 'hidden' },
   picker: { width: '100%' },
   doneButton: { backgroundColor: theme.colors.primary, padding: 16, borderRadius: theme.borderRadius.md, alignItems: 'center', marginTop: theme.spacing.xl },
