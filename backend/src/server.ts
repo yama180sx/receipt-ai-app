@@ -29,19 +29,14 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0'; 
 
 // --- 1. 基本ミドルウェア設定 ---
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : [];
 
+/**
+ * [Web対応] CORS設定を緩和
+ * 開発環境においてブラウザ(localhost)からT320のIPへの通信を許可するため、
+ * origin: true (リクエスト元をそのまま許可) に設定します。
+ */
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      logger.warn(`[CORS] Rejected origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, 
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-member-id'],
   credentials: true
@@ -63,8 +58,6 @@ app.use('/api/auth', authRoutes);
 
 /**
  * [重要] 認証・テナント必須ルート
- * ここで一括適用せず、各ルーターに任せるか、あるいはパスを指定して適用します。
- * 今回はコンテキスト消失を防ぐため、receiptRoutes側で個別に制御できるようにします。
  */
 app.use('/api', receiptRoutes);
 app.use('/api/categories', authMiddleware, tenantMiddleware, categoryRoutes);
