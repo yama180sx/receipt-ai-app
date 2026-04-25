@@ -308,9 +308,12 @@ export default function App() {
     );
   }
 
+  // ★ 追加：現在のビューがフル幅（全幅）表示を許可すべき画面かどうかを判定
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master'].includes(currentView);
+
   if (!userToken) {
     return (
-      <ResponsiveContainer>
+      <ResponsiveContainer fullWidth={false}>
         <View style={styles.loginContainer}>
           <Text style={styles.loginTitle}>家計簿アプリ</Text>
           <Text style={styles.loginSub}>パスワードを入力して開始</Text>
@@ -427,7 +430,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ResponsiveContainer>
+      {/* ★ 変更点: fullWidth プロパティに判定結果を渡す */}
+      <ResponsiveContainer fullWidth={isFullWidth}>
         <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           {renderMainContent()}
         </View>
