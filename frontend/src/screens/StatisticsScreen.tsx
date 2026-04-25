@@ -5,12 +5,14 @@ import { PieChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
+// ★ 共通コンポーネントをインポート
+import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
 // --- interface 定義 ---
 interface Category { id: number; name: string; color: string; }
 interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number | string; color: string; }
 interface ReceiptItem { id: number; name: string; price: number; quantity: number; categoryId: number; category?: { name: string; color: string }; }
-interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; }
+interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; date?: string; }
 interface MonthlyData { month: string; totalAmount: number; prevTotal: number; diffAmount: number; diffPercentage: number; stats: StatItem[]; latestReceipt: ReceiptInfo | null; }
 
 interface TrendData { period: string; total: number; prev_total: number | null; }
@@ -24,7 +26,7 @@ interface StatisticsScreenProps {
 
 export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const { width: windowWidth } = useWindowDimensions();
-  const isWide = windowWidth > 768; // iPad/Web 判定
+  const isWide = windowWidth > 768;
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -33,8 +35,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   
   const [isMainModalVisible, setMainModalVisible] = useState(false);
-  const [isPickerVisible, setPickerVisible] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
@@ -85,14 +85,18 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleUpdateCategory = async (categoryId: number) => {
-    if (!selectedItemId) return;
+  // ★ 共通コンポーネント用のカテゴリー更新関数
+  const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
+    if (!categoryId) return;
     try {
-      await apiClient.patch(`/receipt-items/${selectedItemId}`, { categoryId }, { headers: { 'x-member-id': currentMemberId.toString() } });
-      setPickerVisible(false);
-      await fetchData();
-      Alert.alert("完了", "カテゴリーを更新しました");
-    } catch (error) { Alert.alert("エラー", "更新に失敗しました"); }
+      await apiClient.patch(`/receipt-items/${itemId}`, 
+        { categoryId: Number(categoryId) }, 
+        { headers: { 'x-member-id': currentMemberId.toString() } }
+      );
+      await fetchData(); // レポートの数値を再読込
+    } catch (error) {
+      Alert.alert("エラー", "カテゴリーの更新に失敗しました");
+    }
   };
 
   const chartData = useMemo(() => {
@@ -111,7 +115,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       .filter(s => s.population > 0);
   }, [data?.stats]);
 
-  // チャートの幅を計算（ワイド時は固定、モバイル時は画面幅）
   const chartWidth = isWide ? 400 : windowWidth - 60;
 
   return (
@@ -141,7 +144,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         ) : (
           <View style={isWide ? styles.dashboardGrid : null}>
             
-            {/* --- 左カラム (サマリー & チャート) --- */}
+            {/* 左カラム */}
             <View style={isWide ? styles.leftColumn : null}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>当月合計支出</Text>
@@ -178,7 +181,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                   <TouchableOpacity style={styles.receiptPreviewCard} onPress={() => setMainModalVisible(true)}>
                     <Image source={{ uri: `${BASE_URL}/${data.latestReceipt.imagePath}` }} style={styles.receiptImage} resizeMode="cover" />
                     <View style={styles.receiptInfoOverlay}>
-                      {/* ★店名を flex: 1 で包んで金額を保護 */}
                       <View style={{ flex: 1, marginRight: 10 }}>
                         <Text style={styles.receiptStoreName} numberOfLines={1}>
                           {data.latestReceipt.storeName || '店名不明'}
@@ -193,7 +195,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* --- 右カラム (トレンド & パレート) --- */}
+            {/* 右カラム */}
             <View style={isWide ? styles.rightColumn : null}>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
@@ -239,8 +241,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
-      {/* 詳細 Modal */}
-      <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide}>
+      {/* --- ★ 修正: 解析レシート詳細 Modal --- */}
+      <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide} onRequestClose={() => setMainModalVisible(false)}>
         <View style={isWide ? styles.modalOverlay : styles.modalContainer}>
           <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
             <View style={styles.modalHeader}>
@@ -249,53 +251,16 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 <Text style={styles.modalCloseText}>閉じる</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalScroll}>
-              {data?.latestReceipt?.imagePath && (
-                <Image source={{ uri: `${BASE_URL}/${data.latestReceipt.imagePath}` }} style={styles.modalImage} resizeMode="contain" />
-              )}
-              <View style={styles.itemListContainer}>
-                {data?.latestReceipt?.items.map((item) => (
-                  <View key={item.id} style={styles.itemRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <View style={styles.itemPriceDetailRow}>
-                        <Text style={styles.itemPrice}>¥{((item.price || 0) * (item.quantity || 1)).toLocaleString()}</Text>
-                        <Text style={styles.itemSubText}>（¥{(item.price || 0).toLocaleString()} × {item.quantity || 1}）</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity 
-                      style={[styles.categoryBadge, { backgroundColor: item.category?.color || theme.colors.secondary }]}
-                      onPress={() => { setSelectedItemId(item.id); setPickerVisible(true); }}
-                    >
-                      <Text style={styles.categoryBadgeText}>{item.category?.name || '未分類'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-          </SafeAreaView>
-        </View>
-      </Modal>
-
-      {/* カテゴリ変更 Modal */}
-      <Modal visible={isPickerVisible} transparent={true} animationType="fade">
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerWindow, isWide && { width: 400 }]}>
-            <Text style={styles.pickerHeader}>カテゴリー変更</Text>
-            <FlatList
-              data={allCategories}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.pickerItem} onPress={() => handleUpdateCategory(item.id)}>
-                  <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-                  <Text style={styles.pickerItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
+            
+            {/* ★ 共通コンポーネントに差し替え */}
+            <ReceiptDetailComponent 
+              receipt={data?.latestReceipt}
+              categories={allCategories}
+              onCategoryChange={handleCategoryChange}
+              baseUrl={BASE_URL}
+              fullWidth={true} // モーダルなので広々と使う
             />
-            <TouchableOpacity style={styles.pickerCancel} onPress={() => setPickerVisible(false)}>
-              <Text style={styles.pickerCancelText}>キャンセル</Text>
-            </TouchableOpacity>
-          </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -313,7 +278,6 @@ const styles = StyleSheet.create({
   monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
   monthPicker: { width: '100%' },
 
-  // --- Dashboard Grid (iPad/Web用) ---
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },
@@ -342,37 +306,17 @@ const styles = StyleSheet.create({
   noDataText: { fontSize: 12, color: theme.colors.text.muted },
   receiptPreviewCard: { backgroundColor: theme.colors.surface, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border },
   receiptImage: { width: '100%', height: 160, backgroundColor: theme.colors.border },
-  
-  // --- 修正: レシート情報のオーバーレイ ---
   receiptInfoOverlay: { padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 60 },
   receiptStoreName: { fontWeight: '700', color: theme.colors.text.main },
   receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, minWidth: 80, textAlign: 'right' },
-
   noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
-  // --- Modal Adjustments ---
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  // --- Modal (壁の撤去) ---
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContainer: { flex: 1, backgroundColor: theme.colors.background },
-  wideModal: { width: 600, maxHeight: '80%', borderRadius: 20, overflow: 'hidden' },
+  // ★ 修正：maxWidth を 1400px に拡張し、画面いっぱいに広がるように変更
+  wideModal: { width: '95%', maxWidth: 1400, height: '90%', borderRadius: 20, overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   modalTitle: { fontSize: 18, fontWeight: 'bold' },
-  modalCloseText: { color: theme.colors.error, fontWeight: '600' },
-  modalScroll: { flex: 1 },
-  modalImage: { width: '100%', height: 300, marginVertical: 15 },
-  itemListContainer: { paddingHorizontal: 20, paddingBottom: 30 },
-  itemRow: { flexDirection: 'row', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border, alignItems: 'center' },
-  itemName: { flex: 1, fontSize: 14 },
-  itemPriceDetailRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
-  itemPrice: { fontWeight: '700', color: theme.colors.primary },
-  itemSubText: { fontSize: 10, color: theme.colors.text.muted, marginLeft: 4 },
-  categoryBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginLeft: 10 },
-  categoryBadgeText: { color: 'white', fontWeight: '700', fontSize: 10 },
-  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  pickerWindow: { width: '85%', maxHeight: '70%', backgroundColor: theme.colors.surface, borderRadius: 15, padding: 20 },
-  pickerHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  pickerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
-  pickerItemText: { fontSize: 16 },
-  pickerCancel: { marginTop: 15, alignItems: 'center' },
-  pickerCancelText: { color: theme.colors.error, fontWeight: '700' }
+  modalCloseText: { color: theme.colors.error, fontWeight: '600', fontSize: 16 }
 });

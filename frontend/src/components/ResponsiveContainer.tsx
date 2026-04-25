@@ -4,17 +4,18 @@ import { useResponsive } from '../hooks/useResponsive';
 
 interface Props {
   children: React.ReactNode;
+  fullWidth?: boolean; // ★ 追加：制限を解除して100%広げるためのスイッチ
 }
 
 /**
- * Web/iPad表示の時にコンテンツが横に広がりすぎないように制限するコンテナ
+ * Web/iPad表示の時にコンテンツの幅を制御するコンテナ
  */
-export const ResponsiveContainer: React.FC<Props> = ({ children }) => {
+export const ResponsiveContainer: React.FC<Props> = ({ children, fullWidth }) => {
   const { isWideScreen } = useResponsive();
 
-  // Webかつ広い画面の時だけ、最大幅(600px)を適用して中央寄せ
+  // Webかつ広い画面で、かつ fullWidth フラグが立っていない時だけ最大幅(600px)を適用
   const isWebWide = Platform.OS === 'web' && isWideScreen;
-  const containerStyle = isWebWide ? styles.wideContainer : styles.mobileContainer;
+  const containerStyle = (isWebWide && !fullWidth) ? styles.wideContainer : styles.mobileContainer;
 
   return (
     <View style={styles.outer}>
@@ -40,8 +41,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   wideContainer: {
-    maxWidth: 600,             // iPad/PCで見た時のアプリの横幅
-    // 左右に薄い境界線を入れると、Webサイトっぽさが増します
+    maxWidth: 600,             // iPad/PCで見た時の通常のアプリ横幅
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: '#e9ecef',
