@@ -1,40 +1,37 @@
 import { Worker, Job } from 'bullmq';
 import { redisConnection } from '../config/redis';
 import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
-import { processAndSaveReceipt } from '../services/receiptService'; 
+import { analyzeOnly } from '../services/receiptService'; 
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 
 /**
- * [Issue #53 最終修正]
- * フロントエンドの期待値(items配列を含むオブジェクト)を返すように修正
+ * [Issue #49-8]
+ * 解析ジョブの責務を「保存」から「解析のみ」へ変更。
+ * 保存（永続化）はフロントエンドでのユーザー確認後に別エンドポイントで行うフローに移行。
  */
 const receiptWorker = new Worker(
   RECEIPT_QUEUE_NAME,
   async (job: Job) => {
     const { memberId, familyGroupId, imagePath } = job.data;
-    logger.info(`[Worker] ジョブ開始: ID ${job.id} (世帯: ${familyGroupId})`);
+    logger.info(`[Worker] ジョブ開始 (解析のみ): ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 
+    // テナントコンテキスト内で実行
     return await runWithTenant({ familyGroupId, memberId }, async () => {
       try {
-        // processAndSaveReceipt は内部で items を含む POJO を返します
-        const result = await processAndSaveReceipt(memberId, imagePath);
+        // analyzeOnly は DB 保存を行わず、Gemini の解析結果、画像パス、バリデーション結果を返す
+        const result = await analyzeOnly(memberId, imagePath);
         
-        logger.info(`[Worker] 解析・保存完了: ID ${job.id}, ReceiptID: ${result.id}`);
+        logger.info(`[Worker] 解析完了: ID ${job.id} (画像: ${imagePath})`);
 
-        // ★【重要】 フロントのバリデーションを通すため、result（全データ）をそのまま返す
-        // これにより job.returnvalue に items, isSuspicious, warnings 等が含まれます
+        // この戻り値が job.returnvalue となり、フロントエンドのポーリング側で取得可能になる
         return result;
 
       } catch (error: any) {
-        // 重複チェックのエラーハンドリング
-        if (error.message === 'DUPLICATE_RECEIPT_DETECTED' || error.statusCode === 409) {
-          logger.warn(`[Worker] 重複スキップ: ID ${job.id}`);
-          // 重複時はフロントで処理できるようエラー型を返す
-          return { success: false, errorType: 'DUPLICATE' };
-        }
-
+        // 重複チェックは保存時に行うため、Worker レベルでは主に API 通信や画像処理エラーを捕捉
         logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${error.message}`);
+        
+        // ジョブ自体を失敗状態にする
         throw error;
       }
     });

@@ -4,11 +4,13 @@ import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
 import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveParsedReceipt } from '../services/receiptService'; // ★ persistenceService から変更
-import { getFamilyGroupId } from '../utils/context';
+import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
+import { getFamilyGroupId, getMemberId } from '../utils/context';
 
 /**
  * [Issue #43] ジョブステータス取得
+ * Workerが解析結果（parsedData, imagePath, validation）を返すようになったため、
+ * job.returnvalue をそのままフロントエンドへ返却します。
  */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
@@ -21,7 +23,7 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
       data: {
         id: job.id,
         state,
-        result: job.returnvalue,
+        result: job.returnvalue, // analyzeOnly の戻り値（解析データ）が含まれる
         error: job.failedReason
       }
     });
@@ -60,23 +62,54 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
+ * [Issue #49-8] 解析結果の確定保存
+ * フロントエンドでの編集内容を受け取り、DBへ本保存します。
+ */
+export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberId = getMemberId();
+    const familyGroupId = getFamilyGroupId();
+    const { parsedData, imagePath, validation } = req.body;
+
+    if (!parsedData || !imagePath) {
+      throw new AppError('必要なデータが不足しています。', 400);
+    }
+
+    if (!memberId || !familyGroupId) {
+      throw new AppError('認証情報または世帯情報が取得できません。', 401);
+    }
+
+    const result = await saveConfirmedReceipt(
+      memberId,
+      familyGroupId,
+      parsedData,
+      imagePath,
+      validation?.isSuspicious || false,
+      validation?.warnings || []
+    );
+
+    res.status(201).json({ success: true, data: result });
+  } catch (error: any) { 
+    if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
+    next(error); 
+  }
+};
+
+/**
  * 手動登録 (receiptService に一本化)
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memberId = req.body.memberId || req.headers['x-member-id'];
     const familyGroupId = getFamilyGroupId();
-    const { date, storeName, totalAmount, items, imagePath, rawText } = req.body;
+    const { date, storeName, totalAmount, items, imagePath } = req.body;
 
-    // persistenceService.saveReceiptData を廃止し、
-    // 重複チェックとバリデーションが含まれる receiptService.saveParsedReceipt を使用。
-    // 手動登録なので isSuspicious は false (または入力値に応じたバリデーション) とする。
     const newReceipt = await saveParsedReceipt(
       Number(memberId),
       familyGroupId,
       {
         storeName,
-        purchaseDate: date, // 内部の parseSafeDate でパースされる
+        purchaseDate: date,
         totalAmount: Number(totalAmount),
         items: items.map((i: any) => ({
           name: i.name,
@@ -85,7 +118,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
         }))
       },
       imagePath || "",
-      false, // 手動登録は不整合チェック(AI用)を一旦スルー
+      false, 
       []
     );
 
@@ -120,7 +153,6 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       });
 
       if (categoryId) {
-        // 世帯別 ProductMaster への upsert
         await (tx.productMaster as any).upsert({
           where: {
             name_storeName_familyGroupId: {

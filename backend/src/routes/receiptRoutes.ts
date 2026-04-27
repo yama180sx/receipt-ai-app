@@ -19,7 +19,8 @@ import {
   updateItemCategory,
   getMonthlyStats,
   getJobStatus,
-  getAdvancedStats 
+  getAdvancedStats,
+  commitReceipt // [Issue #49-8] 追加
 } from '../controllers/receiptController';
 
 const router = express.Router();
@@ -39,7 +40,7 @@ router.post(
   '/receipts/upload',
   upload.single('image'), // 1. ファイルをパース（非同期境界）
   authMiddleware,         // 2. ユーザー認証
-  tenantMiddleware,       // 3. テナントコンテキスト開始（ここから ALC が有効）
+  tenantMiddleware,       // 3. テナントコンテキスト開始
   validate(uploadReceiptSchema), // 4. スキーマ検証
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -58,14 +59,14 @@ router.post(
       const uploadDir = 'uploads';
       const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-      // 画像処理
+      // 画像処理: WebP変換とリサイズ
       await sharp(file.buffer)
         .rotate()
         .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 75, effort: 6 })
         .toFile(imagePath);
 
-      // キュー登録
+      // キュー登録 (Issue #49-8 により、Workerは解析のみを行う)
       const job = await receiptQueue.add('analyze-receipt', {
         memberId: memberId,
         familyGroupId: familyGroupId,
@@ -84,8 +85,7 @@ router.post(
   }
 );
 
-// --- [Issue #45] 共通ミドルウェア適用ルート ---
-// これ以降のルートは一括でミドルウェアを適用
+// --- 共通ミドルウェア適用ルート ---
 router.use(authMiddleware, tenantMiddleware);
 
 router.get('/receipts', getReceipts);
@@ -96,5 +96,11 @@ router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', createReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 router.patch('/receipt-items/:id', updateItemCategory);
+
+/**
+ * [Issue #49-8] 解析結果の確定保存
+ * AI解析後、ユーザーが確認・修正したデータをDBに永続化します。
+ */
+router.post('/receipts/commit', commitReceipt);
 
 export default router;
