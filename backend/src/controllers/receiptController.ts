@@ -7,11 +7,6 @@ import { receiptQueue } from '../queues/receiptQueue';
 import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 
-/**
- * [Issue #43] ジョブステータス取得
- * Workerが解析結果（parsedData, imagePath, validation）を返すようになったため、
- * job.returnvalue をそのままフロントエンドへ返却します。
- */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
     const job = await receiptQueue.getJob(req.params.jobId!);
@@ -23,16 +18,13 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
       data: {
         id: job.id,
         state,
-        result: job.returnvalue, // analyzeOnly の戻り値（解析データ）が含まれる
+        result: job.returnvalue,
         error: job.failedReason
       }
     });
   } catch (error) { next(error); }
 };
 
-/**
- * [Issue #45] カテゴリ一覧取得
- */
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
@@ -40,12 +32,9 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
   } catch (error) { next(error); }
 };
 
-/**
- * [Issue #43 & #45] レシートアップロード (AI解析)
- */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.headers['x-member-id'];
+    const memberId = req.body.memberId || req.headers['x-member-id'];
     const imagePath = req.file?.path;
 
     if (!imagePath) throw new AppError('画像がアップロードされていません。', 400);
@@ -63,7 +52,6 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
 /**
  * [Issue #49-8] 解析結果の確定保存
- * フロントエンドでの編集内容を受け取り、DBへ本保存します。
  */
 export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -79,6 +67,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
       throw new AppError('認証情報または世帯情報が取得できません。', 401);
     }
 
+    // サービス層を呼び出し。ここで保存と学習が同時に行われます。
     const result = await saveConfirmedReceipt(
       memberId,
       familyGroupId,
@@ -96,7 +85,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 手動登録 (receiptService に一本化)
+ * 手動登録
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -114,7 +103,8 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
         items: items.map((i: any) => ({
           name: i.name,
           price: Number(i.price),
-          quantity: Number(i.quantity || 1)
+          quantity: Number(i.quantity || 1),
+          categoryId: i.categoryId ? Number(i.categoryId) : null
         }))
       },
       imagePath || "",
@@ -129,9 +119,6 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-/**
- * 明細カテゴリ更新 ＋ 世帯別学習
- */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { categoryId } = req.body;
@@ -153,7 +140,7 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       });
 
       if (categoryId) {
-        await (tx.productMaster as any).upsert({
+        await tx.productMaster.upsert({
           where: {
             name_storeName_familyGroupId: {
               name: getCleanText(currentItem.name),
@@ -176,9 +163,6 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
   } catch (error) { next(error); }
 };
 
-/**
- * [Issue #45] レシート一覧取得 (世帯フィルタリング)
- */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memberId = req.query.memberId || req.headers['x-member-id'];
@@ -204,9 +188,6 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
   } catch (error) { next(error); }
 };
 
-/**
- * 最新1件の取得
- */
 export const getLatestReceipt = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const receipt = await prisma.receipt.findFirst({
@@ -218,9 +199,6 @@ export const getLatestReceipt = async (_req: Request, res: Response, next: NextF
   } catch (error) { next(error); }
 };
 
-/**
- * 削除
- */
 export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.receipt.delete({ 
@@ -230,9 +208,6 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
   } catch (error) { next(error); }
 };
 
-/**
- * [Issue #50] 月別統計
- */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
   const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
@@ -288,9 +263,6 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
   } catch (error) { next(error); }
 };
 
-/**
- * [Issue #50] 高度な統計
- */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
   try {
