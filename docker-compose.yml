@@ -5,11 +5,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     user: "${UID}:${GID}"
-    command: npm run dev
+    # 運用時は Dockerfile 内の CMD (node dist/index.js) を優先
+    # 開発時にホットリロードが必要なら command: npm run dev で上書き
     volumes:
       - ./backend:/app
       - /etc/localtime:/etc/localtime:ro
-      # レシート画像の永続化（明示的なバインドマウント）
       - ./backend/uploads:/app/uploads
     ports:
       - "${BACKEND_PORT:-3000}:3000"
@@ -19,26 +19,48 @@ services:
       - ./backend/.env
     environment:
       - TZ=Asia/Tokyo
+      - NODE_ENV=production
+      # [重要] 運用版(8080)と開発版(8081)の両方のオリジンを許可
+      - CORS_ORIGIN=http://${T320_IP:-192.168.1.32}:8080,http://${T320_IP:-192.168.1.32}:8081
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  # --- Frontend (Expo / React Native) ---
+  # --- Frontend (運用・検証用: Nginx Hosting) ---
+  # 常時稼働・安定動作 (http://IP:8080)
   frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.web
+      args:
+        # ビルド時にAPI URLを確定させ、JSバイナリ内に埋め込む
+        - EXPO_PUBLIC_API_URL=http://${T320_IP:-192.168.1.32}:${BACKEND_PORT:-3000}/api
+    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-frontend-web"
+    ports:
+      - "8080:80"
+    restart: always
+    environment:
+      - TZ=Asia/Tokyo
+    depends_on:
+      - backend
+
+  # --- Frontend (開発用: Expo Dev Server) ---
+  # デバッグ・ホットリロード用 (http://IP:8081)
+  frontend-dev:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     user: "${UID}:${GID}"
-    command: npx expo start
+    command: npx expo start --web --port 8081 --host lan
     volumes:
       - ./frontend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${FRONTEND_PORT:-8081}:8081"
-      - "${EXPO_PORT_1:-19000}:19000"
-      - "${EXPO_PORT_2:-19001}:19001"
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
     stdin_open: true
     tty: true
     env_file:
@@ -47,6 +69,8 @@ services:
       - TZ=Asia/Tokyo
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
       - REACT_NATIVE_PACKAGER_HOSTNAME=${T320_IP:-192.168.1.32}
+    depends_on:
+      - backend
 
   # --- Database (PostgreSQL) ---
   db:
@@ -58,7 +82,6 @@ services:
       - POSTGRES_DB=${DB_NAME:-receipt_db}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      # 名前付きボリュームではなく、カレントディレクトリの pgdata に保存
       - ./pgdata:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
     ports:
@@ -76,7 +99,6 @@ services:
     environment:
       - TZ=Asia/Tokyo
     volumes:
-      # redisdata ディレクトリに永続化
       - ./redisdata:/data
       - /etc/localtime:/etc/localtime:ro
     ports:
@@ -86,5 +108,3 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-# 名前付きボリューム定義は不要になったため削除
