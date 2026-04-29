@@ -19,28 +19,29 @@ import {
   updateItemCategory,
   getMonthlyStats,
   getJobStatus,
-  getAdvancedStats 
+  getAdvancedStats,
+  commitReceipt 
 } from '../controllers/receiptController';
 
 const router = express.Router();
 
-// Sharpで処理するためメモリ上に保存
+// Sharp処理用にメモリストレージを使用
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB制限
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
 /**
- * [Issue #46 修正] 非同期アップロード
- * コンテキスト消失を防ぐため、multerの後に auth/tenant ミドルウェアを配置します。
+ * レシートアップロード (非同期解析ジョブ投入)
+ * ミドルウェアの順序: ファイルパース -> 認証 -> テナント設定 -> バリデーション
  */
 router.post(
   '/receipts/upload',
-  upload.single('image'), // 1. ファイルをパース（非同期境界）
-  authMiddleware,         // 2. ユーザー認証
-  tenantMiddleware,       // 3. テナントコンテキスト開始（ここから ALC が有効）
-  validate(uploadReceiptSchema), // 4. スキーマ検証
+  upload.single('image'),
+  authMiddleware,
+  tenantMiddleware,
+  validate(uploadReceiptSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const file = req.file as Express.Multer.File;
@@ -58,14 +59,14 @@ router.post(
       const uploadDir = 'uploads';
       const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-      // 画像処理
+      // WebP変換とリサイズ処理
       await sharp(file.buffer)
         .rotate()
         .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 75, effort: 6 })
         .toFile(imagePath);
 
-      // キュー登録
+      // 解析ジョブをキューに追加 (Issue #49-8: 解析のみ実行)
       const job = await receiptQueue.add('analyze-receipt', {
         memberId: memberId,
         familyGroupId: familyGroupId,
@@ -84,8 +85,7 @@ router.post(
   }
 );
 
-// --- [Issue #45] 共通ミドルウェア適用ルート ---
-// これ以降のルートは一括でミドルウェアを適用
+// --- 共通認証・テナントミドルウェアを適用 ---
 router.use(authMiddleware, tenantMiddleware);
 
 router.get('/receipts', getReceipts);
@@ -95,6 +95,18 @@ router.get('/stats/monthly', getMonthlyStats);
 router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', createReceipt);
 router.delete('/receipts/:id', deleteReceipt);
-router.patch('/receipt-items/:id', updateItemCategory);
+
+/**
+ * [FIX] カテゴリ更新エンドポイント
+ * フロントエンドからの PATCH /api/receipts/items/:id リクエストに対応させるため
+ * 旧 /receipt-items/:id から /receipts/items/:id へ変更
+ */
+router.patch('/receipts/items/:id', updateItemCategory);
+
+/**
+ * [Issue #49-8] 解析結果の確定保存
+ * ユーザーがフロントエンドで確認・修正した内容をDBへ永続化する
+ */
+router.post('/receipts/commit', commitReceipt);
 
 export default router;

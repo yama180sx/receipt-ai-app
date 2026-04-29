@@ -4,8 +4,8 @@ import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
 import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveParsedReceipt } from '../services/receiptService'; // ★ persistenceService から変更
-import { getFamilyGroupId } from '../utils/context';
+import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
+import { getFamilyGroupId, getMemberId } from '../utils/context';
 
 /**
  * [Issue #43] ジョブステータス取得
@@ -29,7 +29,7 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
 };
 
 /**
- * [Issue #45] カテゴリ一覧取得
+ * カテゴリ一覧取得
  */
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -39,11 +39,12 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
 };
 
 /**
- * [Issue #43 & #45] レシートアップロード (AI解析)
+ * レシートアップロード (AI解析ジョブ投入)
  */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.headers['x-member-id'];
+    const memberId = getMemberId();
+    const familyGroupId = getFamilyGroupId();
     const imagePath = req.file?.path;
 
     if (!imagePath) throw new AppError('画像がアップロードされていません。', 400);
@@ -51,7 +52,7 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
     const job = await receiptQueue.add('analyze-receipt', {
       memberId: Number(memberId),
-      familyGroupId: getFamilyGroupId(),
+      familyGroupId,
       imagePath,
     });
 
@@ -60,32 +61,64 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 手動登録 (receiptService に一本化)
+ * [Issue #49-8] 解析結果の確定保存
+ * ユーザーが修正した小数を含むデータをDBへ永続化します。
+ */
+export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberId = getMemberId();
+    const familyGroupId = getFamilyGroupId();
+    const { parsedData, imagePath, validation } = req.body;
+
+    if (!parsedData || !imagePath) {
+      throw new AppError('必要なデータが不足しています。', 400);
+    }
+
+    if (!memberId || !familyGroupId) {
+      throw new AppError('認証情報または世帯情報が取得できません。', 401);
+    }
+
+    const result = await saveConfirmedReceipt(
+      memberId,
+      familyGroupId,
+      parsedData,
+      imagePath,
+      validation?.isSuspicious || false,
+      validation?.warnings || []
+    );
+
+    res.status(201).json({ success: true, data: result });
+  } catch (error: any) { 
+    if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
+    next(error); 
+  }
+};
+
+/**
+ * 手動登録 (Float対応)
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.body.memberId || req.headers['x-member-id'];
+    const memberId = getMemberId();
     const familyGroupId = getFamilyGroupId();
-    const { date, storeName, totalAmount, items, imagePath, rawText } = req.body;
+    const { date, storeName, totalAmount, items, imagePath } = req.body;
 
-    // persistenceService.saveReceiptData を廃止し、
-    // 重複チェックとバリデーションが含まれる receiptService.saveParsedReceipt を使用。
-    // 手動登録なので isSuspicious は false (または入力値に応じたバリデーション) とする。
     const newReceipt = await saveParsedReceipt(
       Number(memberId),
       familyGroupId,
       {
         storeName,
-        purchaseDate: date, // 内部の parseSafeDate でパースされる
+        purchaseDate: date,
         totalAmount: Number(totalAmount),
         items: items.map((i: any) => ({
           name: i.name,
-          price: Number(i.price),
-          quantity: Number(i.quantity || 1)
+          price: parseFloat(i.price), // 整数キャストから実数(parseFloat)へ
+          quantity: parseFloat(i.quantity || 1),
+          categoryId: i.categoryId ? Number(i.categoryId) : null
         }))
       },
       imagePath || "",
-      false, // 手動登録は不整合チェック(AI用)を一旦スルー
+      false, 
       []
     );
 
@@ -97,7 +130,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 明細カテゴリ更新 ＋ 世帯別学習
+ * カテゴリ更新 ＋ 学習マスタ反映
  */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
@@ -120,8 +153,7 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
       });
 
       if (categoryId) {
-        // 世帯別 ProductMaster への upsert
-        await (tx.productMaster as any).upsert({
+        await tx.productMaster.upsert({
           where: {
             name_storeName_familyGroupId: {
               name: getCleanText(currentItem.name),
@@ -145,7 +177,7 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
 };
 
 /**
- * [Issue #45] レシート一覧取得 (世帯フィルタリング)
+ * レシート一覧取得
  */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -173,7 +205,7 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
 };
 
 /**
- * 最新1件の取得
+ * 最新1件取得
  */
 export const getLatestReceipt = async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -199,7 +231,8 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * [Issue #50] 月別統計
+ * [Issue #49-8] 月別統計
+ * 精度確保のため double precision (float8) にキャストして集計します。
  */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
@@ -207,7 +240,7 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
 
   try {
     const totalRes = await prisma.$queryRaw<any[]>`
-      SELECT SUM("totalAmount")::int as total
+      SELECT SUM("totalAmount")::double precision as total
       FROM "Receipt"
       WHERE "familyGroupId" = ${familyGroupId}
       AND TO_CHAR(date, 'YYYY-MM') = ${month}
@@ -219,7 +252,7 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
         c.id as "categoryId",
         c.name as "categoryName",
         c.color as "color",
-        SUM(i.price * i.quantity)::int as "totalAmount"
+        SUM(i.price * i.quantity)::double precision as "totalAmount"
       FROM "Item" i
       JOIN "Receipt" r ON i."receiptId" = r.id
       LEFT JOIN "Category" c ON i."categoryId" = c.id
@@ -257,7 +290,8 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * [Issue #50] 高度な統計
+ * [Issue #49-8] 高度な統計
+ * 精度確保のため集計値を実数として扱います。
  */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
@@ -265,7 +299,7 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
     const trend = await prisma.$queryRaw<any[]>`
       SELECT 
         TO_CHAR(date, 'YYYY-MM') as period, 
-        SUM("totalAmount")::int as total 
+        SUM("totalAmount")::double precision as total 
       FROM "Receipt" 
       WHERE "familyGroupId" = ${fId} 
       GROUP BY period 
@@ -277,7 +311,7 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
     const paretoRaw = await prisma.$queryRaw<any[]>`
       SELECT 
         COALESCE(c.name, '未分類') as name,
-        SUM(i.price * i.quantity)::int as amount
+        SUM(i.price * i.quantity)::double precision as amount
       FROM "Item" i
       JOIN "Receipt" r ON i."receiptId" = r.id
       LEFT JOIN "Category" c ON i."categoryId" = c.id

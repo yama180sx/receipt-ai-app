@@ -5,7 +5,6 @@ import { PieChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
 import { theme } from '../theme';
-// ★ 共通コンポーネントをインポート
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
 // --- interface 定義 ---
@@ -60,6 +59,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
       if (statsRes.data?.success) {
         const raw = statsRes.data.data;
+        // backend が配列を返す場合とオブジェクトを返す場合の互換性を維持
         if (Array.isArray(raw)) {
           const target = raw.find(item => item.month === selectedMonth) || raw[0];
           setData({
@@ -85,15 +85,15 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ★ 共通コンポーネント用のカテゴリー更新関数
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      await apiClient.patch(`/receipt-items/${itemId}`, 
+      // route mismatch fix: /receipt-items/ -> /receipts/items/ へ変更
+      await apiClient.patch(`/receipts/items/${itemId}`, 
         { categoryId: Number(categoryId) }, 
         { headers: { 'x-member-id': currentMemberId.toString() } }
       );
-      await fetchData(); // レポートの数値を再読込
+      await fetchData(); 
     } catch (error) {
       Alert.alert("エラー", "カテゴリーの更新に失敗しました");
     }
@@ -103,7 +103,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     if (!data?.stats || !Array.isArray(data.stats)) return [];
     return data.stats
       .map(s => {
-        const val = Number(s.totalAmount);
+        // 金額は Math.round で整数化してチャートに渡す
+        const val = Math.round(Number(s.totalAmount));
         return {
           name: s.categoryName || '未分類',
           population: isNaN(val) ? 0 : val,
@@ -148,11 +149,12 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
             <View style={isWide ? styles.leftColumn : null}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>当月合計支出</Text>
-                <Text style={styles.totalValue}>¥{(Number(data?.totalAmount) || 0).toLocaleString()}</Text>
+                {/* 合計額の整数化表示 */}
+                <Text style={styles.totalValue}>¥{Math.round(Number(data?.totalAmount) || 0).toLocaleString()}</Text>
                 <View style={styles.comparisonRow}>
                   <Text style={styles.comparisonLabel}>前月比:</Text>
                   <Text style={[styles.diffValue, { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success }]}>
-                    {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(data?.diffAmount || 0).toLocaleString()} ({data?.diffPercentage || 0}%)
+                    {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(Math.round(data?.diffAmount || 0)).toLocaleString()} ({data?.diffPercentage || 0}%)
                   </Text>
                 </View>
               </View>
@@ -187,7 +189,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                         </Text>
                       </View>
                       <Text style={styles.receiptAmount}>
-                        ¥{data.latestReceipt.totalAmount.toLocaleString()}
+                        ¥{Math.round(data.latestReceipt.totalAmount || 0).toLocaleString()}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -205,9 +207,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     return (
                       <View key={i} style={styles.trendRow}>
                         <Text style={styles.trendPeriod}>{t.period}</Text>
-                        <Text style={styles.trendAmount}>¥{t.total.toLocaleString()}</Text>
+                        <Text style={styles.trendAmount}>¥{Math.round(t.total).toLocaleString()}</Text>
                         <Text style={[styles.trendDiff, { color: diff > 0 ? theme.colors.error : theme.colors.success }]}>
-                          {t.prev_total !== null ? `${diff > 0 ? '+' : ''}${diff.toLocaleString()}` : '-'}
+                          {t.prev_total !== null ? `${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString()}` : '-'}
                         </Text>
                       </View>
                     );
@@ -222,7 +224,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     <View key={i} style={styles.paretoWrapper}>
                       <View style={styles.paretoTextRow}>
                         <Text style={styles.paretoName}>{p.name}</Text>
-                        <Text style={styles.paretoValue}>¥{p.amount.toLocaleString()} ({p.ratio}%)</Text>
+                        <Text style={styles.paretoValue}>¥{Math.round(p.amount).toLocaleString()} ({p.ratio}%)</Text>
                       </View>
                       <View style={styles.paretoBarContainer}>
                         <View style={[
@@ -241,7 +243,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
-      {/* --- ★ 修正: 解析レシート詳細 Modal --- */}
+      {/* 解析レシート詳細 Modal */}
       <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide} onRequestClose={() => setMainModalVisible(false)}>
         <View style={isWide ? styles.modalOverlay : styles.modalContainer}>
           <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
@@ -252,13 +254,12 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </TouchableOpacity>
             </View>
             
-            {/* ★ 共通コンポーネントに差し替え */}
             <ReceiptDetailComponent 
               receipt={data?.latestReceipt}
               categories={allCategories}
               onCategoryChange={handleCategoryChange}
               baseUrl={BASE_URL}
-              fullWidth={true} // モーダルなので広々と使う
+              fullWidth={true}
             />
           </SafeAreaView>
         </View>
@@ -277,11 +278,9 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
   monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
   monthPicker: { width: '100%' },
-
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },
-
   summaryCard: { backgroundColor: theme.colors.surface, padding: 20, borderRadius: 15, marginBottom: 25, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, elevation: 3 },
   summaryLabel: { fontSize: 12, color: theme.colors.text.muted },
   totalValue: { fontSize: 36, fontWeight: 'bold', color: theme.colors.primary, marginVertical: 4 },
@@ -310,11 +309,8 @@ const styles = StyleSheet.create({
   receiptStoreName: { fontWeight: '700', color: theme.colors.text.main },
   receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, minWidth: 80, textAlign: 'right' },
   noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-
-  // --- Modal (壁の撤去) ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContainer: { flex: 1, backgroundColor: theme.colors.background },
-  // ★ 修正：maxWidth を 1400px に拡張し、画面いっぱいに広がるように変更
   wideModal: { width: '95%', maxWidth: 1400, height: '90%', borderRadius: 20, overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   modalTitle: { fontSize: 18, fontWeight: 'bold' },
