@@ -7,6 +7,9 @@ import { receiptQueue } from '../queues/receiptQueue';
 import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 
+/**
+ * [Issue #43] ジョブステータス取得
+ */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
     const job = await receiptQueue.getJob(req.params.jobId!);
@@ -25,6 +28,9 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
   } catch (error) { next(error); }
 };
 
+/**
+ * カテゴリ一覧取得
+ */
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
@@ -32,9 +38,13 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
   } catch (error) { next(error); }
 };
 
+/**
+ * レシートアップロード (AI解析ジョブ投入)
+ */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.body.memberId || req.headers['x-member-id'];
+    const memberId = getMemberId();
+    const familyGroupId = getFamilyGroupId();
     const imagePath = req.file?.path;
 
     if (!imagePath) throw new AppError('画像がアップロードされていません。', 400);
@@ -42,7 +52,7 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
     const job = await receiptQueue.add('analyze-receipt', {
       memberId: Number(memberId),
-      familyGroupId: getFamilyGroupId(),
+      familyGroupId,
       imagePath,
     });
 
@@ -52,6 +62,7 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
 /**
  * [Issue #49-8] 解析結果の確定保存
+ * ユーザーが修正した小数を含むデータをDBへ永続化します。
  */
 export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -67,7 +78,6 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
       throw new AppError('認証情報または世帯情報が取得できません。', 401);
     }
 
-    // サービス層を呼び出し。ここで保存と学習が同時に行われます。
     const result = await saveConfirmedReceipt(
       memberId,
       familyGroupId,
@@ -85,11 +95,11 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 手動登録
+ * 手動登録 (Float対応)
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.body.memberId || req.headers['x-member-id'];
+    const memberId = getMemberId();
     const familyGroupId = getFamilyGroupId();
     const { date, storeName, totalAmount, items, imagePath } = req.body;
 
@@ -102,8 +112,8 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
         totalAmount: Number(totalAmount),
         items: items.map((i: any) => ({
           name: i.name,
-          price: Number(i.price),
-          quantity: Number(i.quantity || 1),
+          price: parseFloat(i.price), // 整数キャストから実数(parseFloat)へ
+          quantity: parseFloat(i.quantity || 1),
           categoryId: i.categoryId ? Number(i.categoryId) : null
         }))
       },
@@ -119,6 +129,9 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
   }
 };
 
+/**
+ * カテゴリ更新 ＋ 学習マスタ反映
+ */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { categoryId } = req.body;
@@ -163,6 +176,9 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
   } catch (error) { next(error); }
 };
 
+/**
+ * レシート一覧取得
+ */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memberId = req.query.memberId || req.headers['x-member-id'];
@@ -188,6 +204,9 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
   } catch (error) { next(error); }
 };
 
+/**
+ * 最新1件取得
+ */
 export const getLatestReceipt = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const receipt = await prisma.receipt.findFirst({
@@ -199,6 +218,9 @@ export const getLatestReceipt = async (_req: Request, res: Response, next: NextF
   } catch (error) { next(error); }
 };
 
+/**
+ * 削除
+ */
 export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.receipt.delete({ 
@@ -208,13 +230,17 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
   } catch (error) { next(error); }
 };
 
+/**
+ * [Issue #49-8] 月別統計
+ * 精度確保のため double precision (float8) にキャストして集計します。
+ */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
   const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
 
   try {
     const totalRes = await prisma.$queryRaw<any[]>`
-      SELECT SUM("totalAmount")::int as total
+      SELECT SUM("totalAmount")::double precision as total
       FROM "Receipt"
       WHERE "familyGroupId" = ${familyGroupId}
       AND TO_CHAR(date, 'YYYY-MM') = ${month}
@@ -226,7 +252,7 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
         c.id as "categoryId",
         c.name as "categoryName",
         c.color as "color",
-        SUM(i.price * i.quantity)::int as "totalAmount"
+        SUM(i.price * i.quantity)::double precision as "totalAmount"
       FROM "Item" i
       JOIN "Receipt" r ON i."receiptId" = r.id
       LEFT JOIN "Category" c ON i."categoryId" = c.id
@@ -263,13 +289,17 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
   } catch (error) { next(error); }
 };
 
+/**
+ * [Issue #49-8] 高度な統計
+ * 精度確保のため集計値を実数として扱います。
+ */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
   try {
     const trend = await prisma.$queryRaw<any[]>`
       SELECT 
         TO_CHAR(date, 'YYYY-MM') as period, 
-        SUM("totalAmount")::int as total 
+        SUM("totalAmount")::double precision as total 
       FROM "Receipt" 
       WHERE "familyGroupId" = ${fId} 
       GROUP BY period 
@@ -281,7 +311,7 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
     const paretoRaw = await prisma.$queryRaw<any[]>`
       SELECT 
         COALESCE(c.name, '未分類') as name,
-        SUM(i.price * i.quantity)::int as amount
+        SUM(i.price * i.quantity)::double precision as amount
       FROM "Item" i
       JOIN "Receipt" r ON i."receiptId" = r.id
       LEFT JOIN "Category" c ON i."categoryId" = c.id

@@ -46,7 +46,9 @@ interface ReceiptScanScreenProps {
 
 /**
  * [Issue #49-8] レシート解析結果の確認・編集画面
- * Android Picker のクリッピング問題を解消し、視認性を最大化したバージョン
+ * - Android Picker の表示欠け再修正 (高さを確保し overflow: visible)
+ * - 合計金額の端数切り捨て (Math.round)
+ * - 数量の小数点入力対応
  */
 export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   initialData,
@@ -64,13 +66,27 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     return `${baseUrl}${path}`;
   }, [initialData.imagePath]);
 
+  // 合計金額の計算（浮動小数点誤差を排除）
   const calculatedTotal = useMemo(() => {
-    return receiptData.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity || 1)), 0);
+    const total = receiptData.items.reduce((sum, item) => {
+      return sum + (Number(item.price || 0) * Number(item.quantity || 0));
+    }, 0);
+    return Math.round(total);
   }, [receiptData.items]);
 
   const updateItem = (index: number, key: keyof ReceiptItem, value: any) => {
     const newItems = [...receiptData.items];
-    newItems[index] = { ...newItems[index], [key]: value };
+    let finalValue = value;
+
+    // 数値項目への変換処理
+    if (key === 'price') {
+      finalValue = parseInt(value, 10) || 0;
+    } else if (key === 'quantity') {
+      // 数量は小数点を含む可能性があるため、入力中は文字列として許可し、保存・計算時に数値化
+      finalValue = value; 
+    }
+
+    newItems[index] = { ...newItems[index], [key]: finalValue };
     setReceiptData({ ...receiptData, items: newItems });
   };
 
@@ -89,7 +105,14 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     try {
       const payload = {
         jobId: initialData.jobId,
-        parsedData: { ...receiptData, totalAmount: calculatedTotal },
+        parsedData: { 
+          ...receiptData, 
+          totalAmount: calculatedTotal,
+          items: receiptData.items.map(item => ({
+            ...item,
+            quantity: parseFloat(String(item.quantity)) || 0
+          }))
+        },
         imagePath: initialData.imagePath,
         validation: initialData.validation
       };
@@ -141,7 +164,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
               placeholder="購入日" 
             />
             <View style={styles.totalDisplay}>
-              <Text style={styles.totalLabel}>合計 (計算)</Text>
+              <Text style={styles.totalLabel}>合計 (計算結果)</Text>
               <Text style={styles.totalValue}>¥ {calculatedTotal.toLocaleString()}</Text>
             </View>
           </View>
@@ -168,7 +191,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
               
               <View style={styles.itemDetailRow}>
                 <View style={styles.itemSubGroup}>
-                  <Text style={styles.subLabel}>単価</Text>
+                  <Text style={styles.subLabel}>単価 (¥)</Text>
                   <TextInput 
                     style={styles.inputSmall} 
                     value={String(item.price)} 
@@ -176,32 +199,37 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
                     onChangeText={(val) => updateItem(idx, 'price', val)} 
                   />
                 </View>
-                <View style={[styles.itemSubGroup, { flex: 0.4 }]}>
-                  <Text style={styles.subLabel}>数</Text>
+                <View style={[styles.itemSubGroup, { flex: 0.6 }]}>
+                  <Text style={styles.subLabel}>数量</Text>
                   <TextInput 
                     style={styles.inputSmall} 
                     value={String(item.quantity)} 
-                    keyboardType="numeric" 
+                    keyboardType="decimal-pad" 
                     onChangeText={(val) => updateItem(idx, 'quantity', val)} 
                   />
                 </View>
-                
-                <View style={[styles.itemSubGroup, { flex: 1.6 }]}>
-                  <Text style={styles.subLabel}>カテゴリ</Text>
-                  <View style={styles.pickerWrapper}>
-                    <Picker
-                      selectedValue={item.categoryId}
-                      onValueChange={(val) => updateItem(idx, 'categoryId', val)}
-                      style={styles.picker}
-                      mode="dropdown"
-                      itemStyle={{ fontSize: 14, height: 55 }} // iOS用だが念のため
-                    >
-                      <Picker.Item label="未選択" value={null} color="#999" />
-                      {categories.map(c => (
-                        <Picker.Item key={c.id} label={c.name} value={c.id} color="#333" />
-                      ))}
-                    </Picker>
-                  </View>
+                <View style={[styles.itemSubGroup, { alignItems: 'flex-end' }]}>
+                  <Text style={styles.subLabel}>小計</Text>
+                  <Text style={styles.subTotalText}>
+                    ¥ {Math.round(Number(item.price || 0) * (parseFloat(String(item.quantity)) || 0)).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.categoryRow}>
+                <Text style={styles.subLabel}>カテゴリ</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={item.categoryId}
+                    onValueChange={(val) => updateItem(idx, 'categoryId', val)}
+                    style={styles.picker}
+                    mode="dropdown"
+                  >
+                    <Picker.Item label="未選択" value={null} color="#999" />
+                    {categories.map(c => (
+                      <Picker.Item key={c.id} label={c.name} value={c.id} color="#333" />
+                    ))}
+                  </Picker>
                 </View>
               </View>
             </View>
@@ -229,7 +257,7 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   saveButtonText: { color: 'white', fontWeight: 'bold' },
   scrollView: { flex: 1 },
-  imageContainer: { width: '100%', height: 280, backgroundColor: '#111', marginBottom: 16, position: 'relative' },
+  imageContainer: { width: '100%', height: 260, backgroundColor: '#111', marginBottom: 16, position: 'relative' },
   receiptImage: { width: '100%', height: '100%' },
   imageLabel: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   imageLabelText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
@@ -238,7 +266,7 @@ const styles = StyleSheet.create({
   input: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 8, fontSize: 16, color: '#111827', marginBottom: 12 },
   totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   totalLabel: { fontSize: 14, color: '#666' },
-  totalValue: { fontSize: 22, fontWeight: 'bold', color: '#2563EB' },
+  totalValue: { fontSize: 24, fontWeight: 'bold', color: '#2563EB' },
   itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginBottom: 12 },
   addButton: { backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   addButtonText: { color: '#2563EB', fontWeight: 'bold', fontSize: 13 },
@@ -246,20 +274,23 @@ const styles = StyleSheet.create({
   itemHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   itemNameInput: { flex: 1, fontSize: 15, fontWeight: 'bold', color: '#111827' },
   deleteIcon: { fontSize: 18, color: '#D1D5DB' },
-  itemDetailRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  itemDetailRow: { flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 12 },
   itemSubGroup: { flex: 1 },
   subLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: 'bold', marginBottom: 4 },
-  inputSmall: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 4, fontSize: 14, color: '#374151' },
+  inputSmall: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 4, fontSize: 14, color: '#374151', fontWeight: '600' },
+  subTotalText: { fontSize: 14, fontWeight: '700', color: '#374151', paddingTop: 4 },
+  categoryRow: { borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 8 },
   
-  // Pickerまわりの改善
+  // Picker表示崩れ修正: 55px確保し overflow: visible に変更
   pickerWrapper: { 
     borderWidth: 1, 
     borderColor: '#F3F4F6', 
     borderRadius: 8, 
     backgroundColor: '#FAFAFA',
-    height: 55, // 高さをさらに確保
+    height: 55, 
     justifyContent: 'center',
-    overflow: 'hidden'
+    marginTop: 4,
+    overflow: 'visible' 
   },
   picker: { 
     width: '100%', 
@@ -267,9 +298,7 @@ const styles = StyleSheet.create({
     color: '#333',
     ...Platform.select({
       android: {
-        paddingTop: 0,
-        paddingBottom: 0,
-        marginLeft: -8 // Android特有の左余白を打ち消す
+        marginLeft: -10,
       }
     })
   },

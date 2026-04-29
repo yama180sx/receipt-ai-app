@@ -8,12 +8,13 @@ interface ReceiptDetailComponentProps {
   categories: any[];
   onCategoryChange: (itemId: number, categoryId: number | null) => void;
   baseUrl: string;
-  fullWidth?: boolean; // App.tsx 外枠の制限が解除されているかどうか
+  fullWidth?: boolean; 
 }
 
 /**
- * レシート詳細表示コンポーネント
- * 画面幅に応じて、1カラム(モバイル)と2カラム(Web/iPad)を自動で切り替えます。
+ * [Issue #49-8] レシート詳細表示コンポーネント
+ * - 数量の小数点表示を強制 (Stringキャストの最適化)
+ * - Android Picker の表示欠けを完全に解消
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -24,11 +25,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 }) => {
   const { width: windowWidth } = useWindowDimensions();
   
-  // 外側の有効幅を計算。
-  // fullWidthがtrue（モーダル）なら画面全体、false（履歴画面）ならリスト分(350px)を差し引く。
   const effectiveWidth = fullWidth ? windowWidth : windowWidth - 350;
-  
-  // 有効幅が 700px 以上確保できるなら横並び(2カラム)にする
   const isWide = effectiveWidth > 700;
 
   const cacheKey = useMemo(() => Date.now(), []);
@@ -49,7 +46,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   const DetailContent = (
     <View style={isWide ? styles.wideContentWrapper : styles.mobileContentWrapper}>
       
-      {/* --- 左側：画像エリア（幅を 400px に固定。これ以上大きくさせず、右側にスペースを譲る） --- */}
+      {/* 左側：画像エリア */}
       <View style={isWide ? styles.wideImageColumn : styles.mobileImageArea}>
         <View style={[styles.imageWrapper, !isWide && { height: 350 }]}>
           {receipt.imagePath ? (
@@ -66,7 +63,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         </View>
       </View>
 
-      {/* --- 右側：情報エリア（flex: 1 により、広がった分の余白をすべて店名表示に充てる） --- */}
+      {/* 右側：情報エリア */}
       <View style={isWide ? styles.wideInfoColumn : styles.mobileInfoArea}>
         <View style={styles.detailHeaderInner}>
           <Text style={styles.detailTitle} selectable={true}>
@@ -79,7 +76,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 
         <View style={styles.detailTotalContainer}>
           <Text style={styles.detailTotalLabel}>合計金額（税込）</Text>
-          <Text style={styles.detailTotalValue}>¥{(receipt.totalAmount || 0).toLocaleString()}</Text>
+          <Text style={styles.detailTotalValue}>¥{Math.round(receipt.totalAmount || 0).toLocaleString()}</Text>
         </View>
 
         <View style={styles.itemsSection}>
@@ -90,10 +87,11 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
                 <Text style={styles.detailItemName}>{item.name}</Text>
                 <View style={styles.detailPriceContainer}>
                   <Text style={styles.detailItemPrice}>
-                    ¥{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                    ¥{Math.round((item.price || 0) * (item.quantity || 0)).toLocaleString()}
                   </Text>
+                  {/* 数量: parseFloatで確実に実数として扱い、不要な整数化を避ける */}
                   <Text style={styles.detailItemSub}>
-                    （¥{(item.price || 0).toLocaleString()} × {item.quantity || 1}）
+                    （¥{(item.price || 0).toLocaleString()} × {String(parseFloat(item.quantity || 0))}）
                   </Text>
                 </View>
               </View>
@@ -103,9 +101,10 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
                     selectedValue={item.categoryId}
                     onValueChange={(val) => onCategoryChange(item.id, val)}
                     style={styles.detailPicker}
+                    mode="dropdown"
                   >
                     <Picker.Item label="カテゴリーを選択..." value={null} color={theme.colors.text.muted} />
-                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
+                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} color="#333" />)}
                   </Picker>
                 </View>
               </View>
@@ -141,9 +140,8 @@ const styles = StyleSheet.create({
   },
   mobileContentWrapper: { flexDirection: 'column', padding: 20 },
   
-  // ★ 画像エリアを「幅 400px」に固定することで、広がる器の影響を受けすぎないようにする
   wideImageColumn: { width: 400, marginRight: 40 }, 
-  wideInfoColumn: { flex: 1 }, // ★ 外側の器が広がるほど、ここが横に長く伸びる
+  wideInfoColumn: { flex: 1 }, 
   
   mobileImageArea: { width: '100%', marginBottom: 25 },
   mobileInfoArea: { width: '100%' },
@@ -161,7 +159,7 @@ const styles = StyleSheet.create({
   receiptImage: { width: '100%', height: '100%' },
 
   detailHeaderInner: { marginBottom: 20 },
-  detailTitle: { fontSize: 28, fontWeight: 'bold', color: theme.colors.text.main },
+  detailTitle: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text.main },
   detailDate: { fontSize: 16, color: theme.colors.text.muted, marginTop: 4 },
   detailTotalContainer: { 
     alignItems: 'flex-end', 
@@ -186,21 +184,28 @@ const styles = StyleSheet.create({
   detailItemBottom: { width: '100%' },
   detailItemName: { fontSize: 17, fontWeight: '600', color: theme.colors.text.main, marginBottom: 4 },
   detailPriceContainer: { flexDirection: 'row', alignItems: 'baseline' },
-  detailItemPrice: { fontWeight: '700', color: theme.colors.primary },
-  detailItemSub: { fontSize: 11, color: theme.colors.text.muted, marginLeft: 4 },
+  detailItemPrice: { fontWeight: '700', color: theme.colors.primary, fontSize: 16 },
+  detailItemSub: { fontSize: 12, color: theme.colors.text.muted, marginLeft: 6 },
   
+  // Android Picker クリッピング修正: 高さを55pxに拡大し overflow: visible を適用
   detailPickerWrapper: { 
-    height: 48, 
+    height: 55, 
     backgroundColor: theme.colors.surface, 
     borderRadius: 8, 
     borderWidth: 1, 
     borderColor: theme.colors.border, 
-    overflow: 'hidden',
-    justifyContent: 'center'
+    overflow: 'visible',
+    justifyContent: 'center',
+    marginTop: 4
   },
   detailPicker: { 
     width: '100%',
+    height: 55,
+    color: '#333',
     ...Platform.select({
+      android: {
+        marginLeft: -10,
+      },
       web: { outlineStyle: 'none' } as any
     })
   },
