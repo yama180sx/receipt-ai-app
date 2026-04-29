@@ -1,14 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Alert, ActivityIndicator, Image, Text, TouchableOpacity, ScrollView, TextInput, Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'; 
-import { Picker } from '@react-native-picker/picker';
+import { StyleSheet, View, Alert, ActivityIndicator, Platform, TextInput, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-
-// @ts-ignore
-import * as FileSystem from 'expo-file-system/legacy';
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService'; 
@@ -18,48 +12,37 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
+import ReceiptScanScreen from './src/screens/ReceiptScanScreen'; // [Issue #49-8] 追加
 import { theme } from './src/theme';
-
-// [Issue #49-2] レスポンシブコンテナの追加
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master';
+// ビュータイプの定義に receipt_scan を追加
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
-  IMAGE: '@app_image',
-  ROTATION: '@app_rotation',
   RESULT: '@app_result',
-  MEMBER_ID: 'currentMemberId', // SecureStore/AsyncStorage 共通キー
+  MEMBER_ID: 'currentMemberId',
 };
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
-
-  // 認証用ステート
   const [loginPassword, setLoginPassword] = useState('');
 
-  // メイン機能用ステート
-  const [image, setImage] = useState<string | null>(null);
-  const [rotation, setRotation] = useState(0); 
-  const [uploading, setUploading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('解析中...');
-  const [resultData, setResultData] = useState<any>(null);
+  // メインステート
+  const [resultData, setResultData] = useState<any>(null); // 解析済み一時データ
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
 
   /**
-   * 1. 状態復元
-   * [Web対応] SecureStoreがWebで未定義のため、AsyncStorageへフォールバック
+   * 1. 初期化と状態復元
    */
   useEffect(() => {
     const initializeApp = async () => {
       try {
         const token = await authService.getToken();
-        
-        // Webブラウザの場合は AsyncStorage、モバイルの場合は SecureStore を使用
         const midStr = Platform.OS === 'web'
           ? await AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
           : await SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID);
@@ -69,24 +52,13 @@ export default function App() {
           setCurrentMemberId(midStr ? parseInt(midStr, 10) : 1);
         }
 
-        const [v, i, r, res] = await Promise.all([
+        const [v, res] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
-          AsyncStorage.getItem(STORAGE_KEYS.IMAGE),
-          AsyncStorage.getItem(STORAGE_KEYS.ROTATION),
           AsyncStorage.getItem(STORAGE_KEYS.RESULT),
         ]);
-        if (v) setCurrentView(v as ViewType);
-        if (i) setImage(i);
-        if (r) setRotation(parseInt(r, 10) || 0);
 
-        if (res) {
-          const parsed = JSON.parse(res);
-          if (parsed && Array.isArray(parsed.items)) {
-            setResultData(parsed);
-          } else {
-            await AsyncStorage.removeItem(STORAGE_KEYS.RESULT);
-          }
-        }
+        if (v) setCurrentView(v as ViewType);
+        if (res) setResultData(JSON.parse(res));
 
       } catch (e) {
         console.error('初期化失敗', e);
@@ -126,7 +98,6 @@ export default function App() {
         const { token, member } = response.data.data;
         await authService.saveToken(token);
 
-        // [Web対応] メンバーIDの保存先をプラットフォームで切り替え
         if (Platform.OS === 'web') {
           await AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, member.id.toString());
         } else {
@@ -139,8 +110,7 @@ export default function App() {
         fetchCategories();
       }
     } catch (e: any) {
-      const errorMsg = e.response?.data?.message || "ログインに失敗しました。";
-      Alert.alert("認証エラー", errorMsg);
+      Alert.alert("認証エラー", "ログインに失敗しました。");
       setLoginPassword('');
     }
   };
@@ -150,8 +120,6 @@ export default function App() {
    */
   const handleLogout = async () => {
     await authService.logout();
-    
-    // [Web対応] メンバーIDの削除
     if (Platform.OS === 'web') {
       await AsyncStorage.removeItem(STORAGE_KEYS.MEMBER_ID);
     } else {
@@ -162,10 +130,12 @@ export default function App() {
     setCurrentMemberId(null);
     setCurrentView('main');
     setResultData(null);
-    setImage(null);
     setLoginPassword('');
   };
 
+  /**
+   * 5. カテゴリマスタの取得
+   */
   const fetchCategories = useCallback(async () => {
     if (!userToken) return;
     try {
@@ -182,122 +152,33 @@ export default function App() {
     if (isReady && userToken) fetchCategories();
   }, [fetchCategories, isReady, userToken]);
 
+  /**
+   * 6. 永続化（現在の表示ビューと未保存の解析結果）
+   */
   useEffect(() => {
     if (!isReady || !userToken) return;
     const saveState = async () => {
       try {
-        await Promise.all([
-          AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView),
-          image ? AsyncStorage.setItem(STORAGE_KEYS.IMAGE, image) : AsyncStorage.removeItem(STORAGE_KEYS.IMAGE),
-          AsyncStorage.setItem(STORAGE_KEYS.ROTATION, rotation.toString()),
-          resultData && Array.isArray(resultData.items) 
-            ? AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData)) 
-            : AsyncStorage.removeItem(STORAGE_KEYS.RESULT),
-        ]);
+        await AsyncStorage.setItem(STORAGE_KEYS.VIEW, currentView);
+        if (resultData) {
+          await AsyncStorage.setItem(STORAGE_KEYS.RESULT, JSON.stringify(resultData));
+        } else {
+          await AsyncStorage.removeItem(STORAGE_KEYS.RESULT);
+        }
       } catch (e) {
         console.error('保存失敗', e);
       }
     };
     saveState();
-  }, [currentView, image, rotation, resultData, isReady, userToken]);
+  }, [currentView, resultData, isReady, userToken]);
 
-  const deleteTempFile = async (uri: string | null) => {
-    if (!uri) return;
-    try {
-      await FileSystem.deleteAsync(uri, { idempotent: true });
-    } catch (e) {
-      console.warn('[Cleanup] Failed to delete temp file:', e);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('権限エラー', 'カメラアクセスが必要です。');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      setRotation(0); 
-      setResultData(null);
-    }
-  };
-
-  const pollJobStatus = async (jobId: string): Promise<any> => {
-    let attempts = 0;
-    while (attempts < 30) {
-      attempts++;
-      setLoadingMessage(`解析中... (${attempts * 2}s)`);
-      const res = await apiClient.get(`/receipts/status/${jobId}`);
-      const { state, result, error } = res.data.data;
-      
-      if (state === 'completed') {
-        if (result && Array.isArray(result.items)) {
-          return result;
-        }
-        throw new Error('解析結果が不完全です。もう一度お試しください。');
-      } 
-      
-      if (state === 'failed') throw new Error(error || '解析に失敗しました。');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    throw new Error('解析がタイムアウトしました。');
-  };
-
-  const processAndUpload = async () => {
-    if (!image) return;
-    setUploading(true);
-    let manipulatedUri: string | null = null;
-    try {
-      const manipulated = await manipulateAsync(
-        image, 
-        [{ resize: { width: 1200 } }, { rotate: rotation }], 
-        { compress: 0.6, format: SaveFormat.JPEG }
-      );
-      manipulatedUri = manipulated.uri;
-      const formData = new FormData();
-      // @ts-ignore
-      formData.append('image', { uri: manipulatedUri, name: 'receipt.jpg', type: 'image/jpeg' });
-      formData.append('memberId', currentMemberId?.toString() || "");
-
-      const response = await apiClient.post('/receipts/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const jobId = response.data.data.jobId;
-      const finalResult = await pollJobStatus(jobId);
-      setResultData(finalResult);
-      setImage(null);
-    } catch (error: any) {
-      Alert.alert('お知らせ', error.message);
-      setResultData(null);
-    } finally {
-      setUploading(false);
-      if (manipulatedUri) await deleteTempFile(manipulatedUri);
-    }
-  };
-
-  const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
-    try {
-      const response = await apiClient.patch(`/receipt-items/${itemId}`, { 
-        categoryId: categoryId ? Number(categoryId) : null 
-      });
-      if (response.data?.success) {
-        const updatedItem = response.data.data;
-        setResultData((prev: any) => {
-          if (!prev?.items) return prev;
-          return {
-            ...prev,
-            items: prev.items.map((item: any) =>
-              item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-            ),
-          };
-        });
-      }
-    } catch (error: any) {
-      Alert.alert('エラー', error.message);
-    }
+  /**
+   * 7. 解析完了時のハンドラ
+   * HomeScreen から解析完了データを受け取って確認画面へ遷移
+   */
+  const handleAnalysisReady = (data: any) => {
+    setResultData(data);
+    setCurrentView('receipt_scan');
   };
 
   if (!isReady) {
@@ -308,8 +189,8 @@ export default function App() {
     );
   }
 
-  // ★ 追加：現在のビューがフル幅（全幅）表示を許可すべき画面かどうかを判定
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master'].includes(currentView);
+  // フル幅表示の判定
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan'].includes(currentView);
 
   if (!userToken) {
     return (
@@ -343,10 +224,29 @@ export default function App() {
     const memberId = currentMemberId!;
 
     switch (currentView) {
-      case 'history': return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={memberId}/>;
-      case 'stats': return <StatisticsScreen currentMemberId={memberId} onBack={() => setCurrentView('main')} />;
-      case 'category_mgr': return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} currentMemberId={memberId} />;
-      case 'product_master': return <ProductMasterScreen onBack={() => setCurrentView('main')} currentMemberId={memberId} />;
+      case 'history': 
+        return <HistoryScreen onBack={() => setCurrentView('main')} currentMemberId={memberId}/>;
+      case 'stats': 
+        return <StatisticsScreen currentMemberId={memberId} onBack={() => setCurrentView('main')} />;
+      case 'category_mgr': 
+        return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} currentMemberId={memberId} />;
+      case 'product_master': 
+        return <ProductMasterScreen onBack={() => setCurrentView('main')} currentMemberId={memberId} />;
+      case 'receipt_scan': 
+        return (
+          <ReceiptScanScreen 
+            initialData={resultData} 
+            categories={categories}
+            onSuccess={() => {
+              setResultData(null);
+              setCurrentView('main');
+            }}
+            onCancel={() => {
+              setResultData(null);
+              setCurrentView('main');
+            }}
+          />
+        );
       default:
         return (
           <View style={{ flex: 1 }}>
@@ -354,75 +254,14 @@ export default function App() {
               <Text style={styles.logoutText}>ログアウト</Text>
             </TouchableOpacity>
 
-            {resultData && Array.isArray(resultData.items) ? (
-              <ScrollView contentContainerStyle={styles.resultContainer} showsVerticalScrollIndicator={false}>
-                <Text style={styles.resultHeader}>解析結果</Text>
-
-                {resultData.isSuspicious && (
-                  <View style={styles.warningContainer}>
-                    <Text style={styles.warningTitle}>⚠️ 数値の不整合・異常の疑い</Text>
-                    {resultData.warnings?.map((w: string, idx: number) => (
-                      <Text key={idx} style={styles.warningText}>・{w}</Text>
-                    ))}
-                    <Text style={styles.warningHint}>内容が正しいか、各明細の単価と数量を必ず確認してください。</Text>
-                  </View>
-                )}
-
-                <View style={[styles.resultCard, resultData.isSuspicious && styles.suspiciousCard]}>
-                  <Text style={styles.storeName}>{resultData.storeName || '不明'}</Text>
-                  <Text style={styles.totalAmount}>¥{(resultData.totalAmount || 0).toLocaleString()}</Text>
-                  <View style={styles.divider} />
-                  {resultData.items?.map((item: any) => (
-                    <View key={item.id} style={styles.itemRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                        <View style={styles.itemPriceDetailRow}>
-                          <Text style={styles.itemPrice}>
-                            ¥{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
-                          </Text>
-                          <Text style={styles.itemSubText}>
-                            (¥{(item.price || 0).toLocaleString()} × {item.quantity || 1})
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.pickerWrapper}>
-                        <Picker selectedValue={item.categoryId} onValueChange={(val) => handleCategoryChange(item.id, val)} style={styles.picker}>
-                          <Picker.Item label="未分類" value={null} color={theme.colors.text.muted} />
-                          {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
-                        </Picker>
-                      </View>
-                    </View>
-                  ))}
-                  <TouchableOpacity style={styles.doneButton} onPress={() => setResultData(null)}>
-                    <Text style={styles.doneButtonText}>完了</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            ) : image ? (
-              <View style={styles.previewContainer}>
-                <Image source={{ uri: image }} style={[styles.preview, { transform: [{ rotate: `${rotation}deg` }] }]} resizeMode="contain" />
-                <View style={styles.previewActions}>
-                  <TouchableOpacity style={styles.subButton} onPress={() => setRotation(prev => (prev + 90) % 360)}>
-                    <Text style={styles.subButtonText}>回転</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.mainButton} onPress={processAndUpload} disabled={uploading}>
-                    {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.mainButtonText}>解析開始</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.subButton} onPress={() => setImage(null)}>
-                    <Text style={styles.subButtonText}>削除</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <HomeScreen 
-                onScan={takePhoto} 
-                onGoToHistory={() => setCurrentView('history')}
-                onGoToStats={() => setCurrentView('stats')}
-                onGoToCategories={() => setCurrentView('category_mgr')}
-                onGoToProductMaster={() => setCurrentView('product_master')}
-                currentMemberId={memberId}
-              />
-            )}
+            <HomeScreen 
+              onAnalysisReady={handleAnalysisReady} 
+              onGoToHistory={() => setCurrentView('history')}
+              onGoToStats={() => setCurrentView('stats')}
+              onGoToCategories={() => setCurrentView('category_mgr')}
+              onGoToProductMaster={() => setCurrentView('product_master')}
+              currentMemberId={memberId}
+            />
           </View>
         );
     }
@@ -430,7 +269,6 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      {/* ★ 変更点: fullWidth プロパティに判定結果を渡す */}
       <ResponsiveContainer fullWidth={isFullWidth}>
         <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           {renderMainContent()}
@@ -459,31 +297,4 @@ const styles = StyleSheet.create({
   loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
   logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
-  previewContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  preview: { width: '90%', height: '70%', borderRadius: 10 },
-  previewActions: { width: '100%', padding: 20, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', position: 'absolute', bottom: 40 },
-  mainButton: { backgroundColor: theme.colors.primary, paddingVertical: 16, paddingHorizontal: 20, borderRadius: theme.borderRadius.md, minWidth: 140, alignItems: 'center' },
-  mainButtonText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
-  subButton: { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 12, paddingHorizontal: 20, borderRadius: theme.borderRadius.sm },
-  subButtonText: { color: 'white', fontWeight: '600' },
-  resultContainer: { padding: theme.spacing.lg, paddingTop: 80, paddingBottom: 40 },
-  resultHeader: { ...theme.typography.h1, marginBottom: theme.spacing.lg, textAlign: 'center' },
-  warningContainer: { backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FFC0C0', borderRadius: 10, padding: 15, marginBottom: 20 },
-  warningTitle: { color: '#D00000', fontWeight: 'bold', fontSize: 16, marginBottom: 8 },
-  warningText: { color: '#600000', fontSize: 14, lineHeight: 20 },
-  warningHint: { color: '#D00000', fontSize: 12, marginTop: 10, fontStyle: 'italic' },
-  suspiciousCard: { borderColor: '#FFC0C0', borderWidth: 2 },
-  resultCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },
-  storeName: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: 5 },
-  totalAmount: { ...theme.typography.h1, color: theme.colors.primary, marginBottom: theme.spacing.md },
-  divider: { height: 1, backgroundColor: theme.colors.border, marginBottom: theme.spacing.md },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.background },
-  itemName: { ...theme.typography.body, fontSize: 14 },
-  itemPriceDetailRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
-  itemPrice: { ...theme.typography.caption, fontWeight: '700', color: theme.colors.primary },
-  itemSubText: { fontSize: 10, color: theme.colors.text.muted, marginLeft: 4 },
-  pickerWrapper: { width: 120, height: 40, backgroundColor: theme.colors.background, borderRadius: theme.borderRadius.sm, overflow: 'hidden' },
-  picker: { width: '100%' },
-  doneButton: { backgroundColor: theme.colors.primary, padding: 16, borderRadius: theme.borderRadius.md, alignItems: 'center', marginTop: theme.spacing.xl },
-  doneButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });

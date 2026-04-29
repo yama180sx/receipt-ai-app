@@ -73,8 +73,8 @@ model Item {
   categoryId Int?
   category   Category? @relation(fields: [categoryId], references: [id])
   name       String
-  price      Int
-  quantity   Int      @default(1)
+  price      Float
+  quantity   Float     @default(1.0)
 }
 
 // 学習マスタ (世帯ごとに学習結果を分離)
