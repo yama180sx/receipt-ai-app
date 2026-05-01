@@ -10,6 +10,7 @@ web-build/
 **/.env.local
 **/.env.*
 .env
+.bak
 # .env.example はリポジトリに含めるため除外対象から外す
 !**/.env.example
 
