@@ -4,42 +4,39 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: receipt-${ENV_NAME}-backend
     user: "${UID}:${GID}"
-    # 運用時は Dockerfile 内の CMD (node dist/index.js) を優先
-    # 開発時にホットリロードが必要なら command: npm run dev で上書き
+    command: ${BACKEND_COMMAND}
     volumes:
       - ./backend:/app
       - /etc/localtime:/etc/localtime:ro
       - ./backend/uploads:/app/uploads
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT}:3000"
     stdin_open: true
     tty: true
     env_file:
       - ./backend/.env
     environment:
       - TZ=Asia/Tokyo
-      - NODE_ENV=production
-      # [重要] 運用版(8080)と開発版(8081)の両方のオリジンを許可
-      - CORS_ORIGIN=http://${T320_IP:-192.168.1.32}:8080,http://${T320_IP:-192.168.1.32}:8081
+      - NODE_ENV=${NODE_ENV}
+      - CORS_ORIGIN=${CORS_ORIGIN}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  # --- Frontend (運用・検証用: Nginx Hosting) ---
-  # 常時稼働・安定動作 (http://IP:8080)
+  # --- Frontend (運用検証・本番用: Nginx Hosting) ---
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.web
       args:
-        # ビルド時にAPI URLを確定させ、JSバイナリ内に埋め込む
-        - EXPO_PUBLIC_API_URL=http://${T320_IP:-192.168.1.32}:${BACKEND_PORT:-3000}/api
-    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-frontend-web"
+        - EXPO_PUBLIC_API_URL=http://${T320_IP}:${BACKEND_PORT}/api
+    container_name: receipt-${ENV_NAME}-frontend
     ports:
-      - "8080:80"
+      - "${WEB_PORT}:80"
     restart: always
     environment:
       - TZ=Asia/Tokyo
@@ -47,20 +44,20 @@ services:
       - backend
 
   # --- Frontend (開発用: Expo Dev Server) ---
-  # デバッグ・ホットリロード用 (http://IP:8081)
   frontend-dev:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: receipt-${ENV_NAME}-frontend-dev
     user: "${UID}:${GID}"
     command: npx expo start --web --port 8081 --host lan
     volumes:
       - ./frontend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "8081:8081"
-      - "19000:19000"
-      - "19001:19001"
+      - "${DEV_PORT}:8081"
+      - "${EXPO_PORT_1:-19000}:19000"
+      - "${EXPO_PORT_2:-19001}:19001"
     stdin_open: true
     tty: true
     env_file:
@@ -68,26 +65,27 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
-      - REACT_NATIVE_PACKAGER_HOSTNAME=${T320_IP:-192.168.1.32}
+      - REACT_NATIVE_PACKAGER_HOSTNAME=${T320_IP}
+      - EXPO_PACKAGER_PROXY_URL=${EXPO_PACKAGER_PROXY_URL}
     depends_on:
       - backend
 
-  # --- Database (PostgreSQL) ---
+  # --- Database (PostgreSQL 18) ---
   db:
-    image: postgres:latest
-    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-db"
+    image: postgres:18
+    container_name: receipt-${ENV_NAME}-db
     environment:
       - TZ=Asia/Tokyo
-      - POSTGRES_USER=${DB_USER:-cntadm}
-      - POSTGRES_DB=${DB_NAME:-receipt_db}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_NAME}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cntadm} -d ${DB_NAME:-receipt_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -95,14 +93,14 @@ services:
   # --- Redis (BullMQ Backend) ---
   redis:
     image: redis:7-alpine
-    container_name: "${COMPOSE_PROJECT_NAME:-receipt}-redis"
+    container_name: receipt-${ENV_NAME}-redis
     environment:
       - TZ=Asia/Tokyo
     volumes:
       - ./redisdata:/data
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

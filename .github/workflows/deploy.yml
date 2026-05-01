@@ -15,7 +15,7 @@ jobs:
       - name: Sync to Stable directory
         run: |
           mkdir -p ~/stable/receipt-ai-app
-          # 永続化データ(pgdata, redisdata, uploads)を同期(削除)対象から除外
+          # 永続化データを除外して同期
           rsync -av --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
@@ -27,37 +27,44 @@ jobs:
       - name: Create Stable .env
         run: |
           cd ~/stable/receipt-ai-app
-          # 1. 共通の.env生成
-          echo "UID=$(id -u)" > .env
-          echo "GID=$(id -g)" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "COMPOSE_PROJECT_NAME=receipt-stable" >> .env
-          echo "BACKEND_PORT=${{ secrets.STABLE_BACKEND_PORT }}" >> .env
-          echo "FRONTEND_PORT=${{ secrets.STABLE_FRONTEND_PORT }}" >> .env
-          echo "EXPO_PORT_1=${{ secrets.STABLE_EXPO_PORT_1 }}" >> .env
-          echo "EXPO_PORT_2=${{ secrets.STABLE_EXPO_PORT_2 }}" >> .env
-          echo "DB_PORT=${{ secrets.STABLE_DB_PORT }}" >> .env
-          echo "REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}" >> .env
-          echo "T320_IP=192.168.1.32" >> .env
           
-          # Expo / CORS 用
-          echo "EXPO_PACKAGER_PROXY_URL=http://192.168.1.32:8082" >> .env
-          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}/api" >> .env
-          echo "ALLOWED_ORIGINS=http://192.168.1.32:8082,http://localhost:8082" >> .env
+          # 1. ルート .env 生成 (docker-compose.yml 参照用)
+          cat <<EOF > .env
+          COMPOSE_PROJECT_NAME=receipt-stable
+          UID=$(id -u)
+          GID=$(id -g)
+          T320_IP=192.168.1.32
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          WEB_PORT=${{ secrets.STABLE_WEB_PORT }}
+          BACKEND_PORT=${{ secrets.STABLE_BACKEND_PORT }}
+          DEV_PORT=${{ secrets.STABLE_DEV_PORT }}
+          DB_PORT=${{ secrets.STABLE_DB_PORT }}
+          REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}
+          # Dev環境(19000, 19001)との衝突を避けるための固定値
+          EXPO_PORT_1=19002
+          EXPO_PORT_2=19003
+          EOF
 
-          # 実行用シークレット
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-          echo "NODE_ENV=production" >> .env
-
-          # 2. 各サービスへ展開
+          # 2. 各サービスへ共通設定を展開
           cp .env ./frontend/.env
           cp .env ./backend/.env
 
-          # 3. バックエンド用の設定をコンテナ内部通信用に最適化
-          echo "DATABASE_URL=postgresql://cntadm:${{ secrets.DB_PASSWORD }}@db:5432/receipt_db?schema=public" >> ./backend/.env
-          echo "REDIS_HOST=redis" >> ./backend/.env
-          sed -i 's/^REDIS_PORT=.*/REDIS_PORT=6379/' ./backend/.env
+          # 3. backend/.env 固有設定 (Prisma / CORS / AI)
+          cat <<EOF >> ./backend/.env
+          PORT=3000
+          NODE_ENV=production
+          DATABASE_URL="postgresql://cntadm:${{ secrets.DB_PASSWORD }}@db:5432/receipt_db?schema=public"
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          CORS_ORIGIN="http://192.168.1.32:${{ secrets.STABLE_WEB_PORT }},http://192.168.1.32:${{ secrets.STABLE_DEV_PORT }}"
+          LOG_LEVEL=info
+          EOF
+
+          # 4. frontend/.env 固有設定 (API Endpoint)
+          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}/api" >> ./frontend/.env
+          echo "EXPO_PUBLIC_API_TOKEN=${{ secrets.EXPO_PUBLIC_API_TOKEN }}" >> ./frontend/.env
 
       - name: Install dependencies
         run: |
@@ -69,12 +76,13 @@ jobs:
       - name: Docker Deploy
         run: |
           cd ~/stable/receipt-ai-app
-          docker compose up -d --build
+          # 構成変更を確実に反映させるため --remove-orphans を付与
+          docker compose up -d --build --remove-orphans
 
       - name: Prisma Migrate (Stable DB)
         run: |
           cd ~/stable/receipt-ai-app
-          # コンテナ内でマイグレーションを実行
+          # 起動完了を待ってからマイグレーション実行
           docker compose exec -T backend npx prisma migrate deploy
           
       - name: Cleanup
