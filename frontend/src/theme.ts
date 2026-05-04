@@ -1,3 +1,8 @@
+export const BREAKPOINTS = {
+  TABLET: 768,
+  DESKTOP: 1024,
+} as const;
+
 export const theme = {
   colors: {
     primary: '#2563eb',     // メインカラー：信頼感のあるブルー
@@ -32,7 +37,9 @@ export const theme = {
     h2: { fontSize: 20, fontWeight: '600' as const },
     body: { fontSize: 16, fontWeight: '400' as const },
     caption: { fontSize: 13, fontWeight: '400' as const },
-  }
+  },
+  // Issue #66: レスポンシブ・ブレイクポイントの定義統一
+  breakpoints: BREAKPOINTS,
 };
 
 export type Theme = typeof theme;

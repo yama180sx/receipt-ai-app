@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-import { theme } from '../theme';
+// Issue #66: BREAKPOINTS を追加インポート
+import { theme, BREAKPOINTS } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
 interface HistoryScreenProps {
@@ -27,7 +28,8 @@ interface HistoryScreenProps {
  */
 export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
   const { width: windowWidth } = useWindowDimensions();
-  const isWide = windowWidth > 800; 
+  // Issue #66: ハードコード(800)を共通定数(768)に置換
+  const isWide = windowWidth >= BREAKPOINTS.TABLET; 
 
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);

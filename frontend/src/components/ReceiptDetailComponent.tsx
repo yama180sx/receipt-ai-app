@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, Image, ScrollView, useWindowDimensions, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { theme } from '../theme';
+// Issue #66: BREAKPOINTS を追加インポート
+import { theme, BREAKPOINTS } from '../theme';
 
 interface ReceiptDetailComponentProps {
   receipt: any;
@@ -15,6 +16,7 @@ interface ReceiptDetailComponentProps {
  * [Issue #49-8] レシート詳細表示コンポーネント
  * - 数量の小数点表示を強制 (Stringキャストの最適化)
  * - Android Picker の表示欠けを完全に解消
+ * - [Issue #66] ブレイクポイントを統一定数に置換
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -26,7 +28,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   const { width: windowWidth } = useWindowDimensions();
   
   const effectiveWidth = fullWidth ? windowWidth : windowWidth - 350;
-  const isWide = effectiveWidth > 700;
+  // Issue #66: ハードコード(700)を共通定数(768)に置換
+  const isWide = effectiveWidth >= BREAKPOINTS.TABLET;
 
   const cacheKey = useMemo(() => Date.now(), []);
 
