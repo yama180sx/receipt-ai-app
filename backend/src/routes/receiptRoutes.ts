@@ -14,6 +14,7 @@ import { AppError } from '../utils/appError';
 import { 
   getReceipts, 
   createReceipt, 
+  updateReceipt, 
   deleteReceipt, 
   getLatestReceipt, 
   updateItemCategory,
@@ -25,16 +26,14 @@ import {
 
 const router = express.Router();
 
-// Sharp処理用にメモリストレージを使用
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
 /**
  * レシートアップロード (非同期解析ジョブ投入)
- * ミドルウェアの順序: ファイルパース -> 認証 -> テナント設定 -> バリデーション
  */
 router.post(
   '/receipts/upload',
@@ -59,14 +58,12 @@ router.post(
       const uploadDir = 'uploads';
       const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-      // WebP変換とリサイズ処理
       await sharp(file.buffer)
         .rotate()
         .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 75, effort: 6 })
         .toFile(imagePath);
 
-      // 解析ジョブをキューに追加 (Issue #49-8: 解析のみ実行)
       const job = await receiptQueue.add('analyze-receipt', {
         memberId: memberId,
         familyGroupId: familyGroupId,
@@ -85,7 +82,7 @@ router.post(
   }
 );
 
-// --- 共通認証・テナントミドルウェアを適用 ---
+// --- 共通認証・テナントミドルウェア ---
 router.use(authMiddleware, tenantMiddleware);
 
 router.get('/receipts', getReceipts);
@@ -96,17 +93,10 @@ router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', createReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 
-/**
- * [FIX] カテゴリ更新エンドポイント
- * フロントエンドからの PATCH /api/receipts/items/:id リクエストに対応させるため
- * 旧 /receipt-items/:id から /receipts/items/:id へ変更
- */
-router.patch('/receipts/items/:id', updateItemCategory);
+// Issue #67: 単価・数量（小数対応）を含むレシート全体の更新
+router.patch('/receipts/:id', updateReceipt);
 
-/**
- * [Issue #49-8] 解析結果の確定保存
- * ユーザーがフロントエンドで確認・修正した内容をDBへ永続化する
- */
+router.patch('/receipts/items/:id', updateItemCategory);
 router.post('/receipts/commit', commitReceipt);
 
 export default router;
