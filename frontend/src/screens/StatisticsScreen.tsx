@@ -39,8 +39,7 @@ interface StatisticsScreenProps {
 
 /**
  * [Issue #67] 家計統計画面
- * - チャートおよびサマリー表示時の整数丸め(Math.round)を徹底。
- * - 1円単位の家計簿（JPY）としての整合性を確保。
+ * - 保存成功時に表示データを再取得するよう修正
  */
 export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const { width: windowWidth } = useWindowDimensions();
@@ -65,6 +64,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     });
   }, []);
 
+  // データの取得 (保存成功時にもこれを呼ぶ)
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
     try {
@@ -160,8 +160,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <View style={isWide ? styles.dashboardGrid : null}>
-            
-            {/* 左カラム */}
             <View style={isWide ? styles.leftColumn : null}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>当月合計支出</Text>
@@ -214,7 +212,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* 右カラム */}
             <View style={isWide ? styles.rightColumn : null}>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
@@ -255,7 +252,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 </View>
               </View>
             </View>
-
           </View>
         )}
       </ScrollView>
@@ -264,12 +260,12 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide} onRequestClose={() => setMainModalVisible(false)}>
         <View style={isWide ? styles.modalOverlay : styles.modalContainer}>
           <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
-            <div style={styles.modalHeader}>
+            <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>解析レシート詳細</Text>
               <TouchableOpacity onPress={() => setMainModalVisible(false)}>
                 <Text style={styles.modalCloseText}>閉じる</Text>
               </TouchableOpacity>
-            </div>
+            </View>
             
             <ReceiptDetailComponent 
               receipt={data?.latestReceipt}
@@ -277,6 +273,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               onCategoryChange={handleCategoryChange}
               baseUrl={BASE_URL}
               fullWidth={true}
+              onSaveSuccess={fetchData} // [修正] 保存成功時に親のデータを再取得
             />
           </SafeAreaView>
         </View>
