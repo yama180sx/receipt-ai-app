@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-// Issue #66: BREAKPOINTS を追加インポート
+// Issue #66: BREAKPOINTS 参照
 import { theme, BREAKPOINTS } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -23,12 +23,13 @@ interface HistoryScreenProps {
 }
 
 /**
- * [Issue #49-8] 履歴一覧画面
- * 確定保存されたデータを正確に表示し、カテゴリの事後修正と学習マスタへの反映をサポートします。
+ * [Issue #67] 履歴一覧画面
+ * - レシート編集後の自動再取得 (onSaveSuccess) を実装。
+ * - リスト表示時の合計金額の整数丸めを徹底。
  */
 export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
   const { width: windowWidth } = useWindowDimensions();
-  // Issue #66: ハードコード(800)を共通定数(768)に置換
+  // Issue #66: 定数によるレスポンシブ判定
   const isWide = windowWidth >= BREAKPOINTS.TABLET; 
 
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
   const [selectedMonth, setSelectedMonth] = useState('');
-  // 初期値を現在のログインユーザーに設定
   const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
 
   const months = useMemo(() => {
@@ -55,7 +55,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const fetchCategories = useCallback(async () => {
     try {
       const res = await apiClient.get('/categories');
-      if (res.data && res.data.success) {
+      if (res.data?.success) {
         setCategories(res.data.data);
       }
     } catch (err) {
@@ -63,7 +63,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     }
   }, []);
 
-  // 履歴データの取得（確定保存直後の最新データを取得）
+  // 履歴データの取得
   const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
@@ -73,11 +73,16 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
           month: selectedMonth 
         }
       });
-      if (res.data && res.data.success) {
+      if (res.data?.success) {
         const data = res.data.data;
         setReceipts(data);
-        // ワイド画面の場合、1件目を選択状態にする
-        if (isWide && data.length > 0) {
+        
+        // 編集・保存後に選択中データの参照を最新に更新
+        if (selectedReceipt) {
+          const updated = data.find((r: any) => r.id === selectedReceipt.id);
+          if (updated) setSelectedReceipt(updated);
+        } else if (isWide && data.length > 0) {
+          // 初回ロード時は1件目を選択
           setSelectedReceipt(data[0]);
         }
       }
@@ -87,7 +92,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedMember, isWide]);
+  }, [selectedMonth, selectedMember, isWide, selectedReceipt?.id]);
 
   useEffect(() => {
     fetchCategories();
@@ -95,39 +100,27 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
   useEffect(() => {
     fetchReceipts();
-  }, [fetchReceipts]);
+  }, [selectedMonth, selectedMember]); // フィルタ変更時のみ自動発火
 
-  // 詳細画面でのカテゴリ変更処理（学習マスタへも即時反映）
+  // カテゴリのみの簡易変更処理（既存互換）
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      // APIエンドポイントを /receipts/items/:id に統一
       const response = await apiClient.patch(`/receipts/items/${itemId}`, 
         { categoryId: Number(categoryId) }
       );
       
-      if (response.data && response.data.success) {
+      if (response.data?.success) {
         const updatedItem = response.data.data;
-        
-        // リスト内のデータを更新
-        const updateInList = (prev: any[]) => prev.map(r => ({
+        const mapper = (r: any) => ({
           ...r,
           items: r.items.map((item: any) =>
             item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
           ),
-        }));
+        });
 
-        setReceipts(updateInList);
-        
-        // 選択中の詳細データも更新
-        if (selectedReceipt) {
-          setSelectedReceipt((prev: any) => ({
-            ...prev,
-            items: prev.items.map((item: any) =>
-              item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-            ),
-          }));
-        }
+        setReceipts(prev => prev.map(mapper));
+        if (selectedReceipt) setSelectedReceipt((prev: any) => mapper(prev));
       }
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
@@ -137,6 +130,10 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
   const renderItem = ({ item }: { item: any }) => {
     const isSelected = selectedReceipt?.id === item.id;
+    // 画面表示でも念のため丸めを徹底
+    // $$ \text{Amount} = \text{round}(\text{totalAmount}) $$
+    const displayAmount = Math.round(item.totalAmount || 0);
+
     return (
       <TouchableOpacity 
         style={[styles.card, isSelected && isWide && styles.activeCard]} 
@@ -151,7 +148,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         </View>
         <View style={styles.cardBody}>
           <View>
-            <Text style={styles.amount}>¥{(item.totalAmount || 0).toLocaleString()}</Text>
+            <Text style={styles.amount}>¥{displayAmount.toLocaleString()}</Text>
           </View>
           <View style={styles.itemCountBadge}>
             <Text style={styles.itemCountText}>{(item.items?.length || 0)} 点</Text>
@@ -223,6 +220,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
                 onCategoryChange={handleCategoryChange}
                 baseUrl={BASE_URL}
                 fullWidth={false}
+                onSaveSuccess={fetchReceipts}
               />
             </View>
           )}
@@ -244,6 +242,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
               onCategoryChange={handleCategoryChange}
               baseUrl={BASE_URL}
               fullWidth={true}
+              onSaveSuccess={fetchReceipts}
             />
           </View>
         </Modal>
