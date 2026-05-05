@@ -1,5 +1,19 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Alert, FlatList, useWindowDimensions, Platform } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Dimensions, 
+  ScrollView, 
+  ActivityIndicator, 
+  Image, 
+  TouchableOpacity, 
+  Modal, 
+  Alert, 
+  FlatList, 
+  useWindowDimensions, 
+  Platform 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
@@ -23,6 +37,10 @@ interface StatisticsScreenProps {
   onBack: () => void;
 }
 
+/**
+ * [Issue #67] 家計統計画面
+ * - 保存成功時に表示データを再取得するよう修正
+ */
 export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth > 768;
@@ -46,6 +64,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     });
   }, []);
 
+  // データの取得 (保存成功時にもこれを呼ぶ)
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
     try {
@@ -59,7 +78,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
       if (statsRes.data?.success) {
         const raw = statsRes.data.data;
-        // backend が配列を返す場合とオブジェクトを返す場合の互換性を維持
         if (Array.isArray(raw)) {
           const target = raw.find(item => item.month === selectedMonth) || raw[0];
           setData({
@@ -88,7 +106,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      // route mismatch fix: /receipt-items/ -> /receipts/items/ へ変更
       await apiClient.patch(`/receipts/items/${itemId}`, 
         { categoryId: Number(categoryId) }, 
         { headers: { 'x-member-id': currentMemberId.toString() } }
@@ -103,11 +120,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     if (!data?.stats || !Array.isArray(data.stats)) return [];
     return data.stats
       .map(s => {
-        // 金額は Math.round で整数化してチャートに渡す
-        const val = Math.round(Number(s.totalAmount));
+        const val = Math.round(Number(s.totalAmount) || 0);
         return {
           name: s.categoryName || '未分類',
-          population: isNaN(val) ? 0 : val,
+          population: val,
           color: s.color || theme.colors.secondary,
           legendFontColor: theme.colors.text.main,
           legendFontSize: 12,
@@ -144,17 +160,16 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <View style={isWide ? styles.dashboardGrid : null}>
-            
-            {/* 左カラム */}
             <View style={isWide ? styles.leftColumn : null}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>当月合計支出</Text>
-                {/* 合計額の整数化表示 */}
-                <Text style={styles.totalValue}>¥{Math.round(Number(data?.totalAmount) || 0).toLocaleString()}</Text>
+                <Text style={styles.totalValue}>
+                  ¥{Math.round(Number(data?.totalAmount) || 0).toLocaleString()}
+                </Text>
                 <View style={styles.comparisonRow}>
                   <Text style={styles.comparisonLabel}>前月比:</Text>
                   <Text style={[styles.diffValue, { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success }]}>
-                    {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(Math.round(data?.diffAmount || 0)).toLocaleString()} ({data?.diffPercentage || 0}%)
+                    {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥{Math.abs(Math.round(Number(data?.diffAmount) || 0)).toLocaleString()} ({data?.diffPercentage || 0}%)
                   </Text>
                 </View>
               </View>
@@ -189,7 +204,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                         </Text>
                       </View>
                       <Text style={styles.receiptAmount}>
-                        ¥{Math.round(data.latestReceipt.totalAmount || 0).toLocaleString()}
+                        ¥{Math.round(Number(data.latestReceipt.totalAmount) || 0).toLocaleString()}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -197,7 +212,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               </View>
             </View>
 
-            {/* 右カラム */}
             <View style={isWide ? styles.rightColumn : null}>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
@@ -207,7 +221,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     return (
                       <View key={i} style={styles.trendRow}>
                         <Text style={styles.trendPeriod}>{t.period}</Text>
-                        <Text style={styles.trendAmount}>¥{Math.round(t.total).toLocaleString()}</Text>
+                        <Text style={styles.trendAmount}>¥{Math.round(Number(t.total) || 0).toLocaleString()}</Text>
                         <Text style={[styles.trendDiff, { color: diff > 0 ? theme.colors.error : theme.colors.success }]}>
                           {t.prev_total !== null ? `${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString()}` : '-'}
                         </Text>
@@ -224,7 +238,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                     <View key={i} style={styles.paretoWrapper}>
                       <View style={styles.paretoTextRow}>
                         <Text style={styles.paretoName}>{p.name}</Text>
-                        <Text style={styles.paretoValue}>¥{Math.round(p.amount).toLocaleString()} ({p.ratio}%)</Text>
+                        <Text style={styles.paretoValue}>¥{Math.round(Number(p.amount) || 0).toLocaleString()} ({p.ratio}%)</Text>
                       </View>
                       <View style={styles.paretoBarContainer}>
                         <View style={[
@@ -238,7 +252,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 </View>
               </View>
             </View>
-
           </View>
         )}
       </ScrollView>
@@ -260,6 +273,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               onCategoryChange={handleCategoryChange}
               baseUrl={BASE_URL}
               fullWidth={true}
+              onSaveSuccess={fetchData} // [修正] 保存成功時に親のデータを再取得
             />
           </SafeAreaView>
         </View>

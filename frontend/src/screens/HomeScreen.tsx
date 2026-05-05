@@ -25,6 +25,10 @@ interface HomeScreenProps {
   currentMemberId: number;
 }
 
+/**
+ * [Issue #67] ホーム画面（ダッシュボード）
+ * - 合計金額の表示時に四捨五入を適用し、小数の端数表示を抑制。
+ */
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
   onAnalysisReady, 
   onGoToHistory, 
@@ -53,7 +57,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
       
       if (statsRes.data && statsRes.data.success) {
-        setMonthlyTotal(statsRes.data.data.totalAmount || 0);
+        // [Issue #67] 小数点誤差や計算結果の端数を丸めてセット
+        const total = statsRes.data.data.totalAmount || 0;
+        setMonthlyTotal(Math.round(total));
       }
     } catch (error) {
       console.error('Data fetch error:', error);
@@ -102,9 +108,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        // SDKバージョン間の不一致を避けるため、文字列で指定
         mediaTypes: 'images' as any, 
-        allowsEditing: true, // サイズ調整画面を有効化
+        allowsEditing: true,
         quality: 0.8,
       });
 
@@ -162,6 +167,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.summaryLabel}>今月の利用合計</Text>
           <View style={styles.summaryAmountRow}>
             <Text style={styles.summarySymbol}>¥</Text>
+            {/* [Issue #67] 通貨表示前に丸めを適用 */}
             <Text style={styles.summaryAmount}>{monthlyTotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryDivider} />
@@ -223,7 +229,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName || '店名不明'}</Text>
                 <Text style={styles.dateText}>{latestReceipt.date ? new Date(latestReceipt.date).toLocaleDateString('ja-JP') : '日付不明'}</Text>
               </View>
-              <Text style={styles.amountText}>¥{(latestReceipt.totalAmount || 0).toLocaleString()}</Text>
+              {/* [Issue #67] 最新履歴も四捨五入して整数表示 */}
+              <Text style={styles.amountText}>
+                ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
+              </Text>
             </TouchableOpacity>
           ) : (
             <View style={[styles.latestCard, { justifyContent: 'center' }]}><Text style={styles.dateText}>表示できるデータがありません</Text></View>

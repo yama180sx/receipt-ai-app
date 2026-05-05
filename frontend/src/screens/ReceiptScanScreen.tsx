@@ -19,8 +19,8 @@ import { theme } from '../theme';
 
 interface ReceiptItem {
   name: string;
-  price: number;
-  quantity: number;
+  price: number | string; // 入力中は文字列を許容
+  quantity: number | string; // 入力中は文字列を許容
   categoryId: number | null;
 }
 
@@ -45,10 +45,9 @@ interface ReceiptScanScreenProps {
 }
 
 /**
- * [Issue #49-8] レシート解析結果の確認・編集画面
- * - Android Picker の表示欠け再修正 (高さを確保し overflow: visible)
- * - 合計金額の端数切り捨て (Math.round)
- * - 数量の小数点入力対応
+ * [Issue #67] レシート解析結果の確認・編集画面
+ * - 単価(price)・数量(quantity)の小数点入力対応
+ * - 日本円の整合性のため合計金額を四捨五入 (Math.round)
  */
 export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   initialData,
@@ -66,27 +65,19 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     return `${baseUrl}${path}`;
   }, [initialData.imagePath]);
 
-  // 合計金額の計算（浮動小数点誤差を排除）
+  // 合計金額の計算（浮動小数点誤差を考慮し、最終表示は四捨五入）
   const calculatedTotal = useMemo(() => {
     const total = receiptData.items.reduce((sum, item) => {
-      return sum + (Number(item.price || 0) * Number(item.quantity || 0));
+      const p = parseFloat(String(item.price)) || 0;
+      const q = parseFloat(String(item.quantity)) || 0;
+      return sum + (p * q);
     }, 0);
     return Math.round(total);
   }, [receiptData.items]);
 
   const updateItem = (index: number, key: keyof ReceiptItem, value: any) => {
     const newItems = [...receiptData.items];
-    let finalValue = value;
-
-    // 数値項目への変換処理
-    if (key === 'price') {
-      finalValue = parseInt(value, 10) || 0;
-    } else if (key === 'quantity') {
-      // 数量は小数点を含む可能性があるため、入力中は文字列として許可し、保存・計算時に数値化
-      finalValue = value; 
-    }
-
-    newItems[index] = { ...newItems[index], [key]: finalValue };
+    newItems[index] = { ...newItems[index], [key]: value };
     setReceiptData({ ...receiptData, items: newItems });
   };
 
@@ -107,21 +98,26 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         jobId: initialData.jobId,
         parsedData: { 
           ...receiptData, 
-          totalAmount: calculatedTotal,
+          totalAmount: calculatedTotal, // 四捨五入済みの整数
           items: receiptData.items.map(item => ({
             ...item,
-            quantity: parseFloat(String(item.quantity)) || 0
+            // 送信直前に確実に数値型へキャスト
+            price: parseFloat(String(item.price)) || 0,
+            quantity: parseFloat(String(item.quantity)) || 0,
+            categoryId: item.categoryId ? Number(item.categoryId) : null
           }))
         },
         imagePath: initialData.imagePath,
         validation: initialData.validation
       };
+      
       const res = await apiClient.post('/receipts/commit', payload);
       if (res.data?.success) {
         Alert.alert('成功', 'レシートを保存しました。');
         onSuccess();
       }
     } catch (err: any) {
+      console.error('Commit error:', err.response?.data || err.message);
       Alert.alert('エラー', '保存に失敗しました。');
     } finally {
       setLoading(false);
@@ -195,7 +191,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
                   <TextInput 
                     style={styles.inputSmall} 
                     value={String(item.price)} 
-                    keyboardType="numeric" 
+                    keyboardType="decimal-pad" 
                     onChangeText={(val) => updateItem(idx, 'price', val)} 
                   />
                 </View>
@@ -211,7 +207,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
                 <View style={[styles.itemSubGroup, { alignItems: 'flex-end' }]}>
                   <Text style={styles.subLabel}>小計</Text>
                   <Text style={styles.subTotalText}>
-                    ¥ {Math.round(Number(item.price || 0) * (parseFloat(String(item.quantity)) || 0)).toLocaleString()}
+                    ¥ {Math.round((parseFloat(String(item.price)) || 0) * (parseFloat(String(item.quantity)) || 0)).toLocaleString()}
                   </Text>
                 </View>
               </View>
@@ -280,8 +276,6 @@ const styles = StyleSheet.create({
   inputSmall: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 4, fontSize: 14, color: '#374151', fontWeight: '600' },
   subTotalText: { fontSize: 14, fontWeight: '700', color: '#374151', paddingTop: 4 },
   categoryRow: { borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 8 },
-  
-  // Picker表示崩れ修正: 55px確保し overflow: visible に変更
   pickerWrapper: { 
     borderWidth: 1, 
     borderColor: '#F3F4F6', 

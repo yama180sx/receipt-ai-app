@@ -5,8 +5,8 @@ import { z } from 'zod';
  */
 export const receiptItemSchema = z.object({
   name: z.string().min(1, "品名は必須です"),
-  price: z.coerce.number().int(),
-  quantity: z.coerce.number().int().default(1),
+  price: z.coerce.number(),
+  quantity: z.coerce.number().default(1),
   categoryId: z.coerce.number().int().nullable().optional(),
 });
 

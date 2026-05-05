@@ -62,7 +62,6 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 
 /**
  * [Issue #49-8] 解析結果の確定保存
- * ユーザーが修正した小数を含むデータをDBへ永続化します。
  */
 export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -95,13 +94,18 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * 手動登録 (Float対応)
+ * 手動登録 (Issue #67: Float対応 & 合計額自動算出)
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const memberId = getMemberId();
     const familyGroupId = getFamilyGroupId();
-    const { date, storeName, totalAmount, items, imagePath } = req.body;
+    const { date, storeName, items, imagePath } = req.body;
+
+    // 単価×数量の合計を算出し、四捨五入して整数にする
+    const calculatedTotal = items.reduce((sum: number, i: any) => {
+      return sum + (Number(i.price || 0) * Number(i.quantity || 0));
+    }, 0);
 
     const newReceipt = await saveParsedReceipt(
       Number(memberId),
@@ -109,10 +113,10 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
       {
         storeName,
         purchaseDate: date,
-        totalAmount: Number(totalAmount),
+        totalAmount: Math.round(calculatedTotal), // 合計は整数
         items: items.map((i: any) => ({
           name: i.name,
-          price: parseFloat(i.price), // 整数キャストから実数(parseFloat)へ
+          price: parseFloat(i.price), 
           quantity: parseFloat(i.quantity || 1),
           categoryId: i.categoryId ? Number(i.categoryId) : null
         }))
@@ -127,6 +131,87 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
     if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
     next(error); 
   }
+};
+
+/**
+ * [Issue #67] 保存済みレシートの完全編集
+ */
+export const updateReceipt = async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  const { date, storeName, items } = req.body;
+  const familyGroupId = getFamilyGroupId();
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. 存在確認
+      const existing = await tx.receipt.findUnique({
+        where: { id: Number(id) },
+      });
+      if (!existing || existing.familyGroupId !== familyGroupId) {
+        throw new AppError('ReceiptNotFound', 404);
+      }
+
+      // 2. 合計金額の再計算（小数点対応後の整合性確保）
+      const calculatedTotal = items.reduce((sum: number, i: any) => {
+        return sum + (Number(i.price || 0) * Number(i.quantity || 0));
+      }, 0);
+      const finalTotal = Math.round(calculatedTotal);
+
+      // 3. レシート基本情報の更新
+      await tx.receipt.update({
+        where: { id: Number(id) },
+        data: {
+          date: date ? new Date(date) : undefined,
+          storeName: storeName || undefined,
+          totalAmount: finalTotal, // 四捨五入した整数値を保存
+        }
+      });
+
+      // 4. 明細（Item）の差し替え
+      await tx.item.deleteMany({ where: { receiptId: Number(id) } });
+      
+      if (items && Array.isArray(items)) {
+        await tx.item.createMany({
+          data: items.map((i: any) => ({
+            receiptId: Number(id),
+            name: i.name,
+            price: parseFloat(i.price) || 0,
+            quantity: parseFloat(i.quantity) || 0,
+            categoryId: i.categoryId ? Number(i.categoryId) : null,
+          }))
+        });
+
+        // 5. 学習マスタへのフィードバック
+        for (const item of items) {
+          if (item.categoryId) {
+            await tx.productMaster.upsert({
+              where: {
+                name_storeName_familyGroupId: {
+                  name: getCleanText(item.name),
+                  storeName: getCleanText(storeName || existing.storeName),
+                  familyGroupId
+                }
+              },
+              update: { categoryId: Number(item.categoryId) },
+              create: {
+                name: getCleanText(item.name),
+                storeName: getCleanText(storeName || existing.storeName),
+                categoryId: Number(item.categoryId),
+                familyGroupId
+              }
+            });
+          }
+        }
+      }
+
+      return await tx.receipt.findUnique({
+        where: { id: Number(id) },
+        include: { items: { include: { category: true } } }
+      });
+    });
+
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
 };
 
 /**
@@ -232,7 +317,6 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
 
 /**
  * [Issue #49-8] 月別統計
- * 精度確保のため double precision (float8) にキャストして集計します。
  */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
@@ -291,7 +375,6 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
 
 /**
  * [Issue #49-8] 高度な統計
- * 精度確保のため集計値を実数として扱います。
  */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
   const fId = getFamilyGroupId();
