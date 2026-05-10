@@ -15,7 +15,6 @@ jobs:
       - name: Sync to Stable directory
         run: |
           mkdir -p ~/stable/receipt-ai-app
-          # 永続化データを除外して同期
           rsync -av --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
@@ -28,61 +27,65 @@ jobs:
         run: |
           cd ~/stable/receipt-ai-app
           
-          # 1. ルート .env 生成 (docker-compose.yml 参照用)
+          # 1. ルート .env 生成
           cat <<EOF > .env
+          ENV_NAME=stable
           COMPOSE_PROJECT_NAME=receipt-stable
           UID=$(id -u)
           GID=$(id -g)
-          T320_IP=192.168.1.32
+          HOST_IP=${{ secrets.HOST_IP }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_USER=cntadm
+          DB_NAME=receipt_db
           WEB_PORT=${{ secrets.STABLE_WEB_PORT }}
           BACKEND_PORT=${{ secrets.STABLE_BACKEND_PORT }}
           DEV_PORT=${{ secrets.STABLE_DEV_PORT }}
           DB_PORT=${{ secrets.STABLE_DB_PORT }}
           REDIS_PORT=${{ secrets.STABLE_REDIS_PORT }}
-          # Dev環境(19000, 19001)との衝突を避けるための固定値
           EXPO_PORT_1=19002
           EXPO_PORT_2=19003
+          BACKEND_COMMAND="npm run start"
+          NODE_ENV=production
           EOF
 
           # 2. 各サービスへ共通設定を展開
           cp .env ./frontend/.env
           cp .env ./backend/.env
 
-          # 3. backend/.env 固有設定 (Prisma / CORS / AI)
+          # 3. backend/.env 固有設定
+          # [Issue #69] GitHub Variables (vars) からの動的注入に対応
           cat <<EOF >> ./backend/.env
           PORT=3000
-          NODE_ENV=production
           DATABASE_URL="postgresql://cntadm:${{ secrets.DB_PASSWORD }}@db:5432/receipt_db?schema=public"
           REDIS_HOST=redis
-          REDIS_PORT=6379
+          REDIS_PORT_INTERNAL=${{ vars.REDIS_PORT_INTERNAL || '6379' }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN="30d"
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          CORS_ORIGIN="http://192.168.1.32:${{ secrets.STABLE_WEB_PORT }},http://192.168.1.32:${{ secrets.STABLE_DEV_PORT }}"
+          GEMINI_MODEL="${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}"
+          GEMINI_RETRY_COUNT=3
+          GEMINI_RETRY_DELAY=2000
+          CORS_ORIGIN="http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_WEB_PORT }}"
           LOG_LEVEL=info
           EOF
 
-          # 4. frontend/.env 固有設定 (API Endpoint)
-          echo "EXPO_PUBLIC_API_URL=http://192.168.1.32:${{ secrets.STABLE_BACKEND_PORT }}/api" >> ./frontend/.env
+          # 4. frontend/.env 固有設定
+          echo "EXPO_PUBLIC_API_URL=http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_BACKEND_PORT }}/api" >> ./frontend/.env
           echo "EXPO_PUBLIC_API_TOKEN=${{ secrets.EXPO_PUBLIC_API_TOKEN }}" >> ./frontend/.env
 
       - name: Install dependencies
         run: |
-          cd ~/stable/receipt-ai-app/backend
-          npm install
-          cd ../frontend
-          npm install
+          cd ~/stable/receipt-ai-app/backend && npm install
+          cd ../frontend && npm install
 
       - name: Docker Deploy
         run: |
           cd ~/stable/receipt-ai-app
-          # 構成変更を確実に反映させるため --remove-orphans を付与
           docker compose up -d --build --remove-orphans
 
       - name: Prisma Migrate (Stable DB)
         run: |
           cd ~/stable/receipt-ai-app
-          # 起動完了を待ってからマイグレーション実行
           docker compose exec -T backend npx prisma migrate deploy
           
       - name: Cleanup

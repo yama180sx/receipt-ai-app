@@ -3,11 +3,15 @@ import fs from 'fs/promises';
 import path from 'path';
 import logger from './logger';
 import { tenantStorage } from './context'; 
-import 'dotenv/config';
 
-// ベースとなるクライアント（拡張前の素のクライアント）
+// [Issue #69] ログレベルを環境に応じて調整可能にする
+const prismaLogLevels: any[] = process.env.NODE_ENV === 'production' 
+  ? ['error', 'warn'] 
+  : ['query', 'info', 'warn', 'error'];
+
+// ベースとなるクライアント
 const basePrisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
+  log: prismaLogLevels,
   datasources: {
     db: {
       url: process.env.DATABASE_URL,
@@ -21,11 +25,10 @@ const basePrisma = new PrismaClient({
  */
 export const prisma = basePrisma.$extends({
   query: {
-    // 1. 全モデル共通のマルチテナント・フィルタリング (Issue #45)
+    // 1. 全モデル共通のマルチテナント・フィルタリング
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        // ★ 修正：familyGroupId カラムを物理的に持っているモデルのみを対象にする
-        // Item, Category などの関連モデルはこのリストに含めない
+        // 世帯ID（familyGroupId）による分離が必要なモデル定義
         const tenantModels = ['Receipt', 'ProductMaster', 'FamilyMember'];
         
         if (!tenantModels.includes(model)) {
@@ -36,29 +39,21 @@ export const prisma = basePrisma.$extends({
         const store = tenantStorage.getStore();
         const familyGroupId = store?.familyGroupId;
 
-        // IDが取得できない場合はフィルタリングをスキップ
+        // IDが取得できない（認証外など）場合はフィルタリングをスキップ
         if (!familyGroupId) return query(args);
         
         const anyArgs = args as any;
 
-        // 検索・更新・削除において familyGroupId を強制注入
+        // 検索・更新・削除における familyGroupId の強制注入
         const tenantOps = ['findMany', 'findFirst', 'findUnique', 'count', 'update', 'delete', 'updateMany', 'deleteMany'];
         
         if (tenantOps.includes(operation)) {
-          if (operation === 'findUnique') {
-            // ★ 修正：findUnique は厳格なキーのみを期待するため、内部的に findFirst 相当のフィルタへ変換
-            // または、スキーマで複合ユニークキーが設定されている場合はそれを使用する設計にする
-            const originalWhere = { ...anyArgs.where };
-            anyArgs.where = {
-              ...originalWhere,
-              familyGroupId: familyGroupId
-            };
-          } else {
-            anyArgs.where = {
-              ...anyArgs.where,
-              familyGroupId: familyGroupId
-            };
-          }
+          // findUnique は複合キー設定がない場合 familyGroupId を追加すると型エラーになるため
+          // 実質的に findFirst 相当の挙動として familyGroupId を条件に加える
+          anyArgs.where = {
+            ...anyArgs.where,
+            familyGroupId: familyGroupId
+          };
         }
 
         // 新規作成時は所属世帯を自動セット
@@ -75,10 +70,10 @@ export const prisma = basePrisma.$extends({
       },
     },
 
-    // 2. Receiptモデル固有の物理ファイル削除フック (Issue #19)
+    // 2. Receiptモデル固有の物理ファイル削除フック
     receipt: {
       async delete({ args, query }) {
-        // 削除前に画像パスを取得（無限ループ防止のため拡張前の basePrisma を使用）
+        // 削除前に画像パスを取得（basePrisma を使用して無限ループを防止）
         const receipt = await basePrisma.receipt.findUnique({
           where: args.where,
           select: { imagePath: true }
@@ -113,11 +108,12 @@ export const prisma = basePrisma.$extends({
 
 /**
  * 物理ファイルの削除実行 (T320 Ubuntu環境用)
+ * @param relativePath uploads/... から始まる相対パス
  */
-async function deletePhysicalFile(relativePah: string) {
-  if (!relativePah) return;
+async function deletePhysicalFile(relativePath: string) {
+  if (!relativePath) return;
   
-  const fullPath = path.join(process.cwd(), relativePah);
+  const fullPath = path.join(process.cwd(), relativePath);
 
   try {
     await fs.access(fullPath);
@@ -125,7 +121,7 @@ async function deletePhysicalFile(relativePah: string) {
     logger.info(`[CLEANUP] 物理ファイルを削除しました: ${fullPath}`);
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      logger.warn(`[CLEANUP] 削除対象が見つかりませんでした: ${fullPath}`);
+      logger.warn(`[CLEANUP] 削除対象が見つかりませんでした (既に削除済み): ${fullPath}`);
     } else {
       logger.error(`[CLEANUP] ファイル削除失敗: ${error.message}`);
     }
