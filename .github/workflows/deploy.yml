@@ -53,15 +53,16 @@ jobs:
           cp .env ./backend/.env
 
           # 3. backend/.env 固有設定
+          # [Issue #69] GitHub Variables (vars) からの動的注入に対応
           cat <<EOF >> ./backend/.env
           PORT=3000
           DATABASE_URL="postgresql://cntadm:${{ secrets.DB_PASSWORD }}@db:5432/receipt_db?schema=public"
           REDIS_HOST=redis
-          REDIS_PORT_INTERNAL=6379
+          REDIS_PORT_INTERNAL=${{ vars.REDIS_PORT_INTERNAL || '6379' }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           JWT_EXPIRES_IN="30d"
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL="gemini-flash-latest"
+          GEMINI_MODEL="${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}"
           GEMINI_RETRY_COUNT=3
           GEMINI_RETRY_DELAY=2000
           CORS_ORIGIN="http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_WEB_PORT }}"
