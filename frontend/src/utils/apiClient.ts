@@ -3,6 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+// --- 定数定義 ---
+const STORAGE_KEYS = {
+  TOKEN: 'userToken',
+  MEMBER_ID: 'currentMemberId',
+} as const;
+
 /**
  * [Issue #52] 401エラー時に App.tsx 等の UI 側でログアウト処理を発火させるためのハンドラ
  */
@@ -12,36 +18,43 @@ export const setOnUnauthorized = (handler: () => void) => {
   onUnauthorizedHandler = handler;
 };
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+// 環境変数からベースURLを取得。未設定の場合は警告を出す
+const API_BASE = process.env.EXPO_PUBLIC_API_URL;
+if (!API_BASE) {
+  console.warn('[API] Warning: EXPO_PUBLIC_API_URL is not defined. Falling back to localhost.');
+}
 
 const apiClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_BASE || 'http://localhost:3000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+/**
+ * ストレージから値を安全に取得するユーティリティ
+ */
+const getStorageItem = async (key: string): Promise<string | null> => {
+  try {
+    return Platform.OS === 'web'
+      ? await AsyncStorage.getItem(key)
+      : await SecureStore.getItemAsync(key);
+  } catch (error) {
+    console.error(`[API-AUTH] Storage retrieval failed for key: ${key}`, error);
+    return null;
+  }
+};
+
 // --- リクエストインターセプター：送信前に認証情報を自動注入 ---
 apiClient.interceptors.request.use(async (config) => {
-  try {
-    // [Web対応] 環境に応じて取得先を切り替え
-    const token = Platform.OS === 'web'
-      ? await AsyncStorage.getItem('userToken')
-      : await SecureStore.getItemAsync('userToken');
-      
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = await getStorageItem(STORAGE_KEYS.TOKEN);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
-    const memberId = Platform.OS === 'web'
-      ? await AsyncStorage.getItem('currentMemberId')
-      : await SecureStore.getItemAsync('currentMemberId');
-
-    if (memberId) {
-      config.headers['x-member-id'] = memberId;
-    }
-  } catch (error) {
-    console.error('[API-AUTH] ストレージ取得失敗:', error);
+  const memberId = await getStorageItem(STORAGE_KEYS.MEMBER_ID);
+  if (memberId) {
+    config.headers['x-member-id'] = memberId;
   }
   
   return config;
