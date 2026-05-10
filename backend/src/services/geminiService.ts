@@ -1,10 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as fs from "fs";
-import { PrismaClient } from "@prisma/client";
-
-// Prisma インスタンスのインポート（プロジェクトの構成に合わせてパスを調整してください）
-// 一般的な構成を想定しています
-const prisma = new PrismaClient();
+import * as path from "path";
+import prisma from "../utils/prismaClient"; // 共通インスタンスを使用
 
 export interface ParsedItem {
   name: string;
@@ -22,10 +19,28 @@ export interface ParsedReceipt {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// 環境変数から設定を取得（デフォルト値を定義）
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const RETRY_COUNT = parseInt(process.env.GEMINI_RETRY_COUNT || "3", 10);
+const RETRY_DELAY = parseInt(process.env.GEMINI_RETRY_DELAY || "2000", 10);
+
+/**
+ * ファイル拡張子から適切なMIMEタイプを返却
+ */
+const getMimeType = (filePath: string): string => {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".png": return "image/png";
+    case ".webp": return "image/webp";
+    case ".heic": return "image/heic";
+    default: return "image/jpeg";
+  }
+};
+
 async function withRetry<T>(
   fn: () => Promise<T>,
-  retries: number = 3,
-  delay: number = 2000 
+  retries: number = RETRY_COUNT,
+  delay: number = RETRY_DELAY 
 ): Promise<T> {
   try {
     return await fn();
@@ -34,7 +49,7 @@ async function withRetry<T>(
     const isRetryable = status === 429 || status >= 500;
     if (retries <= 0 || !isRetryable) throw error;
     
-    console.warn(`⚠️ Gemini APIリトライ中... 残り ${retries} 回`);
+    console.warn(`⚠️ Gemini APIリトライ中... 残り ${retries} 回 (Error: ${status})`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return withRetry(fn, retries - 1, delay * 2);
   }
@@ -42,17 +57,14 @@ async function withRetry<T>(
 
 /**
  * レシート画像を解析し、トークン使用量をDBに記録します
- * @param imagePath 画像のフルパス
- * @param familyMemberId 実行したユーザーのID（ログ記録用）
  */
 export const analyzeReceiptImage = async (
   imagePath: string, 
   familyMemberId?: number
 ): Promise<ParsedReceipt> => {
   const task = async () => {
-    const modelId = "gemini-flash-latest"; // 変数化してログで使用
     const model = genAI.getGenerativeModel({ 
-      model: modelId, 
+      model: GEMINI_MODEL, 
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -81,7 +93,7 @@ export const analyzeReceiptImage = async (
     const imageData = {
       inlineData: {
         data: fs.readFileSync(imagePath).toString("base64"),
-        mimeType: "image/jpeg",
+        mimeType: getMimeType(imagePath), // 拡張子に合わせて動的に変更
       },
     };
 
@@ -89,26 +101,23 @@ export const analyzeReceiptImage = async (
     const result = await model.generateContent([prompt, imageData]);
     const response = await result.response;
     
-    // --- [Issue #59] トークン使用量の記録開始 ---
+    // トークン使用量の記録
     const usage = response.usageMetadata;
     if (usage) {
       try {
         await prisma.apiUsageLog.create({
           data: {
             familyMemberId: familyMemberId || null,
-            modelId: modelId,
+            modelId: GEMINI_MODEL,
             promptTokens: usage.promptTokenCount,
             candidatesTokens: usage.candidatesTokenCount,
             totalTokens: usage.totalTokenCount,
-            // receiptId はこの時点では未確定（保存前）のため、ここでは null
           }
         });
       } catch (logError) {
-        // ログ保存の失敗で本体の解析処理を止めてはいけない
         console.error("❌ ApiUsageLog の保存に失敗しました:", logError);
       }
     }
-    // --- 記録終了 ---
 
     const text = response.text();
     
@@ -126,5 +135,5 @@ export const analyzeReceiptImage = async (
     }
   };
 
-  return await withRetry(task, 3);
+  return await withRetry(task);
 };
