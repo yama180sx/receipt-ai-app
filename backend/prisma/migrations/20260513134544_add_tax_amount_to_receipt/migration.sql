@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Receipt" ADD COLUMN     "taxAmount" DOUBLE PRECISION NOT NULL DEFAULT 0.0;
