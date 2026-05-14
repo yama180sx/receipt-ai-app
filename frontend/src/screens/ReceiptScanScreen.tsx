@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-import { theme } from '../theme';
 
 interface ReceiptItem {
   name: string;
@@ -30,6 +29,7 @@ interface ReceiptScanScreenProps {
       storeName: string;
       purchaseDate: string;
       totalAmount: number;
+      taxAmount?: number | string; // ★ number | string に変更
       items: ReceiptItem[];
     };
     imagePath: string;
@@ -45,9 +45,9 @@ interface ReceiptScanScreenProps {
 }
 
 /**
- * [Issue #67] レシート解析結果の確認・編集画面
- * - 単価(price)・数量(quantity)の小数点入力対応
- * - 日本円の整合性のため合計金額を四捨五入 (Math.round)
+ * [Issue #67 / #71] レシート解析結果の確認・編集画面
+ * - 外税(taxAmount)の編集・合算に対応
+ * - 単価・数量の小数点入力対応
  */
 export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   initialData,
@@ -56,7 +56,11 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   onCancel,
 }) => {
   const [loading, setLoading] = useState(false);
-  const [receiptData, setReceiptData] = useState(initialData.parsedData);
+  // 初期値に taxAmount がない場合へのフォールバック
+  const [receiptData, setReceiptData] = useState({
+    ...initialData.parsedData,
+    taxAmount: initialData.parsedData.taxAmount ?? '0',
+  });
 
   const imageUri = useMemo(() => {
     if (!initialData.imagePath) return null;
@@ -65,15 +69,18 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     return `${baseUrl}${path}`;
   }, [initialData.imagePath]);
 
-  // 合計金額の計算（浮動小数点誤差を考慮し、最終表示は四捨五入）
+  // 合計金額の計算（明細合計 + 外税）
   const calculatedTotal = useMemo(() => {
-    const total = receiptData.items.reduce((sum, item) => {
+    const itemsTotal = receiptData.items.reduce((sum, item) => {
       const p = parseFloat(String(item.price)) || 0;
       const q = parseFloat(String(item.quantity)) || 0;
       return sum + (p * q);
     }, 0);
-    return Math.round(total);
-  }, [receiptData.items]);
+    
+    const tax = parseFloat(String(receiptData.taxAmount)) || 0;
+    // 日本円のため最終的な支払額は四捨五入して整数化
+    return Math.round(itemsTotal + tax);
+  }, [receiptData.items, receiptData.taxAmount]);
 
   const updateItem = (index: number, key: keyof ReceiptItem, value: any) => {
     const newItems = [...receiptData.items];
@@ -98,10 +105,10 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         jobId: initialData.jobId,
         parsedData: { 
           ...receiptData, 
-          totalAmount: calculatedTotal, // 四捨五入済みの整数
+          totalAmount: calculatedTotal,
+          taxAmount: parseFloat(String(receiptData.taxAmount)) || 0,
           items: receiptData.items.map(item => ({
             ...item,
-            // 送信直前に確実に数値型へキャスト
             price: parseFloat(String(item.price)) || 0,
             quantity: parseFloat(String(item.quantity)) || 0,
             categoryId: item.categoryId ? Number(item.categoryId) : null
@@ -157,10 +164,22 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
               style={styles.input} 
               value={receiptData.purchaseDate} 
               onChangeText={(val) => setReceiptData({...receiptData, purchaseDate: val})} 
-              placeholder="購入日" 
+              placeholder="購入日時 (YYYY-MM-DD HH:mm)" 
             />
+            
+            {/* [Issue #71] 消費税(外税)入力フィールド */}
+            <View style={styles.taxInputRow}>
+              <Text style={styles.taxLabel}>消費税 (外税・加算額)</Text>
+              <TextInput 
+                style={styles.taxInput} 
+                value={String(receiptData.taxAmount)} 
+                keyboardType="decimal-pad"
+                onChangeText={(val) => setReceiptData({...receiptData, taxAmount: val})} 
+              />
+            </View>
+
             <View style={styles.totalDisplay}>
-              <Text style={styles.totalLabel}>合計 (計算結果)</Text>
+              <Text style={styles.totalLabel}>支払合計 (税込)</Text>
               <Text style={styles.totalValue}>¥ {calculatedTotal.toLocaleString()}</Text>
             </View>
           </View>
@@ -260,6 +279,9 @@ const styles = StyleSheet.create({
   card: { backgroundColor: 'white', margin: 16, marginTop: 0, borderRadius: 16, padding: 16, elevation: 2 },
   sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 12 },
   input: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 8, fontSize: 16, color: '#111827', marginBottom: 12 },
+  taxInputRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingVertical: 4 },
+  taxLabel: { fontSize: 14, color: '#4B5563' },
+  taxInput: { borderBottomWidth: 1, borderBottomColor: '#2563EB', fontSize: 16, color: '#2563EB', fontWeight: 'bold', minWidth: 80, textAlign: 'right' },
   totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   totalLabel: { fontSize: 14, color: '#666' },
   totalValue: { fontSize: 24, fontWeight: 'bold', color: '#2563EB' },

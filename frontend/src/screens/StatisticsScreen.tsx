@@ -25,8 +25,27 @@ import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 interface Category { id: number; name: string; color: string; }
 interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number | string; color: string; }
 interface ReceiptItem { id: number; name: string; price: number; quantity: number; categoryId: number; category?: { name: string; color: string }; }
-interface ReceiptInfo { id: number; imagePath: string | null; storeName: string; totalAmount: number; items: ReceiptItem[]; date?: string; }
-interface MonthlyData { month: string; totalAmount: number; prevTotal: number; diffAmount: number; diffPercentage: number; stats: StatItem[]; latestReceipt: ReceiptInfo | null; }
+
+// [Issue #71] taxAmount を追加
+interface ReceiptInfo { 
+  id: number; 
+  imagePath: string | null; 
+  storeName: string; 
+  totalAmount: number; 
+  taxAmount?: number; 
+  items: ReceiptItem[]; 
+  date?: string; 
+}
+
+interface MonthlyData { 
+  month: string; 
+  totalAmount: number; 
+  prevTotal: number; 
+  diffAmount: number; 
+  diffPercentage: number; 
+  stats: StatItem[]; 
+  latestReceipt: ReceiptInfo | null; 
+}
 
 interface TrendData { period: string; total: number; prev_total: number | null; }
 interface ParetoData { name: string; amount: number; ratio: number; cumulative_ratio: number; }
@@ -38,8 +57,9 @@ interface StatisticsScreenProps {
 }
 
 /**
- * [Issue #67] 家計統計画面
- * - 保存成功時に表示データを再取得するよう修正
+ * [Issue #67 / #71] 家計統計画面
+ * - 消費税(taxAmount)を考慮した集計表示への対応
+ * - 最新レシートプレビューでの税額表示追加
  */
 export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const { width: windowWidth } = useWindowDimensions();
@@ -64,7 +84,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     });
   }, []);
 
-  // データの取得 (保存成功時にもこれを呼ぶ)
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
     try {
@@ -116,6 +135,11 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     }
   };
 
+  /**
+   * [Issue #71] チャートデータの生成
+   * 基本的にバックエンドの集計ロジック（ID:9に消費税を集約）に依存するが、
+   * フロントエンドでも数値の丸め処理を確実に実施。
+   */
   const chartData = useMemo(() => {
     if (!data?.stats || !Array.isArray(data.stats)) return [];
     return data.stats
@@ -162,7 +186,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <View style={isWide ? styles.dashboardGrid : null}>
             <View style={isWide ? styles.leftColumn : null}>
               <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>当月合計支出</Text>
+                <Text style={styles.summaryLabel}>当月合計支出（税込）</Text>
                 <Text style={styles.totalValue}>
                   ¥{Math.round(Number(data?.totalAmount) || 0).toLocaleString()}
                 </Text>
@@ -202,6 +226,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                         <Text style={styles.receiptStoreName} numberOfLines={1}>
                           {data.latestReceipt.storeName || '店名不明'}
                         </Text>
+                        {/* [Issue #71] 税額のサブ表示 */}
+                        {data.latestReceipt.taxAmount ? (
+                          <Text style={styles.taxSubText}>内、消費税 ¥{data.latestReceipt.taxAmount.toLocaleString()}</Text>
+                        ) : null}
                       </View>
                       <Text style={styles.receiptAmount}>
                         ¥{Math.round(Number(data.latestReceipt.totalAmount) || 0).toLocaleString()}
@@ -273,7 +301,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
               onCategoryChange={handleCategoryChange}
               baseUrl={BASE_URL}
               fullWidth={true}
-              onSaveSuccess={fetchData} // [修正] 保存成功時に親のデータを再取得
+              onSaveSuccess={fetchData} 
             />
           </SafeAreaView>
         </View>
@@ -322,6 +350,7 @@ const styles = StyleSheet.create({
   receiptInfoOverlay: { padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 60 },
   receiptStoreName: { fontWeight: '700', color: theme.colors.text.main },
   receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, minWidth: 80, textAlign: 'right' },
+  taxSubText: { fontSize: 11, color: theme.colors.text.muted, marginTop: 2 },
   noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContainer: { flex: 1, backgroundColor: theme.colors.background },
