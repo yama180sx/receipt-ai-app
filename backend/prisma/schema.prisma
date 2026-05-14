@@ -35,7 +35,7 @@ model FamilyMember {
 model Category {
   id             Int             @id @default(autoincrement())
   name           String          @unique
-  color          String?         
+  color          String?          
   keywords       Json            @default("[]") 
   items          Item[]
   productMasters ProductMaster[]
@@ -56,7 +56,9 @@ model Receipt {
   member        FamilyMember   @relation(fields: [memberId], references: [id])
   storeName     String
   date          DateTime       @db.Timestamptz(3)
-  totalAmount   Int
+  totalAmount   Int            // 支払合計（税込）
+  // [Issue #71] 外税額を保持するフィールドを追加
+  taxAmount     Float          @default(0.0)
   rawText       Json?
   imagePath     String?        
   items         Item[]
@@ -67,9 +69,9 @@ model Receipt {
 }
 
 model Item {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   receiptId  Int
-  receipt    Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   categoryId Int?
   category   Category? @relation(fields: [categoryId], references: [id])
   name       String
@@ -94,16 +96,16 @@ model ProductMaster {
 
 // [Issue #59] Gemini API トークン使用量トラッキング
 model ApiUsageLog {
-  id               Int          @id @default(autoincrement())
-  familyMemberId   Int?         // 実行したユーザー
+  id               Int           @id @default(autoincrement())
+  familyMemberId   Int?          // 実行したユーザー
   familyMember     FamilyMember? @relation(fields: [familyMemberId], references: [id])
-  receiptId        Int?         // 関連するレシート (解析失敗時などは null)
-  receipt          Receipt?     @relation(fields: [receiptId], references: [id])
-  modelId          String       // 例: "gemini-1.5-flash"
-  promptTokens     Int          // 入力トークン
-  candidatesTokens Int          // 出力トークン
-  totalTokens      Int          // 合計トークン
-  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  receiptId        Int?          // 関連するレシート (解析失敗時などは null)
+  receipt          Receipt?      @relation(fields: [receiptId], references: [id])
+  modelId          String        // 例: "gemini-1.5-flash"
+  promptTokens     Int           // 入力トークン
+  candidatesTokens Int           // 出力トークン
+  totalTokens      Int           // 合計トークン
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyMemberId])
   @@index([createdAt])
