@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('--- 🚀 Seeding Start (Multi-Tenancy Architecture) ---');
 
-  // 0. 既存データのクリーンアップ（制約の逆順で削除）
+  // 0. 既存データのクリーンアップ
   await prisma.item.deleteMany();
   await prisma.productMaster.deleteMany();
   await prisma.receipt.deleteMany();
@@ -49,6 +49,8 @@ async function main() {
     { id: 6, name: '交際費', color: '#9b59b6', keywords: ['プレゼント', '贈り物', '会費', '香典', '祝儀'] },
     { id: 7, name: '教養・娯楽', color: '#2ecc71', keywords: ['本', '雑誌', '映画', 'チケット', 'ゲーム', '遊園地'] },
     { id: 8, name: '交通費', color: '#95a5a6', keywords: ['電車', 'バス', 'タクシー', 'ガソリン', '駐車'] },
+    // [Issue #71] 消費税カテゴリーを新設
+    { id: 9, name: '消費税', color: '#795548', keywords: ['消費税', '外税', '税', '軽', '税金', 'tax'] },
     { id: 99, name: 'その他', color: '#ADB5BD', keywords: [] },
   ];
 
@@ -56,7 +58,7 @@ async function main() {
     await prisma.category.create({ data: c });
   }
 
-  // 4. 店舗正規化マスタ (修正箇所: alignItemsを削除)
+  // 4. 店舗正規化マスタ
   const stores = [
     { officialName: 'セブン-イレブン', aliases: ['セブン', 'ｾﾌﾞﾝ', '7-11', 'セブンイレブン'] },
     { officialName: 'ローソン', aliases: ['ﾛｰｿﾝ', 'LAWSON'] },

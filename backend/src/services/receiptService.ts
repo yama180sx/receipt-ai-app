@@ -8,52 +8,59 @@ import { normalizeStoreName, getCleanText } from '../utils/normalizer';
 const prisma = new PrismaClient();
 
 /**
- * 文字列から安全にDateオブジェクトを生成する
+ * [Issue #71] 文字列からDateオブジェクトを生成する (HH:mm 対応版)
+ * Geminiから返却される "YYYY-MM-DD HH:mm" を正確にパースします。
  */
 const parseSafeDate = (dateStr: string | null | undefined): Date => {
   if (!dateStr) return new Date();
-  const match = dateStr.match(/(\d{4})[-\/\.](\d{2})[-\/\.](\d{2})/);
+  
+  // YYYY-MM-DD HH:mm または YYYY-MM-DD の形式を抽出
+  const match = dateStr.match(/(\d{4})[-\/\.](\d{2})[-\/\.](\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+  
   if (match) {
     const y = parseInt(match[1], 10);
     const m = parseInt(match[2], 10);
     const d = parseInt(match[3], 10);
-    const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+    const hh = match[4] ? parseInt(match[4], 10) : 0;
+    const mm = match[5] ? parseInt(match[5], 10) : 0;
+    
+    // タイムゾーンによるズレを防ぐため、OSローカル（JST前提）で生成
+    const date = new Date(y, m - 1, d, hh, mm, 0, 0);
     if (!isNaN(date.getTime())) {
       return date;
     }
   }
-  return new Date();
+  
+  // パース失敗時のフォールバック
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? new Date() : fallback;
 };
 
 /**
  * [Issue #49-8] 解析のみを実行し、推論カテゴリを付与して返す
- * DBがFloat化されたため、数量・単価の端数を維持して返却します
  */
 export const analyzeOnly = async (memberId: number, imagePath: string) => {
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId})`);
   
-  // 1. 会員情報から世帯IDを取得
   const member = await prisma.familyMember.findUnique({
     where: { id: memberId },
     select: { familyGroupId: true }
   });
   const familyGroupId = member?.familyGroupId;
 
-  // 2. Geminiで解析
+  // Geminiで解析 (taxAmount, HH:mm を含む ParsedReceipt が返る)
   const parsedData = await analyzeReceiptImage(imagePath, memberId);
   const cleanStore = getCleanText(parsedData.storeName || '');
 
-  // 3. 各明細にカテゴリを事前割り当て（デグレ修正）
+  // 各明細にカテゴリを事前割り当て
   const itemsWithCategories = await Promise.all(parsedData.items.map(async (item) => {
     const cleanName = getCleanText(item.name);
     let initialCategoryId = null;
 
     if (familyGroupId) {
-      // 学習マスタを優先
       const mastered = await prisma.productMaster.findUnique({
         where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } }
       });
-      // マスタになければ推論
       initialCategoryId = mastered ? mastered.categoryId : await estimateCategoryId(cleanName, cleanStore, prisma);
     }
 
@@ -65,7 +72,7 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
 
   parsedData.items = itemsWithCategories;
 
-  // 4. バリデーション
+  // バリデーション (items合計 + taxAmount = totalAmount のチェック等)
   const validation = validateReceiptItems(parsedData.items);
   
   return {
@@ -77,7 +84,7 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
 
 /**
  * パース済みデータをDBに永続化する（重複チェック ＋ 世帯別学習機能）
- * [Update] price, quantity を Float として保存
+ * [Update] taxAmount, price, quantity を Float として保存
  */
 export const saveParsedReceipt = async (
   memberId: number, 
@@ -92,15 +99,35 @@ export const saveParsedReceipt = async (
     const cleanStore = getCleanText(officialStoreName);
     const jstDate = parseSafeDate(parsedData.purchaseDate || parsedData.date);
     
-    // Receipt.totalAmount は Int のため、計算誤差を考慮し丸めて保存
+    // Receipt.totalAmount は Int、taxAmount は Float
     const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
+    const taxAmount = parseFloat(String(parsedData.taxAmount || 0));
 
-    // 重複チェック用範囲
-    const startOfDay = new Date(jstDate); startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(jstDate); endOfDay.setHours(23, 59, 59, 999);
+    /**
+     * 重複チェックの強化:
+     * 1. 時刻が 00:00 の場合は、従来通り 1日単位でチェック
+     * 2. 時刻がある場合は、前後1分以内の同一金額レシートをチェック
+     */
+    let duplicateWhere: any = { 
+      familyGroupId, 
+      totalAmount,
+    };
+
+    if (jstDate.getHours() === 0 && jstDate.getMinutes() === 0) {
+      const startOfDay = new Date(jstDate); startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(jstDate); endOfDay.setHours(23, 59, 59, 999);
+      duplicateWhere.date = { gte: startOfDay, lte: endOfDay };
+    } else {
+      // 時刻の前後1分を許容（AIによる微小な読み取り誤差を考慮）
+      const margin = 1 * 60 * 1000;
+      duplicateWhere.date = { 
+        gte: new Date(jstDate.getTime() - margin), 
+        lte: new Date(jstDate.getTime() + margin) 
+      };
+    }
 
     const existing = await prisma.receipt.findFirst({
-      where: { familyGroupId, totalAmount, date: { gte: startOfDay, lte: endOfDay } },
+      where: duplicateWhere,
       select: { id: true, storeName: true }
     });
 
@@ -115,7 +142,6 @@ export const saveParsedReceipt = async (
         const cleanName = getCleanText(item.name);
         const finalCategoryId = item.categoryId ? Number(item.categoryId) : null;
 
-        // カテゴリが確定している場合は学習マスタを更新(Upsert)
         if (finalCategoryId) {
           await tx.productMaster.upsert({
             where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } },
@@ -126,7 +152,6 @@ export const saveParsedReceipt = async (
 
         return {
           name: item.name,
-          // Float型対応: parseFloatを使用して端数を維持
           price: parseFloat(String(item.price || 0)),
           quantity: parseFloat(String(item.quantity || 1)),
           categoryId: finalCategoryId
@@ -140,6 +165,7 @@ export const saveParsedReceipt = async (
           storeName: officialStoreName, 
           date: jstDate,
           totalAmount, 
+          taxAmount, // [Issue #71] 追加
           imagePath, 
           items: { create: itemsToCreate },
           rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
@@ -175,7 +201,6 @@ export const saveConfirmedReceipt = async (
 ) => {
   const result = await saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings);
   
-  // API利用ログとの紐付け（15分以内に拡張）
   try {
     await prisma.apiUsageLog.updateMany({
       where: {

@@ -26,10 +26,9 @@ interface ReceiptDetailComponentProps {
 }
 
 /**
- * [Issue #67] レシート詳細表示・編集コンポーネント
- * - 編集モードの追加 (店舗名、日付、明細名、単価、数量)
- * - 小数点入力対応の数値処理
- * - 保存時の一括更新処理
+ * [Issue #67 / #71] レシート詳細表示・編集コンポーネント
+ * - 外税(taxAmount)の表示・編集機能を追加
+ * - 編集モード時の動的な合計金額計算に税額を統合
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -52,22 +51,28 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   // 選択されたレシートが変わったとき、または編集モード開始時にデータを同期
   useEffect(() => {
     if (receipt) {
-      setEditData(JSON.parse(JSON.stringify(receipt))); // ディープコピー
+      // taxAmount が undefined の場合は 0 をセット
+      const data = JSON.parse(JSON.stringify(receipt));
+      data.taxAmount = data.taxAmount ?? 0;
+      setEditData(data);
     }
     setIsEditing(false);
   }, [receipt]);
 
-  // 表示用の合計金額計算 (リアルタイム反映)
+  // 表示用の合計金額計算 (明細合計 + 外税)
   const displayTotal = useMemo(() => {
     if (!editData) return 0;
     const items = isEditing ? editData.items : receipt.items;
-    const sum = items.reduce((s: number, i: any) => {
+    const tax = isEditing ? parseFloat(String(editData.taxAmount)) || 0 : receipt.taxAmount || 0;
+
+    const itemsSum = items.reduce((s: number, i: any) => {
       const p = parseFloat(String(i.price)) || 0;
       const q = parseFloat(String(i.quantity)) || 0;
       return s + (p * q);
     }, 0);
-    return Math.round(sum); // 日本円の整合性のため四捨五入
-  }, [isEditing, editData?.items, receipt.items]);
+
+    return Math.round(itemsSum + tax); // 日本円の整合性のため合算後に四捨五入
+  }, [isEditing, editData?.items, editData?.taxAmount, receipt.items, receipt.taxAmount]);
 
   if (!receipt || !editData) {
     return (
@@ -93,13 +98,16 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
     setEditData({ ...editData, items: newItems });
   };
 
-  // 保存処理 (Issue #67: 小数対応)
+  // 保存処理 (Issue #71: taxAmount を追加)
   const handleSave = async () => {
     setLoading(true);
     try {
       const payload = {
         storeName: editData.storeName,
         date: editData.date,
+        // 数値としての整合性を担保して送信
+        taxAmount: parseFloat(String(editData.taxAmount)) || 0,
+        totalAmount: displayTotal, 
         items: editData.items.map((item: any) => ({
           ...item,
           price: parseFloat(String(item.price)) || 0,
@@ -176,19 +184,22 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
           {isEditing ? (
             <TextInput 
               style={styles.dateInput}
-              value={editData.date ? new Date(editData.date).toISOString().split('T')[0] : ''}
+              // 日付と時刻のパース (YYYY-MM-DD HH:mm 形式を想定)
+              value={editData.date ? new Date(editData.date).toISOString().replace('T', ' ').substring(0, 16) : ''}
               onChangeText={(val) => updateEditField('date', val)}
-              placeholder="YYYY-MM-DD"
+              placeholder="YYYY-MM-DD HH:mm"
             />
           ) : (
             <Text style={styles.detailDate}>
-              {receipt.date ? new Date(receipt.date).toLocaleDateString('ja-JP') : '日付不明'}
+              {receipt.date ? new Date(receipt.date).toLocaleString('ja-JP', {
+                year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+              }) : '日付不明'}
             </Text>
           )}
         </View>
 
         <View style={styles.detailTotalContainer}>
-          <Text style={styles.detailTotalLabel}>合計金額（税込）</Text>
+          <Text style={styles.detailTotalLabel}>最終支払額（税込）</Text>
           <Text style={styles.detailTotalValue}>
             ¥{displayTotal.toLocaleString()}
           </Text>
@@ -255,6 +266,27 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
               </View>
             </View>
           ))}
+
+          {/* [Issue #71] 消費税(外税)表示・編集エリア */}
+          <View style={styles.taxSection}>
+            <View style={styles.taxRow}>
+              <Text style={styles.taxLabel}>消費税 (外税・加算額)</Text>
+              {isEditing ? (
+                <View style={styles.editTaxRow}>
+                  <Text style={styles.currencySymbol}>+ ¥</Text>
+                  <TextInput 
+                    style={styles.taxInput}
+                    value={String(editData.taxAmount)}
+                    keyboardType="decimal-pad"
+                    onChangeText={(val) => updateEditField('taxAmount', val)}
+                  />
+                </View>
+              ) : (
+                <Text style={styles.taxValue}>+ ¥{(receipt.taxAmount || 0).toLocaleString()}</Text>
+              )}
+            </View>
+          </View>
+
         </View>
       </View>
     </View>
@@ -313,4 +345,11 @@ const styles = StyleSheet.create({
   multiplier: { fontSize: 14, color: theme.colors.text.muted },
   detailPickerWrapper: { height: 55, backgroundColor: theme.colors.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, overflow: 'visible', justifyContent: 'center', marginTop: 4 },
   detailPicker: { width: '100%', height: 55, color: '#333', ...Platform.select({ android: { marginLeft: -10 }, web: { outlineStyle: 'none' } as any }) },
+  // Issue #71 styles
+  taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: '#EEE', borderStyle: 'dashed' },
+  taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  taxLabel: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '600' },
+  taxValue: { fontSize: 16, color: theme.colors.text.main, fontWeight: '700' },
+  editTaxRow: { flexDirection: 'row', alignItems: 'center' },
+  taxInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 100, fontSize: 16, textAlign: 'right', color: theme.colors.primary, fontWeight: 'bold' },
 });
