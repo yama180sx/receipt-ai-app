@@ -86,7 +86,6 @@ async function buildPrompt(): Promise<string> {
  * 抽出データの算術整合性チェック
  */
 function validateArithmetic(data: ParsedReceipt): { isValid: boolean; diff: number } {
-  // 浮動小数点の演算誤差を考慮し、微小な差分を許容
   const itemsTotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const calculatedTotal = itemsTotal + (data.taxAmount || 0);
   const diff = Math.abs(calculatedTotal - data.totalAmount);
@@ -98,14 +97,18 @@ function validateArithmetic(data: ParsedReceipt): { isValid: boolean; diff: numb
  * [Issue #72] レシート画像を解析
  * - DBからの動的プロンプト取得
  * - 算術不整合時の自己修復リトライ
- * - [Issue #63] usageLogId の返却
+ * - [Issue #63] usageLogId の返却（自己修復時の累積トークン合算に対応）
  */
 export const analyzeReceiptImage = async (
   imagePath: string, 
   familyMemberId?: number
 ): Promise<ParsedReceipt> => {
 
-  const processAnalysis = async (retryWithCorrection: boolean = false, previousErrorData?: string): Promise<ParsedReceipt> => {
+  const processAnalysis = async (
+    retryWithCorrection: boolean = false, 
+    previousErrorData?: string,
+    existingLogId?: number // ★修正: リトライ用に初回に採番されたログIDを引き回す
+  ): Promise<ParsedReceipt> => {
     const model = genAI.getGenerativeModel({ 
       model: GEMINI_MODEL, 
       generationConfig: { responseMimeType: "application/json" }
@@ -130,22 +133,36 @@ export const analyzeReceiptImage = async (
     const response = await result.response;
     
     // トークンログ記録
-    let usageLogId: number | undefined;
+    let usageLogId: number | undefined = existingLogId;
     const usage = response.usageMetadata;
     if (usage) {
       try {
-        const log = await prisma.apiUsageLog.create({
-          data: {
-            familyMemberId: familyMemberId || null,
-            modelId: GEMINI_MODEL,
-            promptTokens: usage.promptTokenCount,
-            candidatesTokens: usage.candidatesTokenCount,
-            totalTokens: usage.totalTokenCount,
-          }
-        });
-        usageLogId = log.id;
+        if (existingLogId) {
+          // ★修正[Issue #63]: 自己修復リトライ時は、既存のログレコードにトークン使用量を合算（累積）
+          await prisma.apiUsageLog.update({
+            where: { id: existingLogId },
+            data: {
+              promptTokens: { increment: usage.promptTokenCount },
+              candidatesTokens: { increment: usage.candidatesTokenCount },
+              totalTokens: { increment: usage.totalTokenCount },
+            }
+          });
+          logger.info(`[Gemini_Log] 自己修復リトライ分のトークンを合算しました (LogID: ${existingLogId})`);
+        } else {
+          // 初回解析時は新規ログレコードを作成
+          const log = await prisma.apiUsageLog.create({
+            data: {
+              familyMemberId: familyMemberId || null,
+              modelId: GEMINI_MODEL,
+              promptTokens: usage.promptTokenCount,
+              candidatesTokens: usage.candidatesTokenCount,
+              totalTokens: usage.totalTokenCount,
+            }
+          });
+          usageLogId = log.id;
+        }
       } catch (e) {
-        logger.error("❌ ApiUsageLog の保存に失敗しました:", e);
+        logger.error("❌ ApiUsageLog の保存・更新に失敗しました:", e);
       }
     }
 
@@ -166,7 +183,7 @@ export const analyzeReceiptImage = async (
     const { isValid, diff } = validateArithmetic(data);
     if (!isValid && !retryWithCorrection) {
       logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
-      return await processAnalysis(true, text);
+      return await processAnalysis(true, text, usageLogId); // ★修正: 採番済みのログIDを次世代へ引き渡す
     }
 
     return data;

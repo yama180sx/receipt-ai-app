@@ -29,6 +29,7 @@ interface ReceiptDetailComponentProps {
  * [Issue #67 / #71] レシート詳細表示・編集コンポーネント
  * - 外税(taxAmount)の表示・編集機能を追加
  * - 編集モード時の動的な合計金額計算に税額を統合
+ * ※保存済みデータの再編集ルートのため、解析用トークンログ（usageLogId）の紐付け処理（Issue #63）は対象外
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -345,7 +346,6 @@ const styles = StyleSheet.create({
   multiplier: { fontSize: 14, color: theme.colors.text.muted },
   detailPickerWrapper: { height: 55, backgroundColor: theme.colors.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, overflow: 'visible', justifyContent: 'center', marginTop: 4 },
   detailPicker: { width: '100%', height: 55, color: '#333', ...Platform.select({ android: { marginLeft: -10 }, web: { outlineStyle: 'none' } as any }) },
-  // Issue #71 styles
   taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: '#EEE', borderStyle: 'dashed' },
   taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   taxLabel: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '600' },
@@ -353,3 +353,5 @@ const styles = StyleSheet.create({
   editTaxRow: { flexDirection: 'row', alignItems: 'center' },
   taxInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 100, fontSize: 16, textAlign: 'right', color: theme.colors.primary, fontWeight: 'bold' },
 });
+
+export default ReceiptDetailComponent;

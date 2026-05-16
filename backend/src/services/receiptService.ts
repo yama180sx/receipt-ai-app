@@ -24,7 +24,7 @@ const parseSafeDate = (dateStr: string | null | undefined): Date => {
     const hh = match[4] ? parseInt(match[4], 10) : 0;
     const mm = match[5] ? parseInt(match[5], 10) : 0;
     
-    // タイムゾーンによるズレを防群ため、OSローカル（JST前提）で生成
+    // タイムゾーンによるズレを防ぐため、OSローカル（JST前提）で生成
     const date = new Date(y, m - 1, d, hh, mm, 0, 0);
     if (!isNaN(date.getTime())) {
       return date;
@@ -106,7 +106,10 @@ export const saveParsedReceipt = async (
     // Receipt.totalAmount は Int、taxAmount は Float
     const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
     const taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : 0;
-    const usageLogId = parsedData.usageLogId ? Number(parsedData.usageLogId) : null;
+    
+    // 安全な数値キャスト（NaNガード付き）
+    const usageLogIdStr = parsedData.usageLogId !== undefined ? String(parsedData.usageLogId) : null;
+    const usageLogId = usageLogIdStr ? parseInt(usageLogIdStr, 10) : null;
 
     /**
      * 重複チェック
@@ -176,8 +179,8 @@ export const saveParsedReceipt = async (
         select: { id: true }
       });
 
-      // 2. [Issue #63] usageLogId が存在する場合、ピンポイントで紐付けを更新
-      if (usageLogId) {
+      // 2. [Issue #63] usageLogId が有効な数値の場合、ピンポイントで紐付けを更新
+      if (usageLogId && !isNaN(usageLogId)) {
         await tx.apiUsageLog.update({
           where: { id: usageLogId },
           data: { receiptId: created.id }

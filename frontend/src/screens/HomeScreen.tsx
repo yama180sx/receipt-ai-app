@@ -27,9 +27,9 @@ interface HomeScreenProps {
 }
 
 /**
- * [Issue #67 / #72] ホーム画面（ダッシュボード）
+ * [Issue #67 / #72 / #63] ホーム画面（ダッシュボード）
  * - 合計金額の表示時に四捨五入を適用し、小数の端数表示を抑制。
- * - プロンプト編集画面への遷移を追加。
+ * - 非同期ジョブの完了時に、解析データに含まれる usageLogId を欠落させずに親コンポーネントへ送出。
  */
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
   onAnalysisReady, 
@@ -37,7 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToStats, 
   onGoToCategories,
   onGoToProductMaster,
-  onGoToPromptEditor, // ★追加
+  onGoToPromptEditor,
   currentMemberId 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
@@ -87,6 +87,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           clearInterval(interval);
           setIsAnalyzing(false);
           setJobStatus('');
+          // ★ [Issue #63]: result に含まれる { parsedData: { usageLogId, ... }, imagePath, validation } をそのまま親に渡す
           if (result) onAnalysisReady(result);
         } else if (state === 'failed') {
           clearInterval(interval);
@@ -170,7 +171,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.summaryLabel}>今月の利用合計</Text>
           <View style={styles.summaryAmountRow}>
             <Text style={styles.summarySymbol}>¥</Text>
-            {/* [Issue #67] 通貨表示前に丸めを適用 */}
             <Text style={styles.summaryAmount}>{monthlyTotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryDivider} />
@@ -221,7 +221,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.arrowIcon}>›</Text>
           </TouchableOpacity>
 
-          {/* ★追加：プロンプト・外税ヒント編集ボタン */}
           <TouchableOpacity style={[styles.settingsCard, { marginTop: -10 }]} onPress={onGoToPromptEditor}>
             <View style={[styles.settingsIconWrapper, { backgroundColor: '#EDE7F6' }]}><Text>📝</Text></View>
             <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>プロンプト・外税ヒント編集</Text></View>
@@ -239,7 +238,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName || '店名不明'}</Text>
                 <Text style={styles.dateText}>{latestReceipt.date ? new Date(latestReceipt.date).toLocaleDateString('ja-JP') : '日付不明'}</Text>
               </View>
-              {/* [Issue #67] 最新履歴も四捨五入して整数表示 */}
               <Text style={styles.amountText}>
                 ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
               </Text>
