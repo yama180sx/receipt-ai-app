@@ -12,8 +12,8 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
-import ReceiptScanScreen from './src/screens/ReceiptScanScreen'; // [Issue #49-8] 追加
-import { PromptEditorScreen } from './src/screens/PromptEditorScreen'; // ★追加：プロンプト編集画面
+import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; // ★修正: 名前付きインポートに変更
+import { PromptEditorScreen } from './src/screens/PromptEditorScreen'; 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 
@@ -190,7 +190,7 @@ export default function App() {
     );
   }
 
-  // フル幅表示の判定（prompt_editor を追加）
+  // フル幅表示の判定
   const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor'].includes(currentView);
 
   if (!userToken) {
@@ -249,7 +249,7 @@ export default function App() {
             }}
           />
         );
-      case 'prompt_editor': // ★追加：プロンプト編集画面のレンダリング
+      case 'prompt_editor': 
         return (
           <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
             <TouchableOpacity style={styles.adminBackButton} onPress={() => setCurrentView('main')}>
@@ -271,7 +271,6 @@ export default function App() {
               onGoToStats={() => setCurrentView('stats')}
               onGoToCategories={() => setCurrentView('category_mgr')}
               onGoToProductMaster={() => setCurrentView('product_master')}
-              // ★HomeScreen 側にボタンを追加する際は、以下のコールバックを割り当ててください
               onGoToPromptEditor={() => setCurrentView('prompt_editor')}
               currentMemberId={memberId}
             />
@@ -310,7 +309,6 @@ const styles = StyleSheet.create({
   loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
   logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
-  // ★管理画面用戻るボタンのスタイル追加
   adminBackButton: {
     backgroundColor: '#E9ECEF',
     paddingVertical: 10,

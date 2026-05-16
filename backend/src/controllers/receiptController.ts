@@ -61,7 +61,8 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * [Issue #49-8] 解析結果の確定保存
+ * [Issue #49-8 / #63] 解析結果の確定保存
+ * フロントエンドから送還される parsedData 内の usageLogId を欠落させずにサービス層へ引き渡します。
  */
 export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -77,6 +78,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
       throw new AppError('認証情報または世帯情報が取得できません。', 401);
     }
 
+    // parsedData オブジェクト内に含まれる usageLogId がそのまま引き渡されます
     const result = await saveConfirmedReceipt(
       memberId,
       familyGroupId,
@@ -95,6 +97,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 
 /**
  * 手動登録 (Issue #67: Float対応 & 合計額自動算出)
+ * ※手動登録ルートのため、解析用トークンログ（usageLogId）の紐付け処理は対象外
  */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -29,8 +29,9 @@ interface ReceiptScanScreenProps {
       storeName: string;
       purchaseDate: string;
       totalAmount: number;
-      taxAmount?: number | string; // ★ number | string に変更
+      taxAmount?: number | string; 
       items: ReceiptItem[];
+      usageLogId?: number; // ★ Issue #63: ログIDの型定義を追加して引き回しを保証
     };
     imagePath: string;
     validation: {
@@ -45,9 +46,10 @@ interface ReceiptScanScreenProps {
 }
 
 /**
- * [Issue #67 / #71] レシート解析結果の確認・編集画面
+ * [Issue #67 / #71 / #63] レシート解析結果の確認・編集画面
  * - 外税(taxAmount)の編集・合算に対応
  * - 単価・数量の小数点入力対応
+ * - 解析コスト紐付け用 usageLogId のポストに対応
  */
 export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   initialData,
@@ -320,5 +322,3 @@ const styles = StyleSheet.create({
   },
   headerButton: { padding: 4 }
 });
-
-export default ReceiptScanScreen;
