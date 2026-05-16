@@ -88,6 +88,12 @@ app.use('/api/auth', authRoutes);
  */
 app.use('/api/admin', authMiddleware, adminRoutes);
 
+// ★流出ガードミドルウェアを追加
+// adminRoutes 内でマッチしなかった /api/admin 配下のリクエストは、下の一般ルートに流さずここで確実に遮断する
+app.use('/api/admin', (req: Request, res: Response, next: NextFunction) => {
+  next(new AppError(`Admin Route Not Found - ${req.method} ${req.originalUrl}`, 404));
+});
+
 // 2-3. 認証・テナント必須ルート (業務データアクセス)
 const protectedApi = express.Router();
 protectedApi.use(authMiddleware);

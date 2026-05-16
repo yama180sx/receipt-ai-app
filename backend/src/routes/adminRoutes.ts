@@ -5,6 +5,8 @@ const router = Router();
 
 // プロンプト管理
 router.get('/prompts', adminController.getPrompts);
-router.patch('/prompts/:key', adminController.updatePrompt);
+
+// ★修正: フロントエンドの apiClient.patch('/admin/prompts', { key: ... }) と一致させるため :key を削除
+router.patch('/prompts', adminController.updatePrompt);
 
 export default router;
