@@ -22,12 +22,14 @@ interface HomeScreenProps {
   onGoToStats: () => void;
   onGoToCategories: () => void; 
   onGoToProductMaster: () => void; 
+  onGoToPromptEditor: () => void;
   currentMemberId: number;
 }
 
 /**
- * [Issue #67] ホーム画面（ダッシュボード）
+ * [Issue #67 / #72] ホーム画面（ダッシュボード）
  * - 合計金額の表示時に四捨五入を適用し、小数の端数表示を抑制。
+ * - プロンプト編集画面への遷移を追加。
  */
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
   onAnalysisReady, 
@@ -35,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToStats, 
   onGoToCategories,
   onGoToProductMaster,
+  onGoToPromptEditor, // ★追加
   currentMemberId 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
@@ -64,7 +67,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     } catch (error) {
       console.error('Data fetch error:', error);
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   }, [currentMemberId]);
 
@@ -215,6 +218,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <TouchableOpacity style={[styles.settingsCard, { marginTop: -10 }]} onPress={onGoToProductMaster}>
             <View style={[styles.settingsIconWrapper, { backgroundColor: '#E3F2FD' }]}><Text>🧠</Text></View>
             <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>学習マスタ管理</Text></View>
+            <Text style={styles.arrowIcon}>›</Text>
+          </TouchableOpacity>
+
+          {/* ★追加：プロンプト・外税ヒント編集ボタン */}
+          <TouchableOpacity style={[styles.settingsCard, { marginTop: -10 }]} onPress={onGoToPromptEditor}>
+            <View style={[styles.settingsIconWrapper, { backgroundColor: '#EDE7F6' }]}><Text>📝</Text></View>
+            <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>プロンプト・外税ヒント編集</Text></View>
             <Text style={styles.arrowIcon}>›</Text>
           </TouchableOpacity>
         </View>
