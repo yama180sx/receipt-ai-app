@@ -17,6 +17,7 @@ import authRoutes from './routes/authRoutes';
 import receiptRoutes from './routes/receiptRoutes';
 import productMasterRoutes from './routes/productMasterRoutes'; 
 import categoryRoutes from './routes/categoryRoutes';
+import adminRoutes from './routes/adminRoutes'; // [Issue #72] 追加
 
 // --- エラーハンドリング ---
 import { AppError } from './utils/appError';
@@ -33,7 +34,6 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 
 /**
  * [Issue #49-5] CORS設定の堅牢化
- * 開発環境(8081)と運用環境(80)が混在するT320環境に対応。
  */
 const getAllowedOrigins = () => {
   const rawOrigins = process.env.CORS_ORIGIN || '';
@@ -42,10 +42,9 @@ const getAllowedOrigins = () => {
   }
   if (rawOrigins) return rawOrigins;
   
-  // 本番環境でオリジン未設定の場合は警告を出し、開発時は true (全許可)
   if (nodeEnv === 'production') {
     logger.warn('[CORS] CORS_ORIGIN is not defined in production!');
-    return false; // 安全のため不許可に倒す
+    return false;
   }
   return true;
 };
@@ -61,7 +60,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// 静的ファイルの提供 (マウントされた uploads ディレクトリ)
+// 静的ファイルの提供
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -82,17 +81,18 @@ app.get('/health', (req: Request, res: Response) => {
 // 2-1. 認証なしルート
 app.use('/api/auth', authRoutes);
 
-// 2-2. 認証・テナント必須ルート (共通ミドルウェアの一括適用)
+// 2-2. 管理者向けルート [Issue #72]
 /**
- * [Issue #69] /api 配下の全ルートを確実に保護。
- * 修正：receiptRoutes は内部で /receipts や /stats を定義しているため、
- * ベースパスを '/' にしてマウントします。
+ * プロンプト管理等のシステム設定は、個別の世帯(Tenant)に依存しないグローバル設定のため、
+ * tenantMiddleware を介さず、authMiddleware のみで保護します。
  */
+app.use('/api/admin', authMiddleware, adminRoutes);
+
+// 2-3. 認証・テナント必須ルート (業務データアクセス)
 const protectedApi = express.Router();
 protectedApi.use(authMiddleware);
 protectedApi.use(tenantMiddleware);
 
-// パス解決の不整合を修正
 protectedApi.use('/', receiptRoutes); 
 protectedApi.use('/categories', categoryRoutes);
 protectedApi.use('/product-master', productMasterRoutes);
