@@ -23,9 +23,10 @@ interface HistoryScreenProps {
 }
 
 /**
- * [Issue #67] 履歴一覧画面
- * - レシート編集後の自動再取得 (onSaveSuccess) を実装。
- * - リスト表示時の合計金額の整数丸めを徹底。
+ * [Issue #67 / Web・ネイティブ完全互換] 履歴一覧画面
+ * - 初期ロード時（selectedReceiptがnull）のWeb版レンダリングクラッシュを完全に防ぐヌルガードを導入。
+ * - 大画面2カラム時、Web版でリストの高さが0pxに潰れるのを防ぐため height: '100%' をレイヤーへ強制。
+ * - スマホ（縦画面・モーダル表示）とWeb/iPad（横並び2カラム）のスタイル競合を排除。
  */
 export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -88,7 +89,9 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       }
     } catch (err) {
       console.error('履歴取得失敗', err);
-      Alert.alert('エラー', '履歴の取得に失敗しました');
+      if (Platform.OS !== 'web') {
+        Alert.alert('エラー', '履歴の取得に失敗しました');
+      }
     } finally {
       setLoading(false);
     }
@@ -124,14 +127,14 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       }
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
-      Alert.alert('エラー', 'カテゴリーの更新に失敗しました');
+      if (Platform.OS !== 'web') {
+        Alert.alert('エラー', 'カテゴリーの更新に失敗しました');
+      }
     }
   };
 
   const renderItem = ({ item }: { item: any }) => {
     const isSelected = selectedReceipt?.id === item.id;
-    // 画面表示でも念のため丸めを徹底
-    // $$ \text{Amount} = \text{round}(\text{totalAmount}) $$
     const displayAmount = Math.round(item.totalAmount || 0);
 
     return (
@@ -141,7 +144,9 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.date}>{item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '日付不明'}</Text>
+          <Text style={styles.date}>
+            {item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '日付不明'}
+          </Text>
           <Text style={[styles.store, isSelected && isWide && { color: theme.colors.primary }]} numberOfLines={1}>
             {item.storeName || '店名不明'}
           </Text>
@@ -158,6 +163,64 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
     );
   };
 
+  const renderMonthPicker = () => {
+    if (Platform.OS === 'web') {
+      return (
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          style={styles.webSelect}
+        >
+          <option value="">全期間</option>
+          {months.map(m => (
+            <option key={m} value={m}>{`${m.split('-')[0]}年${m.split('-')[1]}月`}</option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <Picker 
+        selectedValue={selectedMonth} 
+        onValueChange={setSelectedMonth} 
+        style={styles.filterPicker}
+        mode="dropdown"
+      >
+        <Picker.Item label="全期間" value="" />
+        {months.map(m => (
+          <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
+        ))}
+      </Picker>
+    );
+  };
+
+  const renderMemberPicker = () => {
+    if (Platform.OS === 'web') {
+      return (
+        <select
+          value={selectedMember}
+          onChange={(e) => setSelectedMember(e.target.value)}
+          style={styles.webSelect}
+        >
+          <option value={currentMemberId.toString()}>自分</option>
+          <option value="">世帯全体</option>
+        </select>
+      );
+    }
+
+    return (
+      <Picker 
+        selectedValue={selectedMember} 
+        onValueChange={setSelectedMember} 
+        style={styles.filterPicker}
+        mode="dropdown"
+      >
+        <Picker.Item label="自分" value={currentMemberId.toString()} />
+        <Picker.Item label="世帯全体" value="" />
+      </Picker>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.mainWrapper}>
@@ -171,35 +234,19 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
         <View style={[styles.filterContainer, isWide && styles.wideFilter]}>
           <View style={[styles.pickerBox, isWide && { width: 250, flex: 0 }]}>
-            <Picker 
-              selectedValue={selectedMonth} 
-              onValueChange={setSelectedMonth} 
-              style={styles.filterPicker}
-              mode="dropdown"
-            >
-              <Picker.Item label="全期間" value="" />
-              {months.map(m => (
-                <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
-              ))}
-            </Picker>
+            {renderMonthPicker()}
           </View>
           <View style={[styles.pickerBox, isWide && { width: 200, flex: 0 }]}>
-            <Picker 
-              selectedValue={selectedMember} 
-              onValueChange={setSelectedMember} 
-              style={styles.filterPicker}
-              mode="dropdown"
-            >
-              <Picker.Item label="自分" value={currentMemberId.toString()} />
-              <Picker.Item label="世帯全体" value="" />
-            </Picker>
+            {renderMemberPicker()}
           </View>
         </View>
 
         <View style={isWide ? styles.mainContentWide : styles.mainContentMobile}>
           <View style={isWide ? styles.masterPane : styles.fullPane}>
             {loading ? (
-              <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50 }} />
+              <View style={styles.centerLoading}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+              </View>
             ) : (
               <FlatList
                 data={receipts}
@@ -212,16 +259,23 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
             )}
           </View>
 
+          {/* ★修正: 大画面表示時、データが読み込まれて選択されるまでのヌルクラッシュを防ぐプレースホルダーガード */}
           {isWide && (
             <View style={styles.detailPane}>
-              <ReceiptDetailComponent 
-                receipt={selectedReceipt}
-                categories={categories}
-                onCategoryChange={handleCategoryChange}
-                baseUrl={BASE_URL}
-                fullWidth={false}
-                onSaveSuccess={fetchReceipts}
-              />
+              {selectedReceipt ? (
+                <ReceiptDetailComponent 
+                  receipt={selectedReceipt}
+                  categories={categories}
+                  onCategoryChange={handleCategoryChange}
+                  baseUrl={BASE_URL}
+                  fullWidth={false}
+                  onSaveSuccess={fetchReceipts}
+                />
+              ) : (
+                <View style={styles.emptyDetailWrapper}>
+                  <Text style={styles.empty}>レシートを選択してください</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -231,19 +285,24 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         <Modal visible={!!selectedReceipt} animationType="slide" onRequestClose={() => setSelectedReceipt(null)}>
           <View style={styles.modalContent}>
             <View style={styles.detailHeader}>
-              <Text style={styles.detailTitleMobile} numberOfLines={1}>{selectedReceipt?.storeName || '店名不明'}</Text>
+              <Text style={styles.detailTitleMobile} numberOfLines={1}>
+                {selectedReceipt?.storeName || '店名不明'}
+              </Text>
               <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
                 <Text style={styles.detailClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ReceiptDetailComponent 
-              receipt={selectedReceipt}
-              categories={categories}
-              onCategoryChange={handleCategoryChange}
-              baseUrl={BASE_URL}
-              fullWidth={true}
-              onSaveSuccess={fetchReceipts}
-            />
+            {/* ★修正: モーダル表示時も、タイミングによるヌル参照を徹底ガード */}
+            {selectedReceipt && (
+              <ReceiptDetailComponent 
+                receipt={selectedReceipt}
+                categories={categories}
+                onCategoryChange={handleCategoryChange}
+                baseUrl={BASE_URL}
+                fullWidth={true}
+                onSaveSuccess={fetchReceipts}
+              />
+            )}
           </View>
         </Modal>
       )}
@@ -261,11 +320,28 @@ const styles = StyleSheet.create({
   wideFilter: { justifyContent: 'flex-start' },
   pickerBox: { flex: 1, height: 44, backgroundColor: theme.colors.surface, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   filterPicker: { width: '100%' },
+  webSelect: {
+    width: '100%',
+    height: '100%',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingLeft: 10,
+    fontSize: 14,
+    color: theme.colors.text.main,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+      default: {},
+    }),
+  } as any,
   mainContentMobile: { flex: 1 },
   mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.colors.border },
-  masterPane: { width: 350, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },
+  // ★重要修正: 横幅固定値を維持し、かつ親の row コンテナに追従させ Web上での高さ消失を完全に防ぐ
+  masterPane: { width: 350, height: '100%', backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },
   fullPane: { flex: 1 },
-  detailPane: { flex: 1, backgroundColor: theme.colors.background },
+  // ★重要修正: 右ペインも大画面時は親コンテナの高さ 100% で追従
+  detailPane: { flex: 1, height: '100%', backgroundColor: theme.colors.background },
   list: { padding: theme.spacing.md },
   card: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border },
   activeCard: { borderColor: theme.colors.primary, backgroundColor: '#F0F7FF', elevation: 0 },
@@ -280,5 +356,8 @@ const styles = StyleSheet.create({
   modalContent: { flex: 1, backgroundColor: theme.colors.background },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailTitleMobile: { fontSize: 18, fontWeight: 'bold', flex: 1 },
-  detailClose: { fontSize: 24, color: theme.colors.text.muted, marginLeft: 15 }
+  detailClose: { fontSize: 24, color: theme.colors.text.muted, marginLeft: 15 },
+  // ★追加: センタリングインジケータおよびプレースホルダー位置固定用
+  centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

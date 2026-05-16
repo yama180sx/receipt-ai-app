@@ -24,7 +24,7 @@ const parseSafeDate = (dateStr: string | null | undefined): Date => {
     const hh = match[4] ? parseInt(match[4], 10) : 0;
     const mm = match[5] ? parseInt(match[5], 10) : 0;
     
-    // タイムゾーンによるズレを防ぐため、OSローカル（JST前提）で生成
+    // タイムゾーンによるズレを防群ため、OSローカル（JST前提）で生成
     const date = new Date(y, m - 1, d, hh, mm, 0, 0);
     if (!isNaN(date.getTime())) {
       return date;
@@ -37,7 +37,8 @@ const parseSafeDate = (dateStr: string | null | undefined): Date => {
 };
 
 /**
- * [Issue #49-8] 解析のみを実行し、推論カテゴリを付与して返す
+ * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
+ * 戻り値に usageLogId を含めるように拡張
  */
 export const analyzeOnly = async (memberId: number, imagePath: string) => {
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId})`);
@@ -48,7 +49,7 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
   });
   const familyGroupId = member?.familyGroupId;
 
-  // Geminiで解析 (taxAmount, HH:mm を含む ParsedReceipt が返る)
+  // Geminiで解析 (taxAmount, HH:mm, usageLogId を含む ParsedReceipt が返る)
   const parsedData = await analyzeReceiptImage(imagePath, memberId);
   const cleanStore = getCleanText(parsedData.storeName || '');
 
@@ -66,17 +67,20 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
 
     return {
       ...item,
+      price: parseFloat(String(item.price || 0)),         // ガソリンスタンド等の小数対応
+      quantity: parseFloat(String(item.quantity || 1)),   // リットル等の小数対応
       categoryId: initialCategoryId
     };
   }));
 
   parsedData.items = itemsWithCategories;
+  parsedData.taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : undefined;
 
   // バリデーション (items合計 + taxAmount = totalAmount のチェック等)
   const validation = validateReceiptItems(parsedData.items);
   
   return {
-    parsedData,
+    parsedData, // usageLogId が含まれる
     imagePath,
     validation
   };
@@ -84,7 +88,7 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
 
 /**
  * パース済みデータをDBに永続化する（重複チェック ＋ 世帯別学習機能）
- * [Update] taxAmount, price, quantity を Float として保存
+ * [Issue #63 / #72] 1対1の確実な ApiUsageLog 紐付けをトランザクション内で実行
  */
 export const saveParsedReceipt = async (
   memberId: number, 
@@ -101,12 +105,11 @@ export const saveParsedReceipt = async (
     
     // Receipt.totalAmount は Int、taxAmount は Float
     const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
-    const taxAmount = parseFloat(String(parsedData.taxAmount || 0));
+    const taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : 0;
+    const usageLogId = parsedData.usageLogId ? Number(parsedData.usageLogId) : null;
 
     /**
-     * 重複チェックの強化:
-     * 1. 時刻が 00:00 の場合は、従来通り 1日単位でチェック
-     * 2. 時刻がある場合は、前後1分以内の同一金額レシートをチェック
+     * 重複チェック
      */
     let duplicateWhere: any = { 
       familyGroupId, 
@@ -118,8 +121,7 @@ export const saveParsedReceipt = async (
       const endOfDay = new Date(jstDate); endOfDay.setHours(23, 59, 59, 999);
       duplicateWhere.date = { gte: startOfDay, lte: endOfDay };
     } else {
-      // 時刻の前後1分を許容（AIによる微小な読み取り誤差を考慮）
-      const margin = 1 * 60 * 1000;
+      const margin = 1 * 60 * 1000; // 前後1分
       duplicateWhere.date = { 
         gte: new Date(jstDate.getTime() - margin), 
         lte: new Date(jstDate.getTime() + margin) 
@@ -158,6 +160,7 @@ export const saveParsedReceipt = async (
         };
       }));
 
+      // 1. Receiptの作成
       const created = await tx.receipt.create({
         data: {
           memberId, 
@@ -165,13 +168,23 @@ export const saveParsedReceipt = async (
           storeName: officialStoreName, 
           date: jstDate,
           totalAmount, 
-          taxAmount, // [Issue #71] 追加
+          taxAmount, 
           imagePath, 
           items: { create: itemsToCreate },
           rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
         },
         select: { id: true }
       });
+
+      // 2. [Issue #63] usageLogId が存在する場合、ピンポイントで紐付けを更新
+      if (usageLogId) {
+        await tx.apiUsageLog.update({
+          where: { id: usageLogId },
+          data: { receiptId: created.id }
+        });
+        logger.info(`[Link_Log] ApiUsageLog(ID: ${usageLogId}) を Receipt(ID: ${created.id}) に紐付けました。`);
+      }
+
       return created.id;
     }, { timeout: 15000 });
 
@@ -189,7 +202,8 @@ export const saveParsedReceipt = async (
 };
 
 /**
- * ユーザー確認済みデータの永続化とログ紐付け
+ * ユーザー確認済みデータの永続化
+ * [Issue #63] 曖昧なupdateManyを廃止し、saveParsedReceiptの内部トランザクションへ委譲
  */
 export const saveConfirmedReceipt = async (
   memberId: number,
@@ -199,25 +213,11 @@ export const saveConfirmedReceipt = async (
   isSuspicious: boolean,
   warnings: string[]
 ) => {
-  const result = await saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings);
-  
-  try {
-    await prisma.apiUsageLog.updateMany({
-      where: {
-        familyMemberId: memberId,
-        receiptId: null,
-        createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) } 
-      },
-      data: { receiptId: result.id }
-    });
-  } catch (logError) {
-    logger.error(`[LOG_LINK_ERROR] ログの紐付けに失敗しました: ${logError}`);
-  }
-  return result;
+  return await saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings);
 };
 
 /**
- * 解析〜保存の一括処理（レガシー/Worker用）
+ * 解析〜保存の一括処理（Worker用/自動投入用）
  */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
   const member = await prisma.familyMember.findUnique({ 

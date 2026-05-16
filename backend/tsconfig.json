@@ -7,12 +7,16 @@
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
-    "types": ["node"],  // ★ これが必須
+    "types": ["node"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true
   },
-  "include": ["src/**/*", "prisma/seed.ts", "prisma.config.js"], // ★ seed.ts等が含まれているか
+  "include": [
+    "src/**/*",
+    "prisma/**/*.ts",
+    "prisma.config.js"
+  ],
   "exclude": ["node_modules", "dist"]
 }

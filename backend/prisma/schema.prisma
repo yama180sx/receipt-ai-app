@@ -57,7 +57,7 @@ model Receipt {
   storeName     String
   date          DateTime       @db.Timestamptz(3)
   totalAmount   Int            // 支払合計（税込）
-  // [Issue #71] 外税額を保持するフィールドを追加
+  // [Issue #71] 外税額を保持するフィールド
   taxAmount     Float          @default(0.0)
   rawText       Json?
   imagePath     String?        
@@ -90,7 +90,6 @@ model ProductMaster {
   familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
   category      Category     @relation(fields: [categoryId], references: [id])
 
-  // コントローラーで使用している名前と一致させる
   @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
 }
 
@@ -99,7 +98,7 @@ model ApiUsageLog {
   id               Int           @id @default(autoincrement())
   familyMemberId   Int?          // 実行したユーザー
   familyMember     FamilyMember? @relation(fields: [familyMemberId], references: [id])
-  receiptId        Int?          // 関連するレシート (解析失敗時などは null)
+  receiptId        Int?          // 関連するレシート
   receipt          Receipt?      @relation(fields: [receiptId], references: [id])
   modelId          String        // 例: "gemini-1.5-flash"
   promptTokens     Int           // 入力トークン
@@ -109,4 +108,18 @@ model ApiUsageLog {
 
   @@index([familyMemberId])
   @@index([createdAt])
+}
+
+// [Issue #72] AIプロンプト管理マスタ
+// 管理画面からの動的チューニングとChain of Thoughtを制御します
+model PromptTemplate {
+  id           Int      @id @default(autoincrement())
+  key          String   @unique                       // 例: "RECEIPT_ANALYSIS"
+  description  String?                                // プロンプトの用途説明
+  systemPrompt String   @db.Text                      // Chain of Thoughtを含む基本命令文
+  domainHints  Json?                                  // 業態別の追加指示集 (JSON)
+  isActive     Boolean  @default(true)                // 現在使用中かどうか
+  version      Int      @default(1)                   // 世代管理用
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 }
