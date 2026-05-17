@@ -422,3 +422,26 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
     res.json({ success: true, data: { trend, pareto } });
   } catch (error) { next(error); }
 };
+
+/**
+ * [Issue #64] 所属世帯のメンバー一覧取得
+ */
+export const getFamilyMembers = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const familyGroupId = getFamilyGroupId();
+    if (!familyGroupId) {
+      throw new AppError('世帯情報が取得できません。', 400);
+    }
+
+    const members = await prisma.familyMember.findMany({
+      where: { familyGroupId },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: { id: 'asc' }
+    });
+
+    res.json({ success: true, data: members });
+  } catch (error) { next(error); }
+};
