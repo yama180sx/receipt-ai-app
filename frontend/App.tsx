@@ -3,6 +3,7 @@ import { StyleSheet, View, Alert, ActivityIndicator, Platform, TextInput, Text, 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as SplashScreen from 'expo-splash-screen'; // ★ Issue #74: スプラッシュ画面制御の導入
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService'; 
@@ -12,12 +13,14 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
-import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; // ★修正: 名前付きインポートに変更
+import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; 
 import { PromptEditorScreen } from './src/screens/PromptEditorScreen'; 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 
-// ビュータイプの定義に prompt_editor を追加
+// ★ Issue #74: アプリ起動時にスプラッシュ画面を自動非表示にするのを防止（初期ロードの隠蔽）
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor';
 
 const STORAGE_KEYS = {
@@ -33,30 +36,40 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // メインステート
-  const [resultData, setResultData] = useState<any>(null); // 解析済み一時データ
+  const [resultData, setResultData] = useState<any>(null); 
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
 
   /**
-   * 1. 初期化と状態復元
+   * 1. 初期化・ローカル永続化データの完全並列ロード & 先行APIフェッチ
    */
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const token = await authService.getToken();
-        const midStr = Platform.OS === 'web'
-          ? await AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
-          : await SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID);
+        // ★ 変更点: トークン、メンバID、前回のView、解析一時データをすべて並列で一括取得（RTTの削減）
+        const [token, midStr, v, res] = await Promise.all([
+          authService.getToken(),
+          Platform.OS === 'web'
+            ? AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
+            : SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID),
+          AsyncStorage.getItem(STORAGE_KEYS.VIEW),
+          AsyncStorage.getItem(STORAGE_KEYS.RESULT),
+        ]);
 
         if (token) {
           setUserToken(token);
           setCurrentMemberId(midStr ? parseInt(midStr, 10) : 1);
-        }
 
-        const [v, res] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.VIEW),
-          AsyncStorage.getItem(STORAGE_KEYS.RESULT),
-        ]);
+          // ★ 変更点: ログイン済みの場合は、カテゴリマスタもスプラッシュの裏で先行フェッチして完了させておく
+          try {
+            const catRes = await apiClient.get('/categories');
+            if (catRes.data?.success) {
+              setCategories(catRes.data.data);
+            }
+          } catch (catErr) {
+            console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
+          }
+        }
 
         if (v) setCurrentView(v as ViewType);
         if (res) setResultData(JSON.parse(res));
@@ -65,6 +78,8 @@ export default function App() {
         console.error('初期化失敗', e);
       } finally {
         setIsReady(true);
+        // ★ 変更点: すべてのデータ準備が整った段階でスプラッシュを非表示にし、メイン画面へパッと切り替える
+        await SplashScreen.hideAsync().catch(() => {});
       }
     };
     initializeApp();
@@ -135,7 +150,7 @@ export default function App() {
   };
 
   /**
-   * 5. カテゴリマスタの取得
+   * 5. カテゴリマスタの取得（手動更新・既存画面からのコール用）
    */
   const fetchCategories = useCallback(async () => {
     if (!userToken) return;
@@ -149,9 +164,12 @@ export default function App() {
     }
   }, [userToken]);
 
+  // ★ 変更点: 起動時に未取得の場合のみ補正用として発火させるガードを追加（重複通信抑止）
   useEffect(() => {
-    if (isReady && userToken) fetchCategories();
-  }, [fetchCategories, isReady, userToken]);
+    if (isReady && userToken && categories.length === 0) {
+      fetchCategories();
+    }
+  }, [fetchCategories, isReady, userToken, categories.length]);
 
   /**
    * 6. 永続化（現在の表示ビューと未保存の解析結果）
@@ -175,13 +193,13 @@ export default function App() {
 
   /**
    * 7. 解析完了時のハンドラ
-   * HomeScreen から解析完了データを受け取って確認画面へ遷移
    */
   const handleAnalysisReady = (data: any) => {
     setResultData(data);
     setCurrentView('receipt_scan');
   };
 
+  // ★ 変更点: 準備中のActivityIndicator表示は基本通らなくなり、ネイティブのスプラッシュ画面が直接維持される
   if (!isReady) {
     return (
       <View style={styles.loadingContainer}>
@@ -190,7 +208,6 @@ export default function App() {
     );
   }
 
-  // フル幅表示の判定
   const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor'].includes(currentView);
 
   if (!userToken) {
