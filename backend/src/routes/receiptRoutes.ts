@@ -21,7 +21,8 @@ import {
   getMonthlyStats,
   getJobStatus,
   getAdvancedStats,
-  commitReceipt 
+  commitReceipt,
+  getFamilyMembers // ★ Issue #64: コントローラーから世帯メンバー取得関数をインポート
 } from '../controllers/receiptController';
 
 const router = express.Router();
@@ -84,6 +85,9 @@ router.post(
 
 // --- 共通認証・テナントミドルウェア ---
 router.use(authMiddleware, tenantMiddleware);
+
+// ★ Issue #64: 所属世帯のメンバー一覧を取得するエンドポイントを追加
+router.get('/family-groups/members', getFamilyMembers);
 
 router.get('/receipts', getReceipts);
 router.get('/receipts/latest', getLatestReceipt);
