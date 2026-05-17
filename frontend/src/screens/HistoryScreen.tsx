@@ -23,9 +23,10 @@ interface HistoryScreenProps {
 }
 
 /**
- * [Issue #67 / Web・ネイティブ完全互換] 履歴一覧画面
+ * [Issue #67 / #64 / Web・ネイティブ完全互換] 履歴一覧画面
+ * - 所属世帯のメンバー一覧を動的取得するフィルタ機能を実装。
+ * - 大画面（isWide）かつWeb環境下におけるフレックスボックスの横幅潰れバグを完全解消。
  * - 初期ロード時（selectedReceiptがnull）のWeb版レンダリングクラッシュを完全に防ぐヌルガードを導入。
- * - 大画面2カラム時、Web版でリストの高さが0pxに潰れるのを防ぐため height: '100%' をレイヤーへ強制。
  * - スマホ（縦画面・モーダル表示）とWeb/iPad（横並び2カラム）のスタイル競合を排除。
  */
 export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
@@ -36,6 +37,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]); // ★ Issue #64: 動的世帯メンバー用ステート
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -61,6 +63,18 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
       }
     } catch (err) {
       console.error('カテゴリー取得失敗', err);
+    }
+  }, []);
+
+  // ★ Issue #64: 所属世帯のメンバー一覧を取得
+  const fetchMembers = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/family-groups/members');
+      if (res.data?.success) {
+        setMembers(res.data.data);
+      }
+    } catch (err) {
+      console.error('世帯メンバー取得失敗', err);
     }
   }, []);
 
@@ -99,7 +113,8 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
 
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchMembers(); // ★ 初期化時にメンバーマスタをロード
+  }, [fetchCategories, fetchMembers]);
 
   useEffect(() => {
     fetchReceipts();
@@ -169,7 +184,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          style={styles.webSelect}
+          style={StyleSheet.flatten(styles.webSelect)} // ★修正: 生HTML互換のため構造をフラット化
         >
           <option value="">全期間</option>
           {months.map(m => (
@@ -200,10 +215,14 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         <select
           value={selectedMember}
           onChange={(e) => setSelectedMember(e.target.value)}
-          style={styles.webSelect}
+          style={StyleSheet.flatten(styles.webSelect)} // ★修正: 生HTML互換のため構造をフラット化
         >
-          <option value={currentMemberId.toString()}>自分</option>
           <option value="">世帯全体</option>
+          {members.map(m => (
+            <option key={m.id} value={m.id.toString()}>
+              {m.id === currentMemberId ? `自分 (${m.name})` : m.name}
+            </option>
+          ))}
         </select>
       );
     }
@@ -215,8 +234,14 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         style={styles.filterPicker}
         mode="dropdown"
       >
-        <Picker.Item label="自分" value={currentMemberId.toString()} />
         <Picker.Item label="世帯全体" value="" />
+        {members.map(m => (
+          <Picker.Item 
+            key={m.id} 
+            label={m.id === currentMemberId ? `自分 (${m.name})` : m.name} 
+            value={m.id.toString()} 
+          />
+        ))}
       </Picker>
     );
   };
@@ -232,11 +257,12 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
           <View style={{ width: 40 }} />
         </View>
 
+        {/* ★修正: 大画面（Web）時、縮小特性による0px潰れを防ぐため flexGrow/flexShrink/minWidth を明示 */}
         <View style={[styles.filterContainer, isWide && styles.wideFilter]}>
-          <View style={[styles.pickerBox, isWide && { width: 250, flex: 0 }]}>
+          <View style={[styles.pickerBox, isWide && { width: 250, minWidth: 250, flexGrow: 0, flexShrink: 0 }]}>
             {renderMonthPicker()}
           </View>
-          <View style={[styles.pickerBox, isWide && { width: 200, flex: 0 }]}>
+          <View style={[styles.pickerBox, isWide && { width: 200, minWidth: 200, flexGrow: 0, flexShrink: 0 }]}>
             {renderMemberPicker()}
           </View>
         </View>
@@ -259,7 +285,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
             )}
           </View>
 
-          {/* ★修正: 大画面表示時、データが読み込まれて選択されるまでのヌルクラッシュを防ぐプレースホルダーガード */}
           {isWide && (
             <View style={styles.detailPane}>
               {selectedReceipt ? (
@@ -292,7 +317,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
                 <Text style={styles.detailClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            {/* ★修正: モーダル表示時も、タイミングによるヌル参照を徹底ガード */}
             {selectedReceipt && (
               <ReceiptDetailComponent 
                 receipt={selectedReceipt}
@@ -337,10 +361,8 @@ const styles = StyleSheet.create({
   } as any,
   mainContentMobile: { flex: 1 },
   mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.colors.border },
-  // ★重要修正: 横幅固定値を維持し、かつ親の row コンテナに追従させ Web上での高さ消失を完全に防ぐ
   masterPane: { width: 350, height: '100%', backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },
   fullPane: { flex: 1 },
-  // ★重要修正: 右ペインも大画面時は親コンテナの高さ 100% で追従
   detailPane: { flex: 1, height: '100%', backgroundColor: theme.colors.background },
   list: { padding: theme.spacing.md },
   card: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border },
@@ -357,7 +379,6 @@ const styles = StyleSheet.create({
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailTitleMobile: { fontSize: 18, fontWeight: 'bold', flex: 1 },
   detailClose: { fontSize: 24, color: theme.colors.text.muted, marginLeft: 15 },
-  // ★追加: センタリングインジケータおよびプレースホルダー位置固定用
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
