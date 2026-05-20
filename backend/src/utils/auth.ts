@@ -13,16 +13,13 @@ if (!JWT_SECRET) {
 }
 
 /**
- * [Issue #52 / #73] トークンのペイロード定義
+ * [Issue #52] トークンのペイロード定義
  * familyGroupId を含み、マルチテナント対応の基盤となります。
- * 権限管理(isAdmin)のために id と role を追加しました。
  */
 export interface JWTPayload {
-  id: number;           // [Issue #73] authMiddleware (req.user.id) 用
-  memberId: number;     // 互換性維持
+  memberId: number;
   familyGroupId: number;
   name: string;
-  role?: string;        // [Issue #73] 権限 (例: 'ADMIN')
 }
 
 /**

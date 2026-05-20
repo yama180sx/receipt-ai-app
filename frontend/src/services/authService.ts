@@ -3,8 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const TOKEN_KEY = 'userToken';
-// [Issue #73] Role保存用のキー
-const ROLE_KEY = 'currentUserRole';
 
 export const authService = {
   // トークンを保存する
@@ -23,30 +21,12 @@ export const authService = {
       return await SecureStore.getItemAsync(TOKEN_KEY);
     }
   },
-  // [Issue #73] Roleを保存する
-  async saveRole(role: string) {
-    if (Platform.OS === 'web') {
-      await AsyncStorage.setItem(ROLE_KEY, role);
-    } else {
-      await SecureStore.setItemAsync(ROLE_KEY, role);
-    }
-  },
-  // [Issue #73] 保存されているRoleを読み出す
-  async getRole() {
-    if (Platform.OS === 'web') {
-      return await AsyncStorage.getItem(ROLE_KEY);
-    } else {
-      return await SecureStore.getItemAsync(ROLE_KEY);
-    }
-  },
-  // ログアウト時にトークンとRoleを消去する
+  // ログアウト時にトークンを消去する
   async logout() {
     if (Platform.OS === 'web') {
       await AsyncStorage.removeItem(TOKEN_KEY);
-      await AsyncStorage.removeItem(ROLE_KEY);
     } else {
       await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(ROLE_KEY);
     }
   }
 };
