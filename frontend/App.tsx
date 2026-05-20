@@ -3,7 +3,7 @@ import { StyleSheet, View, Alert, ActivityIndicator, Platform, TextInput, Text, 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import * as SplashScreen from 'expo-splash-screen'; // ★ Issue #74: スプラッシュ画面制御の導入
+import * as SplashScreen from 'expo-splash-screen'; 
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService'; 
@@ -14,14 +14,16 @@ import { StatisticsScreen } from './src/screens/StatisticsScreen';
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
 import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
 import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; 
-import { PromptEditorScreen } from './src/screens/PromptEditorScreen'; 
+import { PromptEditorScreen } from './src/screens/PromptEditorScreen';
+import { AdminStatsScreen } from './src/screens/AdminStatsScreen';
+import { AdminMenuScreen } from './src/screens/AdminMenuScreen';
+
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 
-// ★ Issue #74: アプリ起動時にスプラッシュ画面を自動非表示にするのを防止（初期ロードの隠蔽）
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor';
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -33,25 +35,22 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [loginPassword, setLoginPassword] = useState('');
 
-  // メインステート
   const [resultData, setResultData] = useState<any>(null); 
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
 
-  /**
-   * 1. 初期化・ローカル永続化データの完全並列ロード & 先行APIフェッチ
-   */
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // ★ 変更点: トークン、メンバID、前回のView、解析一時データをすべて並列で一括取得（RTTの削減）
-        const [token, midStr, v, res] = await Promise.all([
+        const [token, midStr, role, v, res] = await Promise.all([
           authService.getToken(),
           Platform.OS === 'web'
             ? AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
             : SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID),
+          authService.getRole(),
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
           AsyncStorage.getItem(STORAGE_KEYS.RESULT),
         ]);
@@ -59,8 +58,8 @@ export default function App() {
         if (token) {
           setUserToken(token);
           setCurrentMemberId(midStr ? parseInt(midStr, 10) : 1);
+          setCurrentUserRole(role);
 
-          // ★ 変更点: ログイン済みの場合は、カテゴリマスタもスプラッシュの裏で先行フェッチして完了させておく
           try {
             const catRes = await apiClient.get('/categories');
             if (catRes.data?.success) {
@@ -78,16 +77,12 @@ export default function App() {
         console.error('初期化失敗', e);
       } finally {
         setIsReady(true);
-        // ★ 変更点: すべてのデータ準備が整った段階でスプラッシュを非表示にし、メイン画面へパッと切り替える
         await SplashScreen.hideAsync().catch(() => {});
       }
     };
     initializeApp();
   }, []);
 
-  /**
-   * 2. 認証エラーハンドリング
-   */
   useEffect(() => {
     setOnUnauthorized(() => {
       handleLogout();
@@ -95,9 +90,6 @@ export default function App() {
     });
   }, []);
 
-  /**
-   * 3. ログイン処理
-   */
   const handleLogin = async (memberId: number) => {
     if (!loginPassword) {
       Alert.alert("入力エラー", "パスワードを入力してください。");
@@ -112,7 +104,12 @@ export default function App() {
       
       if (response.data && response.data.success) {
         const { token, member } = response.data.data;
+        
         await authService.saveToken(token);
+        if (member.role) {
+          await authService.saveRole(member.role);
+          setCurrentUserRole(member.role);
+        }
 
         if (Platform.OS === 'web') {
           await AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, member.id.toString());
@@ -131,9 +128,6 @@ export default function App() {
     }
   };
 
-  /**
-   * 4. ログアウト処理
-   */
   const handleLogout = async () => {
     await authService.logout();
     if (Platform.OS === 'web') {
@@ -144,14 +138,12 @@ export default function App() {
 
     setUserToken(null);
     setCurrentMemberId(null);
+    setCurrentUserRole(null);
     setCurrentView('main');
     setResultData(null);
     setLoginPassword('');
   };
 
-  /**
-   * 5. カテゴリマスタの取得（手動更新・既存画面からのコール用）
-   */
   const fetchCategories = useCallback(async () => {
     if (!userToken) return;
     try {
@@ -164,16 +156,12 @@ export default function App() {
     }
   }, [userToken]);
 
-  // ★ 変更点: 起動時に未取得の場合のみ補正用として発火させるガードを追加（重複通信抑止）
   useEffect(() => {
     if (isReady && userToken && categories.length === 0) {
       fetchCategories();
     }
   }, [fetchCategories, isReady, userToken, categories.length]);
 
-  /**
-   * 6. 永続化（現在の表示ビューと未保存の解析結果）
-   */
   useEffect(() => {
     if (!isReady || !userToken) return;
     const saveState = async () => {
@@ -191,15 +179,11 @@ export default function App() {
     saveState();
   }, [currentView, resultData, isReady, userToken]);
 
-  /**
-   * 7. 解析完了時のハンドラ
-   */
   const handleAnalysisReady = (data: any) => {
     setResultData(data);
     setCurrentView('receipt_scan');
   };
 
-  // ★ 変更点: 準備中のActivityIndicator表示は基本通らなくなり、ネイティブのスプラッシュ画面が直接維持される
   if (!isReady) {
     return (
       <View style={styles.loadingContainer}>
@@ -208,7 +192,7 @@ export default function App() {
     );
   }
 
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor'].includes(currentView);
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu'].includes(currentView);
 
   if (!userToken) {
     return (
@@ -248,9 +232,9 @@ export default function App() {
       case 'stats': 
         return <StatisticsScreen currentMemberId={memberId} onBack={() => setCurrentView('main')} />;
       case 'category_mgr': 
-        return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('main'); }} currentMemberId={memberId} />;
+        return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('admin_menu'); }} currentMemberId={memberId} />;
       case 'product_master': 
-        return <ProductMasterScreen onBack={() => setCurrentView('main')} currentMemberId={memberId} />;
+        return <ProductMasterScreen onBack={() => setCurrentView('admin_menu')} currentMemberId={memberId} />;
       case 'receipt_scan': 
         return (
           <ReceiptScanScreen 
@@ -267,13 +251,20 @@ export default function App() {
           />
         );
       case 'prompt_editor': 
+        // ★ ラッパーを外し、onBack を直接コンポーネントへ渡す
+        return <PromptEditorScreen onBack={() => setCurrentView('admin_menu')} />;
+      case 'admin_stats':
+        // ★ ラッパーを外し、onBack を直接コンポーネントへ渡す
+        return <AdminStatsScreen onBack={() => setCurrentView('admin_menu')} />;
+      case 'admin_menu':
         return (
-          <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
-            <TouchableOpacity style={styles.adminBackButton} onPress={() => setCurrentView('main')}>
-              <Text style={styles.adminBackButtonText}>← メイン画面に戻る</Text>
-            </TouchableOpacity>
-            <PromptEditorScreen />
-          </View>
+          <AdminMenuScreen 
+            onBack={() => setCurrentView('main')}
+            onGoToCategories={() => setCurrentView('category_mgr')}
+            onGoToProductMaster={() => setCurrentView('product_master')}
+            onGoToPromptEditor={() => setCurrentView('prompt_editor')}
+            onGoToAdminStats={() => setCurrentView('admin_stats')}
+          />
         );
       default:
         return (
@@ -286,10 +277,9 @@ export default function App() {
               onAnalysisReady={handleAnalysisReady} 
               onGoToHistory={() => setCurrentView('history')}
               onGoToStats={() => setCurrentView('stats')}
-              onGoToCategories={() => setCurrentView('category_mgr')}
-              onGoToProductMaster={() => setCurrentView('product_master')}
-              onGoToPromptEditor={() => setCurrentView('prompt_editor')}
+              onGoToAdminMenu={() => setCurrentView('admin_menu')} 
               currentMemberId={memberId}
+              userRole={currentUserRole}
             />
           </View>
         );
@@ -326,19 +316,4 @@ const styles = StyleSheet.create({
   loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
   logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
-  adminBackButton: {
-    backgroundColor: '#E9ECEF',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    margin: 16,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#CED4DA',
-  },
-  adminBackButtonText: {
-    color: '#495057',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
 });
