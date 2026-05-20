@@ -4,9 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 // --- 定数定義 ---
+// [Issue #73] role を保存するためのキー（USER_ROLE）を追加
 const STORAGE_KEYS = {
   TOKEN: 'userToken',
   MEMBER_ID: 'currentMemberId',
+  USER_ROLE: 'currentUserRole', 
 } as const;
 
 /**
@@ -45,6 +47,13 @@ const getStorageItem = async (key: string): Promise<string | null> => {
   }
 };
 
+/**
+ * [Issue #73] 現在ログイン中のユーザーの Role を取得するユーティリティ
+ */
+export const getUserRole = async (): Promise<string | null> => {
+  return await getStorageItem(STORAGE_KEYS.USER_ROLE);
+};
+
 // --- リクエストインターセプター：送信前に認証情報を自動注入 ---
 apiClient.interceptors.request.use(async (config) => {
   const token = await getStorageItem(STORAGE_KEYS.TOKEN);
@@ -73,14 +82,16 @@ apiClient.interceptors.response.use(
       
       error.message = serverMessage;
 
-      // [Issue #51/52] 認証エラー (401) のハンドリング
+      // [Issue #51/52/73] 認証エラー (401) または 権限エラー (403) のハンドリング
       if (error.response.status === 401) {
         console.warn(`[API] Unauthorized: ${errorCode || 'TOKEN_EXPIRED'}`);
-        
-        // App.tsx で登録されたログアウト関数を実行
         if (onUnauthorizedHandler) {
           onUnauthorizedHandler();
         }
+      } else if (error.response.status === 403) {
+        // 403 Forbidden: 管理者メニュー等への不正アクセス
+        console.warn(`[API] Forbidden: ${serverMessage}`);
+        // 403はログアウトさせず、エラーメッセージのみを投げる（画面側でToast等を出す想定）
       }
     }
     return Promise.reject(error);
