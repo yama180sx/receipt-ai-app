@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 
 // --- 定数定義 ---
 // [Issue #73] role を保存するためのキー（USER_ROLE）を追加
@@ -82,16 +82,16 @@ apiClient.interceptors.response.use(
       
       error.message = serverMessage;
 
-      // [Issue #51/52/73] 認証エラー (401) または 権限エラー (403) のハンドリング
+      // [Issue #51/52/73/75] 認証エラー (401) または 権限エラー (403) のハンドリング
       if (error.response.status === 401) {
         console.warn(`[API] Unauthorized: ${errorCode || 'TOKEN_EXPIRED'}`);
         if (onUnauthorizedHandler) {
           onUnauthorizedHandler();
         }
       } else if (error.response.status === 403) {
-        // 403 Forbidden: 管理者メニュー等への不正アクセス
+        // [Issue #75] 403 Forbidden: 管理者メニュー等への不正アクセス時のUIフィードバック
         console.warn(`[API] Forbidden: ${serverMessage}`);
-        // 403はログアウトさせず、エラーメッセージのみを投げる（画面側でToast等を出す想定）
+        Alert.alert('アクセス権限エラー', 'この操作を行う権限がありません。');
       }
     }
     return Promise.reject(error);
