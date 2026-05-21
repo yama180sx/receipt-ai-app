@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   ActivityIndicator, 
   ScrollView,
-  Alert,
   TouchableOpacity
 } from 'react-native';
 import { theme } from '../theme';
@@ -27,6 +26,7 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<StatData[]>([]);
   const [totalCost, setTotalCost] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // ★ 追加: エラー状態管理
 
   useEffect(() => {
     fetchStats();
@@ -42,7 +42,9 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
       }
     } catch (error: any) {
       console.error('Stats Fetch Error:', error);
-      Alert.alert('取得エラー', 'コスト統計の取得に失敗しました。管理者権限があるか確認してください。');
+      // ★ Alertを廃止し、バックエンドのエラーメッセージを抽出してステートにセット
+      const serverError = error?.response?.data?.error || error?.response?.data?.message || 'コスト統計の取得に失敗しました。';
+      setErrorMsg(serverError);
     } finally {
       setLoading(false);
     }
@@ -67,38 +69,48 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>累計利用コスト (概算)</Text>
-          <Text style={styles.summaryAmount}>¥{totalCost.toFixed(2)}</Text>
-          <Text style={styles.summaryNote}>※為替レート150円/$、Gemini 2.0 Flashでの算出</Text>
-        </View>
-
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableCell, { flex: 1.5 }]}>年月</Text>
-          <Text style={[styles.tableCell, { flex: 2 }]}>In / Out (Tokens)</Text>
-          <Text style={[styles.tableCell, { flex: 1.5, textAlign: 'right' }]}>概算(円)</Text>
-        </View>
-
-        {stats.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>データがありません</Text>
+        {/* ★ エラーが存在する場合は赤帯のコンテナを表示して処理をブロック */}
+        {errorMsg ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>アクセス権限エラー</Text>
+            <Text style={styles.errorSubText}>{errorMsg}</Text>
           </View>
         ) : (
-          stats.map((item, index) => (
-            <View key={`${item.month}-${item.modelId}-${index}`} style={styles.tableRow}>
-              <View style={{ flex: 1.5 }}>
-                <Text style={styles.cellMainText}>{item.month}</Text>
-                <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
-              </View>
-              <View style={{ flex: 2 }}>
-                <Text style={styles.cellMainText}>{item.totalPromptTokens.toLocaleString()}</Text>
-                <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
-              </View>
-              <Text style={[styles.cellMainText, { flex: 1.5, textAlign: 'right', fontWeight: 'bold' }]}>
-                ¥{item.estimatedCostJpy.toFixed(2)}
-              </Text>
+          <>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>累計利用コスト (概算)</Text>
+              <Text style={styles.summaryAmount}>¥{totalCost.toFixed(2)}</Text>
+              <Text style={styles.summaryNote}>※為替レート150円/$、Gemini 2.0 Flashでの算出</Text>
             </View>
-          ))
+
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 1.5 }]}>年月</Text>
+              <Text style={[styles.tableCell, { flex: 2 }]}>In / Out (Tokens)</Text>
+              <Text style={[styles.tableCell, { flex: 1.5, textAlign: 'right' }]}>概算(円)</Text>
+            </View>
+
+            {stats.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>データがありません</Text>
+              </View>
+            ) : (
+              stats.map((item, index) => (
+                <View key={`${item.month}-${item.modelId}-${index}`} style={styles.tableRow}>
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={styles.cellMainText}>{item.month}</Text>
+                    <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
+                  </View>
+                  <View style={{ flex: 2 }}>
+                    <Text style={styles.cellMainText}>{item.totalPromptTokens.toLocaleString()}</Text>
+                    <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
+                  </View>
+                  <Text style={[styles.cellMainText, { flex: 1.5, textAlign: 'right', fontWeight: 'bold' }]}>
+                    ¥{item.estimatedCostJpy.toFixed(2)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -123,6 +135,27 @@ const styles = StyleSheet.create({
   backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   content: { padding: 16, paddingBottom: 40 },
+  
+  // ★ 追加: 画面内エラー表示用のスタイル
+  errorContainer: {
+    backgroundColor: '#F8D7DA',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F5C2C7',
+    marginTop: 8,
+  },
+  errorTitle: {
+    color: '#842029',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  errorSubText: {
+    color: '#842029',
+    fontSize: 14,
+  },
+
   summaryCard: { 
     backgroundColor: theme.colors.primary, 
     padding: 20, 
