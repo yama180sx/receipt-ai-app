@@ -156,6 +156,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const isWide = windowWidth > 600;
+  const isAdmin = userRole === 'ADMIN';
 
   return (
     <SafeAreaView style={styles.container}>
