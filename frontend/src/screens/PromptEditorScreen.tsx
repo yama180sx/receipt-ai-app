@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 
 // 共通APIクライアント（環境に合わせて適宜インポートパスを調整してください）
@@ -15,33 +16,44 @@ import {
 import apiClient from '../utils/apiClient';
 
 interface PromptTemplate {
+  id: number;
   key: string;
+  name: string;
+  description: string | null;
   systemPrompt: string;
-  domainHints: Record<string, any>;
+  domainHints: Record<string, any> | null;
   isActive: boolean;
   version: number;
 }
 
-export const PromptEditorScreen: React.FC = () => {
-  const [template, setTemplate] = useState<PromptTemplate | null>(null);
-  const [systemPrompt, setSystemPrompt] = useState('');
-  const [domainHintsStr, setDomainHintsStr] = useState('');
+interface PromptEditorScreenProps {
+  onBack: () => void;
+}
+
+export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }) => {
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  
+  // フォーム用ステート
+  const [formName, setFormName] = useState('');
+  const [formDesc, setFormDesc] = useState('');
+  const [formSystemPrompt, setFormSystemPrompt] = useState('');
+  const [formDomainHints, setFormDomainHints] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const PROMPT_KEY = 'RECEIPT_ANALYSIS';
 
-  // 1. プロンプトテンプレートの取得
   const fetchPromptTemplate = async () => {
     setIsLoading(true);
     setError(null);
     try {
       // adminRoutes: /api/admin/prompts (GET)
       const response = await apiClient.get<{ success: boolean; data: PromptTemplate[] }>('/admin/prompts');
-      
       if (response.data.success && response.data.data) {
-        // キーが RECEIPT_ANALYSIS のものを抽出
         const target = response.data.data.find((p) => p.key === PROMPT_KEY);
         if (target) {
           setTemplate(target);
@@ -61,8 +73,39 @@ export const PromptEditorScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchPromptTemplate();
+    fetchPrompts();
   }, []);
+
+  const handleActivate = async (id: number) => {
+    try {
+      await apiClient.patch(`/admin/prompts/${id}/activate`);
+      fetchPrompts();
+    } catch (err: any) {
+      Alert.alert('エラー', 'デフォルトの切り替えに失敗しました。');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    const executeDelete = async () => {
+      try {
+        await apiClient.delete(`/admin/prompts/${id}`);
+        fetchPrompts();
+      } catch (err: any) {
+        Alert.alert('エラー', err?.response?.data?.error || '削除に失敗しました。');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('本当にこのプロンプトを削除しますか？')) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert('削除確認', '本当にこのプロンプトを削除しますか？', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '削除', style: 'destructive', onPress: executeDelete }
+      ]);
+    }
+  };
 
   // 2. 編集内容の保存
   const handleSave = async () => {
@@ -71,7 +114,6 @@ export const PromptEditorScreen: React.FC = () => {
     setError(null);
     let parsedHints: Record<string, any>;
 
-    // domainHints (JSON) のパースバリデーション
     try {
       parsedHints = JSON.parse(domainHintsStr);
     } catch (e) {
@@ -79,10 +121,20 @@ export const PromptEditorScreen: React.FC = () => {
       return;
     }
 
+    let parsedHints = null;
+    if (formDomainHints.trim()) {
+      try {
+        parsedHints = JSON.parse(formDomainHints);
+      } catch (e) {
+        Alert.alert('JSONエラー', 'Domain Hints の JSON 形式が不正です。');
+        return;
+      }
+    }
+
     setIsSaving(true);
+    setError(null);
+
     try {
-      // adminRoutes: /api/admin/prompts (PATCH)
-      // tenantMiddleware を通さないため、全世帯共通のシステム設定として更新
       const response = await apiClient.patch(`/admin/prompts`, {
         key: PROMPT_KEY,
         systemPrompt,
@@ -91,83 +143,117 @@ export const PromptEditorScreen: React.FC = () => {
 
       if (response.status === 200) {
         Alert.alert('保存完了', `プロンプトをバージョン ${template.version + 1} に更新しました。`);
-        fetchPromptTemplate(); // 最新状態（バージョン等）を再取得
+        fetchPromptTemplate();
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.error || err.message || '保存に失敗しました。';
-      setError(errMsg);
-      Alert.alert('保存エラー', errMsg);
+      setError(err?.response?.data?.error || err.message || '保存に失敗しました。');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading) {
+  // --- UI制御関数 ---
+
+  const openEditForm = (template: PromptTemplate) => {
+    setEditingTemplate(template);
+    setIsCreatingNew(false);
+    setFormName(template.name);
+    setFormDesc(template.description || '');
+    setFormSystemPrompt(template.systemPrompt);
+    setFormDomainHints(template.domainHints ? JSON.stringify(template.domainHints, null, 2) : '');
+  };
+
+  const openCreateForm = () => {
+    setEditingTemplate(null);
+    setIsCreatingNew(true);
+    setFormName('新規プロンプト');
+    setFormDesc('');
+    setFormSystemPrompt('');
+    setFormDomainHints('');
+  };
+
+  const cancelForm = () => {
+    setEditingTemplate(null);
+    setIsCreatingNew(false);
+    setError(null);
+  };
+
+  // --- レンダリング ---
+
+  if (isLoading && templates.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>プロンプトを読み込み中...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>プロンプト・チューニング (Admin UI)</Text>
-      
-      {template && (
-        <View style={styles.infoBadge}>
-          <Text style={styles.infoText}>Target Key: {template.key}</Text>
-          <Text style={styles.infoText}>Current Version: v{template.version}</Text>
-        </View>
-      )}
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.label}>System Prompt (ベース指示 / Chain of Thought規則)</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          multiline
-          numberOfLines={12}
-          textAlignVertical="top"
-          value={systemPrompt}
-          onChangeText={setSystemPrompt}
-          placeholder="Geminiへのシステムプロンプトを入力してください"
-        />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>← 戻る</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>プロンプト・チューニング</Text>
+        <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Domain Hints (業態別レジストリ - JSON形式)</Text>
-        <TextInput
-          style={[styles.input, styles.jsonArea]}
-          multiline
-          numberOfLines={10}
-          textAlignVertical="top"
-          value={domainHintsStr}
-          onChangeText={setDomainHintsStr}
-          placeholder={`{\n  "gas_station": "ガソリンスタンドのヒント...",\n  "pharmacy": "薬局のヒント..."\n}`}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.saveButton, isSaving && styles.disabledButton]}
-        onPress={handleSave}
-        disabled={isSaving}
-      >
-        {isSaving ? (
-          <ActivityIndicator size="small" color="#FFF" />
-        ) : (
-          <Text style={styles.saveButtonText}>更新を保存 (反映)</Text>
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        {template && (
+          <View style={styles.infoBadge}>
+            <Text style={styles.infoText}>Target Key: {template.key}</Text>
+            <Text style={styles.infoText}>Current Version: v{template.version}</Text>
+          </View>
         )}
-      </TouchableOpacity>
-    </ScrollView>
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.label}>System Prompt (ベース指示 / Chain of Thought規則)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            multiline
+            numberOfLines={12}
+            textAlignVertical="top"
+            value={systemPrompt}
+            onChangeText={setSystemPrompt}
+            placeholder="Geminiへのシステムプロンプトを入力してください"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Domain Hints (業態別レジストリ - JSON形式)</Text>
+          <TextInput
+            style={[styles.input, styles.jsonArea]}
+            multiline
+            numberOfLines={10}
+            textAlignVertical="top"
+            value={domainHintsStr}
+            onChangeText={setDomainHintsStr}
+            placeholder={`{\n  "gas_station": "ガソリンスタンドのヒント...",\n  "pharmacy": "薬局のヒント..."\n}`}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.saveButton, isSaving && styles.disabledButton]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>更新を保存 (反映)</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -176,6 +262,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+  },
+  backButton: { width: 60, paddingVertical: 8 },
+  backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   contentContainer: {
     padding: 16,
     paddingBottom: 40,
@@ -185,12 +285,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 12,
   },
   infoBadge: {
     backgroundColor: '#E9ECEF',
@@ -244,7 +338,7 @@ const styles = StyleSheet.create({
   },
   jsonArea: {
     height: 200,
-    fontFamily: 'Courier', // 固定ピッチフォント（Web/iOS環境を考慮、Androidはフォールバック）
+    fontFamily: 'Courier', 
   },
   saveButton: {
     backgroundColor: '#007AFF',
