@@ -20,25 +20,21 @@ interface HomeScreenProps {
   onAnalysisReady: (data: any) => void; 
   onGoToHistory: () => void;
   onGoToStats: () => void;
-  onGoToCategories: () => void; 
-  onGoToProductMaster: () => void; 
-  onGoToPromptEditor: () => void;
+  onGoToAdminMenu?: () => void; // [Issue #73] 個別遷移を廃止し、ハブ画面への遷移へ統合
   currentMemberId: number;
+  userRole?: string | null;
 }
 
 /**
- * [Issue #67 / #72 / #63] ホーム画面（ダッシュボード）
- * - 合計金額の表示時に四捨五入を適用し、小数の端数表示を抑制。
- * - 非同期ジョブの完了時に、解析データに含まれる usageLogId を欠落させずに親コンポーネントへ送出。
+ * ホーム画面（ダッシュボード）
  */
 export const HomeScreen: React.FC<HomeScreenProps> = ({ 
   onAnalysisReady, 
   onGoToHistory, 
   onGoToStats, 
-  onGoToCategories,
-  onGoToProductMaster,
-  onGoToPromptEditor,
-  currentMemberId 
+  onGoToAdminMenu,
+  currentMemberId,
+  userRole 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
@@ -60,7 +56,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
       
       if (statsRes.data && statsRes.data.success) {
-        // [Issue #67] 小数点誤差や計算結果の端数を丸めてセット
         const total = statsRes.data.data.totalAmount || 0;
         setMonthlyTotal(Math.round(total));
       }
@@ -87,7 +82,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           clearInterval(interval);
           setIsAnalyzing(false);
           setJobStatus('');
-          // ★ [Issue #63]: result に含まれる { parsedData: { usageLogId, ... }, imagePath, validation } をそのまま親に渡す
           if (result) onAnalysisReady(result);
         } else if (state === 'failed') {
           clearInterval(interval);
@@ -208,26 +202,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>マスタ管理</Text>
-          <TouchableOpacity style={styles.settingsCard} onPress={onGoToCategories}>
-            <View style={styles.settingsIconWrapper}><Text>⚙️</Text></View>
-            <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>カテゴリー設定</Text></View>
-            <Text style={styles.arrowIcon}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.settingsCard, { marginTop: -10 }]} onPress={onGoToProductMaster}>
-            <View style={[styles.settingsIconWrapper, { backgroundColor: '#E3F2FD' }]}><Text>🧠</Text></View>
-            <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>学習マスタ管理</Text></View>
-            <Text style={styles.arrowIcon}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.settingsCard, { marginTop: -10 }]} onPress={onGoToPromptEditor}>
-            <View style={[styles.settingsIconWrapper, { backgroundColor: '#EDE7F6' }]}><Text>📝</Text></View>
-            <View style={styles.settingsTextWrapper}><Text style={styles.settingsLabel}>プロンプト・外税ヒント編集</Text></View>
-            <Text style={styles.arrowIcon}>›</Text>
-          </TouchableOpacity>
-        </View>
+        {/* [Issue #73] 管理者限定メニューへのハブ導線 */}
+        {isAdmin && (
+          <View style={styles.section}>
+            <TouchableOpacity style={[styles.settingsCard, { backgroundColor: '#F8F9FA' }]} onPress={onGoToAdminMenu}>
+              <View style={[styles.settingsIconWrapper, { backgroundColor: '#E9ECEF' }]}><Text>🛡️</Text></View>
+              <View style={styles.settingsTextWrapper}>
+                <Text style={styles.settingsLabel}>管理者メニュー</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.text.muted, marginTop: 2 }}>マスタ管理・システム設定</Text>
+              </View>
+              <Text style={styles.arrowIcon}>›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最近の登録</Text>

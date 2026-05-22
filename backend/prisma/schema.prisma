@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// [Issue #73] ユーザーの権限レベルを定義
+enum Role {
+  ADMIN // 管理者 (プロンプト編集・コスト統計の閲覧が可能)
+  USER  // 一般ユーザー (レシートの登録・閲覧のみ)
+}
+
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
   id             Int             @id @default(autoincrement())
@@ -20,7 +26,7 @@ model FamilyGroup {
 
 // 家族構成
 model FamilyMember {
-  id            Int            @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   name          String
   password_hash String?
   familyGroupId Int           // ★ 所属世帯
@@ -36,7 +42,7 @@ model FamilyMember {
 model Category {
   id             Int             @id @default(autoincrement())
   name           String          @unique
-  color          String?          
+  color          String?         
   keywords       Json            @default("[]") 
   items          Item[]
   productMasters ProductMaster[]

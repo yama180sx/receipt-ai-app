@@ -11,9 +11,8 @@ import {
   Platform,
 } from 'react-native';
 
-// 共通APIクライアント（環境に合わせて適宜インポートパスを調整してください）
-// 認証ヘッダー等は共通クライアント側で設定されている前提です
 import apiClient from '../utils/apiClient';
+import { theme } from '../theme';
 
 interface PromptTemplate {
   id: number;
@@ -47,21 +46,15 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
 
   const PROMPT_KEY = 'RECEIPT_ANALYSIS';
 
-  const fetchPromptTemplate = async () => {
+  // --- API連携関数 ---
+
+  const fetchPrompts = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // adminRoutes: /api/admin/prompts (GET)
       const response = await apiClient.get<{ success: boolean; data: PromptTemplate[] }>('/admin/prompts');
       if (response.data.success && response.data.data) {
-        const target = response.data.data.find((p) => p.key === PROMPT_KEY);
-        if (target) {
-          setTemplate(target);
-          setSystemPrompt(target.systemPrompt);
-          setDomainHintsStr(JSON.stringify(target.domainHints, null, 2));
-        } else {
-          setError(`キー "${PROMPT_KEY}" のテンプレートが見つかりません。`);
-        }
+        setTemplates(response.data.data.filter(p => p.key === PROMPT_KEY));
       } else {
         setError('データの取得に失敗しました。');
       }
@@ -107,17 +100,9 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
     }
   };
 
-  // 2. 編集内容の保存
   const handleSave = async () => {
-    if (!template) return;
-
-    setError(null);
-    let parsedHints: Record<string, any>;
-
-    try {
-      parsedHints = JSON.parse(domainHintsStr);
-    } catch (e) {
-      Alert.alert('JSONパースエラー', 'Domain Hints の JSON 形式が不正です。構文を確認してください。');
+    if (!formSystemPrompt.trim() || !formName.trim()) {
+      Alert.alert('入力エラー', '名前とシステムプロンプトは必須です。');
       return;
     }
 
@@ -135,16 +120,31 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
     setError(null);
 
     try {
-      const response = await apiClient.patch(`/admin/prompts`, {
-        key: PROMPT_KEY,
-        systemPrompt,
-        domainHints: parsedHints,
-      });
-
-      if (response.status === 200) {
-        Alert.alert('保存完了', `プロンプトをバージョン ${template.version + 1} に更新しました。`);
-        fetchPromptTemplate();
+      if (isCreatingNew) {
+        await apiClient.post(`/admin/prompts`, {
+          key: PROMPT_KEY,
+          name: formName,
+          description: formDesc,
+          systemPrompt: formSystemPrompt,
+          domainHints: parsedHints,
+          isActive: false
+        });
+        if (Platform.OS !== 'web') Alert.alert('作成完了', '新しいプロンプトを作成しました。');
+      } else if (editingTemplate && editingTemplate.id) {
+        await apiClient.patch(`/admin/prompts/${editingTemplate.id}`, {
+          name: formName,
+          description: formDesc,
+          systemPrompt: formSystemPrompt,
+          domainHints: parsedHints,
+        });
+        if (Platform.OS !== 'web') Alert.alert('更新完了', 'プロンプトを更新しました。');
+      } else {
+        throw new Error('更新対象のプロンプトIDが見つかりません。');
       }
+      
+      setEditingTemplate(null);
+      setIsCreatingNew(false);
+      fetchPrompts();
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || '保存に失敗しました。');
     } finally {
@@ -195,169 +195,153 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backButtonText}>← 戻る</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>プロンプト・チューニング</Text>
+        <Text style={styles.headerTitle}>プロンプト管理</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        {template && (
-          <View style={styles.infoBadge}>
-            <Text style={styles.infoText}>Target Key: {template.key}</Text>
-            <Text style={styles.infoText}>Current Version: v{template.version}</Text>
-          </View>
-        )}
-
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.label}>System Prompt (ベース指示 / Chain of Thought規則)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            multiline
-            numberOfLines={12}
-            textAlignVertical="top"
-            value={systemPrompt}
-            onChangeText={setSystemPrompt}
-            placeholder="Geminiへのシステムプロンプトを入力してください"
-          />
-        </View>
+        {/* フォーム画面（編集 または 新規作成） */}
+        {(editingTemplate || isCreatingNew) ? (
+          <View style={styles.formContainer}>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>
+                {isCreatingNew ? '新規プロンプトの作成' : 'プロンプトの編集'}
+              </Text>
+              <TouchableOpacity onPress={cancelForm}>
+                <Text style={styles.cancelText}>キャンセル</Text>
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Domain Hints (業態別レジストリ - JSON形式)</Text>
-          <TextInput
-            style={[styles.input, styles.jsonArea]}
-            multiline
-            numberOfLines={10}
-            textAlignVertical="top"
-            value={domainHintsStr}
-            onChangeText={setDomainHintsStr}
-            placeholder={`{\n  "gas_station": "ガソリンスタンドのヒント...",\n  "pharmacy": "薬局のヒント..."\n}`}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+            <View style={styles.section}>
+              <Text style={styles.label}>識別名 (管理用)</Text>
+              <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="例: テスト用(外税修正版)" />
+            </View>
 
-        <TouchableOpacity
-          style={[styles.saveButton, isSaving && styles.disabledButton]}
-          onPress={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>更新を保存 (反映)</Text>
-          )}
-        </TouchableOpacity>
+            <View style={styles.section}>
+              <Text style={styles.label}>System Prompt</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                multiline numberOfLines={10} textAlignVertical="top"
+                value={formSystemPrompt} onChangeText={setFormSystemPrompt}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.label}>Domain Hints (JSON形式)</Text>
+              <TextInput
+                style={[styles.input, styles.jsonArea]}
+                multiline numberOfLines={8} textAlignVertical="top" autoCapitalize="none" autoCorrect={false}
+                value={formDomainHints} onChangeText={setFormDomainHints}
+                placeholder={`{\n  "gas_station": "ヒント..."\n}`}
+              />
+            </View>
+
+            <TouchableOpacity style={[styles.saveButton, isSaving && styles.disabledButton]} onPress={handleSave} disabled={isSaving}>
+              {isSaving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveButtonText}>保存</Text>}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* 一覧表示画面 */
+          <View>
+            <TouchableOpacity style={styles.createButton} onPress={openCreateForm}>
+              <Text style={styles.createButtonText}>＋ 新規プロンプトを作成</Text>
+            </TouchableOpacity>
+
+            {templates.map((tpl) => (
+              <View key={tpl.id} style={[styles.card, tpl.isActive && styles.activeCard]}>
+                <View style={styles.cardHeader}>
+                  {/* ★修正: タイトル部分に flex: 1 を当てて右側の要素を押し出さないようにする */}
+                  <View style={styles.titleContainer}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {tpl.name} <Text style={styles.versionText}>(v{tpl.version})</Text>
+                    </Text>
+                  </View>
+                  {tpl.isActive && (
+                    <View style={styles.badgeContainer}>
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>使用中</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                {tpl.description && <Text style={styles.cardDesc}>{tpl.description}</Text>}
+                
+                <View style={styles.cardActions}>
+                  {!tpl.isActive && (
+                    <TouchableOpacity style={styles.actionBtnOutline} onPress={() => handleActivate(tpl.id)}>
+                      <Text style={styles.actionBtnOutlineText}>デフォルトに設定</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.actionBtnFill} onPress={() => openEditForm(tpl)}>
+                    <Text style={styles.actionBtnFillText}>編集</Text>
+                  </TouchableOpacity>
+                  {!tpl.isActive && (
+                    <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDelete(tpl.id)}>
+                      <Text style={styles.actionBtnDangerText}>削除</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-  },
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'white', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#E9ECEF' },
   backButton: { width: 60, paddingVertical: 8 },
   backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-  },
-  infoBadge: {
-    backgroundColor: '#E9ECEF',
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 16,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#495057',
-    fontWeight: '600',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6C757D',
-  },
-  errorContainer: {
-    backgroundColor: '#F8D7DA',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F5C2C7',
-  },
-  errorText: {
-    color: '#842029',
-    fontSize: 14,
-  },
-  section: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#495057',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CED4DA',
-    borderRadius: 6,
-    padding: 12,
-    fontSize: 14,
-    color: '#212529',
-  },
-  textArea: {
-    height: 240,
-    fontFamily: 'System',
-  },
-  jsonArea: {
-    height: 200,
-    fontFamily: 'Courier', 
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    borderRadius: 6,
-    alignItems: 'center',
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  disabledButton: {
-    backgroundColor: '#A2C4FF',
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  contentContainer: { padding: 16, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, color: '#6C757D' },
+  errorContainer: { backgroundColor: '#F8D7DA', padding: 12, borderRadius: 6, marginBottom: 16 },
+  errorText: { color: '#842029' },
+  
+  // List Styles
+  createButton: { backgroundColor: '#28A745', padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
+  createButtonText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
+  card: { backgroundColor: 'white', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 2, borderColor: '#E9ECEF' },
+  activeCard: { borderColor: theme.colors.primary },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, // alignItems を flex-start に変更
+  // ★追加: タイトルとバッジのレイアウト制御
+  titleContainer: { flex: 1, paddingRight: 8 },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#212529', lineHeight: 22 },
+  versionText: { fontSize: 12, color: '#6C757D', fontWeight: 'normal' },
+  badgeContainer: { justifyContent: 'flex-start', paddingTop: 2 },
+  badge: { backgroundColor: theme.colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  
+  cardDesc: { fontSize: 13, color: '#6C757D', marginBottom: 12 },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }, // flexWrap を追加して溢れ防止
+  actionBtnOutline: { borderWidth: 1, borderColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
+  actionBtnOutlineText: { color: theme.colors.primary, fontSize: 12 },
+  actionBtnFill: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
+  actionBtnFillText: { color: 'white', fontSize: 12 },
+  actionBtnDanger: { borderWidth: 1, borderColor: '#DC3545', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
+  actionBtnDangerText: { color: '#DC3545', fontSize: 12 },
+
+  // Form Styles
+  formContainer: { backgroundColor: 'white', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E9ECEF' },
+  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  formTitle: { fontSize: 18, fontWeight: 'bold' },
+  cancelText: { color: '#6C757D', fontSize: 14 },
+  section: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: 'bold', color: '#495057', marginBottom: 6 },
+  input: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#CED4DA', borderRadius: 6, padding: 12, fontSize: 14 },
+  textArea: { height: 200, fontFamily: 'System' },
+  jsonArea: { height: 150, fontFamily: 'Courier' },
+  saveButton: { backgroundColor: theme.colors.primary, paddingVertical: 14, borderRadius: 6, alignItems: 'center' },
+  disabledButton: { opacity: 0.5 },
+  saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });

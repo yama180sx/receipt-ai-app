@@ -181,7 +181,6 @@ export const deletePrompt = async (req: Request, res: Response) => {
  */
 export const getCostStats = async (req: Request, res: Response) => {
   try {
-    // PostgreSQLの TO_CHAR 関数を使用して月別・モデル別に集計
     const stats: any[] = await prisma.$queryRaw`
       SELECT
         TO_CHAR("createdAt", 'YYYY-MM') AS month,
@@ -193,7 +192,6 @@ export const getCostStats = async (req: Request, res: Response) => {
       ORDER BY month DESC;
     `;
 
-    // 取得した集計データに対して概算料金(円)を計算して付与
     const result = stats.map(row => {
       const costUsd = (row.totalPromptTokens * PRICE_USD_PER_INPUT) + (row.totalCandidatesTokens * PRICE_USD_PER_OUTPUT);
       const costJpy = costUsd * RATE_USD_TO_JPY;
@@ -203,17 +201,13 @@ export const getCostStats = async (req: Request, res: Response) => {
         modelId: row.modelId,
         totalPromptTokens: row.totalPromptTokens,
         totalCandidatesTokens: row.totalCandidatesTokens,
-        estimatedCostJpy: Math.round(costJpy * 100) / 100 // 小数第2位で丸め
+        estimatedCostJpy: Math.round(costJpy * 100) / 100
       };
     });
 
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error(`[AdminAPI] getCostStats Error: ${error}`);
-    res.status(500).json({ 
-      success: false, 
-      message: '統計データの取得に失敗しました',
-      error: '統計データの取得に失敗しました'
-    });
+    res.status(500).json({ success: false, error: '統計データの取得に失敗しました' });
   }
 };
