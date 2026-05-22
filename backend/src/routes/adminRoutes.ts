@@ -11,10 +11,11 @@ router.use(isAdmin);
 // --- [Issue #73] AIコスト統計管理 ---
 router.get('/stats', adminController.getCostStats);
 
-// --- [Issue #72] プロンプト管理 ---
+// --- [Issue #72/76] プロンプト管理 ---
 router.get('/prompts', adminController.getPrompts);
-
-// フロントエンドの apiClient.patch('/admin/prompts', { key: ... }) と一致させるため :key なし
-router.patch('/prompts', adminController.updatePrompt);
+router.post('/prompts', adminController.createPrompt);               // 新規作成
+router.patch('/prompts/:id', adminController.updatePrompt);          // 更新
+router.patch('/prompts/:id/activate', adminController.activatePrompt); // 切り替え
+router.delete('/prompts/:id', adminController.deletePrompt);         // 削除
 
 export default router;

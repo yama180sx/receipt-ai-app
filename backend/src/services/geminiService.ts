@@ -17,7 +17,7 @@ export interface ParsedReceipt {
   totalAmount: number;
   taxAmount?: number;
   items: ParsedItem[];
-  usageLogId?: number; // [Issue #63] ログ紐付け用に追加
+  usageLogId?: number; // [Issue #63] ログ紐付け用
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -58,11 +58,14 @@ async function withRetry<T>(
 }
 
 /**
- * [Issue #72] プロンプトをDBから取得し、ドメインヒントを結合
+ * [Issue #72/76] プロンプトをDBから取得し、ドメインヒントを結合
  */
 async function buildPrompt(): Promise<string> {
-  const template = await prisma.promptTemplate.findUnique({
-    where: { key: "RECEIPT_ANALYSIS", isActive: true }
+  // ★修正: @unique制約を外したため、findUniqueからfindFirstへ変更。
+  // 現在アクティブ(isActive: true)なRECEIPT_ANALYSISプロンプトを取得する。
+  const template = await prisma.promptTemplate.findFirst({
+    where: { key: "RECEIPT_ANALYSIS", isActive: true },
+    orderBy: { updatedAt: 'desc' } // 念のため最新のものを優先
   });
 
   if (!template) {
@@ -107,7 +110,7 @@ export const analyzeReceiptImage = async (
   const processAnalysis = async (
     retryWithCorrection: boolean = false, 
     previousErrorData?: string,
-    existingLogId?: number // ★修正: リトライ用に初回に採番されたログIDを引き回す
+    existingLogId?: number
   ): Promise<ParsedReceipt> => {
     const model = genAI.getGenerativeModel({ 
       model: GEMINI_MODEL, 
@@ -138,7 +141,7 @@ export const analyzeReceiptImage = async (
     if (usage) {
       try {
         if (existingLogId) {
-          // ★修正[Issue #63]: 自己修復リトライ時は、既存のログレコードにトークン使用量を合算（累積）
+          // 自己修復リトライ時は、既存のログレコードにトークン使用量を合算（累積）
           await prisma.apiUsageLog.update({
             where: { id: existingLogId },
             data: {
@@ -183,7 +186,7 @@ export const analyzeReceiptImage = async (
     const { isValid, diff } = validateArithmetic(data);
     if (!isValid && !retryWithCorrection) {
       logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
-      return await processAnalysis(true, text, usageLogId); // ★修正: 採番済みのログIDを次世代へ引き渡す
+      return await processAnalysis(true, text, usageLogId);
     }
 
     return data;

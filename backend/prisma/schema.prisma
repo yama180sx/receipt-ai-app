@@ -29,11 +29,11 @@ model FamilyMember {
   id            Int           @id @default(autoincrement())
   name          String
   password_hash String?
-  familyGroupId Int            // ★ 所属世帯
+  familyGroupId Int           // ★ 所属世帯
   role          Role          @default(USER) // [Issue #73] デフォルトは一般ユーザー
-  familyGroup   FamilyGroup    @relation(fields: [familyGroupId], references: [id])
+  familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
-  apiUsageLogs  ApiUsageLog[]  // [Issue #59] トークンログとのリレーション
+  apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
 }
@@ -56,21 +56,21 @@ model Store {
 }
 
 model Receipt {
-  id            Int            @id @default(autoincrement())
-  familyGroupId Int            // ★ 世帯ID (論理分離の主軸)
-  familyGroup   FamilyGroup    @relation(fields: [familyGroupId], references: [id])
+  id            Int           @id @default(autoincrement())
+  familyGroupId Int           // ★ 世帯ID (論理分離の主軸)
+  familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   memberId      Int
-  member        FamilyMember   @relation(fields: [memberId], references: [id])
+  member        FamilyMember  @relation(fields: [memberId], references: [id])
   storeName     String
-  date          DateTime       @db.Timestamptz(3)
-  totalAmount   Int            // 支払合計（税込）
+  date          DateTime      @db.Timestamptz(3)
+  totalAmount   Int           // 支払合計（税込）
   // [Issue #71] 外税額を保持するフィールド
-  taxAmount     Float          @default(0.0)
+  taxAmount     Float         @default(0.0)
   rawText       Json?
-  imagePath     String?        
+  imagePath     String?       
   items         Item[]
-  apiUsageLogs  ApiUsageLog[]  // [Issue #59] トークンログとのリレーション
-  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyGroupId, date]) // 検索効率化
 }
@@ -88,14 +88,14 @@ model Item {
 
 // 学習マスタ (世帯ごとに学習結果を分離)
 model ProductMaster {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   name          String
   storeName     String
   categoryId    Int
   familyGroupId Int
   
-  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
-  category      Category     @relation(fields: [categoryId], references: [id])
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  category      Category    @relation(fields: [categoryId], references: [id])
 
   @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
 }
@@ -117,16 +117,19 @@ model ApiUsageLog {
   @@index([createdAt])
 }
 
-// [Issue #72] AIプロンプト管理マスタ
-// 管理画面からの動的チューニングとChain of Thoughtを制御します
+// [Issue #72/76] AIプロンプト管理マスタ
+// 履歴を保持し、isActive = true のものがデフォルトとして使用されます。
 model PromptTemplate {
   id           Int      @id @default(autoincrement())
-  key          String   @unique                       // 例: "RECEIPT_ANALYSIS"
-  description  String?                                // プロンプトの用途説明
-  systemPrompt String   @db.Text                      // Chain of Thoughtを含む基本命令文
-  domainHints  Json?                                  // 業態別の追加指示集 (JSON)
-  isActive     Boolean  @default(true)                // 現在使用中かどうか
-  version      Int      @default(1)                   // 世代管理用
+  key          String   // 例: "RECEIPT_ANALYSIS" (複数バージョン保持のため @unique は削除)
+  name         String   @default("デフォルトプロンプト") // 例: "本番用", "テスト用(外税修正版)"
+  description  String?  // プロンプトの用途説明
+  systemPrompt String   @db.Text // Chain of Thoughtを含む基本命令文
+  domainHints  Json?    // 業態別の追加指示集 (JSON)
+  isActive     Boolean  @default(false) // 現在のデフォルトとして使用中かどうか
+  version      Int      @default(1) // 世代管理用
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([key, isActive]) // 検索効率化のためインデックスを追加
 }
