@@ -22,7 +22,8 @@ import {
   getJobStatus,
   getAdvancedStats,
   commitReceipt,
-  getFamilyMembers // ★ Issue #64: コントローラーから世帯メンバー取得関数をインポート
+  getFamilyMembers,
+  updateItemSplits // ★ Issue #78: 按分保存関数をインポート
 } from '../controllers/receiptController';
 
 const router = express.Router();
@@ -86,7 +87,7 @@ router.post(
 // --- 共通認証・テナントミドルウェア ---
 router.use(authMiddleware, tenantMiddleware);
 
-// ★ Issue #64: 所属世帯のメンバー一覧を取得するエンドポイントを追加
+// 所属世帯のメンバー一覧を取得するエンドポイント
 router.get('/family-groups/members', getFamilyMembers);
 
 router.get('/receipts', getReceipts);
@@ -97,10 +98,13 @@ router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', createReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 
-// Issue #67: 単価・数量（小数対応）を含むレシート全体の更新
+// レシート・明細更新系
 router.patch('/receipts/:id', updateReceipt);
-
 router.patch('/receipts/items/:id', updateItemCategory);
+
+// ★ Issue #78: 明細ごとの按分設定（ItemSplit）を保存するエンドポイント
+router.post('/receipts/items/:itemId/splits', updateItemSplits);
+
 router.post('/receipts/commit', commitReceipt);
 
 export default router;
