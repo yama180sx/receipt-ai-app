@@ -20,7 +20,8 @@ interface HomeScreenProps {
   onAnalysisReady: (data: any) => void; 
   onGoToHistory: () => void;
   onGoToStats: () => void;
-  onGoToAdminMenu?: () => void; // [Issue #73] 個別遷移を廃止し、ハブ画面への遷移へ統合
+  onGoToSettlement?: () => void; // ★ [Issue #80] 精算サマリー画面への遷移ハンドラを追加
+  onGoToAdminMenu?: () => void;
   currentMemberId: number;
   userRole?: string | null;
 }
@@ -32,6 +33,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAnalysisReady, 
   onGoToHistory, 
   onGoToStats, 
+  onGoToSettlement, // ★ 追加
   onGoToAdminMenu,
   currentMemberId,
   userRole 
@@ -191,18 +193,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </TouchableOpacity>
 
-        <View style={[styles.row, isWide && styles.wideRow]}>
-          <TouchableOpacity style={[styles.menuCard, isWide && styles.wideMenuCard]} onPress={onGoToHistory}>
+        {/* メニューカード群：グリッド表示 */}
+        <View style={styles.gridContainer}>
+          <TouchableOpacity style={styles.gridCard} onPress={onGoToHistory}>
             <Text style={{ fontSize: 28, marginBottom: 8 }}>📋</Text>
             <Text style={styles.menuLabel}>履歴一覧</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.menuCard, isWide && styles.wideMenuCard]} onPress={onGoToStats}>
+          <TouchableOpacity style={styles.gridCard} onPress={onGoToStats}>
             <Text style={{ fontSize: 28, marginBottom: 8 }}>📊</Text>
             <Text style={styles.menuLabel}>支出統計</Text>
           </TouchableOpacity>
+          {/* ★ [Issue #80] 精算サマリーへの遷移ボタン */}
+          {onGoToSettlement && (
+            <TouchableOpacity style={styles.gridCard} onPress={onGoToSettlement}>
+              <Text style={{ fontSize: 28, marginBottom: 8 }}>🤝</Text>
+              <Text style={styles.menuLabel}>精算サマリー</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* [Issue #73] 管理者限定メニューへのハブ導線 */}
+        {/* 管理者限定メニューへのハブ導線 */}
         {isAdmin && (
           <View style={styles.section}>
             <TouchableOpacity style={[styles.settingsCard, { backgroundColor: '#F8F9FA' }]} onPress={onGoToAdminMenu}>
@@ -257,10 +267,11 @@ const styles = StyleSheet.create({
   iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   captureButtonText: { ...theme.typography.h2, color: theme.colors.primary },
   jobStatusText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md },
-  wideRow: { justifyContent: 'flex-start', gap: theme.spacing.md },
-  menuCard: { backgroundColor: theme.colors.surface, width: (windowWidth - theme.spacing.lg * 2 - theme.spacing.md) / 2, maxWidth: 280, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  wideMenuCard: { width: '48%' },
+  
+  // ★ メニュー部分を Grid (flexWrap) 対応に変更
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md, marginBottom: theme.spacing.md },
+  gridCard: { flexGrow: 1, minWidth: 100, flexBasis: '30%', backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
+  
   menuLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
   section: { marginTop: theme.spacing.lg },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.sm },
