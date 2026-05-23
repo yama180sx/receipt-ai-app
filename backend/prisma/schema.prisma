@@ -34,6 +34,7 @@ model FamilyMember {
   familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
+  itemSplits    ItemSplit[]   // [Issue #78] 負担明細へのリレーション
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
 }
@@ -76,14 +77,33 @@ model Receipt {
 }
 
 model Item {
-  id         Int       @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   receiptId  Int
-  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receipt    Receipt     @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   categoryId Int?
-  category   Category? @relation(fields: [categoryId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
   name       String
   price      Float
-  quantity   Float     @default(1.0)
+  quantity   Float       @default(1.0)
+  
+  // [Issue #78] 負担割合の内訳（1対多）
+  splits     ItemSplit[] 
+}
+
+// [Issue #78] レシート明細ごとの負担内訳
+// レコードが存在しない場合（0件）は「レシート登録者の全額負担」とみなす（暗黙的デフォルト）
+model ItemSplit {
+  id             Int          @id @default(autoincrement())
+  itemId         Int
+  familyMemberId Int
+  amount         Int          // 精算用金額（端数を丸めた日本円のためInt）
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  item           Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  familyMember   FamilyMember @relation(fields: [familyMemberId], references: [id])
+
+  @@index([itemId])
+  @@index([familyMemberId])
 }
 
 // 学習マスタ (世帯ごとに学習結果を分離)

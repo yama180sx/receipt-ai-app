@@ -285,7 +285,7 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
 
     const receipts = await prisma.receipt.findMany({
       where,
-      include: { items: { include: { category: true } } },
+      include: { items: { include: { category: true, splits: true } } }, // ★ Issue #78: splitsも一緒に取得するよう変更
       orderBy: { date: 'desc' }
     });
     res.json({ success: true, data: receipts });
@@ -300,7 +300,7 @@ export const getLatestReceipt = async (_req: Request, res: Response, next: NextF
     const receipt = await prisma.receipt.findFirst({
       where: { familyGroupId: getFamilyGroupId() },
       orderBy: { createdAt: 'desc' },
-      include: { items: { include: { category: true } } }
+      include: { items: { include: { category: true, splits: true } } } // ★ Issue #78
     });
     res.json({ success: true, data: receipt });
   } catch (error) { next(error); }
@@ -443,5 +443,82 @@ export const getFamilyMembers = async (_req: Request, res: Response, next: NextF
     });
 
     res.json({ success: true, data: members });
+  } catch (error) { next(error); }
+};
+
+/**
+ * ★ [Issue #78] 明細（Item）の負担内訳（ItemSplit）を更新・保存する
+ * 要求されるデータ形式:
+ * { splits: [{ familyMemberId: 1, ratio: 0.5 }, { familyMemberId: 2, amount: 500 }] }
+ * 配列が空の場合は「按分なし」とみなし、既存のSplitを全削除します。
+ */
+export const updateItemSplits = async (req: Request, res: Response, next: NextFunction) => {
+  const { itemId } = req.params;
+  const { splits } = req.body;
+  const familyGroupId = getFamilyGroupId();
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. 対象明細の存在とテナント権限の確認
+      const item = await tx.item.findUnique({
+        where: { id: Number(itemId) },
+        include: { receipt: true }
+      });
+
+      if (!item || item.receipt.familyGroupId !== familyGroupId) {
+        throw new AppError('ItemNotFound', 404);
+      }
+
+      // 2. 空配列が送られてきた場合は、暗黙的デフォルト（按分なし）とみなして削除のみ行う
+      if (!splits || !Array.isArray(splits) || splits.length === 0) {
+        await tx.itemSplit.deleteMany({ where: { itemId: Number(itemId) } });
+        return { message: 'Splits cleared (Fallback to default payer)' };
+      }
+
+      // 3. 単価×数量を基準とする元金額の算出
+      const totalAmount = Math.round((item.price || 0) * (item.quantity || 1));
+      let allocatedAmount = 0;
+      const finalSplits: { familyMemberId: number; amount: number }[] = [];
+
+      // 4. 各メンバーへの金額割り当て計算
+      splits.forEach((split: any, index: number) => {
+        let amount = 0;
+
+        if (index === splits.length - 1) {
+          // ★ 端数丸め: 配列の最後のメンバーに「残額すべて」を寄せて合計不一致を防ぐ
+          amount = totalAmount - allocatedAmount;
+        } else if (split.amount !== undefined) {
+          amount = Math.round(Number(split.amount));
+        } else if (split.ratio !== undefined) {
+          amount = Math.round(totalAmount * Number(split.ratio));
+        }
+
+        allocatedAmount += amount;
+        finalSplits.push({
+          familyMemberId: Number(split.familyMemberId),
+          amount: amount,
+        });
+      });
+
+      // 5. 先頭要素への端数補正（allocatedAmountが超過・不足した場合のセーフティネット）
+      if (allocatedAmount !== totalAmount && finalSplits.length > 0) {
+        finalSplits[0].amount += (totalAmount - allocatedAmount);
+      }
+
+      // 6. DBの洗い替え（Delete & Insert）
+      await tx.itemSplit.deleteMany({ where: { itemId: Number(itemId) } });
+      await tx.itemSplit.createMany({
+        data: finalSplits.map(fs => ({
+          itemId: Number(itemId),
+          familyMemberId: fs.familyMemberId,
+          amount: fs.amount,
+        }))
+      });
+
+      // 更新後のSplitリストを返す
+      return await tx.itemSplit.findMany({ where: { itemId: Number(itemId) } });
+    });
+
+    res.json({ success: true, data: result });
   } catch (error) { next(error); }
 };
