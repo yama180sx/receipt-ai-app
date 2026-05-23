@@ -18,6 +18,7 @@ import receiptRoutes from './routes/receiptRoutes';
 import productMasterRoutes from './routes/productMasterRoutes'; 
 import categoryRoutes from './routes/categoryRoutes';
 import adminRoutes from './routes/adminRoutes'; // [Issue #72] 追加
+import statsRoutes from './routes/statsRoutes'; // ★ [Issue #78] 追加
 
 // --- エラーハンドリング ---
 import { AppError } from './utils/appError';
@@ -102,6 +103,7 @@ protectedApi.use(tenantMiddleware);
 protectedApi.use('/', receiptRoutes); 
 protectedApi.use('/categories', categoryRoutes);
 protectedApi.use('/product-master', productMasterRoutes);
+protectedApi.use('/stats', statsRoutes); // ★ [Issue #78] 統計・精算系ルートの追加
 
 app.use('/api', protectedApi);
 
