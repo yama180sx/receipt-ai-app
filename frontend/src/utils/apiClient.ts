@@ -98,4 +98,18 @@ apiClient.interceptors.response.use(
   }
 );
 
+// ★ [Issue #78/#79] 按分機能等のAPIコール用ラッパー
+export const api = {
+  // 家族メンバー一覧の取得
+  getFamilyMembers: async () => {
+    const res = await apiClient.get('/family-groups/members');
+    return res.data;
+  },
+  // 明細ごとの按分設定保存
+  saveItemSplits: async (itemId: number, splits: { familyMemberId: number; amount?: number; ratio?: number }[]) => {
+    const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
+    return res.data;
+  }
+};
+
 export default apiClient;

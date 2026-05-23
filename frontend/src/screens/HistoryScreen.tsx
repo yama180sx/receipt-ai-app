@@ -20,16 +20,13 @@ import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 interface HistoryScreenProps {
   onBack: () => void;
   currentMemberId: number; 
+  onGoToSplitEditor?: (receipt: any) => void; // ★ [Issue #79] App.tsxからの遷移ハンドラを受け取る
 }
 
 /**
  * [Issue #67 / #64 / Web・ネイティブ完全互換] 履歴一覧画面
- * - 所属世帯のメンバー一覧を動的取得するフィルタ機能を実装。
- * - 大画面（isWide）かつWeb環境下におけるフレックスボックスの横幅潰れバグを完全解消。
- * - 初期ロード時（selectedReceiptがnull）のWeb版レンダリングクラッシュを完全に防ぐヌルガードを導入。
- * - スマホ（縦画面・モーダル表示）とWeb/iPad（横並び2カラム）のスタイル競合を排除。
  */
-export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreenProps) {
+export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEditor }: HistoryScreenProps) {
   const { width: windowWidth } = useWindowDimensions();
   // Issue #66: 定数によるレスポンシブ判定
   const isWide = windowWidth >= BREAKPOINTS.TABLET; 
@@ -184,7 +181,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          style={StyleSheet.flatten(styles.webSelect)} // ★修正: 生HTML互換のため構造をフラット化
+          style={StyleSheet.flatten(styles.webSelect)}
         >
           <option value="">全期間</option>
           {months.map(m => (
@@ -215,7 +212,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
         <select
           value={selectedMember}
           onChange={(e) => setSelectedMember(e.target.value)}
-          style={StyleSheet.flatten(styles.webSelect)} // ★修正: 生HTML互換のため構造をフラット化
+          style={StyleSheet.flatten(styles.webSelect)} 
         >
           <option value="">世帯全体</option>
           {members.map(m => (
@@ -257,7 +254,6 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
           <View style={{ width: 40 }} />
         </View>
 
-        {/* ★修正: 大画面（Web）時、縮小特性による0px潰れを防ぐため flexGrow/flexShrink/minWidth を明示 */}
         <View style={[styles.filterContainer, isWide && styles.wideFilter]}>
           <View style={[styles.pickerBox, isWide && { width: 250, minWidth: 250, flexGrow: 0, flexShrink: 0 }]}>
             {renderMonthPicker()}
@@ -295,6 +291,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
                   baseUrl={BASE_URL}
                   fullWidth={false}
                   onSaveSuccess={fetchReceipts}
+                  onGoToSplitEditor={onGoToSplitEditor} // ★ 追加: Componentへハンドラを渡す
                 />
               ) : (
                 <View style={styles.emptyDetailWrapper}>
@@ -325,6 +322,7 @@ export default function HistoryScreen({ onBack, currentMemberId }: HistoryScreen
                 baseUrl={BASE_URL}
                 fullWidth={true}
                 onSaveSuccess={fetchReceipts}
+                onGoToSplitEditor={onGoToSplitEditor} // ★ 追加
               />
             )}
           </View>
