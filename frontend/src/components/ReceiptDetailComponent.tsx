@@ -22,14 +22,12 @@ interface ReceiptDetailComponentProps {
   onCategoryChange: (itemId: number, categoryId: number | null) => void;
   baseUrl: string;
   fullWidth?: boolean; 
-  onSaveSuccess?: () => void; // 保存成功時のリロード用
+  onSaveSuccess?: () => void;
+  onGoToSplitEditor?: (receipt: any) => void; // ★ [Issue #79] 按分エディタへの遷移
 }
 
 /**
- * [Issue #67 / #71] レシート詳細表示・編集コンポーネント
- * - 外税(taxAmount)の表示・編集機能を追加
- * - 編集モード時の動的な合計金額計算に税額を統合
- * ※保存済みデータの再編集ルートのため、解析用トークンログ（usageLogId）の紐付け処理（Issue #63）は対象外
+ * [Issue #67 / #71 / #79] レシート詳細表示・編集コンポーネント
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -37,7 +35,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   onCategoryChange,
   baseUrl,
   fullWidth = true,
-  onSaveSuccess
+  onSaveSuccess,
+  onGoToSplitEditor
 }) => {
   const { width: windowWidth } = useWindowDimensions();
   const effectiveWidth = fullWidth ? windowWidth : windowWidth - 350;
@@ -49,10 +48,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 
   const cacheKey = useMemo(() => Date.now(), []);
 
-  // 選択されたレシートが変わったとき、または編集モード開始時にデータを同期
   useEffect(() => {
     if (receipt) {
-      // taxAmount が undefined の場合は 0 をセット
       const data = JSON.parse(JSON.stringify(receipt));
       data.taxAmount = data.taxAmount ?? 0;
       setEditData(data);
@@ -60,7 +57,6 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
     setIsEditing(false);
   }, [receipt]);
 
-  // 表示用の合計金額計算 (明細合計 + 外税)
   const displayTotal = useMemo(() => {
     if (!editData) return 0;
     const items = isEditing ? editData.items : receipt.items;
@@ -72,7 +68,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
       return s + (p * q);
     }, 0);
 
-    return Math.round(itemsSum + tax); // 日本円の整合性のため合算後に四捨五入
+    return Math.round(itemsSum + tax); 
   }, [isEditing, editData?.items, editData?.taxAmount, receipt.items, receipt.taxAmount]);
 
   if (!receipt || !editData) {
@@ -88,7 +84,6 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
     return `${baseUrl}/${imagePath}?v=${cacheKey}`;
   };
 
-  // 編集内容の更新ロジック
   const updateEditField = (key: string, value: any) => {
     setEditData({ ...editData, [key]: value });
   };
@@ -99,14 +94,12 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
     setEditData({ ...editData, items: newItems });
   };
 
-  // 保存処理 (Issue #71: taxAmount を追加)
   const handleSave = async () => {
     setLoading(true);
     try {
       const payload = {
         storeName: editData.storeName,
         date: editData.date,
-        // 数値としての整合性を担保して送信
         taxAmount: parseFloat(String(editData.taxAmount)) || 0,
         totalAmount: displayTotal, 
         items: editData.items.map((item: any) => ({
@@ -164,9 +157,17 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
-              <Text style={styles.editButtonText}>✎ 編集</Text>
-            </TouchableOpacity>
+            <>
+              {/* ★ [Issue #79] 按分エディタへの遷移ボタンを追加 */}
+              {onGoToSplitEditor && (
+                <TouchableOpacity onPress={() => onGoToSplitEditor(receipt)} style={styles.splitButton}>
+                  <Text style={styles.splitButtonText}>➗ シェア・按分</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
+                <Text style={styles.editButtonText}>✎ 編集</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
 
@@ -185,7 +186,6 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
           {isEditing ? (
             <TextInput 
               style={styles.dateInput}
-              // 日付と時刻のパース (YYYY-MM-DD HH:mm 形式を想定)
               value={editData.date ? new Date(editData.date).toISOString().replace('T', ' ').substring(0, 16) : ''}
               onChangeText={(val) => updateEditField('date', val)}
               placeholder="YYYY-MM-DD HH:mm"
@@ -268,7 +268,6 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
             </View>
           ))}
 
-          {/* [Issue #71] 消費税(外税)表示・編集エリア */}
           <View style={styles.taxSection}>
             <View style={styles.taxRow}>
               <Text style={styles.taxLabel}>消費税 (外税・加算額)</Text>
@@ -335,6 +334,8 @@ const styles = StyleSheet.create({
   editControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 10 },
   editButton: { backgroundColor: theme.colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
   editButtonText: { color: theme.colors.text.main, fontWeight: 'bold' },
+  splitButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#bae6fd' }, // 追加: 按分ボタン
+  splitButtonText: { color: '#0369a1', fontWeight: 'bold' }, // 追加: 按分ボタンテキスト
   saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
   cancelButton: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
