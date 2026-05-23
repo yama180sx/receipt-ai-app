@@ -17,15 +17,16 @@ import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen';
 import { PromptEditorScreen } from './src/screens/PromptEditorScreen';
 import { AdminStatsScreen } from './src/screens/AdminStatsScreen';
 import { AdminMenuScreen } from './src/screens/AdminMenuScreen';
-import { SplitEditorScreen } from './src/screens/SplitEditorScreen'; // ★ [Issue #79] 追加
+import { SplitEditorScreen } from './src/screens/SplitEditorScreen'; 
+import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen'; // ★ [Issue #80] 追加
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// ★ 'split_editor' を追加
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor';
+// ★ 'settlement_summary' を追加
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -44,7 +45,6 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
   
-  // ★ [Issue #79] 按分エディタに渡す対象レシートを保持
   const [targetReceipt, setTargetReceipt] = useState<any>(null);
 
   useEffect(() => {
@@ -198,8 +198,8 @@ export default function App() {
     );
   }
 
-  // ★ isFullWidth に 'split_editor' を追加
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor'].includes(currentView);
+  // ★ isFullWidth に 'settlement_summary' を追加
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary'].includes(currentView);
 
   if (!userToken) {
     return (
@@ -239,23 +239,26 @@ export default function App() {
           <HistoryScreen 
             onBack={() => setCurrentView('main')} 
             currentMemberId={memberId}
-            // ★ HistoryScreen側から呼び出せるように、ReceiptDetailComponentに onGoToSplitEditor を渡す準備を HistoryScreen 側で行う必要がありますが、
-            // ここでは App.tsx 側で対象レシートを受け取るハンドラを渡す想定にします。
-            // (HistoryScreen.tsxの修正が不要になるよう、ルーティングの親玉で保持する設計)
             onGoToSplitEditor={(receipt) => {
               setTargetReceipt(receipt);
               setCurrentView('split_editor');
             }}
           />
         );
-      case 'split_editor': // ★ [Issue #79] 按分エディタ画面のルーティング
+      case 'split_editor': 
         return (
           <SplitEditorScreen
             receipt={targetReceipt}
             onBack={() => {
               setTargetReceipt(null);
-              setCurrentView('history'); // 戻る先はHistory
+              setCurrentView('history'); 
             }}
+          />
+        );
+      case 'settlement_summary': // ★ [Issue #80] 精算サマリー画面のルーティング追加
+        return (
+          <SettlementSummaryScreen
+            onBack={() => setCurrentView('main')}
           />
         );
       case 'stats': 
@@ -304,6 +307,8 @@ export default function App() {
               onAnalysisReady={handleAnalysisReady} 
               onGoToHistory={() => setCurrentView('history')}
               onGoToStats={() => setCurrentView('stats')}
+              // ★ [Issue #80] ハンドラを注入
+              onGoToSettlement={() => setCurrentView('settlement_summary')}
               onGoToAdminMenu={() => setCurrentView('admin_menu')} 
               currentMemberId={memberId}
               userRole={currentUserRole}
