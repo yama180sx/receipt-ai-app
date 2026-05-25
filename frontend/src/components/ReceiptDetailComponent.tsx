@@ -27,7 +27,7 @@ interface ReceiptDetailComponentProps {
 }
 
 /**
- * [Issue #67 / #71 / #79] レシート詳細表示・編集コンポーネント
+ * [Issue #67 / #71 / #79 / #81] レシート詳細表示・編集コンポーネント
  */
 export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   receipt,
@@ -158,10 +158,10 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
             </>
           ) : (
             <>
-              {/* ★ [Issue #79] 按分エディタへの遷移ボタンを追加 */}
-              {onGoToSplitEditor && (
+              {/* ★ [Issue #81] スマホ非表示化 ＆ 文言変更 */}
+              {onGoToSplitEditor && isWide && (
                 <TouchableOpacity onPress={() => onGoToSplitEditor(receipt)} style={styles.splitButton}>
-                  <Text style={styles.splitButtonText}>➗ シェア・按分</Text>
+                  <Text style={styles.splitButtonText}>➗ 割り勘</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
@@ -334,8 +334,8 @@ const styles = StyleSheet.create({
   editControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 10 },
   editButton: { backgroundColor: theme.colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
   editButtonText: { color: theme.colors.text.main, fontWeight: 'bold' },
-  splitButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#bae6fd' }, // 追加: 按分ボタン
-  splitButtonText: { color: '#0369a1', fontWeight: 'bold' }, // 追加: 按分ボタンテキスト
+  splitButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#bae6fd' },
+  splitButtonText: { color: '#0369a1', fontWeight: 'bold' }, 
   saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
   cancelButton: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
