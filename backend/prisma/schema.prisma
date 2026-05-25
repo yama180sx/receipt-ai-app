@@ -35,6 +35,10 @@ model FamilyMember {
   receipts      Receipt[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
   itemSplits    ItemSplit[]   // [Issue #78] 負担明細へのリレーション
+  
+  // ★ [Issue #81] 送金履歴リレーション
+  sentTransfers     SettlementTransfer[] @relation("TransferSender")
+  receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
 }
@@ -104,6 +108,23 @@ model ItemSplit {
 
   @@index([itemId])
   @@index([familyMemberId])
+}
+
+// ★ [Issue #81] 送金履歴（締め処理の実績管理）
+model SettlementTransfer {
+  id           Int          @id @default(autoincrement())
+  month        String       // 例: "2026-05" (精算対象月)
+  fromMemberId Int          // 送金した人
+  toMemberId   Int          // 受け取った人
+  amount       Int          // 送金額
+  settledAt    DateTime     @default(now()) @db.Timestamptz(3)
+
+  sender       FamilyMember @relation("TransferSender", fields: [fromMemberId], references: [id])
+  receiver     FamilyMember @relation("TransferReceiver", fields: [toMemberId], references: [id])
+
+  @@index([month])
+  @@index([fromMemberId])
+  @@index([toMemberId])
 }
 
 // 学習マスタ (世帯ごとに学習結果を分離)

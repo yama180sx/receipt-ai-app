@@ -47,12 +47,9 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
           
           let initialActive: any[] = [];
           
-          // ★ 修正: レシート内に既に按分(Split)データが存在するかチェック
           const hasExistingSplits = receipt.items.some((item: any) => item.splits && item.splits.length > 0);
 
           if (hasExistingSplits) {
-            // 【登録済みパターンの復元】
-            // 全ItemのSplitを走査し、一度でも登場したメンバーのIDを抽出
             const splitMemberIds = new Set<number>();
             receipt.items.forEach((item: any) => {
               if (item.splits) {
@@ -60,8 +57,6 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
               }
             });
             
-            // 抽出したIDに該当するメンバー情報を allMembers(res.data) から拾う
-            // ※先頭を必ず支払者にするため、支払者から先にpushする
             const payer = res.data.find((m: any) => m.id === receipt.memberId);
             if (payer) initialActive.push(payer);
             
@@ -72,14 +67,12 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
             });
 
           } else {
-            // 【新規登録時パターンのデフォルト2名設定】
             const payer = res.data.find((m: any) => m.id === receipt.memberId);
             if (payer) initialActive.push(payer);
             const others = res.data.filter((m: any) => m.id !== receipt.memberId);
             if (others.length > 0) initialActive.push(others[0]);
           }
 
-          // 万が一初期メンバーが空になった場合のフェールセーフ
           if (initialActive.length === 0) {
             initialActive = res.data.slice(0, 2);
           }
@@ -106,13 +99,11 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
       const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
 
       if (item.splits && item.splits.length > 0) {
-        // 既存データがある場合はセット
         targetMembers.forEach(m => {
           const split = item.splits.find((s: any) => s.familyMemberId === m.id);
           initialData[item.id][m.id] = split ? split.amount : 0;
         });
       } else {
-        // 無い場合は支払者が全額（デフォルト）
         targetMembers.forEach(m => {
           initialData[item.id][m.id] = m.id === receipt.memberId ? itemTotal : 0;
         });
@@ -204,7 +195,6 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     setEditSplits(prev => ({ ...prev, [itemId]: newData }));
   };
 
-
   const splitItemEqually = (itemId: number, itemTotal: number) => {
     const newData = { ...editSplits[itemId] };
     const memberCount = activeMembers.length;
@@ -218,6 +208,57 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     setEditSplits(prev => ({ ...prev, [itemId]: newData }));
   };
 
+  // ★ 追加: 合計行の変更を全明細にカスケードするロジック
+  const applyCascadePercent = (memberId: number, percent: number) => {
+    if (activeMembers.length <= 1 || percent < 0 || percent > 100) return;
+
+    const firstMemberId = activeMembers[0].id;
+    if (memberId === firstMemberId) return; // 先頭は常に自動計算のためスキップ
+
+    setEditSplits(prev => {
+      const next = { ...prev };
+      receipt.items.forEach((item: any) => {
+        const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+        const newData = { ...next[item.id] };
+
+        // 入力された％に基づいて金額を算出
+        const calculatedAmount = Math.round(itemTotal * (percent / 100));
+        newData[memberId] = calculatedAmount;
+
+        // 先頭メンバーの端数調整
+        let sumOthers = 0;
+        activeMembers.forEach(m => {
+          if (m.id !== firstMemberId) {
+            sumOthers += newData[m.id] || 0;
+          }
+        });
+        newData[firstMemberId] = Math.max(0, itemTotal - sumOthers);
+
+        next[item.id] = newData;
+      });
+      return next;
+    });
+  };
+
+  // ★ 追加: 合計行の金額変更ハンドラ
+  const handleTotalAmountChange = (memberId: number, value: string, receiptTotal: number) => {
+    const numericValue = value.replace(/[^0-9]/g, '');
+    let valToSet = numericValue === '' ? 0 : parseInt(numericValue, 10);
+    if (valToSet > receiptTotal) valToSet = receiptTotal;
+
+    // 入力された金額から割合（％）を算出し、全明細に適用
+    const percent = receiptTotal > 0 ? (valToSet / receiptTotal) * 100 : 0;
+    applyCascadePercent(memberId, percent);
+  };
+
+  // ★ 追加: 合計行の％変更ハンドラ
+  const handleTotalPercentChange = (memberId: number, value: string) => {
+    const numericValue = value.replace(/[^0-9]/g, '');
+    let percent = numericValue === '' ? 0 : parseInt(numericValue, 10);
+    applyCascadePercent(memberId, percent);
+  };
+
+  // ★ 追加: レシート全体を均等割り
   const splitWholeReceiptEqually = () => {
     receipt.items.forEach((item: any) => {
       const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
@@ -256,6 +297,20 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   }
 
   const getImageUrl = () => receipt.imagePath ? `${BASE_URL}/${receipt.imagePath}` : null;
+
+  // レシート全体の合計額を算出
+  const receiptTotalAmount = receipt.items.reduce((sum: number, item: any) => {
+    return sum + Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+  }, 0);
+
+  // 合計行表示用: メンバーごとの合計額を計算
+  const getMemberTotalAmount = (memberId: number) => {
+    let sum = 0;
+    receipt.items.forEach((item: any) => {
+      sum += editSplits[item.id]?.[memberId] || 0;
+    });
+    return sum;
+  };
 
   return (
     <View style={styles.container}>
@@ -322,9 +377,6 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
         <View style={styles.editorPane}>
           <View style={styles.editorToolbar}>
             <Text style={styles.storeName}>{receipt.storeName || '店名不明'}</Text>
-            <TouchableOpacity style={styles.batchSplitButton} onPress={splitWholeReceiptEqually}>
-              <Text style={styles.batchSplitText}>⚡ レシート全体を均等割り</Text>
-            </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.tableScroll} horizontal={false}>
@@ -393,6 +445,55 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                   </View>
                 );
               })}
+
+              {/* ★ 追加: 合計行 (Total) */}
+              <View style={[styles.tableRow, styles.totalRow]}>
+                <Text style={[styles.cell, styles.cellName, styles.totalText]}>一括調整（全体合計）</Text>
+                <Text style={[styles.cell, styles.cellAmount, styles.totalText]}>¥{receiptTotalAmount.toLocaleString()}</Text>
+                
+                {activeMembers.map((m, idx) => {
+                  const memberTotal = getMemberTotalAmount(m.id);
+                  const percentValue = receiptTotalAmount > 0 ? Math.round((memberTotal / receiptTotalAmount) * 100) : 0;
+                  const isFirst = idx === 0;
+
+                  return (
+                    <View key={m.id} style={[styles.cell, styles.cellInputCol]}>
+                      <View style={styles.dualInputWrapper}>
+                        <View style={[styles.inputGroup, styles.totalInputGroup]}>
+                          <TextInput
+                            style={[styles.inputBox, styles.percentBox, isFirst && styles.disabledInputBox, styles.totalInputBox]}
+                            value={String(percentValue)}
+                            onChangeText={(val) => handleTotalPercentChange(m.id, val)}
+                            keyboardType="number-pad"
+                            editable={!isFirst}
+                            selectTextOnFocus
+                          />
+                          <Text style={[styles.unitText, styles.totalUnitText]}>%</Text>
+                        </View>
+                        
+                        <View style={[styles.inputGroup, styles.totalInputGroup, { marginLeft: 4 }]}>
+                          <TextInput
+                            style={[styles.inputBox, styles.amountBox, isFirst && styles.disabledInputBox, styles.totalInputBox]}
+                            value={String(memberTotal)}
+                            onChangeText={(val) => handleTotalAmountChange(m.id, val, receiptTotalAmount)}
+                            keyboardType="number-pad"
+                            editable={!isFirst}
+                            selectTextOnFocus
+                          />
+                          <Text style={[styles.unitText, styles.totalUnitText]}>円</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+
+                <View style={[styles.cell, styles.cellAction]}>
+                  <TouchableOpacity style={styles.splitBtnSmall} onPress={splitWholeReceiptEqually}>
+                    <Text style={styles.splitBtnSmallText}>均等</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
             </ScrollView>
           </ScrollView>
         </View>
@@ -436,12 +537,18 @@ const styles = StyleSheet.create({
   editorPane: { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   editorToolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface },
   storeName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  batchSplitButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#bae6fd' },
-  batchSplitText: { color: '#0369a1', fontWeight: 'bold' },
   
   tableScroll: { flex: 1 },
   tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center', minWidth: 800 },
   tableHeader: { backgroundColor: '#F8F9FA', borderBottomColor: theme.colors.border },
+  
+  // ★ 追加: 合計行のスタイル
+  totalRow: { backgroundColor: '#FFFBEB', borderTopWidth: 2, borderTopColor: '#FCD34D' },
+  totalText: { fontWeight: 'bold', color: '#B45309' },
+  totalInputGroup: { borderColor: '#FCD34D', backgroundColor: '#FEF3C7' },
+  totalInputBox: { fontWeight: 'bold', color: '#B45309' },
+  totalUnitText: { color: '#B45309', fontWeight: 'bold' },
+
   cell: { padding: 12, justifyContent: 'center' },
   headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
   cellName: { width: 160, fontSize: 14, color: theme.colors.text.main },
