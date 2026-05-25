@@ -203,8 +203,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={{ fontSize: 28, marginBottom: 8 }}>📊</Text>
             <Text style={styles.menuLabel}>支出統計</Text>
           </TouchableOpacity>
-          {/* ★ [Issue #80] 精算サマリーへの遷移ボタン */}
-          {onGoToSettlement && (
+          {/* ★ [Issue #80] 精算サマリーへの遷移ボタン（スマホ非表示） */}
+          {onGoToSettlement && isWide && (
             <TouchableOpacity style={styles.gridCard} onPress={onGoToSettlement}>
               <Text style={{ fontSize: 28, marginBottom: 8 }}>🤝</Text>
               <Text style={styles.menuLabel}>精算サマリー</Text>

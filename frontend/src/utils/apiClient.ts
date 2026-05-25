@@ -93,7 +93,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-// ★ [Issue #78/#79/#80] 各種APIコール用ラッパー
+// ★ [Issue #78/#79/#80/#81] 各種APIコール用ラッパー
 export const api = {
   getFamilyMembers: async () => {
     const res = await apiClient.get('/family-groups/members');
@@ -103,9 +103,14 @@ export const api = {
     const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
     return res.data;
   },
-  // ★ [Issue #80] 月間精算ステータスの取得メソッドを追加
+  // [Issue #80] 月間精算ステータスの取得メソッド
   getSettlementStatus: async (month: string) => {
     const res = await apiClient.get('/stats/settlement', { params: { month } });
+    return res.data;
+  },
+  // ★ [Issue #81] 送金記録の登録メソッドを追加
+  addSettlementTransfer: async (payload: { month: string; fromMemberId: number; toMemberId: number; amount: number }) => {
+    const res = await apiClient.post('/stats/settlement/transfers', payload);
     return res.data;
   }
 };

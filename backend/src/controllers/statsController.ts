@@ -3,8 +3,9 @@ import { prisma } from '../utils/prismaClient';
 import { getFamilyGroupId } from '../utils/context';
 
 /**
- * [Issue #78] 月間精算ステータスの取得（暗黙的デフォルト対応）
- * 対象月の「各メンバーの立替額」「各メンバーの負担額」を算出し、その差額（精算額）を返します。
+ * [Issue #78 / #81] 月間精算ステータスの取得（暗黙的デフォルト対応 ＆ 送金実績の反映）
+ * 対象月の「各メンバーの立替額」「各メンバーの負担額」を算出し、
+ * さらに同月の送金実績（SettlementTransfer）を加味した最終的な「精算残額」を返します。
  */
 export const getSettlementStatus = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
@@ -23,9 +24,18 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
       select: { id: true, name: true },
     });
 
-    const stats: Record<number, { name: string; totalPaid: number; totalOwed: number; balance: number }> = {};
+    const stats: Record<number, { 
+      name: string; 
+      totalPaid: number; 
+      totalOwed: number; 
+      baseBalance: number; // レシートベースの本来の差額
+      transferredOut: number; // 他者へ送金した額
+      transferredIn: number; // 他者から受け取った額
+      balance: number; // 最終的な残額（baseBalance + transferredOut - transferredIn）
+    }> = {};
+    
     members.forEach(m => {
-      stats[m.id] = { name: m.name, totalPaid: 0, totalOwed: 0, balance: 0 };
+      stats[m.id] = { name: m.name, totalPaid: 0, totalOwed: 0, baseBalance: 0, transferredOut: 0, transferredIn: 0, balance: 0 };
     });
 
     // 2. 指定月・世帯のレシートを、明細とSplitを含めて取得
@@ -41,7 +51,7 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
       }
     });
 
-    // 3. 集計ロジック（暗黙的デフォルト処理）
+    // 3. レシートと明細に基づく基本集計（暗黙的デフォルト処理）
     receipts.forEach(receipt => {
       let receiptTotalPaid = 0; // そのレシートで立替えた総額
 
@@ -71,17 +81,48 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
       }
     });
 
-    // 4. 最終的な精算額（balance）の計算
-    // balance > 0: 払いすぎている（他者から受け取るべき）
-    // balance < 0: 払いが足りない（他者に支払うべき）
+    // ★ [Issue #81] 4. 送金実績（SettlementTransfer）の取得と集計
+    // 対象月の全送金履歴（familyGroupIdに属するメンバー間の送金）
+    const transfers = await prisma.settlementTransfer.findMany({
+      where: {
+        month: targetMonth,
+        sender: { familyGroupId }, // テナント検証
+      },
+      select: {
+        id: true,
+        fromMemberId: true,
+        toMemberId: true,
+        amount: true,
+        settledAt: true,
+      }
+    });
+
+    transfers.forEach(t => {
+      if (stats[t.fromMemberId]) stats[t.fromMemberId].transferredOut += t.amount;
+      if (stats[t.toMemberId]) stats[t.toMemberId].transferredIn += t.amount;
+    });
+
+    // 5. 最終的な精算額（balance）の計算
     const result = Object.entries(stats).map(([id, s]) => {
-      const balance = s.totalPaid - s.totalOwed;
+      // 本来のレシート差額 (立替額 - 負担額)
+      // > 0: 払いすぎ (受け取る権利)
+      // < 0: 払いが足りない (支払う義務)
+      s.baseBalance = s.totalPaid - s.totalOwed;
+
+      // 最終残額の計算
+      // 支払う義務(<0)がある人は、送金(transferredOut)すると義務が減る(+方向へ)
+      // 受け取る権利(>0)がある人は、受領(transferredIn)すると権利が減る(-方向へ)
+      s.balance = s.baseBalance + s.transferredOut - s.transferredIn;
+
       return {
         memberId: Number(id),
         name: s.name,
         totalPaid: s.totalPaid,
         totalOwed: s.totalOwed,
-        balance: balance,
+        baseBalance: s.baseBalance,
+        transferredOut: s.transferredOut,
+        transferredIn: s.transferredIn,
+        balance: s.balance,
       };
     });
 
@@ -89,8 +130,61 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
       success: true,
       data: {
         month: targetMonth,
-        members: result
+        members: result,
+        transfers // 履歴表示用に生の送金データも返す
       }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+/**
+ * ★ [Issue #81] 送金記録（締め処理の実績）の登録
+ * POST /api/stats/settlement/transfers
+ */
+export const addSettlementTransfer = async (req: Request, res: Response, next: NextFunction) => {
+  const familyGroupId = getFamilyGroupId();
+  
+  const { month, fromMemberId, toMemberId, amount } = req.body;
+
+  if (!month || !fromMemberId || !toMemberId || !amount || amount <= 0) {
+    return res.status(400).json({ success: false, message: '必要なパラメータが不足しているか、金額が不正です。' });
+  }
+
+  if (fromMemberId === toMemberId) {
+    return res.status(400).json({ success: false, message: '自分自身への送金は登録できません。' });
+  }
+
+  try {
+    // 送信者・受信者が同一世帯に属しているか（テナント検証）
+    const validMembers = await prisma.familyMember.findMany({
+      where: {
+        id: { in: [fromMemberId, toMemberId] },
+        familyGroupId
+      }
+    });
+
+    if (validMembers.length !== 2) {
+      return res.status(403).json({ success: false, message: '無効なユーザー指定、または権限がありません。' });
+    }
+
+    // 送金記録の作成
+    const newTransfer = await prisma.settlementTransfer.create({
+      data: {
+        month,
+        fromMemberId,
+        toMemberId,
+        amount,
+        // settledAt は default(now()) で自動採番
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      data: newTransfer
     });
 
   } catch (error) {

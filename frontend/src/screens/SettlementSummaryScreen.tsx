@@ -7,7 +7,10 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   Platform,
-  useWindowDimensions
+  useWindowDimensions,
+  Modal,
+  TextInput,
+  Alert
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { theme, BREAKPOINTS } from '../theme';
@@ -24,6 +27,13 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [summaryData, setSummaryData] = useState<any[]>([]);
+
+  // 送金モーダル用ステート
+  const [isTransferModalVisible, setTransferModalVisible] = useState(false);
+  const [transferFrom, setTransferFrom] = useState<number | null>(null);
+  const [transferTo, setTransferTo] = useState<number | null>(null);
+  const [transferAmount, setTransferAmount] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 過去6ヶ月の選択肢を生成
   const months = useMemo(() => {
@@ -51,6 +61,46 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   useEffect(() => {
     loadSettlementData();
   }, [selectedMonth]);
+
+  const handleTransferSubmit = async () => {
+    if (!transferFrom || !transferTo || !transferAmount) {
+      Alert.alert('入力エラー', '送金元、送金先、金額をすべて入力してください。');
+      return;
+    }
+    if (transferFrom === transferTo) {
+      Alert.alert('入力エラー', '送金元と送金先は異なるメンバーを選択してください。');
+      return;
+    }
+    
+    const amountNum = parseInt(transferAmount.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      Alert.alert('入力エラー', '正しい金額を入力してください。');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await api.addSettlementTransfer({
+        month: selectedMonth,
+        fromMemberId: transferFrom,
+        toMemberId: transferTo,
+        amount: amountNum
+      });
+      if (res.success) {
+        Alert.alert('成功', '送金記録を登録しました。');
+        setTransferModalVisible(false);
+        setTransferFrom(null);
+        setTransferTo(null);
+        setTransferAmount('');
+        loadSettlementData(); // 再読み込みして残額を更新
+      }
+    } catch (err) {
+      console.error('送金記録エラー', err);
+      Alert.alert('エラー', '送金記録の登録に失敗しました。');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const renderMonthPicker = () => {
     if (Platform.OS === 'web') {
@@ -89,8 +139,16 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
           <Text style={styles.backButtonText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>家族間精算サマリー</Text>
-        <View style={styles.monthPickerContainer}>
-          {renderMonthPicker()}
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.addTransferButton}
+            onPress={() => setTransferModalVisible(true)}
+          >
+            <Text style={styles.addTransferButtonText}>＋ 送金・受取を記録</Text>
+          </TouchableOpacity>
+          <View style={styles.monthPickerContainer}>
+            {renderMonthPicker()}
+          </View>
         </View>
       </View>
 
@@ -104,23 +162,50 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
           {/* キャッシュ・フロー・サマリーカード群 */}
           <View style={[styles.cardGrid, isWide ? styles.rowLayout : styles.colLayout]}>
             {summaryData.map(m => {
-              const isSurplus = m.balance >= 0;
+              const isSettled = m.balance === 0 && Math.abs(m.baseBalance) > 0;
+              const isSurplus = m.balance > 0;
+              const isDeficit = m.balance < 0;
+              
+              let cardStyle = styles.cardNeutral;
+              if (isSettled) cardStyle = styles.cardSettled;
+              else if (isSurplus) cardStyle = styles.cardSurplus;
+              else if (isDeficit) cardStyle = styles.cardDeficit;
+
               return (
-                <View key={m.memberId} style={[styles.summaryCard, isSurplus ? styles.cardSurplus : styles.cardDeficit]}>
-                  <Text style={styles.cardMemberName}>{m.name}</Text>
+                <View key={m.memberId} style={[styles.summaryCard, cardStyle]}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={styles.cardMemberName}>{m.name}</Text>
+                    {isSettled && <View style={styles.settledBadge}><Text style={styles.settledBadgeText}>精算済</Text></View>}
+                  </View>
+
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>実際の立替支払額:</Text>
-                    <Text style={styles.statValue}>¥{m.totalPaid.toLocaleString()}</Text>
+                    <Text style={styles.statValue}>¥{m.totalPaid?.toLocaleString()}</Text>
                   </View>
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>本来の自己負担額:</Text>
-                    <Text style={styles.statValue}>¥{m.totalOwed.toLocaleString()}</Text>
+                    <Text style={styles.statValue}>¥{m.totalOwed?.toLocaleString()}</Text>
                   </View>
+                  
+                  {((m.transferredOut || 0) > 0 || (m.transferredIn || 0) > 0) && (
+                    <View style={styles.transferSummaryBox}>
+                      {(m.transferredOut || 0) > 0 && <Text style={styles.transferText}>↑ 送金済: ¥{m.transferredOut.toLocaleString()}</Text>}
+                      {(m.transferredIn || 0) > 0 && <Text style={styles.transferText}>↓ 受取済: ¥{m.transferredIn.toLocaleString()}</Text>}
+                    </View>
+                  )}
+
                   <View style={styles.cardDivider} />
-                  <Text style={styles.balanceLabel}>{isSurplus ? "他メンバーから受け取る額" : "他メンバーへ支払う額"}</Text>
-                  <Text style={[styles.balanceValue, isSurplus ? styles.textSurplus : styles.textDeficit]}>
-                    ¥{Math.abs(m.balance).toLocaleString()}
-                  </Text>
+                  
+                  {isSettled ? (
+                    <Text style={[styles.balanceValue, { color: theme.colors.text.muted }]}>¥0 (精算完了)</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.balanceLabel}>{isSurplus ? "他メンバーから受け取る残額" : (isDeficit ? "他メンバーへ支払う残額" : "精算なし")}</Text>
+                      <Text style={[styles.balanceValue, isSurplus ? styles.textSurplus : (isDeficit ? styles.textDeficit : styles.textNeutral)]}>
+                        ¥{Math.abs(m.balance || 0).toLocaleString()}
+                      </Text>
+                    </>
+                  )}
                 </View>
               );
             })}
@@ -130,26 +215,32 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
           <View style={styles.tableContainer}>
             <Text style={styles.tableTitle}>📋 世帯内精算内訳（一覧）</Text>
             <View style={styles.tableWrapper}>
-              {/* テーブルヘッダー */}
               <View style={[styles.tableRow, styles.tableHeader]}>
                 <Text style={[styles.cell, styles.cellName, styles.headerText]}>メンバー名</Text>
                 <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>立替金額(A)</Text>
                 <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>負担金額(B)</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>精算差額(A - B)</Text>
+                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>差額(A-B)</Text>
+                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>送金/受取相殺</Text>
+                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>最終残額</Text>
               </View>
 
-              {/* テーブルボディ */}
               {summaryData.map(m => {
-                // ★ 修正箇所: スタイル計算を変数に切り出し、型エラーと可読性の問題を解消
-                const balanceStyle = m.balance >= 0 ? styles.textSurplus : styles.textDeficit;
+                const balanceStyle = m.balance > 0 ? styles.textSurplus : (m.balance < 0 ? styles.textDeficit : styles.textNeutral);
+                const offsetAmount = (m.transferredOut || 0) - (m.transferredIn || 0);
                 
                 return (
                   <View key={m.memberId} style={styles.tableRow}>
                     <Text style={[styles.cell, styles.cellName, styles.bodyText, styles.boldText]}>{m.name}</Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalPaid.toLocaleString()}</Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalOwed.toLocaleString()}</Text>
+                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalPaid?.toLocaleString()}</Text>
+                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalOwed?.toLocaleString()}</Text>
+                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>
+                      {m.baseBalance >= 0 ? "+" : ""}{m.baseBalance?.toLocaleString()}
+                    </Text>
+                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText, { color: theme.colors.text.muted }]}>
+                      {offsetAmount >= 0 ? "+" : ""}{offsetAmount.toLocaleString()}
+                    </Text>
                     <Text style={[styles.cell, styles.cellAmount, balanceStyle, styles.boldText]}>
-                      {m.balance >= 0 ? "+" : ""}{m.balance.toLocaleString()}
+                      {m.balance > 0 ? "+" : ""}{m.balance?.toLocaleString()}
                     </Text>
                   </View>
                 );
@@ -159,6 +250,64 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
         </ScrollView>
       )}
+
+      {/* 送金記録モーダル */}
+      <Modal
+        visible={isTransferModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>送金・受取の記録</Text>
+            <Text style={styles.modalDesc}>実際に現金やPayPay等で精算した金額を記録します。</Text>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>送金元 (払った人)</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={transferFrom} onValueChange={setTransferFrom} style={styles.modalPicker}>
+                  <Picker.Item label="選択してください" value={null} color={theme.colors.text.muted} />
+                  {summaryData.map(m => <Picker.Item key={`from-${m.memberId}`} label={m.name} value={m.memberId} />)}
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>送金先 (受け取った人)</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker selectedValue={transferTo} onValueChange={setTransferTo} style={styles.modalPicker}>
+                  <Picker.Item label="選択してください" value={null} color={theme.colors.text.muted} />
+                  {summaryData.map(m => <Picker.Item key={`to-${m.memberId}`} label={m.name} value={m.memberId} />)}
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>送金額</Text>
+              <View style={styles.inputWithUnit}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={transferAmount}
+                  onChangeText={setTransferAmount}
+                  keyboardType="number-pad"
+                  placeholder="例: 5000"
+                />
+                <Text style={styles.unitText}>円</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setTransferModalVisible(false)}>
+                <Text style={styles.modalCancelText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleTransferSubmit} disabled={isSubmitting}>
+                {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSubmitText}>記録する</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -170,35 +319,43 @@ const styles = StyleSheet.create({
   backButton: { paddingRight: 15 },
   backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
-  monthPickerContainer: { width: 160, height: 40, backgroundColor: theme.colors.surface, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  addTransferButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
+  addTransferButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  monthPickerContainer: { width: 140, height: 36, backgroundColor: theme.colors.surface, borderRadius: 6, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   filterPicker: { width: '100%' },
-  webSelect: {
-    width: '100%',
-    height: '100%',
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingLeft: 10,
-    fontSize: 14,
-    color: theme.colors.text.main,
-    ...Platform.select({ web: { outlineStyle: 'none' } as any }),
-  } as any,
+  webSelect: { width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingLeft: 10, fontSize: 14, color: theme.colors.text.main, ...Platform.select({ web: { outlineStyle: 'none' } as any }) } as any,
   scrollContainer: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   rowLayout: { flexDirection: 'row' },
   colLayout: { flexDirection: 'column' },
   cardGrid: { gap: 20, marginBottom: 30 },
-  summaryCard: { flex: 1, padding: 20, borderRadius: 12, borderWidth: 1, elevation: 2, backgroundColor: '#fff' },
+  
+  summaryCard: { flex: 1, padding: 20, borderRadius: 12, borderWidth: 1, elevation: 2 },
+  cardNeutral: { borderColor: theme.colors.border, backgroundColor: '#fff' },
   cardSurplus: { borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' },
   cardDeficit: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
-  cardMemberName: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: theme.colors.text.main },
+  cardSettled: { borderColor: '#cbd5e1', backgroundColor: '#f8fafc' },
+  
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardMemberName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
+  settledBadge: { backgroundColor: '#94a3b8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  settledBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  
   statRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   statLabel: { fontSize: 13, color: theme.colors.text.muted },
   statValue: { fontSize: 14, fontWeight: '600', color: theme.colors.text.main },
+  
+  transferSummaryBox: { marginTop: 8, padding: 8, backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 6 },
+  transferText: { fontSize: 12, color: theme.colors.text.muted },
+  
   cardDivider: { height: 1, backgroundColor: 'rgba(0,0,0,0.05)', marginVertical: 10 },
   balanceLabel: { fontSize: 11, color: theme.colors.text.muted, fontWeight: 'bold' },
   balanceValue: { fontSize: 24, fontWeight: 'bold', marginTop: 4 },
+  
   textSurplus: { color: '#16a34a' },
   textDeficit: { color: '#dc2626' },
+  textNeutral: { color: theme.colors.text.main },
   
   tableContainer: { backgroundColor: '#fff', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
   tableTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
@@ -208,7 +365,24 @@ const styles = StyleSheet.create({
   cell: { paddingHorizontal: 12, justifyContent: 'center' },
   headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
   bodyText: { fontSize: 14, color: theme.colors.text.main },
-  boldText: { fontWeight: 'bold' }, // ★ インラインスタイルではなく、StyleSheetに定義
+  boldText: { fontWeight: 'bold' },
   cellName: { flex: 1.5, minWidth: 100 },
-  cellAmount: { flex: 1, textAlign: 'right' }
+  cellAmount: { flex: 1, textAlign: 'right' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', width: 400, maxWidth: '90%', padding: 25, borderRadius: 12, elevation: 5 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 5 },
+  modalDesc: { fontSize: 13, color: theme.colors.text.muted, marginBottom: 20 },
+  formGroup: { marginBottom: 15 },
+  formLabel: { fontSize: 13, fontWeight: '600', color: theme.colors.text.main, marginBottom: 5 },
+  pickerWrapper: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' },
+  modalPicker: { width: '100%', height: 40, ...Platform.select({ web: { outlineStyle: 'none', border: 'none' } as any }) },
+  inputWithUnit: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: '#fff', height: 40, paddingHorizontal: 10 },
+  modalInput: { flex: 1, height: '100%', fontSize: 16, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
+  unitText: { fontSize: 14, color: theme.colors.text.muted, marginLeft: 8 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 10 },
+  modalCancelBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, backgroundColor: '#f1f5f9' },
+  modalCancelText: { color: theme.colors.text.muted, fontWeight: 'bold' },
+  modalSubmitBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 6, backgroundColor: theme.colors.primary, minWidth: 100, alignItems: 'center' },
+  modalSubmitText: { color: '#fff', fontWeight: 'bold' }
 });
