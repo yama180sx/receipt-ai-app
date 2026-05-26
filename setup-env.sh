@@ -25,6 +25,8 @@ DB_NAME="receipt_db"
 # [Issue #69] Redis内部ポートの固定
 REDIS_PORT_INTERNAL=6379
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # 3. 環境ごとの切り替え設定
 if [ "$ENV" == "dev" ]; then
     ENV_NAME="dev"
@@ -40,6 +42,7 @@ if [ "$ENV" == "dev" ]; then
     BACKEND_COMMAND="npm run dev"
     CORS_ORIGIN="http://localhost:$DEV_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT,http://$HOST_IP:$WEB_PORT"
     GEMINI_MODEL="gemini-flash-latest"
+    CRON_SCHEDULE="0 3 * * *" # dev環境は毎日午前3時に実行
 else
     ENV_NAME="stable"
     NODE_ENV="production"
@@ -54,6 +57,7 @@ else
     BACKEND_COMMAND="npm run start"
     CORS_ORIGIN="http://$HOST_IP:$WEB_PORT"
     GEMINI_MODEL="gemini-flash-latest"
+    CRON_SCHEDULE="0 4 * * *" # stable環境は毎日午前4時に実行
 fi
 
 # 4. ルート .env (docker-compose.yml 用)
@@ -103,4 +107,31 @@ REDIS_HOST=redis
 REDIS_PORT_INTERNAL=$REDIS_PORT_INTERNAL
 EOF
 
+echo "✅ Environment variables created."
+
+# ★ [Issue #41] Cronジョブの自動登録（定期実行 ＆ 起動時実行の多重登録）
+CRON_CMD="${PROJECT_ROOT}/scripts/backup.sh $ENV >> ${PROJECT_ROOT}/logs/backup_${ENV}.log 2>&1"
+
+# 現在のcronを一時ファイルに出力 (存在しない場合は空ファイル作成)
+crontab -l > /tmp/current_cron 2>/dev/null || touch /tmp/current_cron
+
+# 既に同じ環境のバックアップジョブ（定期・reboot双方）があれば削除
+grep -v "scripts/backup.sh $ENV" /tmp/current_cron > /tmp/new_cron
+
+# 1. 定期時間実行の追加
+echo "$CRON_SCHEDULE $CRON_CMD" >> /tmp/new_cron
+
+# 2. サーバー起動時実行（@reboot）の追加（コンテナ安定のため120秒スリープを噛ませる）
+echo "@reboot sleep 120 && $CRON_CMD" >> /tmp/new_cron
+
+# crontabの更新
+crontab /tmp/new_cron
+rm /tmp/current_cron /tmp/new_cron
+
+# ログディレクトリの作成
+mkdir -p "${PROJECT_ROOT}/logs"
+
+echo "✅ Cron jobs registered for $ENV:"
+echo "   - Scheduled: $CRON_SCHEDULE"
+echo "   - On Boot:   @reboot (with 120s delay)"
 echo "✅ Setup complete for $ENV_NAME. Project name: receipt-$ENV_NAME"
