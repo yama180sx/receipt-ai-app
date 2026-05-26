@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# --- 环境判定ロジック ---
+# --- 環境判定ロジック ---
 ENV=$1
 
 if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
@@ -9,7 +9,7 @@ if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
 fi
 
 # --- 設定項目 ---
-PROJECT_ROOT=$(cd $(dirname "$0")/..; pwd)
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
@@ -70,43 +70,60 @@ SOURCE_UPLOADS_DIR="${PROJECT_ROOT}/backend/uploads"
 
 echo "[$(date)] ($ENV_LABEL) Backup started."
 
+# エラーカウント用
+ERROR_COUNT=0
+DETAILS=""
+
 # 3. DBバックアップ
 if [ ! "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
-    msg="Container ${CONTAINER_NAME} is NOT running. ($ENV_LABEL) DB Backup aborted."
+    msg="Container ${CONTAINER_NAME} is NOT running."
     echo "  -> [ERROR] $msg"
-    send_discord_alert "ERROR" "$msg"
+    DETAILS="${DETAILS}- DB Backup: FAILED (Container down)\n"
+    ((ERROR_COUNT++))
 else
     docker exec -e PGPASSWORD="${DB_PASS}" ${CONTAINER_NAME} pg_dump -U ${DB_USER} ${DB_NAME} | gzip > "${BACKUP_DIR}/db/db_backup_${TIMESTAMP}.sql.gz"
     
     if [ ${PIPESTATUS[0]} -eq 0 ]; then
         echo "  -> ($ENV_LABEL) DB Backup SUCCESS."
+        DETAILS="${DETAILS}- DB Backup: SUCCESS\n"
     else
         msg="PostgreSQL Dump FAILED on ($ENV_LABEL)."
         echo "  -> [ERROR] $msg"
-        send_discord_alert "ERROR" "$msg"
+        DETAILS="${DETAILS}- DB Backup: FAILED (Dump error)\n"
+        ((ERROR_COUNT++))
     fi
 fi
 
 # 4. 画像バックアップ
 if [ -d "${SOURCE_UPLOADS_DIR}" ]; then
-    # ★修正: 圧縮コマンド自体の成否を取得するため 2>/dev/null は外し、終了ステータスをチェック
     tar -czf "${BACKUP_DIR}/uploads/uploads_backup_${TIMESTAMP}.tar.gz" -C "${PROJECT_ROOT}/backend" "uploads"
     
     if [ $? -eq 0 ]; then
         echo "  -> ($ENV_LABEL) Uploads Backup SUCCESS."
+        DETAILS="${DETAILS}- Image Backup: SUCCESS\n"
     else
         msg="Tar archive creation FAILED on ($ENV_LABEL)."
         echo "  -> [ERROR] $msg"
-        send_discord_alert "ERROR" "$msg"
+        DETAILS="${DETAILS}- Image Backup: FAILED (Tar error)\n"
+        ((ERROR_COUNT++))
     fi
 else
     msg="Uploads directory NOT found at ${SOURCE_UPLOADS_DIR}."
     echo "  -> [ERROR] $msg"
-    send_discord_alert "ERROR" "$msg"
+    DETAILS="${DETAILS}- Image Backup: FAILED (Dir not found)\n"
+    ((ERROR_COUNT++))
 fi
 
 # 5. 世代管理
 find "${BACKUP_DIR}/db" -name "*.gz" -mtime +${RETENTION_DAYS} -delete
 find "${BACKUP_DIR}/uploads" -name "*.tar.gz" -mtime +${RETENTION_DAYS} -delete
+DETAILS="${DETAILS}- Retention Policy: Applied (Kept $RETENTION_DAYS days)"
 
 echo "[$(date)] ($ENV_LABEL) Backup completed."
+
+# 6. 最終結果通知
+if [ $ERROR_COUNT -eq 0 ]; then
+    send_discord_alert "SUCCESS" "Backup completed successfully.\n\n**Details:**\n$DETAILS"
+else
+    send_discord_alert "ERROR" "Backup finished with $ERROR_COUNT error(s).\n\n**Details:**\n$DETAILS"
+fi
