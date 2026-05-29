@@ -14,6 +14,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
 // Issue #66: BREAKPOINTS 参照
+import { AppBackButton, AppModalCloseButton } from '../components/ui';
 import { theme, BREAKPOINTS } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -247,9 +248,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
     <View style={styles.container}>
       <View style={styles.mainWrapper}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-            <Text style={styles.backButton}>← 戻る</Text>
-          </TouchableOpacity>
+          <AppBackButton onPress={onBack} />
           <Text style={styles.title}>レシート履歴</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -310,9 +309,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
               <Text style={styles.detailTitleMobile} numberOfLines={1}>
                 {selectedReceipt?.storeName || '店名不明'}
               </Text>
-              <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
-                <Text style={styles.detailClose}>✕</Text>
-              </TouchableOpacity>
+              <AppModalCloseButton onPress={() => setSelectedReceipt(null)} />
             </View>
             {selectedReceipt && (
               <ReceiptDetailComponent 
@@ -336,7 +333,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   mainWrapper: { flex: 1, width: '100%', alignSelf: 'stretch', paddingTop: Platform.OS === 'ios' ? 60 : 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
-  backButton: { color: theme.colors.primary, fontWeight: '700' },
   title: { ...theme.typography.h2, color: theme.colors.text.main },
   filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 10 },
   wideFilter: { justifyContent: 'flex-start' },
@@ -376,7 +372,6 @@ const styles = StyleSheet.create({
   modalContent: { flex: 1, backgroundColor: theme.colors.background },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailTitleMobile: { fontSize: 18, fontWeight: 'bold', flex: 1 },
-  detailClose: { fontSize: 24, color: theme.colors.text.muted, marginLeft: 15 },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

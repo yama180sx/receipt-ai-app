@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity
 } from 'react-native';
+import { AppBackButton } from '../components/ui';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 
@@ -61,9 +62,7 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>AIコスト統計</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -133,8 +132,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: adm.border,
   },
-  backButton: { width: 60, paddingVertical: 8 },
-  backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   content: { padding: 16, paddingBottom: 40 },
   

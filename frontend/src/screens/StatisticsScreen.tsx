@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppModalCloseButton } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -161,9 +162,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <Text style={styles.backButton}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>家計分析レポート</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -290,9 +289,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>解析レシート詳細</Text>
-              <TouchableOpacity onPress={() => setMainModalVisible(false)}>
-                <Text style={styles.modalCloseText}>閉じる</Text>
-              </TouchableOpacity>
+              <AppModalCloseButton onPress={() => setMainModalVisible(false)} />
             </View>
             
             <ReceiptDetailComponent 
@@ -313,7 +310,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backButton: { color: theme.colors.primary, fontWeight: '700' },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   scrollContent: { padding: 20 },
   topInfo: { marginBottom: 15 },
@@ -357,5 +353,4 @@ const styles = StyleSheet.create({
   wideModal: { width: '95%', maxWidth: 1400, height: '90%', borderRadius: 20, overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   modalTitle: { fontSize: 18, fontWeight: 'bold' },
-  modalCloseText: { color: theme.colors.error, fontWeight: '600', fontSize: 16 }
 });
