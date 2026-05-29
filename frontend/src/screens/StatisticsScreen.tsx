@@ -271,7 +271,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                       <View style={styles.paretoBarContainer}>
                         <View style={[
                           styles.paretoBar, 
-                          { width: `${p.ratio}%`, backgroundColor: p.cumulative_ratio <= 80 ? theme.colors.primary : '#CED4DA' }
+                          { width: `${p.ratio}%`, backgroundColor: p.cumulative_ratio <= 80 ? theme.colors.primary : theme.colors.semantic.chart.barInactive }
                         ]} />
                         <Text style={styles.cumText}>{p.cumulative_ratio}%</Text>
                       </View>
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   paretoTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   paretoName: { fontWeight: '700', fontSize: 14 },
   paretoValue: { fontSize: 12, color: theme.colors.text.muted },
-  paretoBarContainer: { height: 16, backgroundColor: '#E9ECEF', borderRadius: 8, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  paretoBarContainer: { height: 16, backgroundColor: theme.colors.semantic.chart.barBg, borderRadius: 8, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   paretoBar: { height: '100%' },
   cumText: { fontSize: 10, position: 'absolute', right: 8, fontWeight: '700', color: theme.colors.text.main },
   chartCard: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, minHeight: 220, justifyContent: 'center' },

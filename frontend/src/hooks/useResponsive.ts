@@ -1,4 +1,5 @@
 import { useWindowDimensions } from 'react-native';
+import { BREAKPOINTS } from '../theme';
 
 /**
  * 画面幅に応じたレスポンシブ判定を行うカスタムフック
@@ -6,12 +7,11 @@ import { useWindowDimensions } from 'react-native';
 export const useResponsive = () => {
   const { width } = useWindowDimensions();
 
-  // iPad (768px以上) を「広い画面」と定義
-  const isWideScreen = width >= 768;
+  const isWideScreen = width >= BREAKPOINTS.TABLET;
 
   return {
     width,
     isWideScreen,
-    isDesktop: width >= 1024,
+    isDesktop: width >= BREAKPOINTS.DESKTOP,
   };
 };

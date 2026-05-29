@@ -153,7 +153,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
                 <Text style={styles.cancelButtonText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSave} disabled={loading} style={styles.saveButton}>
-                {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveButtonText}>保存</Text>}
+                {loading ? <ActivityIndicator color={theme.colors.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>保存</Text>}
               </TouchableOpacity>
             </>
           ) : (
@@ -261,7 +261,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
                     mode="dropdown"
                   >
                     <Picker.Item label="カテゴリーを選択..." value={null} color={theme.colors.text.muted} />
-                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} color="#333" />)}
+                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} color={theme.colors.semantic.picker.text} />)}
                   </Picker>
                 </View>
               </View>
@@ -300,6 +300,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   );
 };
 
+const sem = theme.colors.semantic;
+
 const styles = StyleSheet.create({
   detailScroll: { flex: 1 },
   placeholderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
@@ -310,7 +312,7 @@ const styles = StyleSheet.create({
   wideInfoColumn: { flex: 1 }, 
   mobileImageArea: { width: '100%', marginBottom: 25 },
   mobileInfoArea: { width: '100%' },
-  imageWrapper: { width: '100%', height: 600, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  imageWrapper: { width: '100%', height: 600, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   noImagePlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surface },
   receiptImage: { width: '100%', height: '100%' },
   detailHeaderInner: { marginBottom: 20 },
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
   detailTotalValue: { fontSize: 38, fontWeight: 'bold', color: theme.colors.text.main },
   itemsSection: { marginBottom: 20 },
   itemsSectionTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.secondary, marginBottom: 15, textTransform: 'uppercase' },
-  detailItemRow: { flexDirection: 'column', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  detailItemRow: { flexDirection: 'column', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder },
   detailItemTop: { marginBottom: 10 },
   detailItemName: { fontSize: 17, fontWeight: '600', color: theme.colors.text.main, marginBottom: 4 },
   itemNameInput: { fontSize: 17, fontWeight: '600', color: theme.colors.primary, borderBottomWidth: 1, borderBottomColor: theme.colors.primary, marginBottom: 4 },
@@ -334,11 +336,11 @@ const styles = StyleSheet.create({
   editControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 10 },
   editButton: { backgroundColor: theme.colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
   editButtonText: { color: theme.colors.text.main, fontWeight: 'bold' },
-  splitButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#bae6fd' },
-  splitButtonText: { color: '#0369a1', fontWeight: 'bold' }, 
+  splitButton: { backgroundColor: sem.info.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: sem.info.border },
+  splitButtonText: { color: sem.info.text, fontWeight: 'bold' },
   saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
-  saveButtonText: { color: '#fff', fontWeight: 'bold' },
-  cancelButton: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
+  cancelButton: { backgroundColor: sem.neutral.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   cancelButtonText: { color: theme.colors.text.muted },
   editPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   priceInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 80, fontSize: 15, textAlign: 'right', color: theme.colors.primary },
@@ -346,8 +348,8 @@ const styles = StyleSheet.create({
   currencySymbol: { fontSize: 14, color: theme.colors.text.muted },
   multiplier: { fontSize: 14, color: theme.colors.text.muted },
   detailPickerWrapper: { height: 55, backgroundColor: theme.colors.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, overflow: 'visible', justifyContent: 'center', marginTop: 4 },
-  detailPicker: { width: '100%', height: 55, color: '#333', ...Platform.select({ android: { marginLeft: -10 }, web: { outlineStyle: 'none' } as any }) },
-  taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: '#EEE', borderStyle: 'dashed' },
+  detailPicker: { width: '100%', height: 55, color: sem.picker.text, ...Platform.select({ android: { marginLeft: -10 }, web: { outlineStyle: 'none' } as any }) },
+  taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: sem.divider, borderStyle: 'dashed' },
   taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   taxLabel: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '600' },
   taxValue: { fontSize: 16, color: theme.colors.text.main, fontWeight: '700' },
