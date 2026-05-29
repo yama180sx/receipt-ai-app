@@ -13,6 +13,8 @@ import {
   Alert 
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, BREAKPOINTS } from '../theme';
 import apiClient from '../utils/apiClient';
 
@@ -149,24 +151,38 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         <View style={styles.editControls}>
           {isEditing ? (
             <>
-              <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelButton}>
-                <Text style={styles.cancelButtonText}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSave} disabled={loading} style={styles.saveButton}>
-                {loading ? <ActivityIndicator color={theme.colors.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>保存</Text>}
-              </TouchableOpacity>
+              <AppButton
+                title={BUTTON_LABELS.cancel}
+                onPress={() => setIsEditing(false)}
+                variant="secondary"
+                size="sm"
+              />
+              <AppButton
+                title={BUTTON_LABELS.save}
+                onPress={handleSave}
+                loading={loading}
+                disabled={loading}
+                size="sm"
+              />
             </>
           ) : (
             <>
               {/* ★ [Issue #81] スマホ非表示化 ＆ 文言変更 */}
               {onGoToSplitEditor && isWide && (
-                <TouchableOpacity onPress={() => onGoToSplitEditor(receipt)} style={styles.splitButton}>
-                  <Text style={styles.splitButtonText}>➗ 割り勘</Text>
-                </TouchableOpacity>
+                <AppButton
+                  title="➗ 割り勘"
+                  onPress={() => onGoToSplitEditor(receipt)}
+                  variant="outline"
+                  size="sm"
+                  style={styles.splitButtonOverride}
+                />
               )}
-              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
-                <Text style={styles.editButtonText}>✎ 編集</Text>
-              </TouchableOpacity>
+              <AppButton
+                title={`✎ ${BUTTON_LABELS.edit}`}
+                onPress={() => setIsEditing(true)}
+                variant="secondary"
+                size="sm"
+              />
             </>
           )}
         </View>
@@ -334,14 +350,7 @@ const styles = StyleSheet.create({
   detailItemSub: { fontSize: 12, color: theme.colors.text.muted, marginLeft: 6 },
   detailItemBottom: { width: '100%' },
   editControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 10 },
-  editButton: { backgroundColor: theme.colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },
-  editButtonText: { color: theme.colors.text.main, fontWeight: 'bold' },
-  splitButton: { backgroundColor: sem.info.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: sem.info.border },
-  splitButtonText: { color: sem.info.text, fontWeight: 'bold' },
-  saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
-  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
-  cancelButton: { backgroundColor: sem.neutral.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  cancelButtonText: { color: theme.colors.text.muted },
+  splitButtonOverride: { backgroundColor: sem.info.bg, borderColor: sem.info.border },
   editPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   priceInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 80, fontSize: 15, textAlign: 'right', color: theme.colors.primary },
   quantityInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 50, fontSize: 15, textAlign: 'center', color: theme.colors.primary },

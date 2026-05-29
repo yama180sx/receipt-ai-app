@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { AppBackButton } from '../components/ui';
 import { theme } from '../theme';
 
 interface AdminMenuScreenProps {
@@ -20,9 +21,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>管理者メニュー</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -91,8 +90,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: adm.border,
   },
-  backButton: { width: 60, paddingVertical: 8 },
-  backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   content: { padding: 16 },
   section: { marginBottom: 24 },

@@ -13,6 +13,8 @@ import {
   Alert
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 
@@ -135,17 +137,15 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
     <View style={styles.container}>
       {/* ヘッダー */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>家族間精算サマリー</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.addTransferButton}
+          <AppButton
+            title={`＋ ${BUTTON_LABELS.recordTransfer}`}
             onPress={() => setTransferModalVisible(true)}
-          >
-            <Text style={styles.addTransferButtonText}>＋ 送金・受取を記録</Text>
-          </TouchableOpacity>
+            size="sm"
+            style={styles.addTransferButton}
+          />
           <View style={styles.monthPickerContainer}>
             {renderMonthPicker()}
           </View>
@@ -300,12 +300,20 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setTransferModalVisible(false)}>
-                <Text style={styles.modalCancelText}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleTransferSubmit} disabled={isSubmitting}>
-                {isSubmitting ? <ActivityIndicator color={theme.colors.text.inverse} /> : <Text style={styles.modalSubmitText}>記録する</Text>}
-              </TouchableOpacity>
+              <AppButton
+                title={BUTTON_LABELS.cancel}
+                onPress={() => setTransferModalVisible(false)}
+                variant="secondary"
+                size="md"
+              />
+              <AppButton
+                title={BUTTON_LABELS.save}
+                onPress={handleTransferSubmit}
+                loading={isSubmitting}
+                disabled={isSubmitting}
+                size="md"
+                style={styles.modalSubmitBtn}
+              />
             </View>
           </View>
         </View>
@@ -321,12 +329,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backButton: { paddingRight: 15 },
-  backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  addTransferButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  addTransferButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 13 },
+  addTransferButton: { paddingHorizontal: 4 },
   monthPickerContainer: { width: 140, height: 36, backgroundColor: theme.colors.surface, borderRadius: 6, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   filterPicker: { width: '100%' },
   webSelect: { width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingLeft: 10, fontSize: 14, color: theme.colors.text.main, ...Platform.select({ web: { outlineStyle: 'none' } as any }) } as any,
@@ -386,8 +391,5 @@ const styles = StyleSheet.create({
   modalInput: { flex: 1, height: '100%', fontSize: 16, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
   unitText: { fontSize: 14, color: theme.colors.text.muted, marginLeft: 8 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 10 },
-  modalCancelBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, backgroundColor: sem.neutral.bg },
-  modalCancelText: { color: theme.colors.text.muted, fontWeight: 'bold' },
-  modalSubmitBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 6, backgroundColor: theme.colors.primary, minWidth: 100, alignItems: 'center' },
-  modalSubmitText: { color: theme.colors.text.inverse, fontWeight: 'bold' }
+  modalSubmitBtn: { minWidth: 100 },
 });

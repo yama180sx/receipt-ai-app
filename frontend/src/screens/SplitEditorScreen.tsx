@@ -13,6 +13,8 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 
@@ -315,14 +317,16 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>割り勘エディタ</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color={theme.colors.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>確定して保存</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title={BUTTON_LABELS.save}
+            onPress={handleSave}
+            loading={saving}
+            disabled={saving}
+            size="md"
+          />
         </View>
       </View>
 
@@ -438,9 +442,12 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                     })}
 
                     <View style={[styles.cell, styles.cellAction]}>
-                      <TouchableOpacity style={styles.splitBtnSmall} onPress={() => splitItemEqually(item.id, itemTotal)}>
-                        <Text style={styles.splitBtnSmallText}>均等</Text>
-                      </TouchableOpacity>
+                      <AppButton
+                        title={BUTTON_LABELS.splitEqual}
+                        onPress={() => splitItemEqually(item.id, itemTotal)}
+                        variant="ghost"
+                        size="sm"
+                      />
                     </View>
                   </View>
                 );
@@ -488,9 +495,12 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                 })}
 
                 <View style={[styles.cell, styles.cellAction]}>
-                  <TouchableOpacity style={styles.splitBtnSmall} onPress={splitWholeReceiptEqually}>
-                    <Text style={styles.splitBtnSmallText}>均等</Text>
-                  </TouchableOpacity>
+                  <AppButton
+                    title={BUTTON_LABELS.splitEqual}
+                    onPress={splitWholeReceiptEqually}
+                    variant="ghost"
+                    size="sm"
+                  />
                 </View>
               </View>
 
@@ -508,12 +518,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backButton: { paddingRight: 15 },
-  backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
   headerRight: { minWidth: 100, alignItems: 'flex-end' },
-  saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 16 },
   
   targetSection: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, padding: 15, paddingHorizontal: 20 },
   targetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -565,6 +571,4 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 11, color: theme.colors.text.muted },
   
   cellAction: { width: 70, alignItems: 'center' },
-  splitBtnSmall: { backgroundColor: sem.neutral.bg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  splitBtnSmallText: { fontSize: 12, color: theme.colors.text.muted, fontWeight: 'bold' },
 });

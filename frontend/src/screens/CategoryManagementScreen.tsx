@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
 interface Category {
@@ -115,9 +117,7 @@ export const CategoryManagementScreen = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.title}>カテゴリー設定</Text>
       </View>
 
@@ -129,22 +129,18 @@ export const CategoryManagementScreen = ({
           placeholder="新しいカテゴリー"
           placeholderTextColor={theme.colors.text.muted}
         />
-        <TouchableOpacity style={styles.addButton} onPress={addCategory}>
-          <Text style={styles.addButtonText}>追加</Text>
-        </TouchableOpacity>
+        <AppButton title={BUTTON_LABELS.add} onPress={addCategory} size="md" />
       </View>
 
-      <TouchableOpacity 
-        style={[styles.optimizeButton, optimizing && styles.buttonDisabled]} 
+      <AppButton
+        title="🪄 キーワード自動最適化"
         onPress={handleOptimize}
+        loading={optimizing}
         disabled={optimizing}
-      >
-        {optimizing ? (
-          <ActivityIndicator size="small" color="white" />
-        ) : (
-          <Text style={styles.optimizeButtonText}>🪄 キーワード自動最適化</Text>
-        )}
-      </TouchableOpacity>
+        fullWidth
+        size="md"
+        style={{ backgroundColor: theme.colors.semantic.category.optimize, marginBottom: 20 }}
+      />
 
       {!currentMemberId ? (
         <Text style={styles.emptyText}>メンバーを選択してください</Text>
@@ -159,9 +155,12 @@ export const CategoryManagementScreen = ({
             <View style={styles.itemRow}>
               <View style={[styles.colorBadge, { backgroundColor: item.color }]} />
               <Text style={styles.categoryName}>{item.name}</Text>
-              <TouchableOpacity onPress={() => deleteCategory(item.id)} style={styles.deleteButton}>
-                <Text style={styles.deleteText}>削除</Text>
-              </TouchableOpacity>
+              <AppButton
+                title={BUTTON_LABELS.delete}
+                onPress={() => deleteCategory(item.id)}
+                variant="dangerFilled"
+                size="sm"
+              />
             </View>
           )}
         />
@@ -173,21 +172,12 @@ export const CategoryManagementScreen = ({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
-  backButton: { padding: 5 },
-  backText: { color: theme.colors.primary, fontSize: 16, fontWeight: 'bold' },
-  title: { ...theme.typography.h1, marginLeft: 15 },
-  inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10 },
+  title: { ...theme.typography.h1, marginLeft: 8, flex: 1 },
+  inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10, alignItems: 'center' },
   input: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: theme.colors.border, color: theme.colors.text.main },
-  addButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 25, justifyContent: 'center', borderRadius: 10 },
-  addButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
-  optimizeButton: { backgroundColor: theme.colors.semantic.category.optimize, padding: 12, borderRadius: 10, marginBottom: 20, alignItems: 'center', justifyContent: 'center' },
-  optimizeButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
-  buttonDisabled: { opacity: 0.6 },
   list: { paddingBottom: 40 },
   itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border },
   colorBadge: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
   categoryName: { flex: 1, ...theme.typography.body, fontWeight: '600' },
-  deleteButton: { padding: 8 },
-  deleteText: { color: theme.colors.error, fontSize: 14, fontWeight: '700' },
   emptyText: { textAlign: 'center', marginTop: 30, color: theme.colors.text.muted }
 });

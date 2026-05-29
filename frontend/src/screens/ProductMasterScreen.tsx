@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
 interface ProductMaster {
@@ -150,9 +152,12 @@ export const ProductMasterScreen = ({
         </View>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
-          <Text style={styles.btnText}>削除</Text>
-        </TouchableOpacity>
+        <AppButton
+          title={BUTTON_LABELS.delete}
+          onPress={() => handleDelete(item.id)}
+          variant="dangerFilled"
+          size="sm"
+        />
       </View>
     </View>
   );
@@ -160,9 +165,7 @@ export const ProductMasterScreen = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} hitSlop={{top:10, bottom:10, left:10, right:10}}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.title}>学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
         <TouchableOpacity onPress={handleMergeStores}>
           <Text style={styles.mergeText}>店舗統合</Text>
@@ -217,8 +220,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, 
     borderBottomColor: theme.colors.border 
   },
-  backText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
-  title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
+  title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1, textAlign: 'center' },
   mergeText: { color: theme.colors.secondary, fontWeight: 'bold' },
   searchBar: { padding: 10, flexDirection: 'row', backgroundColor: theme.colors.surface },
   input: { 
@@ -258,7 +260,5 @@ const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
   actions: { justifyContent: 'center', paddingLeft: 10 },
-  deleteBtn: { backgroundColor: theme.colors.error, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
-  btnText: { color: theme.colors.text.inverse, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
   empty: { textAlign: 'center', marginTop: 40, color: theme.colors.text.muted }
 });
