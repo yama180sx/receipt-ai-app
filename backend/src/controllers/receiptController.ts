@@ -90,7 +90,13 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 
     res.status(201).json({ success: true, data: result });
   } catch (error: any) { 
-    if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
+    if (error.statusCode === 409) {
+      return res.status(409).json({
+        success: false,
+        message: 'DUPLICATE',
+        existingId: error.existingId ?? null,
+      });
+    }
     next(error); 
   }
 };
@@ -131,7 +137,13 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
 
     res.status(201).json({ success: true, data: newReceipt });
   } catch (error: any) { 
-    if (error.statusCode === 409) return res.status(409).json({ success: false, message: 'DUPLICATE' });
+    if (error.statusCode === 409) {
+      return res.status(409).json({
+        success: false,
+        message: 'DUPLICATE',
+        existingId: error.existingId ?? null,
+      });
+    }
     next(error); 
   }
 };

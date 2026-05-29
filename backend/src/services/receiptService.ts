@@ -111,8 +111,24 @@ export const saveParsedReceipt = async (
     const usageLogIdStr = parsedData.usageLogId !== undefined ? String(parsedData.usageLogId) : null;
     const usageLogId = usageLogIdStr ? parseInt(usageLogIdStr, 10) : null;
 
+    /** 同一画像の再保存（二重タップ・アプリ復帰後の再確定）は成功扱い */
+    if (imagePath) {
+      const existingByImage = await prisma.receipt.findFirst({
+        where: { familyGroupId, imagePath },
+        include: { items: { include: { category: true } } },
+      });
+      if (existingByImage) {
+        logger.info(`[Idempotent] imagePath 一致のため既存レシートを返却: ID ${existingByImage.id}`);
+        return {
+          ...JSON.parse(JSON.stringify(existingByImage)),
+          isSuspicious,
+          warnings,
+        };
+      }
+    }
+
     /**
-     * 重複チェック
+     * 重複チェック（別画像で店名・日付・金額が同一の場合）
      */
     let duplicateWhere: any = { 
       familyGroupId, 
@@ -139,6 +155,7 @@ export const saveParsedReceipt = async (
     if (existing && getCleanText(existing.storeName) === cleanStore) {
       const error = new Error('DUPLICATE_RECEIPT_DETECTED');
       (error as any).statusCode = 409;
+      (error as any).existingId = existing.id;
       throw error;
     }
 

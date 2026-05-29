@@ -215,8 +215,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 管理者限定メニューへのハブ導線 */}
         {isAdmin && (
           <View style={styles.section}>
-            <TouchableOpacity style={[styles.settingsCard, { backgroundColor: '#F8F9FA' }]} onPress={onGoToAdminMenu}>
-              <View style={[styles.settingsIconWrapper, { backgroundColor: '#E9ECEF' }]}><Text>🛡️</Text></View>
+            <TouchableOpacity style={[styles.settingsCard, { backgroundColor: theme.colors.semantic.icon.adminSettings }]} onPress={onGoToAdminMenu}>
+              <View style={[styles.settingsIconWrapper, { backgroundColor: theme.colors.semantic.icon.adminCard }]}><Text>🛡️</Text></View>
               <View style={styles.settingsTextWrapper}>
                 <Text style={styles.settingsLabel}>管理者メニュー</Text>
                 <Text style={{ fontSize: 12, color: theme.colors.text.muted, marginTop: 2 }}>マスタ管理・システム設定</Text>
@@ -258,12 +258,12 @@ const styles = StyleSheet.create({
   summaryCard: { backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, padding: theme.spacing.xl, marginBottom: theme.spacing.lg, elevation: 4 },
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
   summaryAmountRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 5 },
-  summarySymbol: { color: 'white', fontSize: 20, marginRight: 4, fontWeight: 'bold' },
-  summaryAmount: { color: 'white', fontSize: 36, fontWeight: 'bold' },
+  summarySymbol: { color: theme.colors.text.inverse, fontSize: 20, marginRight: 4, fontWeight: 'bold' },
+  summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
   summaryDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: theme.spacing.md },
-  summaryLink: { color: 'white', fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  summaryLink: { color: theme.colors.text.inverse, fontSize: 14, fontWeight: '600', textAlign: 'right' },
   captureButton: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg, borderWidth: 2, borderColor: theme.colors.primary, borderStyle: 'dashed' },
-  captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: '#F5F5F5' },
+  captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },
   iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   captureButtonText: { ...theme.typography.h2, color: theme.colors.primary },
   jobStatusText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
