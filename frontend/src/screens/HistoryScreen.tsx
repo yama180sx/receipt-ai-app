@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
   detailPane: { flex: 1, height: '100%', backgroundColor: theme.colors.background },
   list: { padding: theme.spacing.md },
   card: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border },
-  activeCard: { borderColor: theme.colors.primary, backgroundColor: '#F0F7FF', elevation: 0 },
+  activeCard: { borderColor: theme.colors.primary, backgroundColor: theme.colors.semantic.active.bg, elevation: 0 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   date: { fontSize: 12, color: theme.colors.text.muted },
   store: { fontWeight: '700', color: theme.colors.text.main, flex: 1, marginLeft: 10, textAlign: 'right' },

@@ -166,13 +166,16 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
               const isSurplus = m.balance > 0;
               const isDeficit = m.balance < 0;
               
-              let cardStyle = styles.cardNeutral;
-              if (isSettled) cardStyle = styles.cardSettled;
-              else if (isSurplus) cardStyle = styles.cardSurplus;
-              else if (isDeficit) cardStyle = styles.cardDeficit;
+              const cardVariantStyle = isSettled
+                ? styles.cardSettled
+                : isSurplus
+                  ? styles.cardSurplus
+                  : isDeficit
+                    ? styles.cardDeficit
+                    : styles.cardNeutral;
 
               return (
-                <View key={m.memberId} style={[styles.summaryCard, cardStyle]}>
+                <View key={m.memberId} style={[styles.summaryCard, cardVariantStyle]}>
                   <View style={styles.cardHeaderRow}>
                     <Text style={styles.cardMemberName}>{m.name}</Text>
                     {isSettled && <View style={styles.settledBadge}><Text style={styles.settledBadgeText}>精算済</Text></View>}
@@ -301,7 +304,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
                 <Text style={styles.modalCancelText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleTransferSubmit} disabled={isSubmitting}>
-                {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSubmitText}>記録する</Text>}
+                {isSubmitting ? <ActivityIndicator color={theme.colors.text.inverse} /> : <Text style={styles.modalSubmitText}>記録する</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -312,16 +315,18 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   );
 };
 
+const sem = theme.colors.semantic;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   backButton: { paddingRight: 15 },
   backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   addTransferButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  addTransferButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  addTransferButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 13 },
   monthPickerContainer: { width: 140, height: 36, backgroundColor: theme.colors.surface, borderRadius: 6, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   filterPicker: { width: '100%' },
   webSelect: { width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingLeft: 10, fontSize: 14, color: theme.colors.text.main, ...Platform.select({ web: { outlineStyle: 'none' } as any }) } as any,
@@ -332,15 +337,15 @@ const styles = StyleSheet.create({
   cardGrid: { gap: 20, marginBottom: 30 },
   
   summaryCard: { flex: 1, padding: 20, borderRadius: 12, borderWidth: 1, elevation: 2 },
-  cardNeutral: { borderColor: theme.colors.border, backgroundColor: '#fff' },
-  cardSurplus: { borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' },
-  cardDeficit: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
-  cardSettled: { borderColor: '#cbd5e1', backgroundColor: '#f8fafc' },
+  cardNeutral: { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  cardSurplus: { borderColor: sem.surplus.border, backgroundColor: sem.surplus.bg },
+  cardDeficit: { borderColor: sem.deficit.border, backgroundColor: sem.deficit.bg },
+  cardSettled: { borderColor: sem.settled.border, backgroundColor: sem.settled.bg },
   
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardMemberName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  settledBadge: { backgroundColor: '#94a3b8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  settledBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  settledBadge: { backgroundColor: sem.settled.badgeBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  settledBadgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
   
   statRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   statLabel: { fontSize: 13, color: theme.colors.text.muted },
@@ -353,15 +358,15 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 11, color: theme.colors.text.muted, fontWeight: 'bold' },
   balanceValue: { fontSize: 24, fontWeight: 'bold', marginTop: 4 },
   
-  textSurplus: { color: '#16a34a' },
-  textDeficit: { color: '#dc2626' },
+  textSurplus: { color: sem.surplus.text },
+  textDeficit: { color: sem.deficit.text },
   textNeutral: { color: theme.colors.text.main },
   
-  tableContainer: { backgroundColor: '#fff', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
+  tableContainer: { backgroundColor: theme.colors.surface, padding: 20, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
   tableTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
-  tableWrapper: { borderWidth: 1, borderColor: '#F0F0F0', borderRadius: 8, overflow: 'hidden' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center', height: 48 },
-  tableHeader: { backgroundColor: '#F8F9FA' },
+  tableWrapper: { borderWidth: 1, borderColor: sem.table.rowBorder, borderRadius: 8, overflow: 'hidden' },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder, alignItems: 'center', height: 48 },
+  tableHeader: { backgroundColor: sem.table.headerBg },
   cell: { paddingHorizontal: 12, justifyContent: 'center' },
   headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
   bodyText: { fontSize: 14, color: theme.colors.text.main },
@@ -370,19 +375,19 @@ const styles = StyleSheet.create({
   cellAmount: { flex: 1, textAlign: 'right' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', width: 400, maxWidth: '90%', padding: 25, borderRadius: 12, elevation: 5 },
+  modalContent: { backgroundColor: theme.colors.surface, width: 400, maxWidth: '90%', padding: 25, borderRadius: 12, elevation: 5 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 5 },
   modalDesc: { fontSize: 13, color: theme.colors.text.muted, marginBottom: 20 },
   formGroup: { marginBottom: 15 },
   formLabel: { fontSize: 13, fontWeight: '600', color: theme.colors.text.main, marginBottom: 5 },
-  pickerWrapper: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' },
+  pickerWrapper: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: theme.colors.surface, height: 40, justifyContent: 'center' },
   modalPicker: { width: '100%', height: 40, ...Platform.select({ web: { outlineStyle: 'none', border: 'none' } as any }) },
-  inputWithUnit: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: '#fff', height: 40, paddingHorizontal: 10 },
+  inputWithUnit: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: theme.colors.surface, height: 40, paddingHorizontal: 10 },
   modalInput: { flex: 1, height: '100%', fontSize: 16, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
   unitText: { fontSize: 14, color: theme.colors.text.muted, marginLeft: 8 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 10 },
-  modalCancelBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, backgroundColor: '#f1f5f9' },
+  modalCancelBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, backgroundColor: sem.neutral.bg },
   modalCancelText: { color: theme.colors.text.muted, fontWeight: 'bold' },
   modalSubmitBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 6, backgroundColor: theme.colors.primary, minWidth: 100, alignItems: 'center' },
-  modalSubmitText: { color: '#fff', fontWeight: 'bold' }
+  modalSubmitText: { color: theme.colors.text.inverse, fontWeight: 'bold' }
 });

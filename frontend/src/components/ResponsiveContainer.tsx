@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { useResponsive } from '../hooks/useResponsive';
+import { theme } from '../theme';
 
 interface Props {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ interface Props {
 export const ResponsiveContainer: React.FC<Props> = ({ children, fullWidth }) => {
   const { isWideScreen } = useResponsive();
 
-  // Webかつ広い画面で、かつ fullWidth フラグが立っていない時だけ最大幅(600px)を適用
+  // Webかつ広い画面で、かつ fullWidth フラグが立っていない時だけ最大幅を適用
   const isWebWide = Platform.OS === 'web' && isWideScreen;
   const containerStyle = (isWebWide && !fullWidth) ? styles.wideContainer : styles.mobileContainer;
 
@@ -29,21 +30,21 @@ export const ResponsiveContainer: React.FC<Props> = ({ children, fullWidth }) =>
 const styles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: '#f8f9fa', // 画面両端の余白部分の色
-    alignItems: 'center',       // 横方向の中央寄せ
+    backgroundColor: theme.colors.semantic.admin.background,
+    alignItems: 'center',
   },
   inner: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#ffffff', // アプリ本体の背景色
+    backgroundColor: theme.colors.surface,
   },
   mobileContainer: {
     maxWidth: '100%',
   },
   wideContainer: {
-    maxWidth: 600,             // iPad/PCで見た時の通常のアプリ横幅
+    maxWidth: theme.layout.maxContentWidth,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.colors.semantic.admin.border,
   },
 });

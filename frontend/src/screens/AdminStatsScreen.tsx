@@ -117,62 +117,59 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
   );
 };
 
+const adm = theme.colors.semantic.admin;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: adm.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: adm.surface,
     paddingTop: 16,
     paddingBottom: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
+    borderBottomColor: adm.border,
   },
   backButton: { width: 60, paddingVertical: 8 },
   backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   content: { padding: 16, paddingBottom: 40 },
   
-  // ★ 追加: 画面内エラー表示用のスタイル
   errorContainer: {
-    backgroundColor: '#F8D7DA',
+    backgroundColor: adm.errorBg,
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#F5C2C7',
+    borderColor: adm.errorBorder,
     marginTop: 8,
   },
   errorTitle: {
-    color: '#842029',
+    color: adm.errorText,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 6,
   },
   errorSubText: {
-    color: '#842029',
+    color: adm.errorText,
     fontSize: 14,
   },
 
-  summaryCard: { 
-    backgroundColor: theme.colors.primary, 
-    padding: 20, 
-    borderRadius: 12, 
+  summaryCard: {
+    backgroundColor: theme.colors.primary,
+    padding: 20,
+    borderRadius: 12,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    ...theme.shadows.md,
   },
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
-  summaryAmount: { color: 'white', fontSize: 36, fontWeight: 'bold' },
+  summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
   summaryNote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 8 },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#E9ECEF',
+    backgroundColor: adm.border,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -182,16 +179,16 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: adm.surface,
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E9ECEF'
+    borderColor: adm.border,
   },
   cellMainText: { fontSize: 15, color: theme.colors.text.main },
   cellSubText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 4 },
   emptyContainer: { padding: 32, alignItems: 'center' },
-  emptyText: { color: theme.colors.text.muted, fontSize: 16 }
+  emptyText: { color: theme.colors.text.muted, fontSize: 16 },
 });

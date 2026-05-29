@@ -32,7 +32,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
           <Text style={styles.sectionTitle}>マスタデータ管理</Text>
           
           <TouchableOpacity style={styles.settingsCard} onPress={onGoToCategories}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#F0F4F8' }]}><Text>⚙️</Text></View>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.settings }]}><Text>⚙️</Text></View>
             <View style={styles.textWrapper}>
               <Text style={styles.cardTitle}>カテゴリー設定</Text>
               <Text style={styles.cardDesc}>支出カテゴリの追加・編集・色変更</Text>
@@ -41,7 +41,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.settingsCard} onPress={onGoToProductMaster}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#E3F2FD' }]}><Text>🧠</Text></View>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.product }]}><Text>🧠</Text></View>
             <View style={styles.textWrapper}>
               <Text style={styles.cardTitle}>学習マスタ管理</Text>
               <Text style={styles.cardDesc}>商品名からの自動カテゴリ分類の修正</Text>
@@ -54,7 +54,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
           
           <TouchableOpacity style={styles.settingsCard} onPress={onGoToPromptEditor}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#EDE7F6' }]}><Text>📝</Text></View>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.prompt }]}><Text>📝</Text></View>
             <View style={styles.textWrapper}>
               <Text style={styles.cardTitle}>プロンプト・外税ヒント編集</Text>
               <Text style={styles.cardDesc}>Geminiへの指示と店舗特有の計算ルール</Text>
@@ -63,7 +63,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.settingsCard} onPress={onGoToAdminStats}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#FFF3E0' }]}><Text>📈</Text></View>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.stats }]}><Text>📈</Text></View>
             <View style={styles.textWrapper}>
               <Text style={styles.cardTitle}>AIコスト統計</Text>
               <Text style={styles.cardDesc}>API利用量と概算コストの確認</Text>
@@ -76,18 +76,20 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   );
 };
 
+const adm = theme.colors.semantic.admin;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: adm.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: adm.surface,
     paddingTop: 16,
     paddingBottom: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
+    borderBottomColor: adm.border,
   },
   backButton: { width: 60, paddingVertical: 8 },
   backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
@@ -98,12 +100,12 @@ const styles = StyleSheet.create({
   settingsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: adm.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: adm.border,
   },
   iconWrapper: {
     width: 44,
@@ -116,5 +118,5 @@ const styles = StyleSheet.create({
   textWrapper: { flex: 1 },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 4 },
   cardDesc: { fontSize: 12, color: theme.colors.text.muted },
-  arrow: { fontSize: 24, color: '#CED4DA' }
+  arrow: { fontSize: 24, color: adm.arrow },
 });

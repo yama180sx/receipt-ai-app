@@ -321,7 +321,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
         <Text style={styles.headerTitle}>割り勘エディタ</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveButtonText}>確定して保存</Text>}
+            {saving ? <ActivityIndicator color={theme.colors.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>確定して保存</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -502,68 +502,69 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   );
 };
 
+const sem = theme.colors.semantic;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   backButton: { paddingRight: 15 },
   backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
   headerRight: { minWidth: 100, alignItems: 'flex-end' },
   saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 16 },
   
-  targetSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border, padding: 15, paddingHorizontal: 20 },
+  targetSection: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, padding: 15, paddingHorizontal: 20 },
   targetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   targetTitle: { fontSize: 15, fontWeight: 'bold', color: theme.colors.text.main },
   
   memberChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#bae6fd' },
-  firstChip: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }, 
-  chipText: { color: '#0369a1', fontWeight: 'bold', fontSize: 14 },
+  chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: sem.info.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: sem.info.border },
+  firstChip: { backgroundColor: sem.neutral.bg, borderColor: sem.neutral.border },
+  chipText: { color: sem.info.text, fontWeight: 'bold', fontSize: 14 },
   firstChipText: { color: theme.colors.text.muted },
   chipClose: { marginLeft: 8, backgroundColor: 'rgba(3,105,161,0.1)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  chipCloseText: { color: '#0369a1', fontSize: 10, fontWeight: 'bold' },
-  addMemberWrapper: { height: 32, justifyContent: 'center', backgroundColor: '#f8fafc', borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  chipCloseText: { color: sem.info.text, fontSize: 10, fontWeight: 'bold' },
+  addMemberWrapper: { height: 32, justifyContent: 'center', backgroundColor: theme.colors.background, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   addPicker: { height: 32, width: 120, color: theme.colors.primary, fontSize: 14, fontWeight: 'bold', ...Platform.select({ web: { outlineStyle: 'none', border: 'none', background: 'transparent' } as any }) },
   
   mainLayout: { flex: 1, padding: 20, gap: 20 },
   rowLayout: { flexDirection: 'row' },
   colLayout: { flexDirection: 'column' },
   imagePane: { height: '100%', minHeight: 300 },
-  imageBox: { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  imageBox: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   receiptImage: { width: '100%', height: '100%' },
   noImageText: { color: theme.colors.text.muted },
-  editorPane: { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  editorPane: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   editorToolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface },
   storeName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   
   tableScroll: { flex: 1 },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center', minWidth: 800 },
-  tableHeader: { backgroundColor: '#F8F9FA', borderBottomColor: theme.colors.border },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder, alignItems: 'center', minWidth: 800 },
+  tableHeader: { backgroundColor: sem.table.headerBg, borderBottomColor: theme.colors.border },
   
-  // ★ 追加: 合計行のスタイル
-  totalRow: { backgroundColor: '#FFFBEB', borderTopWidth: 2, borderTopColor: '#FCD34D' },
-  totalText: { fontWeight: 'bold', color: '#B45309' },
-  totalInputGroup: { borderColor: '#FCD34D', backgroundColor: '#FEF3C7' },
-  totalInputBox: { fontWeight: 'bold', color: '#B45309' },
-  totalUnitText: { color: '#B45309', fontWeight: 'bold' },
+  totalRow: { backgroundColor: sem.warning.bg, borderTopWidth: 2, borderTopColor: sem.warning.border },
+  totalText: { fontWeight: 'bold', color: sem.warning.text },
+  totalInputGroup: { borderColor: sem.warning.border, backgroundColor: sem.warning.inputBg },
+  totalInputBox: { fontWeight: 'bold', color: sem.warning.text },
+  totalUnitText: { color: sem.warning.text, fontWeight: 'bold' },
 
   cell: { padding: 12, justifyContent: 'center' },
   headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
   cellName: { width: 160, fontSize: 14, color: theme.colors.text.main },
   cellAmount: { width: 90, fontSize: 14, fontWeight: 'bold', textAlign: 'right', color: theme.colors.text.main },
-  cellInputCol: { width: 180, alignItems: 'center' }, 
+  cellInputCol: { width: 180, alignItems: 'center' },
   
   dualInputWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
-  inputGroup: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, height: 36, paddingRight: 4 },
+  inputGroup: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, height: 36, paddingRight: 4 },
   inputBox: { height: '100%', textAlign: 'right', fontSize: 14, color: theme.colors.text.main, paddingRight: 4, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
   percentBox: { width: 35 },
   amountBox: { width: 60 },
-  disabledInputBox: { backgroundColor: '#f1f5f9', color: theme.colors.text.muted },
+  disabledInputBox: { backgroundColor: sem.neutral.bg, color: theme.colors.text.muted },
   unitText: { fontSize: 11, color: theme.colors.text.muted },
   
   cellAction: { width: 70, alignItems: 'center' },
-  splitBtnSmall: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  splitBtnSmall: { backgroundColor: sem.neutral.bg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   splitBtnSmallText: { fontSize: 12, color: theme.colors.text.muted, fontWeight: 'bold' },
 });

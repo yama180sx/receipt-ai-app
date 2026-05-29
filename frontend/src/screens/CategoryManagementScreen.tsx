@@ -56,7 +56,7 @@ export const CategoryManagementScreen = ({
     if (!newName.trim() || !currentMemberId) return;
     try {
       await apiClient.post('/categories', 
-        { name: newName, color: '#2ecc71' },
+        { name: newName, color: theme.colors.semantic.category.newDefault },
         { headers: getHeaders() }
       );
       setNewName('');
@@ -179,9 +179,9 @@ const styles = StyleSheet.create({
   inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10 },
   input: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: theme.colors.border, color: theme.colors.text.main },
   addButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 25, justifyContent: 'center', borderRadius: 10 },
-  addButtonText: { color: 'white', fontWeight: 'bold' },
-  optimizeButton: { backgroundColor: '#6c5ce7', padding: 12, borderRadius: 10, marginBottom: 20, alignItems: 'center', justifyContent: 'center' },
-  optimizeButtonText: { color: 'white', fontWeight: 'bold' },
+  addButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
+  optimizeButton: { backgroundColor: theme.colors.semantic.category.optimize, padding: 12, borderRadius: 10, marginBottom: 20, alignItems: 'center', justifyContent: 'center' },
+  optimizeButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold' },
   buttonDisabled: { opacity: 0.6 },
   list: { paddingBottom: 40 },
   itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border },

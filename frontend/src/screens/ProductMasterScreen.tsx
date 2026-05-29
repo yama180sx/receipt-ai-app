@@ -145,7 +145,7 @@ export const ProductMasterScreen = ({
       <View style={styles.cardInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
         <Text style={styles.storeName}>店舗: {item.storeName || '共通'}</Text>
-        <View style={[styles.badge, { backgroundColor: item.category?.color || '#ccc' }]}>
+        <View style={[styles.badge, { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge }]}>
           <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
         </View>
       </View>
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   searchBar: { padding: 10, flexDirection: 'row', backgroundColor: theme.colors.surface },
   input: { 
     flex: 1, 
-    backgroundColor: '#fff', 
+    backgroundColor: theme.colors.surface, 
     marginHorizontal: 5, 
     padding: 12, 
     borderRadius: 8, 
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   listContent: { paddingBottom: 40 },
   card: { 
-    backgroundColor: '#fff', 
+    backgroundColor: theme.colors.surface, 
     marginHorizontal: 15, 
     marginTop: 10, 
     padding: 15, 
@@ -243,17 +243,22 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: theme.colors.border,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-      android: { elevation: 2 }
-    })
+      ios: {
+        shadowColor: theme.shadows.sm.shadowColor,
+        shadowOffset: theme.shadows.sm.shadowOffset,
+        shadowOpacity: theme.shadows.sm.shadowOpacity,
+        shadowRadius: theme.shadows.sm.shadowRadius,
+      },
+      android: { elevation: theme.shadows.sm.elevation },
+    }),
   },
   cardInfo: { flex: 1 },
   itemName: { fontWeight: 'bold', fontSize: 16, color: theme.colors.text.main },
   storeName: { color: theme.colors.text.muted, fontSize: 13, marginVertical: 4 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
   actions: { justifyContent: 'center', paddingLeft: 10 },
   deleteBtn: { backgroundColor: theme.colors.error, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
-  btnText: { color: '#fff', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  btnText: { color: theme.colors.text.inverse, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
   empty: { textAlign: 'center', marginTop: 40, color: theme.colors.text.muted }
 });

@@ -15,6 +15,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
+import { theme } from '../theme';
+
+const c = theme.colors;
+const s = theme.colors.semantic.scan;
 
 interface ReceiptItem {
   name: string;
@@ -101,6 +105,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   };
 
   const handleCommit = async () => {
+    if (loading) return;
     setLoading(true);
     try {
       const payload = {
@@ -126,8 +131,19 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         onSuccess();
       }
     } catch (err: any) {
-      console.error('Commit error:', err.response?.data || err.message);
-      Alert.alert('エラー', '保存に失敗しました。');
+      const apiError = err.response?.data;
+      console.error('Commit error:', apiError || err.message);
+
+      if (apiError?.message === 'DUPLICATE') {
+        Alert.alert(
+          '既に登録済みです',
+          '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
+
+      Alert.alert('エラー', apiError?.message || '保存に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -142,7 +158,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
           </TouchableOpacity>
           <Text style={styles.headerTitle}>解析結果の確認</Text>
           <TouchableOpacity onPress={handleCommit} disabled={loading} style={[styles.saveButton, loading && { opacity: 0.6 }]}>
-            {loading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.saveButtonText}>確定保存</Text>}
+            {loading ? <ActivityIndicator color={c.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>確定保存</Text>}
           </TouchableOpacity>
         </View>
 
@@ -242,9 +258,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
                     style={styles.picker}
                     mode="dropdown"
                   >
-                    <Picker.Item label="未選択" value={null} color="#999" />
+                    <Picker.Item label="未選択" value={null} color={theme.colors.semantic.picker.muted} />
                     {categories.map(c => (
-                      <Picker.Item key={c.id} label={c.name} value={c.id} color="#333" />
+                      <Picker.Item key={c.id} label={c.name} value={c.id} color={theme.colors.semantic.picker.text} />
                     ))}
                   </Picker>
                 </View>
@@ -259,66 +275,66 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 16, 
-    backgroundColor: 'white', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#EEE' 
+  container: { flex: 1, backgroundColor: s.background },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    backgroundColor: c.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: s.borderLight,
   },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#333' },
-  cancelText: { color: '#666', fontSize: 15 },
-  saveButton: { backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  saveButtonText: { color: 'white', fontWeight: 'bold' },
+  headerTitle: { fontSize: 17, fontWeight: 'bold', color: s.textTitle },
+  cancelText: { color: s.textSecondary, fontSize: 15 },
+  saveButton: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: theme.borderRadius.lg },
+  saveButtonText: { color: c.text.inverse, fontWeight: 'bold' },
   scrollView: { flex: 1 },
-  imageContainer: { width: '100%', height: 260, backgroundColor: '#111', marginBottom: 16, position: 'relative' },
+  imageContainer: { width: '100%', height: 260, backgroundColor: s.imageBg, marginBottom: theme.spacing.md, position: 'relative' },
   receiptImage: { width: '100%', height: '100%' },
-  imageLabel: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  imageLabelText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  card: { backgroundColor: 'white', margin: 16, marginTop: 0, borderRadius: 16, padding: 16, elevation: 2 },
-  sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 12 },
-  input: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 8, fontSize: 16, color: '#111827', marginBottom: 12 },
+  imageLabel: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.borderRadius.sm },
+  imageLabelText: { color: c.text.inverse, fontSize: 10, fontWeight: 'bold' },
+  card: { backgroundColor: c.surface, margin: theme.spacing.md, marginTop: 0, borderRadius: theme.spacing.md, padding: theme.spacing.md, elevation: 2 },
+  sectionLabel: { fontSize: 12, fontWeight: 'bold', color: s.textMuted, textTransform: 'uppercase', marginBottom: 12 },
+  input: { borderBottomWidth: 1, borderBottomColor: s.borderInput, paddingVertical: 8, fontSize: 16, color: s.textBody, marginBottom: 12 },
   taxInputRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingVertical: 4 },
-  taxLabel: { fontSize: 14, color: '#4B5563' },
-  taxInput: { borderBottomWidth: 1, borderBottomColor: '#2563EB', fontSize: 16, color: '#2563EB', fontWeight: 'bold', minWidth: 80, textAlign: 'right' },
-  totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  totalLabel: { fontSize: 14, color: '#666' },
-  totalValue: { fontSize: 24, fontWeight: 'bold', color: '#2563EB' },
-  itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginBottom: 12 },
-  addButton: { backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  addButtonText: { color: '#2563EB', fontWeight: 'bold', fontSize: 13 },
-  itemCard: { backgroundColor: 'white', marginHorizontal: 16, marginBottom: 12, borderRadius: 16, padding: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB', elevation: 1 },
+  taxLabel: { fontSize: 14, color: s.textSub },
+  taxInput: { borderBottomWidth: 1, borderBottomColor: c.primary, fontSize: 16, color: c.primary, fontWeight: 'bold', minWidth: 80, textAlign: 'right' },
+  totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: theme.spacing.md, borderTopWidth: 1, borderTopColor: s.borderInput },
+  totalLabel: { fontSize: 14, color: s.textSecondary },
+  totalValue: { fontSize: 24, fontWeight: 'bold', color: c.primary },
+  itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: theme.spacing.md, marginBottom: 12 },
+  addButton: { backgroundColor: s.primaryLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.borderRadius.sm },
+  addButtonText: { color: c.primary, fontWeight: 'bold', fontSize: 13 },
+  itemCard: { backgroundColor: c.surface, marginHorizontal: theme.spacing.md, marginBottom: 12, borderRadius: theme.spacing.md, padding: theme.spacing.md, borderLeftWidth: 4, borderLeftColor: c.primary, elevation: 1 },
   itemHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  itemNameInput: { flex: 1, fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  deleteIcon: { fontSize: 18, color: '#D1D5DB' },
+  itemNameInput: { flex: 1, fontSize: 15, fontWeight: 'bold', color: s.textBody },
+  deleteIcon: { fontSize: 18, color: s.deleteIcon },
   itemDetailRow: { flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 12 },
   itemSubGroup: { flex: 1 },
-  subLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: 'bold', marginBottom: 4 },
-  inputSmall: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 4, fontSize: 14, color: '#374151', fontWeight: '600' },
-  subTotalText: { fontSize: 14, fontWeight: '700', color: '#374151', paddingTop: 4 },
-  categoryRow: { borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 8 },
-  pickerWrapper: { 
-    borderWidth: 1, 
-    borderColor: '#F3F4F6', 
-    borderRadius: 8, 
-    backgroundColor: '#FAFAFA',
-    height: 55, 
+  subLabel: { fontSize: 10, color: s.textMuted, fontWeight: 'bold', marginBottom: 4 },
+  inputSmall: { borderBottomWidth: 1, borderBottomColor: s.borderInput, paddingVertical: 4, fontSize: 14, color: s.textItem, fontWeight: '600' },
+  subTotalText: { fontSize: 14, fontWeight: '700', color: s.textItem, paddingTop: 4 },
+  categoryRow: { borderTopWidth: 1, borderTopColor: s.background, paddingTop: theme.spacing.sm },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: s.borderInput,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: s.pickerBg,
+    height: 55,
     justifyContent: 'center',
     marginTop: 4,
-    overflow: 'visible' 
+    overflow: 'visible',
   },
-  picker: { 
-    width: '100%', 
+  picker: {
+    width: '100%',
     height: 55,
-    color: '#333',
+    color: theme.colors.semantic.picker.text,
     ...Platform.select({
       android: {
         marginLeft: -10,
-      }
-    })
+      },
+    }),
   },
-  headerButton: { padding: 4 }
+  headerButton: { padding: 4 },
 });

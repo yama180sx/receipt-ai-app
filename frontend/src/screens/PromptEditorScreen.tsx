@@ -243,7 +243,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
             </View>
 
             <TouchableOpacity style={[styles.saveButton, isSaving && styles.disabledButton]} onPress={handleSave} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveButtonText}>保存</Text>}
+              {isSaving ? <ActivityIndicator size="small" color={theme.colors.text.inverse} /> : <Text style={styles.saveButtonText}>保存</Text>}
             </TouchableOpacity>
           </View>
         ) : (
@@ -296,52 +296,51 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
   );
 };
 
+const adm = theme.colors.semantic.admin;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'white', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#E9ECEF' },
+  container: { flex: 1, backgroundColor: adm.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: adm.surface, paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: adm.border },
   backButton: { width: 60, paddingVertical: 8 },
   backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   contentContainer: { padding: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#6C757D' },
-  errorContainer: { backgroundColor: '#F8D7DA', padding: 12, borderRadius: 6, marginBottom: 16 },
-  errorText: { color: '#842029' },
+  loadingText: { marginTop: 12, color: adm.textMuted },
+  errorContainer: { backgroundColor: adm.errorBg, padding: 12, borderRadius: 6, marginBottom: 16 },
+  errorText: { color: adm.errorText },
   
-  // List Styles
-  createButton: { backgroundColor: '#28A745', padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
-  createButtonText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
-  card: { backgroundColor: 'white', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 2, borderColor: '#E9ECEF' },
+  createButton: { backgroundColor: adm.success, padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
+  createButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 15 },
+  card: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 2, borderColor: adm.border },
   activeCard: { borderColor: theme.colors.primary },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, // alignItems を flex-start に変更
-  // ★追加: タイトルとバッジのレイアウト制御
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   titleContainer: { flex: 1, paddingRight: 8 },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#212529', lineHeight: 22 },
-  versionText: { fontSize: 12, color: '#6C757D', fontWeight: 'normal' },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', color: adm.textDark, lineHeight: 22 },
+  versionText: { fontSize: 12, color: adm.textMuted, fontWeight: 'normal' },
   badgeContainer: { justifyContent: 'flex-start', paddingTop: 2 },
   badge: { backgroundColor: theme.colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  badgeText: { color: theme.colors.text.inverse, fontSize: 10, fontWeight: 'bold' },
   
-  cardDesc: { fontSize: 13, color: '#6C757D', marginBottom: 12 },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }, // flexWrap を追加して溢れ防止
+  cardDesc: { fontSize: 13, color: adm.textMuted, marginBottom: 12 },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
   actionBtnOutline: { borderWidth: 1, borderColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
   actionBtnOutlineText: { color: theme.colors.primary, fontSize: 12 },
   actionBtnFill: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
-  actionBtnFillText: { color: 'white', fontSize: 12 },
-  actionBtnDanger: { borderWidth: 1, borderColor: '#DC3545', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
-  actionBtnDangerText: { color: '#DC3545', fontSize: 12 },
+  actionBtnFillText: { color: theme.colors.text.inverse, fontSize: 12 },
+  actionBtnDanger: { borderWidth: 1, borderColor: adm.danger, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
+  actionBtnDangerText: { color: adm.danger, fontSize: 12 },
 
-  // Form Styles
-  formContainer: { backgroundColor: 'white', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#E9ECEF' },
+  formContainer: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: adm.border },
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   formTitle: { fontSize: 18, fontWeight: 'bold' },
-  cancelText: { color: '#6C757D', fontSize: 14 },
+  cancelText: { color: adm.textMuted, fontSize: 14 },
   section: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#495057', marginBottom: 6 },
-  input: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#CED4DA', borderRadius: 6, padding: 12, fontSize: 14 },
+  label: { fontSize: 14, fontWeight: 'bold', color: adm.textLabel, marginBottom: 6 },
+  input: { backgroundColor: adm.inputBg, borderWidth: 1, borderColor: adm.inputBorder, borderRadius: 6, padding: 12, fontSize: 14 },
   textArea: { height: 200, fontFamily: 'System' },
   jsonArea: { height: 150, fontFamily: 'Courier' },
   saveButton: { backgroundColor: theme.colors.primary, paddingVertical: 14, borderRadius: 6, alignItems: 'center' },
   disabledButton: { opacity: 0.5 },
-  saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 16 },
 });
