@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppButton } from '../components/ui';
+import { AppBackButton, AppButton, AppListItem } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
@@ -143,23 +143,27 @@ export const ProductMasterScreen = ({
   };
 
   const renderItem = ({ item }: { item: ProductMaster }) => (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.storeName}>店舗: {item.storeName || '共通'}</Text>
-        <View style={[styles.badge, { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge }]}>
-          <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
-        </View>
-      </View>
-      <View style={styles.actions}>
+    <AppListItem
+      title={item.name}
+      subtitle={`店舗: ${item.storeName || '共通'}`}
+      right={
         <AppButton
           title={BUTTON_LABELS.delete}
           onPress={() => handleDelete(item.id)}
           variant="dangerFilled"
           size="sm"
         />
+      }
+    >
+      <View
+        style={[
+          styles.badge,
+          { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge },
+        ]}
+      >
+        <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
       </View>
-    </View>
+    </AppListItem>
   );
 
   return (
@@ -233,32 +237,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     color: theme.colors.text.main 
   },
-  listContent: { paddingBottom: 40 },
-  card: { 
-    backgroundColor: theme.colors.surface, 
-    marginHorizontal: 15, 
-    marginTop: 10, 
-    padding: 15, 
-    borderRadius: 10, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    borderWidth: 1, 
-    borderColor: theme.colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.shadows.sm.shadowColor,
-        shadowOffset: theme.shadows.sm.shadowOffset,
-        shadowOpacity: theme.shadows.sm.shadowOpacity,
-        shadowRadius: theme.shadows.sm.shadowRadius,
-      },
-      android: { elevation: theme.shadows.sm.elevation },
-    }),
-  },
-  cardInfo: { flex: 1 },
-  itemName: { fontWeight: 'bold', fontSize: 16, color: theme.colors.text.main },
-  storeName: { color: theme.colors.text.muted, fontSize: 13, marginVertical: 4 },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
+  listContent: { paddingHorizontal: 15, paddingBottom: 40 },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 4 },
   badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
-  actions: { justifyContent: 'center', paddingLeft: 10 },
   empty: { textAlign: 'center', marginTop: 40, color: theme.colors.text.muted }
 });

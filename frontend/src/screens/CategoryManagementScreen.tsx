@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppButton } from '../components/ui';
+import { AppBackButton, AppButton, AppListColorDot, AppListItem } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
@@ -152,16 +152,18 @@ export const CategoryManagementScreen = ({
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.itemRow}>
-              <View style={[styles.colorBadge, { backgroundColor: item.color }]} />
-              <Text style={styles.categoryName}>{item.name}</Text>
-              <AppButton
-                title={BUTTON_LABELS.delete}
-                onPress={() => deleteCategory(item.id)}
-                variant="dangerFilled"
-                size="sm"
-              />
-            </View>
+            <AppListItem
+              title={item.name}
+              left={<AppListColorDot color={item.color} />}
+              right={
+                <AppButton
+                  title={BUTTON_LABELS.delete}
+                  onPress={() => deleteCategory(item.id)}
+                  variant="dangerFilled"
+                  size="sm"
+                />
+              }
+            />
           )}
         />
       )}
@@ -176,8 +178,5 @@ const styles = StyleSheet.create({
   inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10, alignItems: 'center' },
   input: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: theme.colors.border, color: theme.colors.text.main },
   list: { paddingBottom: 40 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border },
-  colorBadge: { width: 14, height: 14, borderRadius: 7, marginRight: 15 },
-  categoryName: { flex: 1, ...theme.typography.body, fontWeight: '600' },
-  emptyText: { textAlign: 'center', marginTop: 30, color: theme.colors.text.muted }
+  emptyText: { textAlign: 'center', marginTop: 30, color: theme.colors.text.muted },
 });

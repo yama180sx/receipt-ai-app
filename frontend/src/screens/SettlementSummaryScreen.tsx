@@ -15,7 +15,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme, BREAKPOINTS } from '../theme';
+import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 
 interface SettlementSummaryScreenProps {
@@ -217,14 +217,14 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
           {/* 清算ステータス詳細（スプレッドシート風一覧テーブル） */}
           <View style={styles.tableContainer}>
             <Text style={styles.tableTitle}>📋 世帯内精算内訳（一覧）</Text>
-            <View style={styles.tableWrapper}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.cell, styles.cellName, styles.headerText]}>メンバー名</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>立替金額(A)</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>負担金額(B)</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>差額(A-B)</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>送金/受取相殺</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>最終残額</Text>
+            <View style={tableStyles.wrapper}>
+              <View style={[tableStyles.row, tableStyles.headerRow]}>
+                <Text style={[tableStyles.cell, styles.cellName, tableStyles.headerText]}>メンバー名</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>立替金額(A)</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>負担金額(B)</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>差額(A-B)</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>送金/受取相殺</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>最終残額</Text>
               </View>
 
               {summaryData.map(m => {
@@ -232,17 +232,17 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
                 const offsetAmount = (m.transferredOut || 0) - (m.transferredIn || 0);
                 
                 return (
-                  <View key={m.memberId} style={styles.tableRow}>
-                    <Text style={[styles.cell, styles.cellName, styles.bodyText, styles.boldText]}>{m.name}</Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalPaid?.toLocaleString()}</Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>¥{m.totalOwed?.toLocaleString()}</Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText]}>
+                  <View key={m.memberId} style={tableStyles.row}>
+                    <Text style={[tableStyles.cell, styles.cellName, tableStyles.bodyText, tableStyles.boldText]}>{m.name}</Text>
+                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText]}>¥{m.totalPaid?.toLocaleString()}</Text>
+                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText]}>¥{m.totalOwed?.toLocaleString()}</Text>
+                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText]}>
                       {m.baseBalance >= 0 ? "+" : ""}{m.baseBalance?.toLocaleString()}
                     </Text>
-                    <Text style={[styles.cell, styles.cellAmount, styles.bodyText, { color: theme.colors.text.muted }]}>
+                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText, { color: theme.colors.text.muted }]}>
                       {offsetAmount >= 0 ? "+" : ""}{offsetAmount.toLocaleString()}
                     </Text>
-                    <Text style={[styles.cell, styles.cellAmount, balanceStyle, styles.boldText]}>
+                    <Text style={[tableStyles.cell, styles.cellAmount, balanceStyle, tableStyles.boldText]}>
                       {m.balance > 0 ? "+" : ""}{m.balance?.toLocaleString()}
                     </Text>
                   </View>
@@ -369,13 +369,6 @@ const styles = StyleSheet.create({
   
   tableContainer: { backgroundColor: theme.colors.surface, padding: 20, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border },
   tableTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
-  tableWrapper: { borderWidth: 1, borderColor: sem.table.rowBorder, borderRadius: 8, overflow: 'hidden' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder, alignItems: 'center', height: 48 },
-  tableHeader: { backgroundColor: sem.table.headerBg },
-  cell: { paddingHorizontal: 12, justifyContent: 'center' },
-  headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
-  bodyText: { fontSize: 14, color: theme.colors.text.main },
-  boldText: { fontWeight: 'bold' },
   cellName: { flex: 1.5, minWidth: 100 },
   cellAmount: { flex: 1, textAlign: 'right' },
 
