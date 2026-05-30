@@ -4,7 +4,6 @@ import {
   Text, 
   View, 
   ScrollView, 
-  TouchableOpacity, 
   ActivityIndicator, 
   useWindowDimensions,
   Alert
