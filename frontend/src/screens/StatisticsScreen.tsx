@@ -3,22 +3,19 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  Dimensions, 
   ScrollView, 
   ActivityIndicator, 
   Image, 
   TouchableOpacity, 
-  Modal, 
   Alert, 
   FlatList, 
   useWindowDimensions, 
-  Platform 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
 import apiClient from '../utils/apiClient';
 import { toMonthSelectOptions } from '../utils/monthSelectOptions';
-import { AppBackButton, AppModalCloseButton, AppSelect } from '../components/ui';
+import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -290,26 +287,22 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
-      {/* 解析レシート詳細 Modal */}
-      <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide} onRequestClose={() => setMainModalVisible(false)}>
-        <View style={isWide ? styles.modalOverlay : styles.modalContainer}>
-          <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>解析レシート詳細</Text>
-              <AppModalCloseButton onPress={() => setMainModalVisible(false)} />
-            </View>
-            
-            <ReceiptDetailComponent 
-              receipt={data?.latestReceipt}
-              categories={allCategories}
-              onCategoryChange={handleCategoryChange}
-              baseUrl={BASE_URL}
-              fullWidth={true}
-              onSaveSuccess={fetchData} 
-            />
-          </SafeAreaView>
-        </View>
-      </Modal>
+      <AppModal
+        visible={isMainModalVisible}
+        onRequestClose={() => setMainModalVisible(false)}
+        variant="sheet"
+        sheetPresentation={isWide ? 'wide' : 'fullscreen'}
+        title="解析レシート詳細"
+      >
+        <ReceiptDetailComponent
+          receipt={data?.latestReceipt}
+          categories={allCategories}
+          onCategoryChange={handleCategoryChange}
+          baseUrl={BASE_URL}
+          fullWidth={true}
+          onSaveSuccess={fetchData}
+        />
+      </AppModal>
     </SafeAreaView>
   );
 };
@@ -356,9 +349,4 @@ const styles = StyleSheet.create({
   receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, minWidth: 80, textAlign: 'right' },
   taxSubText: { fontSize: 11, color: theme.colors.text.muted, marginTop: 2 },
   noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { flex: 1, backgroundColor: theme.colors.background },
-  wideModal: { width: '95%', maxWidth: 1400, height: '90%', borderRadius: 20, overflow: 'hidden' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  modalTitle: { fontSize: 18, fontWeight: 'bold' },
 });

@@ -6,7 +6,6 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Modal, 
   Platform, 
   Alert, 
   useWindowDimensions 
@@ -15,7 +14,7 @@ import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
 import { toMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
-import { AppBackButton, AppModalCloseButton, AppSelect } from '../components/ui';
+import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme, BREAKPOINTS } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -285,27 +284,24 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
       </View>
 
       {!isWide && (
-        <Modal visible={!!selectedReceipt} animationType="slide" onRequestClose={() => setSelectedReceipt(null)}>
-          <View style={styles.modalContent}>
-            <View style={styles.detailHeader}>
-              <Text style={styles.detailTitleMobile} numberOfLines={1}>
-                {selectedReceipt?.storeName || '店名不明'}
-              </Text>
-              <AppModalCloseButton onPress={() => setSelectedReceipt(null)} />
-            </View>
-            {selectedReceipt && (
-              <ReceiptDetailComponent 
-                receipt={selectedReceipt}
-                categories={categories}
-                onCategoryChange={handleCategoryChange}
-                baseUrl={BASE_URL}
-                fullWidth={true}
-                onSaveSuccess={fetchReceipts}
-                onGoToSplitEditor={onGoToSplitEditor} // ★ 追加
-              />
-            )}
-          </View>
-        </Modal>
+        <AppModal
+          visible={!!selectedReceipt}
+          onRequestClose={() => setSelectedReceipt(null)}
+          variant="sheet"
+          title={selectedReceipt?.storeName || '店名不明'}
+        >
+          {selectedReceipt ? (
+            <ReceiptDetailComponent
+              receipt={selectedReceipt}
+              categories={categories}
+              onCategoryChange={handleCategoryChange}
+              baseUrl={BASE_URL}
+              fullWidth={true}
+              onSaveSuccess={fetchReceipts}
+              onGoToSplitEditor={onGoToSplitEditor}
+            />
+          ) : null}
+        </AppModal>
       )}
     </View>
   );
@@ -354,9 +350,6 @@ const styles = StyleSheet.create({
   itemCountBadge: { backgroundColor: theme.colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   itemCountText: { fontSize: 10, color: theme.colors.secondary },
   empty: { textAlign: 'center', marginTop: 50, color: theme.colors.text.muted },
-  modalContent: { flex: 1, backgroundColor: theme.colors.background },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  detailTitleMobile: { fontSize: 18, fontWeight: 'bold', flex: 1 },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

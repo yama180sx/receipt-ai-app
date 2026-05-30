@@ -91,4 +91,46 @@ export const modalStyles = StyleSheet.create({
     color: colors.text.main,
     ...Platform.select({ web: { outlineStyle: 'none' } as object }),
   },
+  /** フルスクリーン sheet（履歴詳細等） */
+  sheetContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheetWide: {
+    width: '95%',
+    maxWidth: 1400,
+    height: '90%',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sheetHeaderTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.main,
+    marginRight: spacing.sm,
+  },
+  sheetBody: {
+    flex: 1,
+  },
 });
