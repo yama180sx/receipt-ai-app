@@ -3,22 +3,19 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  Dimensions, 
   ScrollView, 
   ActivityIndicator, 
   Image, 
   TouchableOpacity, 
-  Modal, 
   Alert, 
   FlatList, 
   useWindowDimensions, 
-  Platform 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
-import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppModalCloseButton } from '../components/ui';
+import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
+import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -67,7 +64,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const isWide = windowWidth > 768;
 
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [data, setData] = useState<MonthlyData | null>(null);
   const [advancedData, setAdvancedData] = useState<AdvancedStats | null>(null);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -77,13 +74,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
-  const monthOptions = useMemo(() => {
-    return Array.from({ length: 12 }).map((_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return d.toISOString().slice(0, 7);
-    });
-  }, []);
+  const monthOptions = useMemo(() => getRecentYearMonths(12), []);
+
+  const monthSelectOptions = useMonthSelectOptions(monthOptions, isWide);
 
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
@@ -170,12 +163,13 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
-          <View style={[styles.monthPickerContainer, isWide && { width: 300 }]}>
-            <Picker selectedValue={selectedMonth} onValueChange={(val) => setSelectedMonth(val)} style={styles.monthPicker}>
-              {monthOptions.map(m => (
-                <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
-              ))}
-            </Picker>
+          <View style={[styles.monthPickerContainer, isWide ? styles.monthPickerContainerWide : styles.monthPickerContainerMobile]}>
+            <AppSelect<string>
+              selectedValue={selectedMonth}
+              onValueChange={setSelectedMonth}
+              options={monthSelectOptions}
+              includePlaceholder={false}
+            />
           </View>
         </View>
         
@@ -283,26 +277,22 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         )}
       </ScrollView>
 
-      {/* 解析レシート詳細 Modal */}
-      <Modal visible={isMainModalVisible} animationType="slide" transparent={isWide} onRequestClose={() => setMainModalVisible(false)}>
-        <View style={isWide ? styles.modalOverlay : styles.modalContainer}>
-          <SafeAreaView style={[styles.modalContainer, isWide && styles.wideModal]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>解析レシート詳細</Text>
-              <AppModalCloseButton onPress={() => setMainModalVisible(false)} />
-            </View>
-            
-            <ReceiptDetailComponent 
-              receipt={data?.latestReceipt}
-              categories={allCategories}
-              onCategoryChange={handleCategoryChange}
-              baseUrl={BASE_URL}
-              fullWidth={true}
-              onSaveSuccess={fetchData} 
-            />
-          </SafeAreaView>
-        </View>
-      </Modal>
+      <AppModal
+        visible={isMainModalVisible}
+        onRequestClose={() => setMainModalVisible(false)}
+        variant="sheet"
+        sheetPresentation={isWide ? 'wide' : 'fullscreen'}
+        title="解析レシート詳細"
+      >
+        <ReceiptDetailComponent
+          receipt={data?.latestReceipt}
+          categories={allCategories}
+          onCategoryChange={handleCategoryChange}
+          baseUrl={BASE_URL}
+          fullWidth={true}
+          onSaveSuccess={fetchData}
+        />
+      </AppModal>
     </SafeAreaView>
   );
 };
@@ -314,8 +304,9 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   topInfo: { marginBottom: 15 },
   headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
-  monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
-  monthPicker: { width: '100%' },
+  monthPickerContainer: { marginTop: 8, justifyContent: 'center' },
+  monthPickerContainerMobile: { width: '100%', alignSelf: 'stretch' },
+  monthPickerContainerWide: { width: 180 },
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },
@@ -348,9 +339,4 @@ const styles = StyleSheet.create({
   receiptAmount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, minWidth: 80, textAlign: 'right' },
   taxSubText: { fontSize: 11, color: theme.colors.text.muted, marginTop: 2 },
   noImageBox: { height: 100, backgroundColor: theme.colors.border, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { flex: 1, backgroundColor: theme.colors.background },
-  wideModal: { width: '95%', maxWidth: 1400, height: '90%', borderRadius: 20, overflow: 'hidden' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  modalTitle: { fontSize: 18, fontWeight: 'bold' },
 });

@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { AppButton, AppListItem } from '../components/ui';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
+import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -47,7 +49,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const currentMonth = getCurrentYearMonth();
       const [latestRes, statsRes] = await Promise.all([
         apiClient.get('/receipts/latest', { params: { memberId: currentMemberId } }),
         apiClient.get('/stats/monthly', { params: { month: currentMonth } })
@@ -171,9 +173,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.summaryAmount}>{monthlyTotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryDivider} />
-          <TouchableOpacity onPress={onGoToStats}>
-            <Text style={styles.summaryLink}>統計の詳細を見る ›</Text>
-          </TouchableOpacity>
+          <AppButton
+            title="統計の詳細を見る ›"
+            onPress={onGoToStats}
+            variant="outline"
+            size="sm"
+            style={styles.summaryLinkButton}
+            textStyle={styles.summaryLinkText}
+          />
         </View>
 
         <TouchableOpacity 
@@ -195,34 +202,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* メニューカード群：グリッド表示 */}
         <View style={styles.gridContainer}>
-          <TouchableOpacity style={styles.gridCard} onPress={onGoToHistory}>
-            <Text style={{ fontSize: 28, marginBottom: 8 }}>📋</Text>
-            <Text style={styles.menuLabel}>履歴一覧</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.gridCard} onPress={onGoToStats}>
-            <Text style={{ fontSize: 28, marginBottom: 8 }}>📊</Text>
-            <Text style={styles.menuLabel}>支出統計</Text>
-          </TouchableOpacity>
-          {/* ★ [Issue #80] 精算サマリーへの遷移ボタン（スマホ非表示） */}
+          <AppListItem
+            variant="nav"
+            onPress={onGoToHistory}
+            title="履歴一覧"
+            left={<Text style={styles.gridEmoji}>📋</Text>}
+            right={<View />}
+            style={styles.gridCard}
+          />
+          <AppListItem
+            variant="nav"
+            onPress={onGoToStats}
+            title="支出統計"
+            left={<Text style={styles.gridEmoji}>📊</Text>}
+            right={<View />}
+            style={styles.gridCard}
+          />
           {onGoToSettlement && isWide && (
-            <TouchableOpacity style={styles.gridCard} onPress={onGoToSettlement}>
-              <Text style={{ fontSize: 28, marginBottom: 8 }}>🤝</Text>
-              <Text style={styles.menuLabel}>精算サマリー</Text>
-            </TouchableOpacity>
+            <AppListItem
+              variant="nav"
+              onPress={onGoToSettlement}
+              title="精算サマリー"
+              left={<Text style={styles.gridEmoji}>🤝</Text>}
+              right={<View />}
+              style={styles.gridCard}
+            />
           )}
         </View>
 
         {/* 管理者限定メニューへのハブ導線 */}
         {isAdmin && (
           <View style={styles.section}>
-            <TouchableOpacity style={[styles.settingsCard, { backgroundColor: theme.colors.semantic.icon.adminSettings }]} onPress={onGoToAdminMenu}>
-              <View style={[styles.settingsIconWrapper, { backgroundColor: theme.colors.semantic.icon.adminCard }]}><Text>🛡️</Text></View>
-              <View style={styles.settingsTextWrapper}>
-                <Text style={styles.settingsLabel}>管理者メニュー</Text>
-                <Text style={{ fontSize: 12, color: theme.colors.text.muted, marginTop: 2 }}>マスタ管理・システム設定</Text>
-              </View>
-              <Text style={styles.arrowIcon}>›</Text>
-            </TouchableOpacity>
+            <AppListItem
+              variant="nav"
+              onPress={onGoToAdminMenu}
+              title="管理者メニュー"
+              subtitle="マスタ管理・システム設定"
+              style={{ backgroundColor: theme.colors.semantic.icon.adminSettings }}
+              left={
+                <View style={[styles.settingsIconWrapper, { backgroundColor: theme.colors.semantic.icon.adminCard }]}>
+                  <Text>🛡️</Text>
+                </View>
+              }
+            />
           </View>
         )}
 
@@ -231,15 +253,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {loading ? (
             <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 10 }} />
           ) : latestReceipt ? (
-            <TouchableOpacity style={styles.latestCard} onPress={onGoToHistory}>
-              <View style={styles.cardInfo}>
-                <Text style={styles.storeName} numberOfLines={1}>{latestReceipt.storeName || '店名不明'}</Text>
-                <Text style={styles.dateText}>{latestReceipt.date ? new Date(latestReceipt.date).toLocaleDateString('ja-JP') : '日付不明'}</Text>
-              </View>
-              <Text style={styles.amountText}>
-                ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
-              </Text>
-            </TouchableOpacity>
+            <AppListItem
+              variant="nav"
+              onPress={onGoToHistory}
+              title={latestReceipt.storeName || '店名不明'}
+              subtitle={
+                latestReceipt.date
+                  ? new Date(latestReceipt.date).toLocaleDateString('ja-JP')
+                  : '日付不明'
+              }
+              right={
+                <Text style={styles.amountText}>
+                  ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
+                </Text>
+              }
+              style={styles.latestCard}
+            />
           ) : (
             <View style={[styles.latestCard, { justifyContent: 'center' }]}><Text style={styles.dateText}>表示できるデータがありません</Text></View>
           )}
@@ -261,7 +290,13 @@ const styles = StyleSheet.create({
   summarySymbol: { color: theme.colors.text.inverse, fontSize: 20, marginRight: 4, fontWeight: 'bold' },
   summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
   summaryDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: theme.spacing.md },
-  summaryLink: { color: theme.colors.text.inverse, fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  summaryLinkButton: {
+    alignSelf: 'flex-end',
+    marginTop: theme.spacing.xs,
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
+  summaryLinkText: { color: theme.colors.text.inverse, fontSize: 14, fontWeight: '600' },
   captureButton: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg, borderWidth: 2, borderColor: theme.colors.primary, borderStyle: 'dashed' },
   captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },
   iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
@@ -270,19 +305,12 @@ const styles = StyleSheet.create({
   
   // ★ メニュー部分を Grid (flexWrap) 対応に変更
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md, marginBottom: theme.spacing.md },
-  gridCard: { flexGrow: 1, minWidth: 100, flexBasis: '30%', backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  
-  menuLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
+  gridCard: { flexGrow: 1, minWidth: 100, flexBasis: '30%' },
+  gridEmoji: { fontSize: 28 },
   section: { marginTop: theme.spacing.lg },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.sm },
-  settingsCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, padding: theme.spacing.md, borderRadius: theme.borderRadius.md, borderWidth: 1, borderColor: theme.colors.border, marginBottom: theme.spacing.md },
   settingsIconWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
-  settingsTextWrapper: { flex: 1 },
-  settingsLabel: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text.main },
-  arrowIcon: { fontSize: 20, color: theme.colors.text.muted },
-  latestCard: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  cardInfo: { flex: 1 },
-  storeName: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text.main },
+  latestCard: { marginBottom: 0 },
+  amountText: { ...theme.typography.h2, color: theme.colors.primary, fontWeight: 'bold' },
   dateText: { ...theme.typography.caption, color: theme.colors.text.muted },
-  amountText: { ...theme.typography.h2, color: theme.colors.primary }
 });

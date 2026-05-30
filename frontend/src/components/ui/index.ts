@@ -15,7 +15,12 @@ export {
   type AppTextInputVariant,
 } from './AppTextInput';
 export { AppFormField, type AppFormFieldProps } from './AppFormField';
-export { AppModal, type AppModalProps } from './AppModal';
+export {
+  AppModal,
+  type AppModalProps,
+  type AppModalVariant,
+  type AppModalSheetPresentation,
+} from './AppModal';
 export {
   AppSelect,
   type AppSelectProps,

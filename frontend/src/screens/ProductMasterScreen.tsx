@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
 import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
@@ -171,9 +171,12 @@ export const ProductMasterScreen = ({
       <View style={styles.header}>
         <AppBackButton onPress={onBack} />
         <Text style={styles.title}>学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
-        <TouchableOpacity onPress={handleMergeStores}>
-          <Text style={styles.mergeText}>店舗統合</Text>
-        </TouchableOpacity>
+        <AppButton
+          title="店舗統合"
+          onPress={handleMergeStores}
+          variant="ghost"
+          size="sm"
+        />
       </View>
 
       <View style={styles.searchBar}>
@@ -221,7 +224,6 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border 
   },
   title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1, textAlign: 'center' },
-  mergeText: { color: theme.colors.secondary, fontWeight: 'bold' },
   searchBar: { padding: 10, flexDirection: 'row', gap: 10, backgroundColor: theme.colors.surface },
   searchInput: { flex: 1 },
   listContent: { paddingHorizontal: 15, paddingBottom: 40 },

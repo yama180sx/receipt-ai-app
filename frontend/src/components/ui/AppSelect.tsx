@@ -1,6 +1,16 @@
-import React from 'react';
-import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import React, { useMemo, useState } from 'react';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { modalStyles } from '../../theme/modalStyles';
 import { colors } from '../../theme/colors';
 
@@ -21,6 +31,12 @@ export interface AppSelectProps<T extends string | number | null = string | numb
   style?: StyleProp<ViewStyle>;
 }
 
+function valuesEqual<T>(a: T, b: T): boolean {
+  if (a === b) return true;
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  return String(a) === String(b);
+}
+
 export function AppSelect<T extends string | number | null = string | number | null>({
   selectedValue,
   onValueChange,
@@ -36,6 +52,27 @@ export function AppSelect<T extends string | number | null = string | number | n
     error && modalStyles.selectWrapperError,
     style,
   ];
+
+  const displayLabel = useMemo(() => {
+    if (
+      includePlaceholder &&
+      (selectedValue === null ||
+        selectedValue === undefined ||
+        valuesEqual(selectedValue, placeholderValue as T))
+    ) {
+      return placeholder;
+    }
+    const found = options.find((o) => valuesEqual(o.value, selectedValue));
+    return found?.label ?? placeholder;
+  }, [includePlaceholder, selectedValue, placeholderValue, options, placeholder]);
+
+  const listOptions = useMemo(() => {
+    const items: AppSelectOption<T>[] = [...options];
+    if (includePlaceholder) {
+      items.unshift({ label: placeholder, value: placeholderValue as T });
+    }
+    return items;
+  }, [options, includePlaceholder, placeholder, placeholderValue]);
 
   if (Platform.OS === 'web') {
     const webValue =
@@ -71,29 +108,53 @@ export function AppSelect<T extends string | number | null = string | number | n
     );
   }
 
+  const [open, setOpen] = useState(false);
+
   return (
-    <View style={wrapperStyle}>
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={(value) => onValueChange(value as T)}
-        style={modalStyles.selectPicker}
-        {...Platform.select({ ios: { mode: 'dropdown' as const }, default: {} })}
+    <>
+      <TouchableOpacity
+        style={[wrapperStyle, modalStyles.selectTrigger]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
       >
-        {includePlaceholder ? (
-          <Picker.Item
-            label={placeholder}
-            value={placeholderValue as unknown as number}
-            color={colors.text.muted}
-          />
-        ) : null}
-        {options.map((opt) => (
-          <Picker.Item
-            key={String(opt.value)}
-            label={opt.label}
-            value={opt.value as unknown as number}
-          />
-        ))}
-      </Picker>
-    </View>
+        <Text style={modalStyles.selectTriggerText} numberOfLines={1}>
+          {displayLabel}
+        </Text>
+        <Text style={modalStyles.selectChevron}>▼</Text>
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={modalStyles.selectOverlay} onPress={() => setOpen(false)}>
+          <Pressable style={modalStyles.selectSheet} onPress={(e) => e.stopPropagation()}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {listOptions.map((opt, index) => {
+                const selected = valuesEqual(opt.value, selectedValue);
+                return (
+                  <TouchableOpacity
+                    key={`${index}-${String(opt.value)}`}
+                    style={[modalStyles.selectOptionRow, selected && modalStyles.selectOptionRowSelected]}
+                    onPress={() => {
+                      onValueChange(opt.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        modalStyles.selectOptionText,
+                        selected && modalStyles.selectOptionTextSelected,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
