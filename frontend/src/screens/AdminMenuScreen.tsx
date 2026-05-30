@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { AppBackButton, AppListItem } from '../components/ui';
 import { theme } from '../theme';
 
 interface AdminMenuScreenProps {
@@ -20,9 +21,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>管理者メニュー</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -31,45 +30,57 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>マスタデータ管理</Text>
           
-          <TouchableOpacity style={styles.settingsCard} onPress={onGoToCategories}>
-            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.settings }]}><Text>⚙️</Text></View>
-            <View style={styles.textWrapper}>
-              <Text style={styles.cardTitle}>カテゴリー設定</Text>
-              <Text style={styles.cardDesc}>支出カテゴリの追加・編集・色変更</Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
+          <AppListItem
+            variant="nav"
+            onPress={onGoToCategories}
+            title="カテゴリー設定"
+            subtitle="支出カテゴリの追加・編集・色変更"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.settings }]}>
+                <Text>⚙️</Text>
+              </View>
+            }
+          />
 
-          <TouchableOpacity style={styles.settingsCard} onPress={onGoToProductMaster}>
-            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.product }]}><Text>🧠</Text></View>
-            <View style={styles.textWrapper}>
-              <Text style={styles.cardTitle}>学習マスタ管理</Text>
-              <Text style={styles.cardDesc}>商品名からの自動カテゴリ分類の修正</Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
+          <AppListItem
+            variant="nav"
+            onPress={onGoToProductMaster}
+            title="学習マスタ管理"
+            subtitle="商品名からの自動カテゴリ分類の修正"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.product }]}>
+                <Text>🧠</Text>
+              </View>
+            }
+          />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
           
-          <TouchableOpacity style={styles.settingsCard} onPress={onGoToPromptEditor}>
-            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.prompt }]}><Text>📝</Text></View>
-            <View style={styles.textWrapper}>
-              <Text style={styles.cardTitle}>プロンプト・外税ヒント編集</Text>
-              <Text style={styles.cardDesc}>Geminiへの指示と店舗特有の計算ルール</Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
+          <AppListItem
+            variant="nav"
+            onPress={onGoToPromptEditor}
+            title="プロンプト・外税ヒント編集"
+            subtitle="Geminiへの指示と店舗特有の計算ルール"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.prompt }]}>
+                <Text>📝</Text>
+              </View>
+            }
+          />
 
-          <TouchableOpacity style={styles.settingsCard} onPress={onGoToAdminStats}>
-            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.stats }]}><Text>📈</Text></View>
-            <View style={styles.textWrapper}>
-              <Text style={styles.cardTitle}>AIコスト統計</Text>
-              <Text style={styles.cardDesc}>API利用量と概算コストの確認</Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
+          <AppListItem
+            variant="nav"
+            onPress={onGoToAdminStats}
+            title="AIコスト統計"
+            subtitle="API利用量と概算コストの確認"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: theme.colors.semantic.icon.stats }]}>
+                <Text>📈</Text>
+              </View>
+            }
+          />
         </View>
       </ScrollView>
     </View>
@@ -91,32 +102,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: adm.border,
   },
-  backButton: { width: 60, paddingVertical: 8 },
-  backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   content: { padding: 16 },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 14, fontWeight: 'bold', color: theme.colors.text.muted, marginBottom: 12, marginLeft: 4 },
-  settingsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: adm.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: adm.border,
-  },
   iconWrapper: {
     width: 44,
     height: 44,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 0,
   },
-  textWrapper: { flex: 1 },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 4 },
-  cardDesc: { fontSize: 12, color: theme.colors.text.muted },
-  arrow: { fontSize: 24, color: adm.arrow },
 });

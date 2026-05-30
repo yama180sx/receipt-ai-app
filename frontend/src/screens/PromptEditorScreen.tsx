@@ -3,8 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -12,6 +10,8 @@ import {
 } from 'react-native';
 
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
 interface PromptTemplate {
@@ -192,9 +192,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>プロンプト管理</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -213,45 +211,63 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
               <Text style={styles.formTitle}>
                 {isCreatingNew ? '新規プロンプトの作成' : 'プロンプトの編集'}
               </Text>
-              <TouchableOpacity onPress={cancelForm}>
-                <Text style={styles.cancelText}>キャンセル</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>識別名 (管理用)</Text>
-              <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="例: テスト用(外税修正版)" />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>System Prompt</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                multiline numberOfLines={10} textAlignVertical="top"
-                value={formSystemPrompt} onChangeText={setFormSystemPrompt}
+              <AppButton
+                title={BUTTON_LABELS.cancel}
+                onPress={cancelForm}
+                variant="ghost"
+                size="sm"
               />
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>Domain Hints (JSON形式)</Text>
-              <TextInput
-                style={[styles.input, styles.jsonArea]}
-                multiline numberOfLines={8} textAlignVertical="top" autoCapitalize="none" autoCorrect={false}
-                value={formDomainHints} onChangeText={setFormDomainHints}
+            <AppFormField label="識別名 (管理用)">
+              <AppTextInput
+                value={formName}
+                onChangeText={setFormName}
+                placeholder="例: テスト用(外税修正版)"
+              />
+            </AppFormField>
+
+            <AppFormField label="System Prompt">
+              <AppTextInput
+                variant="textarea"
+                style={styles.promptTextArea}
+                value={formSystemPrompt}
+                onChangeText={setFormSystemPrompt}
+              />
+            </AppFormField>
+
+            <AppFormField label="Domain Hints (JSON形式)">
+              <AppTextInput
+                variant="textarea"
+                style={styles.jsonTextArea}
+                inputStyle={styles.jsonInputFont}
+                value={formDomainHints}
+                onChangeText={setFormDomainHints}
+                autoCapitalize="none"
+                autoCorrect={false}
                 placeholder={`{\n  "gas_station": "ヒント..."\n}`}
               />
-            </View>
+            </AppFormField>
 
-            <TouchableOpacity style={[styles.saveButton, isSaving && styles.disabledButton]} onPress={handleSave} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator size="small" color={theme.colors.text.inverse} /> : <Text style={styles.saveButtonText}>保存</Text>}
-            </TouchableOpacity>
+            <AppButton
+              title={BUTTON_LABELS.save}
+              onPress={handleSave}
+              loading={isSaving}
+              disabled={isSaving}
+              fullWidth
+              size="lg"
+            />
           </View>
         ) : (
           /* 一覧表示画面 */
           <View>
-            <TouchableOpacity style={styles.createButton} onPress={openCreateForm}>
-              <Text style={styles.createButtonText}>＋ 新規プロンプトを作成</Text>
-            </TouchableOpacity>
+            <AppButton
+              title={`＋ ${BUTTON_LABELS.create}`}
+              onPress={openCreateForm}
+              variant="success"
+              fullWidth
+              style={{ marginBottom: 16 }}
+            />
 
             {templates.map((tpl) => (
               <View key={tpl.id} style={[styles.card, tpl.isActive && styles.activeCard]}>
@@ -274,17 +290,25 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
                 
                 <View style={styles.cardActions}>
                   {!tpl.isActive && (
-                    <TouchableOpacity style={styles.actionBtnOutline} onPress={() => handleActivate(tpl.id)}>
-                      <Text style={styles.actionBtnOutlineText}>デフォルトに設定</Text>
-                    </TouchableOpacity>
+                    <AppButton
+                      title={BUTTON_LABELS.setDefault}
+                      onPress={() => handleActivate(tpl.id)}
+                      variant="outline"
+                      size="sm"
+                    />
                   )}
-                  <TouchableOpacity style={styles.actionBtnFill} onPress={() => openEditForm(tpl)}>
-                    <Text style={styles.actionBtnFillText}>編集</Text>
-                  </TouchableOpacity>
+                  <AppButton
+                    title={BUTTON_LABELS.edit}
+                    onPress={() => openEditForm(tpl)}
+                    size="sm"
+                  />
                   {!tpl.isActive && (
-                    <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDelete(tpl.id)}>
-                      <Text style={styles.actionBtnDangerText}>削除</Text>
-                    </TouchableOpacity>
+                    <AppButton
+                      title={BUTTON_LABELS.delete}
+                      onPress={() => handleDelete(tpl.id)}
+                      variant="danger"
+                      size="sm"
+                    />
                   )}
                 </View>
               </View>
@@ -301,8 +325,6 @@ const adm = theme.colors.semantic.admin;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: adm.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: adm.surface, paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: adm.border },
-  backButton: { width: 60, paddingVertical: 8 },
-  backButtonText: { color: theme.colors.primary, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   contentContainer: { padding: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -310,8 +332,6 @@ const styles = StyleSheet.create({
   errorContainer: { backgroundColor: adm.errorBg, padding: 12, borderRadius: 6, marginBottom: 16 },
   errorText: { color: adm.errorText },
   
-  createButton: { backgroundColor: adm.success, padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16 },
-  createButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 15 },
   card: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 2, borderColor: adm.border },
   activeCard: { borderColor: theme.colors.primary },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
@@ -324,23 +344,11 @@ const styles = StyleSheet.create({
   
   cardDesc: { fontSize: 13, color: adm.textMuted, marginBottom: 12 },
   cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
-  actionBtnOutline: { borderWidth: 1, borderColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
-  actionBtnOutlineText: { color: theme.colors.primary, fontSize: 12 },
-  actionBtnFill: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
-  actionBtnFillText: { color: theme.colors.text.inverse, fontSize: 12 },
-  actionBtnDanger: { borderWidth: 1, borderColor: adm.danger, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, marginBottom: 4 },
-  actionBtnDangerText: { color: adm.danger, fontSize: 12 },
 
   formContainer: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: adm.border },
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  formTitle: { fontSize: 18, fontWeight: 'bold' },
-  cancelText: { color: adm.textMuted, fontSize: 14 },
-  section: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: 'bold', color: adm.textLabel, marginBottom: 6 },
-  input: { backgroundColor: adm.inputBg, borderWidth: 1, borderColor: adm.inputBorder, borderRadius: 6, padding: 12, fontSize: 14 },
-  textArea: { height: 200, fontFamily: 'System' },
-  jsonArea: { height: 150, fontFamily: 'Courier' },
-  saveButton: { backgroundColor: theme.colors.primary, paddingVertical: 14, borderRadius: 6, alignItems: 'center' },
-  disabledButton: { opacity: 0.5 },
-  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 16 },
+  formTitle: { fontSize: 18, fontWeight: 'bold', flex: 1 },
+  promptTextArea: { minHeight: 200 },
+  jsonTextArea: { minHeight: 150 },
+  jsonInputFont: { fontFamily: 'Courier' },
 });

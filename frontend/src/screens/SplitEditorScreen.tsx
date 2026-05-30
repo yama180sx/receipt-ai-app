@@ -13,7 +13,9 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { theme, BREAKPOINTS } from '../theme';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
+import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 
 interface SplitEditorScreenProps {
@@ -315,14 +317,16 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.headerTitle}>割り勘エディタ</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color={theme.colors.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>確定して保存</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title={BUTTON_LABELS.save}
+            onPress={handleSave}
+            loading={saving}
+            disabled={saving}
+            size="md"
+          />
         </View>
       </View>
 
@@ -381,25 +385,25 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
 
           <ScrollView style={styles.tableScroll} horizontal={false}>
             <ScrollView horizontal={true} contentContainerStyle={{ flexDirection: 'column' }}>
-              
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.cell, styles.cellName, styles.headerText]}>商品名</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.headerText]}>合計</Text>
+              <View style={tableStyles.wrapper}>
+              <View style={[tableStyles.row, tableStyles.headerRow, styles.tableRowWide]}>
+                <Text style={[tableStyles.cell, styles.cellName, tableStyles.headerText]}>商品名</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>合計</Text>
                 {activeMembers.map(m => (
-                  <Text key={m.id} style={[styles.cell, styles.cellInputCol, styles.headerText, { textAlign: 'center' }]}>
+                  <Text key={m.id} style={[tableStyles.cell, styles.cellInputCol, tableStyles.headerText, { textAlign: 'center' }]}>
                     {m.name}
                   </Text>
                 ))}
-                <Text style={[styles.cell, styles.cellAction, styles.headerText]}>操作</Text>
+                <Text style={[tableStyles.cell, styles.cellAction, tableStyles.headerText]}>操作</Text>
               </View>
 
               {receipt.items.map((item: any) => {
                 const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
 
                 return (
-                  <View key={item.id} style={styles.tableRow}>
-                    <Text style={[styles.cell, styles.cellName]} numberOfLines={2}>{item.name}</Text>
-                    <Text style={[styles.cell, styles.cellAmount]}>¥{itemTotal.toLocaleString()}</Text>
+                  <View key={item.id} style={[tableStyles.row, styles.tableRowWide]}>
+                    <Text style={[tableStyles.cell, styles.cellName, tableStyles.bodyText]} numberOfLines={2}>{item.name}</Text>
+                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText, tableStyles.boldText]}>¥{itemTotal.toLocaleString()}</Text>
                     
                     {activeMembers.map((m, idx) => {
                       const amountValue = editSplits[item.id]?.[m.id] || 0;
@@ -407,7 +411,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                       const isFirst = idx === 0;
 
                       return (
-                        <View key={m.id} style={[styles.cell, styles.cellInputCol]}>
+                        <View key={m.id} style={[tableStyles.cell, styles.cellInputCol]}>
                           <View style={styles.dualInputWrapper}>
                             <View style={styles.inputGroup}>
                               <TextInput
@@ -437,19 +441,22 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                       );
                     })}
 
-                    <View style={[styles.cell, styles.cellAction]}>
-                      <TouchableOpacity style={styles.splitBtnSmall} onPress={() => splitItemEqually(item.id, itemTotal)}>
-                        <Text style={styles.splitBtnSmallText}>均等</Text>
-                      </TouchableOpacity>
+                    <View style={[tableStyles.cell, styles.cellAction]}>
+                      <AppButton
+                        title={BUTTON_LABELS.splitEqual}
+                        onPress={() => splitItemEqually(item.id, itemTotal)}
+                        variant="ghost"
+                        size="sm"
+                      />
                     </View>
                   </View>
                 );
               })}
 
               {/* ★ 追加: 合計行 (Total) */}
-              <View style={[styles.tableRow, styles.totalRow]}>
-                <Text style={[styles.cell, styles.cellName, styles.totalText]}>一括調整（全体合計）</Text>
-                <Text style={[styles.cell, styles.cellAmount, styles.totalText]}>¥{receiptTotalAmount.toLocaleString()}</Text>
+              <View style={[tableStyles.row, styles.tableRowWide, styles.totalRow]}>
+                <Text style={[tableStyles.cell, styles.cellName, styles.totalText]}>一括調整（全体合計）</Text>
+                <Text style={[tableStyles.cell, styles.cellAmount, styles.totalText]}>¥{receiptTotalAmount.toLocaleString()}</Text>
                 
                 {activeMembers.map((m, idx) => {
                   const memberTotal = getMemberTotalAmount(m.id);
@@ -457,7 +464,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                   const isFirst = idx === 0;
 
                   return (
-                    <View key={m.id} style={[styles.cell, styles.cellInputCol]}>
+                    <View key={m.id} style={[tableStyles.cell, styles.cellInputCol]}>
                       <View style={styles.dualInputWrapper}>
                         <View style={[styles.inputGroup, styles.totalInputGroup]}>
                           <TextInput
@@ -487,13 +494,17 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                   );
                 })}
 
-                <View style={[styles.cell, styles.cellAction]}>
-                  <TouchableOpacity style={styles.splitBtnSmall} onPress={splitWholeReceiptEqually}>
-                    <Text style={styles.splitBtnSmallText}>均等</Text>
-                  </TouchableOpacity>
+                <View style={[tableStyles.cell, styles.cellAction]}>
+                  <AppButton
+                    title={BUTTON_LABELS.splitEqual}
+                    onPress={splitWholeReceiptEqually}
+                    variant="ghost"
+                    size="sm"
+                  />
                 </View>
               </View>
 
+              </View>
             </ScrollView>
           </ScrollView>
         </View>
@@ -508,12 +519,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  backButton: { paddingRight: 15 },
-  backButtonText: { color: theme.colors.primary, fontWeight: '700', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
   headerRight: { minWidth: 100, alignItems: 'flex-end' },
-  saveButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  saveButtonText: { color: theme.colors.text.inverse, fontWeight: 'bold', fontSize: 16 },
   
   targetSection: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, padding: 15, paddingHorizontal: 20 },
   targetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -541,19 +548,14 @@ const styles = StyleSheet.create({
   storeName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
   
   tableScroll: { flex: 1 },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder, alignItems: 'center', minWidth: 800 },
-  tableHeader: { backgroundColor: sem.table.headerBg, borderBottomColor: theme.colors.border },
-  
+  tableRowWide: { minWidth: 800 },
   totalRow: { backgroundColor: sem.warning.bg, borderTopWidth: 2, borderTopColor: sem.warning.border },
   totalText: { fontWeight: 'bold', color: sem.warning.text },
   totalInputGroup: { borderColor: sem.warning.border, backgroundColor: sem.warning.inputBg },
   totalInputBox: { fontWeight: 'bold', color: sem.warning.text },
   totalUnitText: { color: sem.warning.text, fontWeight: 'bold' },
-
-  cell: { padding: 12, justifyContent: 'center' },
-  headerText: { fontWeight: 'bold', color: theme.colors.text.muted, fontSize: 13 },
-  cellName: { width: 160, fontSize: 14, color: theme.colors.text.main },
-  cellAmount: { width: 90, fontSize: 14, fontWeight: 'bold', textAlign: 'right', color: theme.colors.text.main },
+  cellName: { width: 160 },
+  cellAmount: { width: 90, textAlign: 'right' },
   cellInputCol: { width: 180, alignItems: 'center' },
   
   dualInputWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
@@ -565,6 +567,4 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 11, color: theme.colors.text.muted },
   
   cellAction: { width: 70, alignItems: 'center' },
-  splitBtnSmall: { backgroundColor: sem.neutral.bg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  splitBtnSmallText: { fontSize: 12, color: theme.colors.text.muted, fontWeight: 'bold' },
 });

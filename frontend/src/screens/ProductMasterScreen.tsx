@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
 interface ProductMaster {
@@ -141,28 +143,33 @@ export const ProductMasterScreen = ({
   };
 
   const renderItem = ({ item }: { item: ProductMaster }) => (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.storeName}>店舗: {item.storeName || '共通'}</Text>
-        <View style={[styles.badge, { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge }]}>
-          <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
-        </View>
+    <AppListItem
+      title={item.name}
+      subtitle={`店舗: ${item.storeName || '共通'}`}
+      right={
+        <AppButton
+          title={BUTTON_LABELS.delete}
+          onPress={() => handleDelete(item.id)}
+          variant="dangerFilled"
+          size="sm"
+        />
+      }
+    >
+      <View
+        style={[
+          styles.badge,
+          { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge },
+        ]}
+      >
+        <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
-          <Text style={styles.btnText}>削除</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </AppListItem>
   );
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} hitSlop={{top:10, bottom:10, left:10, right:10}}>
-          <Text style={styles.backText}>← 戻る</Text>
-        </TouchableOpacity>
+        <AppBackButton onPress={onBack} />
         <Text style={styles.title}>学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
         <TouchableOpacity onPress={handleMergeStores}>
           <Text style={styles.mergeText}>店舗統合</Text>
@@ -170,21 +177,17 @@ export const ProductMasterScreen = ({
       </View>
 
       <View style={styles.searchBar}>
-        <TextInput 
-          placeholder="品名検索..." 
-          style={styles.input} 
-          value={searchQuery} 
-          onChangeText={setSearchQuery} 
-          clearButtonMode="while-editing"
-          placeholderTextColor={theme.colors.text.muted}
+        <AppTextInput
+          placeholder="品名検索..."
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
-        <TextInput 
-          placeholder="店舗名..." 
-          style={styles.input} 
-          value={storeFilter} 
-          onChangeText={setStoreFilter} 
-          clearButtonMode="while-editing"
-          placeholderTextColor={theme.colors.text.muted}
+        <AppTextInput
+          placeholder="店舗名..."
+          style={styles.searchInput}
+          value={storeFilter}
+          onChangeText={setStoreFilter}
         />
       </View>
 
@@ -217,48 +220,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, 
     borderBottomColor: theme.colors.border 
   },
-  backText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
-  title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
+  title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1, textAlign: 'center' },
   mergeText: { color: theme.colors.secondary, fontWeight: 'bold' },
-  searchBar: { padding: 10, flexDirection: 'row', backgroundColor: theme.colors.surface },
-  input: { 
-    flex: 1, 
-    backgroundColor: theme.colors.surface, 
-    marginHorizontal: 5, 
-    padding: 12, 
-    borderRadius: 8, 
-    borderWidth: 1, 
-    borderColor: theme.colors.border,
-    color: theme.colors.text.main 
-  },
-  listContent: { paddingBottom: 40 },
-  card: { 
-    backgroundColor: theme.colors.surface, 
-    marginHorizontal: 15, 
-    marginTop: 10, 
-    padding: 15, 
-    borderRadius: 10, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    borderWidth: 1, 
-    borderColor: theme.colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.shadows.sm.shadowColor,
-        shadowOffset: theme.shadows.sm.shadowOffset,
-        shadowOpacity: theme.shadows.sm.shadowOpacity,
-        shadowRadius: theme.shadows.sm.shadowRadius,
-      },
-      android: { elevation: theme.shadows.sm.elevation },
-    }),
-  },
-  cardInfo: { flex: 1 },
-  itemName: { fontWeight: 'bold', fontSize: 16, color: theme.colors.text.main },
-  storeName: { color: theme.colors.text.muted, fontSize: 13, marginVertical: 4 },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
+  searchBar: { padding: 10, flexDirection: 'row', gap: 10, backgroundColor: theme.colors.surface },
+  searchInput: { flex: 1 },
+  listContent: { paddingHorizontal: 15, paddingBottom: 40 },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 4 },
   badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
-  actions: { justifyContent: 'center', paddingLeft: 10 },
-  deleteBtn: { backgroundColor: theme.colors.error, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
-  btnText: { color: theme.colors.text.inverse, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
   empty: { textAlign: 'center', marginTop: 40, color: theme.colors.text.muted }
 });

@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
+import { AppBackButton, AppButton } from '../components/ui';
+import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
 const c = theme.colors;
@@ -153,13 +155,15 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onCancel} style={styles.headerButton}>
-            <Text style={styles.cancelText}>戻る</Text>
-          </TouchableOpacity>
+          <AppBackButton onPress={onCancel} style={styles.headerBack} />
           <Text style={styles.headerTitle}>解析結果の確認</Text>
-          <TouchableOpacity onPress={handleCommit} disabled={loading} style={[styles.saveButton, loading && { opacity: 0.6 }]}>
-            {loading ? <ActivityIndicator color={c.text.inverse} size="small" /> : <Text style={styles.saveButtonText}>確定保存</Text>}
-          </TouchableOpacity>
+          <AppButton
+            title={BUTTON_LABELS.save}
+            onPress={handleCommit}
+            loading={loading}
+            disabled={loading}
+            size="sm"
+          />
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -204,9 +208,12 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
 
           <View style={styles.itemsHeader}>
             <Text style={styles.sectionLabel}>商品明細 ({receiptData.items.length})</Text>
-            <TouchableOpacity onPress={addItem} style={styles.addButton}>
-              <Text style={styles.addButtonText}>+ 追加</Text>
-            </TouchableOpacity>
+            <AppButton
+              title={`+ ${BUTTON_LABELS.add}`}
+              onPress={addItem}
+              variant="outline"
+              size="sm"
+            />
           </View>
 
           {receiptData.items.map((item, idx) => (
@@ -286,9 +293,7 @@ const styles = StyleSheet.create({
     borderBottomColor: s.borderLight,
   },
   headerTitle: { fontSize: 17, fontWeight: 'bold', color: s.textTitle },
-  cancelText: { color: s.textSecondary, fontSize: 15 },
-  saveButton: { backgroundColor: c.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: theme.borderRadius.lg },
-  saveButtonText: { color: c.text.inverse, fontWeight: 'bold' },
+  headerBack: { minWidth: 50 },
   scrollView: { flex: 1 },
   imageContainer: { width: '100%', height: 260, backgroundColor: s.imageBg, marginBottom: theme.spacing.md, position: 'relative' },
   receiptImage: { width: '100%', height: '100%' },
@@ -304,8 +309,6 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 14, color: s.textSecondary },
   totalValue: { fontSize: 24, fontWeight: 'bold', color: c.primary },
   itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: theme.spacing.md, marginBottom: 12 },
-  addButton: { backgroundColor: s.primaryLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.borderRadius.sm },
-  addButtonText: { color: c.primary, fontWeight: 'bold', fontSize: 13 },
   itemCard: { backgroundColor: c.surface, marginHorizontal: theme.spacing.md, marginBottom: 12, borderRadius: theme.spacing.md, padding: theme.spacing.md, borderLeftWidth: 4, borderLeftColor: c.primary, elevation: 1 },
   itemHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   itemNameInput: { flex: 1, fontSize: 15, fontWeight: 'bold', color: s.textBody },
