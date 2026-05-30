@@ -16,9 +16,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
-import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppModalCloseButton } from '../components/ui';
+import { toMonthSelectOptions } from '../utils/monthSelectOptions';
+import { AppBackButton, AppModalCloseButton, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -84,6 +84,11 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       return d.toISOString().slice(0, 7);
     });
   }, []);
+
+  const monthSelectOptions = useMemo(
+    () => toMonthSelectOptions(monthOptions),
+    [monthOptions]
+  );
 
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
@@ -170,12 +175,14 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
-          <View style={[styles.monthPickerContainer, isWide && { width: 300 }]}>
-            <Picker selectedValue={selectedMonth} onValueChange={(val) => setSelectedMonth(val)} style={styles.monthPicker}>
-              {monthOptions.map(m => (
-                <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
-              ))}
-            </Picker>
+          <View style={[styles.monthPickerContainer, isWide && styles.monthPickerContainerWide]}>
+            <AppSelect<string>
+              selectedValue={selectedMonth}
+              onValueChange={setSelectedMonth}
+              options={monthSelectOptions}
+              includePlaceholder={false}
+              style={styles.monthSelect}
+            />
           </View>
         </View>
         
@@ -314,8 +321,9 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   topInfo: { marginBottom: 15 },
   headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
-  monthPickerContainer: { backgroundColor: theme.colors.surface, borderRadius: 10, marginTop: 8, borderWidth: 1, borderColor: theme.colors.border, height: 50, justifyContent: 'center' },
-  monthPicker: { width: '100%' },
+  monthPickerContainer: { width: 140, marginTop: 8, justifyContent: 'center' },
+  monthPickerContainerWide: { width: 180 },
+  monthSelect: { minHeight: 36 },
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },

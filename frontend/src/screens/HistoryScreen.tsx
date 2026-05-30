@@ -13,8 +13,9 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
+import { toMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
-import { AppBackButton, AppModalCloseButton } from '../components/ui';
+import { AppBackButton, AppModalCloseButton, AppSelect } from '../components/ui';
 import { theme, BREAKPOINTS } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
@@ -48,6 +49,11 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
       return d.toISOString().slice(0, 7);
     });
   }, []);
+
+  const monthSelectOptions = useMemo(
+    () => toMonthSelectOptions(months),
+    [months]
+  );
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
@@ -176,37 +182,6 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
     );
   };
 
-  const renderMonthPicker = () => {
-    if (Platform.OS === 'web') {
-      return (
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          style={StyleSheet.flatten(styles.webSelect)}
-        >
-          <option value="">全期間</option>
-          {months.map(m => (
-            <option key={m} value={m}>{`${m.split('-')[0]}年${m.split('-')[1]}月`}</option>
-          ))}
-        </select>
-      );
-    }
-
-    return (
-      <Picker 
-        selectedValue={selectedMonth} 
-        onValueChange={setSelectedMonth} 
-        style={styles.filterPicker}
-        mode="dropdown"
-      >
-        <Picker.Item label="全期間" value="" />
-        {months.map(m => (
-          <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
-        ))}
-      </Picker>
-    );
-  };
-
   const renderMemberPicker = () => {
     if (Platform.OS === 'web') {
       return (
@@ -254,8 +229,15 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
         </View>
 
         <View style={[styles.filterContainer, isWide && styles.wideFilter]}>
-          <View style={[styles.pickerBox, isWide && { width: 250, minWidth: 250, flexGrow: 0, flexShrink: 0 }]}>
-            {renderMonthPicker()}
+          <View style={[styles.filterSelectWrap, isWide && styles.filterSelectWrapWide]}>
+            <AppSelect<string>
+              selectedValue={selectedMonth}
+              onValueChange={setSelectedMonth}
+              options={monthSelectOptions}
+              placeholder="全期間"
+              placeholderValue=""
+              style={styles.monthSelect}
+            />
           </View>
           <View style={[styles.pickerBox, isWide && { width: 200, minWidth: 200, flexGrow: 0, flexShrink: 0 }]}>
             {renderMemberPicker()}
@@ -336,6 +318,9 @@ const styles = StyleSheet.create({
   title: { ...theme.typography.h2, color: theme.colors.text.main },
   filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 10 },
   wideFilter: { justifyContent: 'flex-start' },
+  filterSelectWrap: { flex: 1, minWidth: 140, justifyContent: 'center' },
+  filterSelectWrapWide: { width: 180, flexGrow: 0, flexShrink: 0 },
+  monthSelect: { minHeight: 36 },
   pickerBox: { flex: 1, height: 44, backgroundColor: theme.colors.surface, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   filterPicker: { width: '100%' },
   webSelect: {
