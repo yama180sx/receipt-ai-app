@@ -5,10 +5,9 @@ import {
   StyleSheet, 
   ActivityIndicator, 
   ScrollView,
-  TouchableOpacity
 } from 'react-native';
 import { AppBackButton } from '../components/ui';
-import { theme } from '../theme';
+import { theme, tableStyles } from '../theme';
 import apiClient from '../utils/apiClient';
 
 interface StatData {
@@ -82,33 +81,35 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
               <Text style={styles.summaryNote}>※為替レート150円/$、Gemini 2.0 Flashでの算出</Text>
             </View>
 
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 1.5 }]}>年月</Text>
-              <Text style={[styles.tableCell, { flex: 2 }]}>In / Out (Tokens)</Text>
-              <Text style={[styles.tableCell, { flex: 1.5, textAlign: 'right' }]}>概算(円)</Text>
-            </View>
-
-            {stats.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>データがありません</Text>
+            <View style={tableStyles.wrapper}>
+              <View style={[tableStyles.row, tableStyles.headerRow]}>
+                <Text style={[tableStyles.cell, styles.colMonth, tableStyles.headerText]}>年月</Text>
+                <Text style={[tableStyles.cell, styles.colTokens, tableStyles.headerText]}>In / Out (Tokens)</Text>
+                <Text style={[tableStyles.cell, styles.colCost, tableStyles.headerText]}>概算(円)</Text>
               </View>
-            ) : (
-              stats.map((item, index) => (
-                <View key={`${item.month}-${item.modelId}-${index}`} style={styles.tableRow}>
-                  <View style={{ flex: 1.5 }}>
-                    <Text style={styles.cellMainText}>{item.month}</Text>
-                    <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
-                  </View>
-                  <View style={{ flex: 2 }}>
-                    <Text style={styles.cellMainText}>{item.totalPromptTokens.toLocaleString()}</Text>
-                    <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
-                  </View>
-                  <Text style={[styles.cellMainText, { flex: 1.5, textAlign: 'right', fontWeight: 'bold' }]}>
-                    ¥{item.estimatedCostJpy.toFixed(2)}
-                  </Text>
+
+              {stats.length === 0 ? (
+                <View style={[tableStyles.row, styles.emptyRow]}>
+                  <Text style={[tableStyles.cell, tableStyles.bodyText]}>データがありません</Text>
                 </View>
-              ))
-            )}
+              ) : (
+                stats.map((item, index) => (
+                  <View key={`${item.month}-${item.modelId}-${index}`} style={tableStyles.row}>
+                    <View style={[tableStyles.cell, styles.colMonth]}>
+                      <Text style={tableStyles.bodyText}>{item.month}</Text>
+                      <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
+                    </View>
+                    <View style={[tableStyles.cell, styles.colTokens]}>
+                      <Text style={tableStyles.bodyText}>{item.totalPromptTokens.toLocaleString()}</Text>
+                      <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
+                    </View>
+                    <Text style={[tableStyles.cell, styles.colCost, tableStyles.bodyText, tableStyles.boldText]}>
+                      ¥{item.estimatedCostJpy.toFixed(2)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
           </>
         )}
       </ScrollView>
@@ -164,28 +165,9 @@ const styles = StyleSheet.create({
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
   summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
   summaryNote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 8 },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: adm.border,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  tableCell: { fontSize: 13, fontWeight: 'bold', color: theme.colors.text.muted },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: adm.surface,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: adm.border,
-  },
-  cellMainText: { fontSize: 15, color: theme.colors.text.main },
+  colMonth: { flex: 1.5 },
+  colTokens: { flex: 2 },
+  colCost: { flex: 1.5, textAlign: 'right' },
   cellSubText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 4 },
-  emptyContainer: { padding: 32, alignItems: 'center' },
-  emptyText: { color: theme.colors.text.muted, fontSize: 16 },
+  emptyRow: { justifyContent: 'center', paddingVertical: 24 },
 });

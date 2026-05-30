@@ -4,7 +4,6 @@ import {
   Text, 
   View, 
   ScrollView, 
-  TouchableOpacity, 
   ActivityIndicator, 
   useWindowDimensions,
   Alert
@@ -21,6 +20,7 @@ import {
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
+import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 
 interface SettlementSummaryScreenProps {
   onBack: () => void;
@@ -31,7 +31,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   const isWide = width >= BREAKPOINTS.TABLET;
 
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [summaryData, setSummaryData] = useState<any[]>([]);
 
   // 送金モーダル用ステート
@@ -47,13 +47,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   }>({});
 
   // 過去6ヶ月の選択肢を生成
-  const months = useMemo(() => {
-    return Array.from({ length: 6 }).map((_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return d.toISOString().slice(0, 7);
-    });
-  }, []);
+  const months = useMemo(() => getRecentYearMonths(6), []);
 
   const memberSelectOptions = useMemo(
     () =>
@@ -64,14 +58,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
     [summaryData]
   );
 
-  const monthSelectOptions = useMemo(
-    () =>
-      months.map((m) => ({
-        label: `${m.split('-')[0]}年${m.split('-')[1]}月`,
-        value: m,
-      })),
-    [months]
-  );
+  const monthSelectOptions = useMonthSelectOptions(months, isWide);
 
   const openTransferModal = () => {
     setTransferFieldErrors({});
@@ -153,27 +140,49 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   return (
     <View style={styles.container}>
       {/* ヘッダー */}
-      <View style={styles.header}>
-        <AppBackButton onPress={onBack} />
-        <Text style={styles.headerTitle}>家族間精算サマリー</Text>
-        <View style={styles.headerRight}>
+      {isWide ? (
+        <View style={styles.header}>
+          <AppBackButton onPress={onBack} />
+          <Text style={styles.headerTitle}>家族間精算サマリー</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.monthPickerContainerWide}>
+              <AppSelect<string>
+                selectedValue={selectedMonth}
+                onValueChange={setSelectedMonth}
+                options={monthSelectOptions}
+                includePlaceholder={false}
+              />
+            </View>
+            <AppButton
+              title={`＋ ${BUTTON_LABELS.recordTransfer}`}
+              onPress={openTransferModal}
+              size="sm"
+              style={styles.addTransferButton}
+            />
+          </View>
+        </View>
+      ) : (
+        <View style={[styles.header, styles.headerMobile]}>
+          <View style={styles.headerTopRow}>
+            <AppBackButton onPress={onBack} />
+            <Text style={styles.headerTitleMobile}>家族間精算サマリー</Text>
+          </View>
+          <View style={styles.monthPickerContainerMobile}>
+            <AppSelect<string>
+              selectedValue={selectedMonth}
+              onValueChange={setSelectedMonth}
+              options={monthSelectOptions}
+              includePlaceholder={false}
+            />
+          </View>
           <AppButton
             title={`＋ ${BUTTON_LABELS.recordTransfer}`}
             onPress={openTransferModal}
             size="sm"
             style={styles.addTransferButton}
           />
-          <View style={styles.monthPickerContainer}>
-            <AppSelect<string>
-              selectedValue={selectedMonth}
-              onValueChange={setSelectedMonth}
-              options={monthSelectOptions}
-              includePlaceholder={false}
-              style={styles.monthSelect}
-            />
-          </View>
         </View>
-      </View>
+      )}
 
       {loading ? (
         <View style={styles.centerLoading}>
@@ -363,12 +372,24 @@ const sem = theme.colors.semantic;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    gap: 12,
+  },
+  headerMobile: { flexDirection: 'column', alignItems: 'stretch', gap: 10 },
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  headerTitleMobile: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0 },
   addTransferButton: { paddingHorizontal: 4 },
-  monthPickerContainer: { width: 140, justifyContent: 'center' },
-  monthSelect: { minHeight: 36 },
+  monthPickerContainerMobile: { width: '100%' },
+  monthPickerContainerWide: { width: 140, justifyContent: 'center' },
   scrollContainer: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   rowLayout: { flexDirection: 'row' },
