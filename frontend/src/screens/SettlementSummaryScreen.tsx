@@ -8,12 +8,18 @@ import {
   ActivityIndicator, 
   Platform,
   useWindowDimensions,
-  Modal,
-  TextInput,
   Alert
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { AppBackButton, AppButton } from '../components/ui';
+import {
+  AppBackButton,
+  AppButton,
+  AppFormField,
+  AppModal,
+  AppSelect,
+  AppTextInput,
+  modalStyles,
+} from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
@@ -45,6 +51,15 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       return d.toISOString().slice(0, 7);
     });
   }, []);
+
+  const memberSelectOptions = useMemo(
+    () =>
+      summaryData.map((m: { memberId: number; name: string }) => ({
+        label: m.name,
+        value: m.memberId,
+      })),
+    [summaryData]
+  );
 
   const loadSettlementData = async () => {
     try {
@@ -254,70 +269,59 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
         </ScrollView>
       )}
 
-      {/* 送金記録モーダル */}
-      <Modal
+      <AppModal
         visible={isTransferModalVisible}
-        transparent={true}
-        animationType="fade"
+        onRequestClose={() => setTransferModalVisible(false)}
+        title="送金・受取の記録"
+        description="実際に現金やPayPay等で精算した金額を記録します。"
+        footer={
+          <>
+            <AppButton
+              title={BUTTON_LABELS.cancel}
+              onPress={() => setTransferModalVisible(false)}
+              variant="secondary"
+              size="md"
+            />
+            <AppButton
+              title={BUTTON_LABELS.save}
+              onPress={handleTransferSubmit}
+              loading={isSubmitting}
+              disabled={isSubmitting}
+              size="md"
+              style={modalStyles.footerPrimaryButton}
+            />
+          </>
+        }
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>送金・受取の記録</Text>
-            <Text style={styles.modalDesc}>実際に現金やPayPay等で精算した金額を記録します。</Text>
+        <AppFormField label="送金元 (払った人)">
+          <AppSelect<number | null>
+            selectedValue={transferFrom}
+            onValueChange={setTransferFrom}
+            options={memberSelectOptions}
+          />
+        </AppFormField>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>送金元 (払った人)</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={transferFrom} onValueChange={setTransferFrom} style={styles.modalPicker}>
-                  <Picker.Item label="選択してください" value={null} color={theme.colors.text.muted} />
-                  {summaryData.map(m => <Picker.Item key={`from-${m.memberId}`} label={m.name} value={m.memberId} />)}
-                </Picker>
-              </View>
-            </View>
+        <AppFormField label="送金先 (受け取った人)">
+          <AppSelect<number | null>
+            selectedValue={transferTo}
+            onValueChange={setTransferTo}
+            options={memberSelectOptions}
+          />
+        </AppFormField>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>送金先 (受け取った人)</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={transferTo} onValueChange={setTransferTo} style={styles.modalPicker}>
-                  <Picker.Item label="選択してください" value={null} color={theme.colors.text.muted} />
-                  {summaryData.map(m => <Picker.Item key={`to-${m.memberId}`} label={m.name} value={m.memberId} />)}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>送金額</Text>
-              <View style={styles.inputWithUnit}>
-                <TextInput
-                  style={styles.modalInput}
-                  value={transferAmount}
-                  onChangeText={setTransferAmount}
-                  keyboardType="number-pad"
-                  placeholder="例: 5000"
-                />
-                <Text style={styles.unitText}>円</Text>
-              </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <AppButton
-                title={BUTTON_LABELS.cancel}
-                onPress={() => setTransferModalVisible(false)}
-                variant="secondary"
-                size="md"
-              />
-              <AppButton
-                title={BUTTON_LABELS.save}
-                onPress={handleTransferSubmit}
-                loading={isSubmitting}
-                disabled={isSubmitting}
-                size="md"
-                style={styles.modalSubmitBtn}
-              />
-            </View>
+        <AppFormField label="送金額">
+          <View style={modalStyles.inputWithUnit}>
+            <AppTextInput
+              variant="inline"
+              value={transferAmount}
+              onChangeText={setTransferAmount}
+              keyboardType="number-pad"
+              placeholder="例: 5000"
+            />
+            <Text style={modalStyles.unitSuffix}>円</Text>
           </View>
-        </View>
-      </Modal>
+        </AppFormField>
+      </AppModal>
 
     </View>
   );
@@ -371,18 +375,4 @@ const styles = StyleSheet.create({
   tableTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
   cellName: { flex: 1.5, minWidth: 100 },
   cellAmount: { flex: 1, textAlign: 'right' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: theme.colors.surface, width: 400, maxWidth: '90%', padding: 25, borderRadius: 12, elevation: 5 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, marginBottom: 5 },
-  modalDesc: { fontSize: 13, color: theme.colors.text.muted, marginBottom: 20 },
-  formGroup: { marginBottom: 15 },
-  formLabel: { fontSize: 13, fontWeight: '600', color: theme.colors.text.main, marginBottom: 5 },
-  pickerWrapper: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: theme.colors.surface, height: 40, justifyContent: 'center' },
-  modalPicker: { width: '100%', height: 40, ...Platform.select({ web: { outlineStyle: 'none', border: 'none' } as any }) },
-  inputWithUnit: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, backgroundColor: theme.colors.surface, height: 40, paddingHorizontal: 10 },
-  modalInput: { flex: 1, height: '100%', fontSize: 16, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
-  unitText: { fontSize: 14, color: theme.colors.text.muted, marginLeft: 8 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, gap: 10 },
-  modalSubmitBtn: { minWidth: 100 },
 });

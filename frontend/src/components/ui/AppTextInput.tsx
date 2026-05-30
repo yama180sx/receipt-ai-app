@@ -9,7 +9,7 @@ import {
 import { formStyles } from '../../theme/formStyles';
 import { colors } from '../../theme/colors';
 
-export type AppTextInputVariant = 'default' | 'textarea' | 'textareaFill';
+export type AppTextInputVariant = 'default' | 'textarea' | 'textareaFill' | 'inline';
 
 export interface AppTextInputProps
   extends Pick<
@@ -53,6 +53,7 @@ export const AppTextInput: React.FC<AppTextInputProps> = ({
   const [focused, setFocused] = useState(false);
   const hasError = Boolean(error);
 
+  const isInline = variant === 'inline';
   const isTextarea = variant === 'textarea' || variant === 'textareaFill';
   const resolvedMultiline = multiline ?? isTextarea;
   const resolvedNumberOfLines = numberOfLines ?? (isTextarea ? 4 : undefined);
@@ -75,11 +76,11 @@ export const AppTextInput: React.FC<AppTextInputProps> = ({
         onBlur?.(e);
       }}
       style={[
-        formStyles.input,
+        isInline ? formStyles.inputInline : formStyles.input,
         variant === 'textarea' && formStyles.textArea,
         variant === 'textareaFill' && formStyles.textAreaFill,
-        focused && !hasError && formStyles.inputFocused,
-        hasError && formStyles.inputError,
+        !isInline && focused && !hasError && formStyles.inputFocused,
+        !isInline && hasError && formStyles.inputError,
         style,
         inputStyle,
       ]}

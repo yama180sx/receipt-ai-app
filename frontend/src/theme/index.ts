@@ -7,6 +7,7 @@ import { spacing } from './spacing';
 import { typography } from './typography';
 import { tableStyles, listItemStyles } from './tableStyles';
 import { formStyles } from './formStyles';
+import { modalStyles } from './modalStyles';
 
 export { BREAKPOINTS } from './breakpoints';
 export { colors } from './colors';
@@ -17,6 +18,7 @@ export { spacing } from './spacing';
 export { typography } from './typography';
 export { tableStyles, listItemStyles } from './tableStyles';
 export { formStyles } from './formStyles';
+export { modalStyles } from './modalStyles';
 
 export const theme = {
   colors,
@@ -29,6 +31,7 @@ export const theme = {
   tableStyles,
   listItemStyles,
   formStyles,
+  modalStyles,
 } as const;
 
 export type Theme = typeof theme;

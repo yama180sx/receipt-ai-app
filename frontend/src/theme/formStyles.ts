@@ -50,4 +50,15 @@ export const formStyles = StyleSheet.create({
     color: colors.error,
     marginTop: spacing.xs,
   },
+  /** 単位付き入力の内側（外枠は modalStyles.inputWithUnit） */
+  inputInline: {
+    flex: 1,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    minHeight: 40,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.sm,
+    fontSize: 16,
+    color: colors.text.main,
+  },
 });
