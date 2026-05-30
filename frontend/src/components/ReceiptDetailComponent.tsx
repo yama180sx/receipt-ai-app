@@ -6,14 +6,9 @@ import {
   Image, 
   ScrollView, 
   useWindowDimensions, 
-  Platform, 
-  TextInput, 
-  TouchableOpacity, 
-  ActivityIndicator, 
   Alert 
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { AppButton } from '../components/ui';
+import { AppButton, AppSelect, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, BREAKPOINTS } from '../theme';
 import apiClient from '../utils/apiClient';
@@ -49,6 +44,11 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   const [editData, setEditData] = useState<any>(null);
 
   const cacheKey = useMemo(() => Date.now(), []);
+
+  const categorySelectOptions = useMemo(
+    () => categories.map((c) => ({ label: c.name, value: c.id as number })),
+    [categories]
+  );
 
   useEffect(() => {
     if (receipt) {
@@ -189,8 +189,9 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 
         <View style={styles.detailHeaderInner}>
           {isEditing ? (
-            <TextInput 
+            <AppTextInput
               style={styles.titleInput}
+              inputStyle={styles.titleInputText}
               value={editData.storeName}
               onChangeText={(val) => updateEditField('storeName', val)}
               placeholder="店舗名"
@@ -200,7 +201,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
           )}
           
           {isEditing ? (
-            <TextInput 
+            <AppTextInput
               style={styles.dateInput}
               value={editData.date ? new Date(editData.date).toISOString().replace('T', ' ').substring(0, 16) : ''}
               onChangeText={(val) => updateEditField('date', val)}
@@ -228,7 +229,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
             <View key={item.id || idx} style={styles.detailItemRow}>
               <View style={styles.detailItemTop}>
                 {isEditing ? (
-                  <TextInput 
+                  <AppTextInput
                     style={styles.itemNameInput}
                     value={item.name}
                     onChangeText={(val) => updateEditItem(idx, 'name', val)}
@@ -241,14 +242,14 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
                   {isEditing ? (
                     <View style={styles.editPriceRow}>
                       <Text style={styles.currencySymbol}>¥</Text>
-                      <TextInput 
+                      <AppTextInput
                         style={styles.priceInput}
                         value={String(item.price)}
                         keyboardType="decimal-pad"
                         onChangeText={(val) => updateEditItem(idx, 'price', val)}
                       />
                       <Text style={styles.multiplier}>×</Text>
-                      <TextInput 
+                      <AppTextInput
                         style={styles.quantityInput}
                         value={String(item.quantity)}
                         keyboardType="decimal-pad"
@@ -269,17 +270,15 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
               </View>
               
               <View style={styles.detailItemBottom}>
-                <View style={styles.detailPickerWrapper}>
-                  <Picker
-                    selectedValue={item.categoryId}
-                    onValueChange={(val) => isEditing ? updateEditItem(idx, 'categoryId', val) : onCategoryChange(item.id, val)}
-                    style={styles.detailPicker}
-                    mode="dropdown"
-                  >
-                    <Picker.Item label="カテゴリーを選択..." value={null} color={theme.colors.text.muted} />
-                    {categories.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} color={theme.colors.semantic.picker.text} />)}
-                  </Picker>
-                </View>
+                <AppSelect<number | null>
+                  selectedValue={item.categoryId ?? null}
+                  onValueChange={(val) =>
+                    isEditing ? updateEditItem(idx, 'categoryId', val) : onCategoryChange(item.id, val)
+                  }
+                  options={categorySelectOptions}
+                  placeholder="カテゴリーを選択..."
+                  style={styles.categorySelect}
+                />
               </View>
             </View>
           ))}
@@ -290,7 +289,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
               {isEditing ? (
                 <View style={styles.editTaxRow}>
                   <Text style={styles.currencySymbol}>+ ¥</Text>
-                  <TextInput 
+                  <AppTextInput
                     style={styles.taxInput}
                     value={String(editData.taxAmount)}
                     keyboardType="decimal-pad"
@@ -333,9 +332,10 @@ const styles = StyleSheet.create({
   receiptImage: { width: '100%', height: '100%' },
   detailHeaderInner: { marginBottom: 20 },
   detailTitle: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text.main },
-  titleInput: { fontSize: 24, fontWeight: 'bold', color: theme.colors.primary, borderBottomWidth: 1, borderBottomColor: theme.colors.primary, marginBottom: 4 },
+  titleInput: { marginBottom: 4 },
+  titleInputText: { fontSize: 24, fontWeight: 'bold' },
   detailDate: { fontSize: 16, color: theme.colors.text.muted, marginTop: 4 },
-  dateInput: { fontSize: 16, color: theme.colors.primary, borderBottomWidth: 1, borderBottomColor: theme.colors.primary, marginTop: 4 },
+  dateInput: { marginTop: 4 },
   detailTotalContainer: { alignItems: 'flex-end', marginBottom: 30, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   detailTotalLabel: { fontSize: 13, color: theme.colors.text.muted },
   detailTotalValue: { fontSize: 38, fontWeight: 'bold', color: theme.colors.text.main },
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   detailItemRow: { flexDirection: 'column', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: sem.table.rowBorder },
   detailItemTop: { marginBottom: 10 },
   detailItemName: { fontSize: 17, fontWeight: '600', color: theme.colors.text.main, marginBottom: 4 },
-  itemNameInput: { fontSize: 17, fontWeight: '600', color: theme.colors.primary, borderBottomWidth: 1, borderBottomColor: theme.colors.primary, marginBottom: 4 },
+  itemNameInput: { marginBottom: 4 },
   detailPriceContainer: { flexDirection: 'row', alignItems: 'baseline' },
   detailItemPrice: { fontWeight: '700', color: theme.colors.primary, fontSize: 16 },
   detailItemSub: { fontSize: 12, color: theme.colors.text.muted, marginLeft: 6 },
@@ -352,18 +352,17 @@ const styles = StyleSheet.create({
   editControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 10 },
   splitButtonOverride: { backgroundColor: sem.info.bg, borderColor: sem.info.border },
   editPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  priceInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 80, fontSize: 15, textAlign: 'right', color: theme.colors.primary },
-  quantityInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 50, fontSize: 15, textAlign: 'center', color: theme.colors.primary },
+  priceInput: { width: 100, minHeight: 40 },
+  quantityInput: { width: 72, minHeight: 40 },
   currencySymbol: { fontSize: 14, color: theme.colors.text.muted },
   multiplier: { fontSize: 14, color: theme.colors.text.muted },
-  detailPickerWrapper: { height: 55, backgroundColor: theme.colors.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, overflow: 'visible', justifyContent: 'center', marginTop: 4 },
-  detailPicker: { width: '100%', height: 55, color: sem.picker.text, ...Platform.select({ android: { marginLeft: -10 }, web: { outlineStyle: 'none' } as any }) },
+  categorySelect: { marginTop: 4, minHeight: 48 },
   taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: sem.divider, borderStyle: 'dashed' },
   taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   taxLabel: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '600' },
   taxValue: { fontSize: 16, color: theme.colors.text.main, fontWeight: '700' },
   editTaxRow: { flexDirection: 'row', alignItems: 'center' },
-  taxInput: { borderBottomWidth: 1, borderBottomColor: theme.colors.primary, width: 100, fontSize: 16, textAlign: 'right', color: theme.colors.primary, fontWeight: 'bold' },
+  taxInput: { width: 120, minHeight: 40 },
 });
 
 export default ReceiptDetailComponent;
