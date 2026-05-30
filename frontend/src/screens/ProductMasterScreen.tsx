@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppButton, AppListItem } from '../components/ui';
+import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
@@ -177,21 +177,17 @@ export const ProductMasterScreen = ({
       </View>
 
       <View style={styles.searchBar}>
-        <TextInput 
-          placeholder="品名検索..." 
-          style={styles.input} 
-          value={searchQuery} 
-          onChangeText={setSearchQuery} 
-          clearButtonMode="while-editing"
-          placeholderTextColor={theme.colors.text.muted}
+        <AppTextInput
+          placeholder="品名検索..."
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
-        <TextInput 
-          placeholder="店舗名..." 
-          style={styles.input} 
-          value={storeFilter} 
-          onChangeText={setStoreFilter} 
-          clearButtonMode="while-editing"
-          placeholderTextColor={theme.colors.text.muted}
+        <AppTextInput
+          placeholder="店舗名..."
+          style={styles.searchInput}
+          value={storeFilter}
+          onChangeText={setStoreFilter}
         />
       </View>
 
@@ -226,17 +222,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1, textAlign: 'center' },
   mergeText: { color: theme.colors.secondary, fontWeight: 'bold' },
-  searchBar: { padding: 10, flexDirection: 'row', backgroundColor: theme.colors.surface },
-  input: { 
-    flex: 1, 
-    backgroundColor: theme.colors.surface, 
-    marginHorizontal: 5, 
-    padding: 12, 
-    borderRadius: 8, 
-    borderWidth: 1, 
-    borderColor: theme.colors.border,
-    color: theme.colors.text.main 
-  },
+  searchBar: { padding: 10, flexDirection: 'row', gap: 10, backgroundColor: theme.colors.surface },
+  searchInput: { flex: 1 },
   listContent: { paddingHorizontal: 15, paddingBottom: 40 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 4 },
   badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },

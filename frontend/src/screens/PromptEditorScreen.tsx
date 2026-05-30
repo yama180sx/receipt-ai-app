@@ -3,8 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -12,7 +10,7 @@ import {
 } from 'react-native';
 
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppButton } from '../components/ui';
+import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
@@ -221,29 +219,35 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
               />
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>識別名 (管理用)</Text>
-              <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="例: テスト用(外税修正版)" />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>System Prompt</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                multiline numberOfLines={10} textAlignVertical="top"
-                value={formSystemPrompt} onChangeText={setFormSystemPrompt}
+            <AppFormField label="識別名 (管理用)">
+              <AppTextInput
+                value={formName}
+                onChangeText={setFormName}
+                placeholder="例: テスト用(外税修正版)"
               />
-            </View>
+            </AppFormField>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>Domain Hints (JSON形式)</Text>
-              <TextInput
-                style={[styles.input, styles.jsonArea]}
-                multiline numberOfLines={8} textAlignVertical="top" autoCapitalize="none" autoCorrect={false}
-                value={formDomainHints} onChangeText={setFormDomainHints}
+            <AppFormField label="System Prompt">
+              <AppTextInput
+                variant="textarea"
+                style={styles.promptTextArea}
+                value={formSystemPrompt}
+                onChangeText={setFormSystemPrompt}
+              />
+            </AppFormField>
+
+            <AppFormField label="Domain Hints (JSON形式)">
+              <AppTextInput
+                variant="textarea"
+                style={styles.jsonTextArea}
+                inputStyle={styles.jsonInputFont}
+                value={formDomainHints}
+                onChangeText={setFormDomainHints}
+                autoCapitalize="none"
+                autoCorrect={false}
                 placeholder={`{\n  "gas_station": "ヒント..."\n}`}
               />
-            </View>
+            </AppFormField>
 
             <AppButton
               title={BUTTON_LABELS.save}
@@ -344,9 +348,7 @@ const styles = StyleSheet.create({
   formContainer: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: adm.border },
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   formTitle: { fontSize: 18, fontWeight: 'bold', flex: 1 },
-  section: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: 'bold', color: adm.textLabel, marginBottom: 6 },
-  input: { backgroundColor: adm.inputBg, borderWidth: 1, borderColor: adm.inputBorder, borderRadius: 6, padding: 12, fontSize: 14 },
-  textArea: { height: 200, fontFamily: 'System' },
-  jsonArea: { height: 150, fontFamily: 'Courier' },
+  promptTextArea: { minHeight: 200 },
+  jsonTextArea: { minHeight: 150 },
+  jsonInputFont: { fontFamily: 'Courier' },
 });

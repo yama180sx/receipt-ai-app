@@ -81,4 +81,14 @@ export const modalStyles = StyleSheet.create({
     color: colors.text.muted,
     marginLeft: spacing.sm,
   },
+  webSelect: {
+    width: '100%',
+    height: 40,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingLeft: spacing.sm,
+    fontSize: 14,
+    color: colors.text.main,
+    ...Platform.select({ web: { outlineStyle: 'none' } as object }),
+  },
 });

@@ -6,11 +6,9 @@ import {
   ScrollView, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Platform,
   useWindowDimensions,
   Alert
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import {
   AppBackButton,
   AppButton,
@@ -42,6 +40,11 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   const [transferTo, setTransferTo] = useState<number | null>(null);
   const [transferAmount, setTransferAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [transferFieldErrors, setTransferFieldErrors] = useState<{
+    from?: string;
+    to?: string;
+    amount?: string;
+  }>({});
 
   // 過去6ヶ月の選択肢を生成
   const months = useMemo(() => {
@@ -60,6 +63,42 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       })),
     [summaryData]
   );
+
+  const monthSelectOptions = useMemo(
+    () =>
+      months.map((m) => ({
+        label: `${m.split('-')[0]}年${m.split('-')[1]}月`,
+        value: m,
+      })),
+    [months]
+  );
+
+  const openTransferModal = () => {
+    setTransferFieldErrors({});
+    setTransferModalVisible(true);
+  };
+
+  const validateTransferForm = (): boolean => {
+    const errors: { from?: string; to?: string; amount?: string } = {};
+    if (!transferFrom) {
+      errors.from = '送金元を選択してください';
+    }
+    if (!transferTo) {
+      errors.to = '送金先を選択してください';
+    }
+    if (!transferAmount.trim()) {
+      errors.amount = '金額を入力してください';
+    } else if (transferFrom && transferTo && transferFrom === transferTo) {
+      errors.to = '送金先は送金元と異なるメンバーを選んでください';
+    } else {
+      const amountNum = parseInt(transferAmount.replace(/[^0-9]/g, ''), 10);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        errors.amount = '正しい金額を入力してください';
+      }
+    }
+    setTransferFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const loadSettlementData = async () => {
     try {
@@ -80,27 +119,18 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   }, [selectedMonth]);
 
   const handleTransferSubmit = async () => {
-    if (!transferFrom || !transferTo || !transferAmount) {
-      Alert.alert('入力エラー', '送金元、送金先、金額をすべて入力してください。');
+    if (!validateTransferForm()) {
       return;
     }
-    if (transferFrom === transferTo) {
-      Alert.alert('入力エラー', '送金元と送金先は異なるメンバーを選択してください。');
-      return;
-    }
-    
+
     const amountNum = parseInt(transferAmount.replace(/[^0-9]/g, ''), 10);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      Alert.alert('入力エラー', '正しい金額を入力してください。');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const res = await api.addSettlementTransfer({
         month: selectedMonth,
-        fromMemberId: transferFrom,
-        toMemberId: transferTo,
+        fromMemberId: transferFrom!,
+        toMemberId: transferTo!,
         amount: amountNum
       });
       if (res.success) {
@@ -109,6 +139,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
         setTransferFrom(null);
         setTransferTo(null);
         setTransferAmount('');
+        setTransferFieldErrors({});
         loadSettlementData(); // 再読み込みして残額を更新
       }
     } catch (err) {
@@ -117,35 +148,6 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const renderMonthPicker = () => {
-    if (Platform.OS === 'web') {
-      return (
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          style={StyleSheet.flatten(styles.webSelect)}
-        >
-          {months.map(m => (
-            <option key={m} value={m}>{`${m.split('-')[0]}年${m.split('-')[1]}月`}</option>
-          ))}
-        </select>
-      );
-    }
-
-    return (
-      <Picker 
-        selectedValue={selectedMonth} 
-        onValueChange={setSelectedMonth} 
-        style={styles.filterPicker}
-        mode="dropdown"
-      >
-        {months.map(m => (
-          <Picker.Item key={m} label={`${m.split('-')[0]}年${m.split('-')[1]}月`} value={m} />
-        ))}
-      </Picker>
-    );
   };
 
   return (
@@ -157,12 +159,18 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
         <View style={styles.headerRight}>
           <AppButton
             title={`＋ ${BUTTON_LABELS.recordTransfer}`}
-            onPress={() => setTransferModalVisible(true)}
+            onPress={openTransferModal}
             size="sm"
             style={styles.addTransferButton}
           />
           <View style={styles.monthPickerContainer}>
-            {renderMonthPicker()}
+            <AppSelect<string>
+              selectedValue={selectedMonth}
+              onValueChange={setSelectedMonth}
+              options={monthSelectOptions}
+              includePlaceholder={false}
+              style={styles.monthSelect}
+            />
           </View>
         </View>
       </View>
@@ -293,30 +301,53 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
           </>
         }
       >
-        <AppFormField label="送金元 (払った人)">
+        <AppFormField label="送金元 (払った人)" error={transferFieldErrors.from}>
           <AppSelect<number | null>
             selectedValue={transferFrom}
-            onValueChange={setTransferFrom}
+            onValueChange={(v) => {
+              setTransferFrom(v);
+              if (transferFieldErrors.from) {
+                setTransferFieldErrors((prev) => ({ ...prev, from: undefined }));
+              }
+            }}
             options={memberSelectOptions}
+            error={Boolean(transferFieldErrors.from)}
           />
         </AppFormField>
 
-        <AppFormField label="送金先 (受け取った人)">
+        <AppFormField label="送金先 (受け取った人)" error={transferFieldErrors.to}>
           <AppSelect<number | null>
             selectedValue={transferTo}
-            onValueChange={setTransferTo}
+            onValueChange={(v) => {
+              setTransferTo(v);
+              if (transferFieldErrors.to) {
+                setTransferFieldErrors((prev) => ({ ...prev, to: undefined }));
+              }
+            }}
             options={memberSelectOptions}
+            error={Boolean(transferFieldErrors.to)}
           />
         </AppFormField>
 
-        <AppFormField label="送金額">
-          <View style={modalStyles.inputWithUnit}>
+        <AppFormField label="送金額" error={transferFieldErrors.amount}>
+          <View
+            style={[
+              modalStyles.inputWithUnit,
+              transferFieldErrors.amount && modalStyles.selectWrapperError,
+            ]}
+          >
             <AppTextInput
               variant="inline"
               value={transferAmount}
-              onChangeText={setTransferAmount}
+              onChangeText={(v) => {
+                setTransferAmount(v);
+                if (transferFieldErrors.amount) {
+                  setTransferFieldErrors((prev) => ({ ...prev, amount: undefined }));
+                }
+              }}
               keyboardType="number-pad"
               placeholder="例: 5000"
+              error={Boolean(transferFieldErrors.amount)}
             />
             <Text style={modalStyles.unitSuffix}>円</Text>
           </View>
@@ -336,9 +367,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main, flex: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   addTransferButton: { paddingHorizontal: 4 },
-  monthPickerContainer: { width: 140, height: 36, backgroundColor: theme.colors.surface, borderRadius: 6, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  filterPicker: { width: '100%' },
-  webSelect: { width: '100%', height: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingLeft: 10, fontSize: 14, color: theme.colors.text.main, ...Platform.select({ web: { outlineStyle: 'none' } as any }) } as any,
+  monthPickerContainer: { width: 140, justifyContent: 'center' },
+  monthSelect: { minHeight: 36 },
   scrollContainer: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   rowLayout: { flexDirection: 'row' },
