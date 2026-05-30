@@ -325,7 +325,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
             onPress={handleSave}
             loading={saving}
             disabled={saving}
-            size="md"
+            size="sm"
           />
         </View>
       </View>

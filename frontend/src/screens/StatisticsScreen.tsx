@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
 import apiClient from '../utils/apiClient';
-import { toMonthSelectOptions } from '../utils/monthSelectOptions';
+import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
@@ -64,7 +64,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const isWide = windowWidth > 768;
 
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [data, setData] = useState<MonthlyData | null>(null);
   const [advancedData, setAdvancedData] = useState<AdvancedStats | null>(null);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -74,18 +74,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
 
-  const monthOptions = useMemo(() => {
-    return Array.from({ length: 12 }).map((_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return d.toISOString().slice(0, 7);
-    });
-  }, []);
+  const monthOptions = useMemo(() => getRecentYearMonths(12), []);
 
-  const monthSelectOptions = useMemo(
-    () => toMonthSelectOptions(monthOptions),
-    [monthOptions]
-  );
+  const monthSelectOptions = useMonthSelectOptions(monthOptions, isWide);
 
   const fetchData = useCallback(async () => {
     if (!currentMemberId) return;
@@ -172,13 +163,12 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
-          <View style={[styles.monthPickerContainer, isWide && styles.monthPickerContainerWide]}>
+          <View style={[styles.monthPickerContainer, isWide ? styles.monthPickerContainerWide : styles.monthPickerContainerMobile]}>
             <AppSelect<string>
               selectedValue={selectedMonth}
               onValueChange={setSelectedMonth}
               options={monthSelectOptions}
               includePlaceholder={false}
-              style={styles.monthSelect}
             />
           </View>
         </View>
@@ -314,9 +304,9 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   topInfo: { marginBottom: 15 },
   headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
-  monthPickerContainer: { width: 140, marginTop: 8, justifyContent: 'center' },
+  monthPickerContainer: { marginTop: 8, justifyContent: 'center' },
+  monthPickerContainerMobile: { width: '100%', alignSelf: 'stretch' },
   monthPickerContainerWide: { width: 180 },
-  monthSelect: { minHeight: 36 },
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },

@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   quantityInput: { width: 72, minHeight: 40 },
   currencySymbol: { fontSize: 14, color: theme.colors.text.muted },
   multiplier: { fontSize: 14, color: theme.colors.text.muted },
-  categorySelect: { marginTop: 4, minHeight: 48 },
+  categorySelect: { marginTop: 4 },
   taxSection: { marginTop: 20, paddingVertical: 15, borderTopWidth: 2, borderTopColor: sem.divider, borderStyle: 'dashed' },
   taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   taxLabel: { fontSize: 14, color: theme.colors.text.muted, fontWeight: '600' },

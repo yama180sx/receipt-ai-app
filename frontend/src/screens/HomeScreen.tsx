@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem } from '../components/ui';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
+import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -48,7 +49,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const currentMonth = getCurrentYearMonth();
       const [latestRes, statsRes] = await Promise.all([
         apiClient.get('/receipts/latest', { params: { memberId: currentMemberId } }),
         apiClient.get('/stats/monthly', { params: { month: currentMonth } })
@@ -175,7 +176,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <AppButton
             title="統計の詳細を見る ›"
             onPress={onGoToStats}
-            variant="ghost"
+            variant="outline"
             size="sm"
             style={styles.summaryLinkButton}
             textStyle={styles.summaryLinkText}
@@ -289,7 +290,12 @@ const styles = StyleSheet.create({
   summarySymbol: { color: theme.colors.text.inverse, fontSize: 20, marginRight: 4, fontWeight: 'bold' },
   summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
   summaryDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: theme.spacing.md },
-  summaryLinkButton: { alignSelf: 'flex-end', marginTop: theme.spacing.xs },
+  summaryLinkButton: {
+    alignSelf: 'flex-end',
+    marginTop: theme.spacing.xs,
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
   summaryLinkText: { color: theme.colors.text.inverse, fontSize: 14, fontWeight: '600' },
   captureButton: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg, borderWidth: 2, borderColor: theme.colors.primary, borderStyle: 'dashed' },
   captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },

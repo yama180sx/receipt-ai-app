@@ -10,9 +10,8 @@ import {
   Alert, 
   useWindowDimensions 
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import apiClient from '../utils/apiClient';
-import { toMonthSelectOptions } from '../utils/monthSelectOptions';
+import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme, BREAKPOINTS } from '../theme';
@@ -41,17 +40,17 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
 
-  const months = useMemo(() => {
-    return Array.from({ length: 6 }).map((_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return d.toISOString().slice(0, 7);
-    });
-  }, []);
+  const months = useMemo(() => getRecentYearMonths(6), []);
 
-  const monthSelectOptions = useMemo(
-    () => toMonthSelectOptions(months),
-    [months]
+  const monthSelectOptions = useMonthSelectOptions(months, isWide);
+
+  const memberSelectOptions = useMemo(
+    () =>
+      members.map((m) => ({
+        label: m.id === currentMemberId ? `自分 (${m.name})` : m.name,
+        value: m.id.toString(),
+      })),
+    [members, currentMemberId]
   );
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
@@ -181,43 +180,6 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
     );
   };
 
-  const renderMemberPicker = () => {
-    if (Platform.OS === 'web') {
-      return (
-        <select
-          value={selectedMember}
-          onChange={(e) => setSelectedMember(e.target.value)}
-          style={StyleSheet.flatten(styles.webSelect)} 
-        >
-          <option value="">世帯全体</option>
-          {members.map(m => (
-            <option key={m.id} value={m.id.toString()}>
-              {m.id === currentMemberId ? `自分 (${m.name})` : m.name}
-            </option>
-          ))}
-        </select>
-      );
-    }
-
-    return (
-      <Picker 
-        selectedValue={selectedMember} 
-        onValueChange={setSelectedMember} 
-        style={styles.filterPicker}
-        mode="dropdown"
-      >
-        <Picker.Item label="世帯全体" value="" />
-        {members.map(m => (
-          <Picker.Item 
-            key={m.id} 
-            label={m.id === currentMemberId ? `自分 (${m.name})` : m.name} 
-            value={m.id.toString()} 
-          />
-        ))}
-      </Picker>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.mainWrapper}>
@@ -227,7 +189,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={[styles.filterContainer, isWide && styles.wideFilter]}>
+        <View style={[styles.filterContainer, isWide ? styles.filterContainerWide : styles.filterContainerMobile]}>
           <View style={[styles.filterSelectWrap, isWide && styles.filterSelectWrapWide]}>
             <AppSelect<string>
               selectedValue={selectedMonth}
@@ -235,11 +197,16 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
               options={monthSelectOptions}
               placeholder="全期間"
               placeholderValue=""
-              style={styles.monthSelect}
             />
           </View>
-          <View style={[styles.pickerBox, isWide && { width: 200, minWidth: 200, flexGrow: 0, flexShrink: 0 }]}>
-            {renderMemberPicker()}
+          <View style={[styles.filterSelectWrap, isWide && styles.filterSelectWrapWide]}>
+            <AppSelect<string>
+              selectedValue={selectedMember}
+              onValueChange={setSelectedMember}
+              options={memberSelectOptions}
+              placeholder="世帯全体"
+              placeholderValue=""
+            />
           </View>
         </View>
 
@@ -312,28 +279,11 @@ const styles = StyleSheet.create({
   mainWrapper: { flex: 1, width: '100%', alignSelf: 'stretch', paddingTop: Platform.OS === 'ios' ? 60 : 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   title: { ...theme.typography.h2, color: theme.colors.text.main },
-  filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 10 },
-  wideFilter: { justifyContent: 'flex-start' },
-  filterSelectWrap: { flex: 1, minWidth: 140, justifyContent: 'center' },
-  filterSelectWrapWide: { width: 180, flexGrow: 0, flexShrink: 0 },
-  monthSelect: { minHeight: 36 },
-  pickerBox: { flex: 1, height: 44, backgroundColor: theme.colors.surface, borderRadius: 8, justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  filterPicker: { width: '100%' },
-  webSelect: {
-    width: '100%',
-    height: '100%',
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingLeft: 10,
-    fontSize: 14,
-    color: theme.colors.text.main,
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none',
-      },
-      default: {},
-    }),
-  } as any,
+  filterContainer: { paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 8 },
+  filterContainerMobile: { flexDirection: 'column' },
+  filterContainerWide: { flexDirection: 'row', justifyContent: 'flex-start' },
+  filterSelectWrap: { width: '100%', justifyContent: 'center' },
+  filterSelectWrapWide: { flex: 1, width: undefined, minWidth: 160, maxWidth: 220 },
   mainContentMobile: { flex: 1 },
   mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.colors.border },
   masterPane: { width: 350, height: '100%', backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },

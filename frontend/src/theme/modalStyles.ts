@@ -55,16 +55,73 @@ export const modalStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     minHeight: 40,
     justifyContent: 'center',
-    overflow: 'hidden',
+    paddingHorizontal: spacing.sm,
+    ...Platform.select({
+      android: { overflow: 'visible' as const },
+      ios: { overflow: 'visible' as const },
+      default: { overflow: 'hidden' as const },
+    }),
   },
   selectWrapperError: {
     borderColor: colors.error,
     backgroundColor: colors.semantic.deficit.bg,
   },
-  selectPicker: {
-    width: '100%',
-    height: 40,
-    ...Platform.select({ web: { outlineStyle: 'none', border: 'none' } as object }),
+  /** ネイティブ: タップで開く選択 UI（Picker の文字切れ回避） */
+  selectTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingVertical: spacing.xs,
+  },
+  selectTriggerText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text.main,
+    marginRight: spacing.sm,
+  },
+  selectChevron: {
+    fontSize: 10,
+    color: colors.text.muted,
+  },
+  selectOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  selectSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.md,
+    borderTopRightRadius: borderRadius.md,
+    maxHeight: '55%',
+    paddingBottom: spacing.lg,
+    ...Platform.select({
+      android: { elevation: 8 },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+      },
+      default: {},
+    }),
+  },
+  selectOptionRow: {
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  selectOptionRowSelected: {
+    backgroundColor: colors.semantic.active.bg,
+  },
+  selectOptionText: {
+    fontSize: 16,
+    color: colors.text.main,
+  },
+  selectOptionTextSelected: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   inputWithUnit: {
     flexDirection: 'row',
@@ -86,8 +143,8 @@ export const modalStyles = StyleSheet.create({
     height: 40,
     borderWidth: 0,
     backgroundColor: 'transparent',
-    paddingLeft: spacing.sm,
-    fontSize: 14,
+    paddingLeft: spacing.xs,
+    fontSize: 13,
     color: colors.text.main,
     ...Platform.select({ web: { outlineStyle: 'none' } as object }),
   },
