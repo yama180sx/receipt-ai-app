@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, Text, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import apiClient from '../utils/apiClient';
-import { AppBackButton, AppButton, AppListColorDot, AppListItem } from '../components/ui';
+import { AppBackButton, AppButton, AppListColorDot, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 
@@ -122,12 +122,11 @@ export const CategoryManagementScreen = ({
       </View>
 
       <View style={styles.inputSection}>
-        <TextInput 
-          style={styles.input} 
-          value={newName} 
-          onChangeText={setNewName} 
+        <AppTextInput
+          style={styles.nameInput}
+          value={newName}
+          onChangeText={setNewName}
           placeholder="新しいカテゴリー"
-          placeholderTextColor={theme.colors.text.muted}
         />
         <AppButton title={BUTTON_LABELS.add} onPress={addCategory} size="md" />
       </View>
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
   title: { ...theme.typography.h1, marginLeft: 8, flex: 1 },
   inputSection: { flexDirection: 'row', marginBottom: 15, gap: 10, alignItems: 'center' },
-  input: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: theme.colors.border, color: theme.colors.text.main },
+  nameInput: { flex: 1 },
   list: { paddingBottom: 40 },
   emptyText: { textAlign: 'center', marginTop: 30, color: theme.colors.text.muted },
 });
