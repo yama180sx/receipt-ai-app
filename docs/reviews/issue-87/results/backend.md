@@ -24,7 +24,7 @@
 | R-B002 | **Must** | データ整合 | `updateItemSplits` | `familyMemberId` が同一世帯か未検証 | #87-2 | ✅ 保存前に世帯メンバー照合 |
 | R-B003 | **Must** | データ整合 | `updateItemSplits` | 端数を「最後のメンバー」に寄せた後、先頭へ再補正する二重ロジックで意図と不一致 | #87-2 | ✅ `itemSplitAllocation.ts` に一本化 |
 | R-B004 | **Must** | データ整合 | `updateItemSplits` | 按分合計≠小計・負の按分額を許容しうる | #87-2 | ✅ 合計検証・負数拒否 |
-| R-B005 | Should | 型 | `updateItemSplits` | `split: any` | #87-4 | 未対応（Epic 外子） |
+| R-B005 | Should | 型 | `updateItemSplits` | `split: any` | #87-4 | ✅ #87-2 で `SplitInput`（#87-4 で記録） |
 | R-B006 | Should | アーキ | `statsController` | `AppError` と直 `res.status` 混在 | #87-2 | 未対応 |
 | R-B007 | Should | 型 | `addSettlementTransfer` | `month` 形式未検証 | #87-2 | ✅ `normalizeYearMonth` |
 | R-B008 | Later | 性能 | `getSettlementStatus` | レシート全件+明細 include（世帯小なら許容） | — | 未対応 |

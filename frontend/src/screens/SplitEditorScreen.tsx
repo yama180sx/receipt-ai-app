@@ -21,9 +21,14 @@ import {
   buildItemSplitSavePayload,
   calcItemTotal,
 } from '../utils/splitEditorSplits';
+import type {
+  FamilyMemberSummary,
+  ReceiptForSplitEditor,
+  ReceiptItemForSplit,
+} from '../types/settlement';
 
 interface SplitEditorScreenProps {
-  receipt: any;
+  receipt: ReceiptForSplitEditor;
   onBack: () => void;
 }
 
@@ -31,8 +36,8 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   const { width } = useWindowDimensions();
   const isWide = width >= BREAKPOINTS.TABLET;
 
-  const [allMembers, setAllMembers] = useState<any[]>([]); 
-  const [activeMembers, setActiveMembers] = useState<any[]>([]); 
+  const [allMembers, setAllMembers] = useState<FamilyMemberSummary[]>([]);
+  const [activeMembers, setActiveMembers] = useState<FamilyMemberSummary[]>([]); 
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,31 +56,33 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
         if (res.success) {
           setAllMembers(res.data);
           
-          let initialActive: any[] = [];
-          
-          const hasExistingSplits = receipt.items.some((item: any) => item.splits && item.splits.length > 0);
+          let initialActive: FamilyMemberSummary[] = [];
+
+          const hasExistingSplits = receipt.items.some(
+            (item) => item.splits && item.splits.length > 0
+          );
 
           if (hasExistingSplits) {
             const splitMemberIds = new Set<number>();
-            receipt.items.forEach((item: any) => {
+            receipt.items.forEach((item) => {
               if (item.splits) {
-                item.splits.forEach((s: any) => splitMemberIds.add(s.familyMemberId));
+                item.splits.forEach((s) => splitMemberIds.add(s.familyMemberId));
               }
             });
-            
-            const payer = res.data.find((m: any) => m.id === receipt.memberId);
+
+            const payer = res.data.find((m) => m.id === receipt.memberId);
             if (payer) initialActive.push(payer);
-            
-            res.data.forEach((m: any) => {
+
+            res.data.forEach((m) => {
               if (splitMemberIds.has(m.id) && m.id !== receipt.memberId) {
                 initialActive.push(m);
               }
             });
 
           } else {
-            const payer = res.data.find((m: any) => m.id === receipt.memberId);
+            const payer = res.data.find((m) => m.id === receipt.memberId);
             if (payer) initialActive.push(payer);
-            const others = res.data.filter((m: any) => m.id !== receipt.memberId);
+            const others = res.data.filter((m) => m.id !== receipt.memberId);
             if (others.length > 0) initialActive.push(others[0]);
           }
 
@@ -96,17 +103,20 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     init();
   }, [receipt]);
 
-  const initializeSplits = (familyMembers: any[], targetMembers: any[]) => {
+  const initializeSplits = (
+    _familyMembers: FamilyMemberSummary[],
+    targetMembers: FamilyMemberSummary[]
+  ) => {
     if (!receipt || !receipt.items) return;
-    
+
     const initialData: Record<number, Record<number, number>> = {};
-    receipt.items.forEach((item: any) => {
+    receipt.items.forEach((item) => {
       initialData[item.id] = {};
       const itemTotal = calcItemTotal(item);
 
       if (item.splits && item.splits.length > 0) {
         targetMembers.forEach(m => {
-          const split = item.splits.find((s: any) => s.familyMemberId === m.id);
+          const split = item.splits!.find((s) => s.familyMemberId === m.id);
           initialData[item.id][m.id] = split ? split.amount : 0;
         });
       } else {
@@ -223,7 +233,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
 
     setEditSplits(prev => {
       const next = { ...prev };
-      receipt.items.forEach((item: any) => {
+      receipt.items.forEach((item) => {
         const itemTotal = calcItemTotal(item);
         const newData = { ...next[item.id] };
 
@@ -266,7 +276,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
 
   // ★ 追加: レシート全体を均等割り
   const splitWholeReceiptEqually = () => {
-    receipt.items.forEach((item: any) => {
+    receipt.items.forEach((item) => {
       splitItemEqually(item.id, calcItemTotal(item));
     });
   };
@@ -280,7 +290,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     const remainderMemberId = activeMembers[0].id;
     setSaving(true);
     try {
-      const savePromises = receipt.items.map(async (item: any) => {
+      const savePromises = receipt.items.map(async (item) => {
         const amounts = editSplits[item.id] ?? {};
         const payloadSplits = buildItemSplitSavePayload(
           activeMembers,
@@ -312,14 +322,14 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
 
   // レシート全体の合計額を算出
   const receiptTotalAmount = receipt.items.reduce(
-    (sum: number, item: any) => sum + calcItemTotal(item),
+    (sum, item) => sum + calcItemTotal(item),
     0
   );
 
   // 合計行表示用: メンバーごとの合計額を計算
   const getMemberTotalAmount = (memberId: number) => {
     let sum = 0;
-    receipt.items.forEach((item: any) => {
+    receipt.items.forEach((item) => {
       sum += editSplits[item.id]?.[memberId] || 0;
     });
     return sum;
@@ -408,7 +418,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
                 <Text style={[tableStyles.cell, styles.cellAction, tableStyles.headerText]}>操作</Text>
               </View>
 
-              {receipt.items.map((item: any) => {
+              {receipt.items.map((item: ReceiptItemForSplit) => {
                 const itemTotal = calcItemTotal(item);
 
                 return (

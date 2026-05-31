@@ -7,6 +7,7 @@ import { receiptQueue } from '../queues/receiptQueue';
 import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
+import { calcItemLineTotal } from '../utils/itemLineTotal';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
 
 /**
@@ -501,7 +502,7 @@ export const updateItemSplits = async (req: Request, res: Response, next: NextFu
         return { message: 'Splits cleared (Fallback to default payer)' };
       }
 
-      const totalAmount = Math.round(Number(item.price || 0) * Number(item.quantity || 1));
+      const totalAmount = calcItemLineTotal(item.price, item.quantity);
       const splitInputs: SplitInput[] = splits.map((split: SplitInput) => ({
         familyMemberId: Number(split.familyMemberId),
         ratio: split.ratio,
