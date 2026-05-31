@@ -4,6 +4,7 @@ import apiClient from '../utils/apiClient';
 import { AppBackButton, AppButton, AppListColorDot, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
+import { pickNextCategoryColor } from '../utils/categoryColor';
 
 interface Category {
   id: number;
@@ -57,8 +58,10 @@ export const CategoryManagementScreen = ({
   const addCategory = async () => {
     if (!newName.trim() || !currentMemberId) return;
     try {
-      await apiClient.post('/categories', 
-        { name: newName, color: theme.colors.semantic.category.newDefault },
+      const color = pickNextCategoryColor(categories.map((c) => c.color));
+      await apiClient.post(
+        '/categories',
+        { name: newName, color },
         { headers: getHeaders() }
       );
       setNewName('');
