@@ -93,26 +93,46 @@ apiClient.interceptors.response.use(
   }
 );
 
+import type {
+  ApiSuccessResponse,
+  FamilyMemberSummary,
+  ItemSplitSavePayload,
+  SettlementStatusData,
+  SettlementTransfer,
+} from '../types/settlement';
+
+export type ItemSplitSaveRequest = ItemSplitSavePayload & {
+  ratio?: number;
+};
+
 // ★ [Issue #78/#79/#80/#81] 各種APIコール用ラッパー
 export const api = {
-  getFamilyMembers: async () => {
+  getFamilyMembers: async (): Promise<ApiSuccessResponse<FamilyMemberSummary[]>> => {
     const res = await apiClient.get('/family-groups/members');
     return res.data;
   },
-  saveItemSplits: async (itemId: number, splits: { familyMemberId: number; amount?: number; ratio?: number }[]) => {
+  saveItemSplits: async (
+    itemId: number,
+    splits: ItemSplitSaveRequest[]
+  ): Promise<ApiSuccessResponse<unknown>> => {
     const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
     return res.data;
   },
-  // [Issue #80] 月間精算ステータスの取得メソッド
-  getSettlementStatus: async (month: string) => {
+  getSettlementStatus: async (
+    month: string
+  ): Promise<ApiSuccessResponse<SettlementStatusData>> => {
     const res = await apiClient.get('/stats/settlement', { params: { month } });
     return res.data;
   },
-  // ★ [Issue #81] 送金記録の登録メソッドを追加
-  addSettlementTransfer: async (payload: { month: string; fromMemberId: number; toMemberId: number; amount: number }) => {
+  addSettlementTransfer: async (payload: {
+    month: string;
+    fromMemberId: number;
+    toMemberId: number;
+    amount: number;
+  }): Promise<ApiSuccessResponse<SettlementTransfer>> => {
     const res = await apiClient.post('/stats/settlement/transfers', payload);
     return res.data;
-  }
+  },
 };
 
 export default apiClient;

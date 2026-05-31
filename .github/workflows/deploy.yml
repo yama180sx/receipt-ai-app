@@ -21,7 +21,9 @@ jobs:
             --exclude 'pgdata' \
             --exclude 'redisdata' \
             --exclude 'uploads' \
+            --exclude 'logs' \
             ./ ~/stable/receipt-ai-app/
+          mkdir -p ~/stable/receipt-ai-app/logs
 
       - name: Create Stable .env
         run: |

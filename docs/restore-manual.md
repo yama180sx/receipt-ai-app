@@ -5,6 +5,22 @@
 
 ---
 
+## 0. バックアップが増えないとき（cron）
+
+stable の定期バックアップは `crontab`（4:00 / `@reboot`）で `scripts/backup.sh` を実行する。ログは `{プロジェクト}/logs/backup_{env}.log` に追記される。
+
+**`logs/` が無いと cron のリダイレクトが失敗し、バックアップ自体が走らない**（Issue #89）。`main` デプロイ後は次を確認する。
+
+```bash
+mkdir -p ~/stable/receipt-ai-app/logs
+cd ~/stable/receipt-ai-app && ./scripts/backup.sh stable
+tail ~/stable/receipt-ai-app/logs/backup_stable.log
+```
+
+cron 行を直す場合は `setup-env.sh stable` を再実行する（`mkdir -p logs` を含む行に更新される）。
+
+---
+
 ## 1. 事前準備：最新バックアップのタイムスタンプ確認
 
 リストアを実行する前に、まずは復元に使用するバックアップファイルの「タイムスタンプ（日時情報）」を確認する。

@@ -6,6 +6,9 @@ import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
 import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
+import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
+import { calcItemLineTotal } from '../utils/itemLineTotal';
+import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
 
 /**
  * [Issue #43] ジョブステータス取得
@@ -281,17 +284,29 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
  */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = req.query.memberId || req.headers['x-member-id'];
     const { month } = req.query;
     const familyGroupId = getFamilyGroupId();
-    
+
     const where: any = { familyGroupId };
-    if (memberId) where.memberId = Number(memberId);
-    
-    if (typeof month === 'string' && month) {
-      const start = new Date(`${month}-01`);
-      const end = new Date(start);
-      end.setMonth(start.getMonth() + 1);
+
+    // 「世帯全体」は memberId="" → 世帯全件。空文字を x-member-id にフォールバックしない
+    const rawMemberId = req.query.memberId;
+    if (
+      rawMemberId !== undefined &&
+      rawMemberId !== null &&
+      String(rawMemberId).trim() !== ''
+    ) {
+      const filterMemberId = Number(rawMemberId);
+      if (!Number.isNaN(filterMemberId)) {
+        where.memberId = filterMemberId;
+      }
+    }
+
+    const normalizedMonth = normalizeYearMonth(
+      typeof month === 'string' ? month : undefined
+    );
+    if (normalizedMonth) {
+      const { start, end } = getLocalMonthDateRange(normalizedMonth);
       where.date = { gte: start, lt: end };
     }
 
@@ -487,37 +502,25 @@ export const updateItemSplits = async (req: Request, res: Response, next: NextFu
         return { message: 'Splits cleared (Fallback to default payer)' };
       }
 
-      // 3. 単価×数量を基準とする元金額の算出
-      const totalAmount = Math.round((item.price || 0) * (item.quantity || 1));
-      let allocatedAmount = 0;
-      const finalSplits: { familyMemberId: number; amount: number }[] = [];
+      const totalAmount = calcItemLineTotal(item.price, item.quantity);
+      const splitInputs: SplitInput[] = splits.map((split: SplitInput) => ({
+        familyMemberId: Number(split.familyMemberId),
+        ratio: split.ratio,
+        amount: split.amount,
+      }));
 
-      // 4. 各メンバーへの金額割り当て計算
-      splits.forEach((split: any, index: number) => {
-        let amount = 0;
-
-        if (index === splits.length - 1) {
-          // ★ 端数丸め: 配列の最後のメンバーに「残額すべて」を寄せて合計不一致を防ぐ
-          amount = totalAmount - allocatedAmount;
-        } else if (split.amount !== undefined) {
-          amount = Math.round(Number(split.amount));
-        } else if (split.ratio !== undefined) {
-          amount = Math.round(totalAmount * Number(split.ratio));
-        }
-
-        allocatedAmount += amount;
-        finalSplits.push({
-          familyMemberId: Number(split.familyMemberId),
-          amount: amount,
-        });
+      const memberIds = [...new Set(splitInputs.map((s) => s.familyMemberId))];
+      const validMembers = await tx.familyMember.findMany({
+        where: { id: { in: memberIds }, familyGroupId },
+        select: { id: true },
       });
-
-      // 5. 先頭要素への端数補正（allocatedAmountが超過・不足した場合のセーフティネット）
-      if (allocatedAmount !== totalAmount && finalSplits.length > 0) {
-        finalSplits[0].amount += (totalAmount - allocatedAmount);
+      if (validMembers.length !== memberIds.length) {
+        throw new AppError('Invalid familyMemberId in splits', 403);
       }
 
-      // 6. DBの洗い替え（Delete & Insert）
+      const finalSplits = allocateItemSplits(totalAmount, splitInputs);
+
+      // DBの洗い替え（Delete & Insert）
       await tx.itemSplit.deleteMany({ where: { itemId: Number(itemId) } });
       await tx.itemSplit.createMany({
         data: finalSplits.map(fs => ({

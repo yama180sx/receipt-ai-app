@@ -6,7 +6,6 @@ import {
   ScrollView, 
   ActivityIndicator, 
   useWindowDimensions,
-  Alert
 } from 'react-native';
 import {
   AppBackButton,
@@ -21,6 +20,12 @@ import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
+import { showAlert } from '../utils/alertMessage';
+import {
+  hasNegativeAmountSign,
+  parsePositiveYenAmount,
+} from '../utils/parsePositiveYenAmount';
+import type { SettlementMemberSummary } from '../types/settlement';
 
 interface SettlementSummaryScreenProps {
   onBack: () => void;
@@ -32,7 +37,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
-  const [summaryData, setSummaryData] = useState<any[]>([]);
+  const [summaryData, setSummaryData] = useState<SettlementMemberSummary[]>([]);
 
   // 送金モーダル用ステート
   const [isTransferModalVisible, setTransferModalVisible] = useState(false);
@@ -51,7 +56,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
   const memberSelectOptions = useMemo(
     () =>
-      summaryData.map((m: { memberId: number; name: string }) => ({
+      summaryData.map((m) => ({
         label: m.name,
         value: m.memberId,
       })),
@@ -77,9 +82,11 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       errors.amount = '金額を入力してください';
     } else if (transferFrom && transferTo && transferFrom === transferTo) {
       errors.to = '送金先は送金元と異なるメンバーを選んでください';
+    } else if (hasNegativeAmountSign(transferAmount)) {
+      errors.amount = '金額は0より大きい値を入力してください';
     } else {
-      const amountNum = parseInt(transferAmount.replace(/[^0-9]/g, ''), 10);
-      if (isNaN(amountNum) || amountNum <= 0) {
+      const amountNum = parsePositiveYenAmount(transferAmount);
+      if (amountNum === null) {
         errors.amount = '正しい金額を入力してください';
       }
     }
@@ -92,10 +99,11 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       setLoading(true);
       const res = await api.getSettlementStatus(selectedMonth);
       if (res.success) {
-        setSummaryData(res.data.members || []);
+        setSummaryData(res.data?.members ?? []);
       }
     } catch (err) {
       console.error('精算サマリーの取得失敗:', err);
+      showAlert('エラー', '精算サマリーの取得に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -110,7 +118,10 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       return;
     }
 
-    const amountNum = parseInt(transferAmount.replace(/[^0-9]/g, ''), 10);
+    const amountNum = parsePositiveYenAmount(transferAmount);
+    if (amountNum === null) {
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -121,7 +132,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
         amount: amountNum
       });
       if (res.success) {
-        Alert.alert('成功', '送金記録を登録しました。');
+        showAlert('成功', '送金記録を登録しました。');
         setTransferModalVisible(false);
         setTransferFrom(null);
         setTransferTo(null);
@@ -131,7 +142,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       }
     } catch (err) {
       console.error('送金記録エラー', err);
-      Alert.alert('エラー', '送金記録の登録に失敗しました。');
+      showAlert('エラー', '送金記録の登録に失敗しました。');
     } finally {
       setIsSubmitting(false);
     }
@@ -349,7 +360,14 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
               variant="inline"
               value={transferAmount}
               onChangeText={(v) => {
-                setTransferAmount(v);
+                if (hasNegativeAmountSign(v)) {
+                  setTransferFieldErrors((prev) => ({
+                    ...prev,
+                    amount: '金額は0より大きい値を入力してください',
+                  }));
+                  return;
+                }
+                setTransferAmount(v.replace(/[^0-9]/g, ''));
                 if (transferFieldErrors.amount) {
                   setTransferFieldErrors((prev) => ({ ...prev, amount: undefined }));
                 }

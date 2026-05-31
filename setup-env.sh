@@ -110,7 +110,8 @@ EOF
 echo "✅ Environment variables created."
 
 # ★ [Issue #41] Cronジョブの自動登録（定期実行 ＆ 起動時実行の多重登録）
-CRON_CMD="${PROJECT_ROOT}/scripts/backup.sh $ENV >> ${PROJECT_ROOT}/logs/backup_${ENV}.log 2>&1"
+# ★ [Issue #89] logs/ が無いとリダイレクトで cron 全体が失敗するため先に mkdir
+CRON_CMD="mkdir -p \"${PROJECT_ROOT}/logs\" && ${PROJECT_ROOT}/scripts/backup.sh $ENV >> ${PROJECT_ROOT}/logs/backup_${ENV}.log 2>&1"
 
 # 現在のcronを一時ファイルに出力 (存在しない場合は空ファイル作成)
 crontab -l > /tmp/current_cron 2>/dev/null || touch /tmp/current_cron
