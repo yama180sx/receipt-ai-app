@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prismaClient';
 import { getFamilyGroupId } from '../utils/context';
+import {
+  getCurrentYearMonthLocal,
+  getLocalMonthDateRange,
+  normalizeYearMonth,
+} from '../utils/yearMonth';
 
 /**
  * [Issue #78 / #81] 月間精算ステータスの取得（暗黙的デフォルト対応 ＆ 送金実績の反映）
@@ -10,13 +15,11 @@ import { getFamilyGroupId } from '../utils/context';
 export const getSettlementStatus = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
   
-  // 対象月 (YYYY-MM形式)。指定がなければ今月。
-  const targetMonth = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+  const queryMonth = normalizeYearMonth(req.query.month as string);
+  const targetMonth = queryMonth ?? getCurrentYearMonthLocal();
+  const { start: startDate, end: endDate } = getLocalMonthDateRange(targetMonth);
 
   try {
-    const startDate = new Date(`${targetMonth}-01T00:00:00.000Z`);
-    const endDate = new Date(startDate);
-    endDate.setMonth(startDate.getMonth() + 1);
 
     // 1. 対象グループの全メンバーを取得して初期化
     const members = await prisma.familyMember.findMany({
@@ -149,12 +152,16 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
   const familyGroupId = getFamilyGroupId();
   
   const { month, fromMemberId, toMemberId, amount } = req.body;
+  const normalizedMonth = normalizeYearMonth(month);
+  const fromId = Number(fromMemberId);
+  const toId = Number(toMemberId);
+  const transferAmount = Math.round(Number(amount));
 
-  if (!month || !fromMemberId || !toMemberId || !amount || amount <= 0) {
+  if (!normalizedMonth || !fromMemberId || !toMemberId || !Number.isFinite(transferAmount) || transferAmount <= 0) {
     return res.status(400).json({ success: false, message: '必要なパラメータが不足しているか、金額が不正です。' });
   }
 
-  if (fromMemberId === toMemberId) {
+  if (fromId === toId) {
     return res.status(400).json({ success: false, message: '自分自身への送金は登録できません。' });
   }
 
@@ -162,7 +169,7 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
     // 送信者・受信者が同一世帯に属しているか（テナント検証）
     const validMembers = await prisma.familyMember.findMany({
       where: {
-        id: { in: [fromMemberId, toMemberId] },
+        id: { in: [fromId, toId] },
         familyGroupId
       }
     });
@@ -174,10 +181,10 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
     // 送金記録の作成
     const newTransfer = await prisma.settlementTransfer.create({
       data: {
-        month,
-        fromMemberId,
-        toMemberId,
-        amount,
+        month: normalizedMonth,
+        fromMemberId: fromId,
+        toMemberId: toId,
+        amount: transferAmount,
         // settledAt は default(now()) で自動採番
       }
     });

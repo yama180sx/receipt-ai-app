@@ -85,10 +85,11 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
     try {
       setLoading(true);
       const res = await apiClient.get('/receipts', {
-        params: { 
-          memberId: selectedMember, 
-          month: selectedMonth 
-        }
+        params: {
+          ...(selectedMonth ? { month: selectedMonth } : {}),
+          // 世帯全体: memberId を空で送る（省略すると API がログインユーザーに絞る旧挙動になる）
+          memberId: selectedMember,
+        },
       });
       if (res.data?.success) {
         const data = res.data.data;
