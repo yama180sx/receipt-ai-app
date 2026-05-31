@@ -67,7 +67,7 @@ jobs:
           GEMINI_MODEL="${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}"
           GEMINI_RETRY_COUNT=3
           GEMINI_RETRY_DELAY=2000
-          CORS_ORIGIN="http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_WEB_PORT }}"
+          CORS_ORIGIN="http://${{ secrets.HOST_IP }},http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_WEB_PORT }}"
           LOG_LEVEL=info
           EOF
 
