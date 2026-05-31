@@ -8,7 +8,8 @@
     "backend:dev": "ts-node-dev --respawn src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

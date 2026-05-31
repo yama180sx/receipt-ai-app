@@ -43,3 +43,30 @@
    ```bash
    # マスタのみ更新する場合
    docker compose exec backend npm run prisma:update
+   ```
+
+---
+
+## 5. トラブルシューティング: カテゴリー追加で `Unique constraint failed on (id)`
+
+### 原因
+
+`seed.ts` や `update-master.ts` で **明示的な `id`**（1〜9, 99 など）を投入すると、PostgreSQL の `Category_id_seq` が追従せず、次の `prisma.category.create()` が既存 id を採番して失敗します。
+
+### 対処（データを消さずに直す）
+
+```bash
+# backend コンテナ or ローカル backend ディレクトリで
+npm run prisma:sync-sequences
+```
+
+`FamilyGroup` / `FamilyMember` / `Category` の id シーケンスを `MAX(id)` に合わせます。
+
+### 再発防止
+
+- `npm run prisma:seed` 実行時は seed 内で自動同期されます。
+- `update-master.ts` 実行後も `Category` シーケンスを同期します。
+
+### 確認
+
+管理者メニュー → カテゴリー設定で新規追加が成功すること。

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { syncPostgresIdSequence } from './syncSequences';
 
 const prisma = new PrismaClient();
 
@@ -23,6 +24,7 @@ async function main() {
   });
 
   console.log(`✅ Category updated: ${category9.name} (ID: ${category9.id})`);
+  await syncPostgresIdSequence(prisma, 'Category');
   console.log('--- 🚀 Master Data Update Completed ---');
 }
 
