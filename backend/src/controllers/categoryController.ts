@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prismaClient'; // テナント拡張済みのインスタンスを使用
 import { AppError } from '../utils/appError';
 import logger from '../utils/logger';
+import { pickNextCategoryColor } from '../utils/categoryColor';
 
 /**
  * 📂 カテゴリー一覧取得
@@ -32,11 +33,25 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
       return next(new AppError('Name is required', 400));
     }
 
+    const existing = await prisma.category.findMany({ select: { color: true } });
+    const existingColors = existing.map((c) => c.color);
+    const requested =
+      typeof color === 'string' && color.trim() ? color.trim() : '';
+    const isDuplicate =
+      requested &&
+      existingColors.some(
+        (c) => (c ?? '').trim().toLowerCase() === requested.toLowerCase()
+      );
+    const resolvedColor =
+      requested && !isDuplicate
+        ? requested
+        : pickNextCategoryColor(existingColors);
+
     const category = await prisma.category.create({
-      data: { 
-        name, 
-        color: color || '#2ecc71' 
-      }
+      data: {
+        name,
+        color: resolvedColor,
+      },
     });
 
     logger.info(`[CATEGORY] Created: ${name}`);

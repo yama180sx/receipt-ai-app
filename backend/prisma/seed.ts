@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import process from 'node:process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { syncAllSeedTableSequences } from './syncSequences';
 
 const prisma = new PrismaClient();
 
@@ -59,6 +60,9 @@ async function main() {
   for (const c of categories) {
     await prisma.category.create({ data: c });
   }
+
+  // 明示 id 投入後は PostgreSQL の serial を同期（未同期だと Category 追加で id 重複）
+  await syncAllSeedTableSequences(prisma);
 
   // 4. 店舗正規化マスタ
   const stores = [

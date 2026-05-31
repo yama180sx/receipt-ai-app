@@ -4,6 +4,8 @@ import apiClient from '../utils/apiClient';
 import { AppBackButton, AppButton, AppListColorDot, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
+import { pickNextCategoryColor } from '../utils/categoryColor';
+import { showConfirmDialog } from '../utils/confirmDialog';
 
 interface Category {
   id: number;
@@ -57,8 +59,10 @@ export const CategoryManagementScreen = ({
   const addCategory = async () => {
     if (!newName.trim() || !currentMemberId) return;
     try {
-      await apiClient.post('/categories', 
-        { name: newName, color: theme.colors.semantic.category.newDefault },
+      const color = pickNextCategoryColor(categories.map((c) => c.color));
+      await apiClient.post(
+        '/categories',
+        { name: newName, color },
         { headers: getHeaders() }
       );
       setNewName('');
@@ -68,48 +72,52 @@ export const CategoryManagementScreen = ({
     }
   };
 
-  const deleteCategory = async (id: number) => {
-    Alert.alert("削除の確認", "このカテゴリーを削除しますか？", [
-      { text: "キャンセル" },
-      { text: "削除", style: 'destructive', onPress: async () => {
+  const deleteCategory = (id: number) => {
+    showConfirmDialog('削除の確認', 'このカテゴリーを削除しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
           try {
             await apiClient.delete(`/categories/${id}`, { headers: getHeaders() });
             fetchCategories();
           } catch (e: any) {
             const status = e.response?.status;
             if (status === 400 || status === 409) {
-              Alert.alert("制限", "このカテゴリーは既に使用されているため削除できません。");
+              Alert.alert('制限', 'このカテゴリーは既に使用されているため削除できません。');
             } else {
-              Alert.alert("エラー", "削除に失敗しました。");
+              Alert.alert('エラー', '削除に失敗しました。');
             }
           }
-      }}
+        },
+      },
     ]);
   };
 
-  const handleOptimize = async () => {
-    Alert.alert(
-      "マスタ最適化",
-      "ProductMasterの統計に基づき、カテゴリーのキーワードを自動補強します。よろしいですか？",
+  const handleOptimize = () => {
+    showConfirmDialog(
+      'マスタ最適化',
+      'ProductMasterの統計に基づき、カテゴリーのキーワードを自動補強します。よろしいですか？',
       [
-        { text: "キャンセル", style: "cancel" },
-        { 
-          text: "実行", 
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '実行',
           onPress: async () => {
             setOptimizing(true);
             try {
               const res = await apiClient.post('/categories/optimize', {}, { headers: getHeaders() });
               if (res.data.success) {
-                Alert.alert("完了", res.data.data.message);
+                Alert.alert('完了', res.data.data.message);
                 fetchCategories();
               }
             } catch (e) {
-              Alert.alert("エラー", "最適化処理に失敗しました。");
+              Alert.alert('エラー', '最適化処理に失敗しました。');
             } finally {
               setOptimizing(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
