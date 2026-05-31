@@ -34,8 +34,6 @@
 | Backend | `calcItemLineTotal` | 同上（`itemLineTotal.ts`） |
 | 使用箇所 | `statsController`, `updateItemSplits` | `calcItemLineTotal(item.price, item.quantity)` |
 
-## 手動確認（マージ前）
+## 手動確認
 
-- [ ] 割り勘保存 → 精算サマリー金額一致（挙動不変）
-- [ ] 精算サマリー月切替・送金モーダル
-- [ ] `cd frontend && npx tsc --noEmit`
+Issue #87-5 で実施済み → [regression-checklist.md](../regression-checklist.md)

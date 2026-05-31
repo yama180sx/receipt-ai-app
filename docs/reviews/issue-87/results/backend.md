@@ -52,13 +52,9 @@
 - `getReceipts`: `memberId` クエリが空のときは世帯全件（ヘッダーにフォールバックしない）
 - 履歴の月フィルタも `getLocalMonthDateRange` に統一
 
-## 手動確認（マージ前）
+## 手動確認
 
-- [ ] 精算サマリー: 当月・前月切替で件数・金額が妥当
-- [ ] 割り勘保存: ％/円保存後、精算サマリーと一致
-- [ ] 他世帯 memberId を splits に含めた POST → 403/400
-- [ ] 送金記録: 正常登録、同一人物・不正 month は拒否
-- [ ] **履歴: メンバー「世帯全体」で妻・息子など全員分のレシートが表示される**
+Issue #87-5 で実施済み → [regression-checklist.md](../regression-checklist.md)
 
 ## Should / Later（バックログ）
 

@@ -13,13 +13,15 @@ Epic: [#246 Issue #87](https://github.com/yama180sx/receipt-ai-app/issues/246)
 | [triage-rules.md](./triage-rules.md) | Must / Should / Later の判定基準 |
 | [review-result-template.md](./review-result-template.md) | レビュー結果の記録テンプレート |
 | [assignment.md](./assignment.md) | 指摘の振り分け先（#87-2 / #87-3 / #87-4） |
+| [regression-checklist.md](./regression-checklist.md) | **#87-5** 回帰チェックリスト（実施記録） |
+| [should-backlog.md](./should-backlog.md) | Epic 外の Should / Later 一覧 |
 
 ## 推奨ワークフロー
 
 1. **#87-1（本 Issue）** — 本ドキュメントを PR で `develop` にマージ
 2. **#87-2 / #87-3** — `prompt.md` + `scope.md` の該当セクションを LLM に添付し、`review-result-template.md` を埋める
 3. **#87-4** — 横断指摘のみ（型・重複 util）を実装
-4. **#87-5** — [regression-checklist.md](./regression-checklist.md)（#87-5 着手時に追加可）で回帰確認
+4. **#87-5** — [regression-checklist.md](./regression-checklist.md) で回帰確認（✅ 2026-05-31 実施済み）
 
 ## 子 Issue 対応表
 
