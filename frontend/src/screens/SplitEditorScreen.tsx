@@ -8,7 +8,6 @@ import {
   TextInput, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Alert, 
   Platform,
   useWindowDimensions
 } from 'react-native';
@@ -17,6 +16,11 @@ import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
+import { showAlert } from '../utils/alertMessage';
+import {
+  buildItemSplitSavePayload,
+  calcItemTotal,
+} from '../utils/splitEditorSplits';
 
 interface SplitEditorScreenProps {
   receipt: any;
@@ -84,7 +88,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
         }
       } catch (err) {
         console.error('メンバー取得失敗', err);
-        Alert.alert('エラー', 'メンバー情報の取得に失敗しました。');
+        showAlert('エラー', 'メンバー情報の取得に失敗しました。');
       } finally {
         setLoading(false);
       }
@@ -98,7 +102,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     const initialData: Record<number, Record<number, number>> = {};
     receipt.items.forEach((item: any) => {
       initialData[item.id] = {};
-      const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+      const itemTotal = calcItemTotal(item);
 
       if (item.splits && item.splits.length > 0) {
         targetMembers.forEach(m => {
@@ -133,7 +137,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
 
   const removeMember = (memberId: number) => {
     if (activeMembers.length <= 1) {
-      Alert.alert('エラー', '対象者は最低1人必要です。');
+      showAlert('エラー', '対象者は最低1人必要です。');
       return;
     }
     const newActive = activeMembers.filter(m => m.id !== memberId);
@@ -220,7 +224,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     setEditSplits(prev => {
       const next = { ...prev };
       receipt.items.forEach((item: any) => {
-        const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+        const itemTotal = calcItemTotal(item);
         const newData = { ...next[item.id] };
 
         // 入力された％に基づいて金額を算出
@@ -263,28 +267,34 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   // ★ 追加: レシート全体を均等割り
   const splitWholeReceiptEqually = () => {
     receipt.items.forEach((item: any) => {
-      const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
-      splitItemEqually(item.id, itemTotal);
+      splitItemEqually(item.id, calcItemTotal(item));
     });
   };
 
   const handleSave = async () => {
+    if (activeMembers.length === 0) {
+      showAlert('エラー', '対象者を1人以上選択してください。');
+      return;
+    }
+
+    const remainderMemberId = activeMembers[0].id;
     setSaving(true);
     try {
       const savePromises = receipt.items.map(async (item: any) => {
-        const payloadSplits = activeMembers.map(m => ({
-          familyMemberId: m.id,
-          amount: editSplits[item.id]?.[m.id] || 0
-        })).filter(p => p.amount > 0);
-
+        const amounts = editSplits[item.id] ?? {};
+        const payloadSplits = buildItemSplitSavePayload(
+          activeMembers,
+          amounts,
+          remainderMemberId
+        );
         return api.saveItemSplits(item.id, payloadSplits);
       });
 
       await Promise.all(savePromises);
-      Alert.alert('保存完了', '割り勘設定を保存しました。', [{ text: 'OK', onPress: onBack }]);
+      showAlert('保存完了', '割り勘設定を保存しました。', { onOk: onBack });
     } catch (err) {
       console.error('保存エラー', err);
-      Alert.alert('エラー', '保存に失敗しました。');
+      showAlert('エラー', '保存に失敗しました。');
     } finally {
       setSaving(false);
     }
@@ -301,9 +311,10 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   const getImageUrl = () => receipt.imagePath ? `${BASE_URL}/${receipt.imagePath}` : null;
 
   // レシート全体の合計額を算出
-  const receiptTotalAmount = receipt.items.reduce((sum: number, item: any) => {
-    return sum + Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
-  }, 0);
+  const receiptTotalAmount = receipt.items.reduce(
+    (sum: number, item: any) => sum + calcItemTotal(item),
+    0
+  );
 
   // 合計行表示用: メンバーごとの合計額を計算
   const getMemberTotalAmount = (memberId: number) => {
@@ -398,7 +409,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
               </View>
 
               {receipt.items.map((item: any) => {
-                const itemTotal = Math.round((parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1));
+                const itemTotal = calcItemTotal(item);
 
                 return (
                   <View key={item.id} style={[tableStyles.row, styles.tableRowWide]}>
