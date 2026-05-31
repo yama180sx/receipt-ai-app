@@ -23,7 +23,7 @@
 | R-F001 | **Must** | データ整合 | `SplitEditorScreen` | 端数は UI 先頭、API は配列最後。`amount>0` のみ送信でズレ | ✅ `splitEditorSplits.ts` |
 | R-F002 | **Must** | 手戻り | `SettlementSummaryScreen` | 取得失敗が console のみ | ✅ `showAlert` |
 | R-F003 | **Must** | 手戻り | 両画面 | Web で `Alert.alert` が効かない | ✅ `alertMessage.ts` |
-| R-F004 | Should | 型 | 両画面 | `any` 多用 | #87-4 |
+| R-F004 | Should | 型 | 両画面 | `any` 多用 | #87-4 | ✅ Issue #87-4 |
 | R-F005 | Should | アーキ | `SplitEditorScreen` | 単一巨大コンポーネント | 未対応 |
 | R-F006 | Should | 手戻り | `SplitEditorScreen` | 小計計算の重複 | 一部 `calcItemTotal` 化 |
 

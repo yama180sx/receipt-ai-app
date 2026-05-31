@@ -6,6 +6,7 @@ import {
   getLocalMonthDateRange,
   normalizeYearMonth,
 } from '../utils/yearMonth';
+import { calcItemLineTotal } from '../utils/itemLineTotal';
 
 /**
  * [Issue #78 / #81] 月間精算ステータスの取得（暗黙的デフォルト対応 ＆ 送金実績の反映）
@@ -60,7 +61,7 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
 
       receipt.items.forEach(item => {
         // 金額は整数（Int）丸めで計算
-        const itemPriceInt = Math.round((item.price || 0) * (item.quantity || 1));
+        const itemPriceInt = calcItemLineTotal(item.price, item.quantity);
         receiptTotalPaid += itemPriceInt;
 
         if (item.splits.length > 0) {

@@ -25,6 +25,7 @@ import {
   hasNegativeAmountSign,
   parsePositiveYenAmount,
 } from '../utils/parsePositiveYenAmount';
+import type { SettlementMemberSummary } from '../types/settlement';
 
 interface SettlementSummaryScreenProps {
   onBack: () => void;
@@ -36,7 +37,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
-  const [summaryData, setSummaryData] = useState<any[]>([]);
+  const [summaryData, setSummaryData] = useState<SettlementMemberSummary[]>([]);
 
   // 送金モーダル用ステート
   const [isTransferModalVisible, setTransferModalVisible] = useState(false);
@@ -55,7 +56,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
   const memberSelectOptions = useMemo(
     () =>
-      summaryData.map((m: { memberId: number; name: string }) => ({
+      summaryData.map((m) => ({
         label: m.name,
         value: m.memberId,
       })),
@@ -98,7 +99,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       setLoading(true);
       const res = await api.getSettlementStatus(selectedMonth);
       if (res.success) {
-        setSummaryData(res.data.members || []);
+        setSummaryData(res.data?.members ?? []);
       }
     } catch (err) {
       console.error('精算サマリーの取得失敗:', err);
