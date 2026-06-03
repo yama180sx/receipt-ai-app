@@ -133,6 +133,12 @@ export const api = {
     const res = await apiClient.post('/stats/settlement/transfers', payload);
     return res.data;
   },
+  deleteSettlementTransfer: async (
+    id: number
+  ): Promise<ApiSuccessResponse<{ id: number }>> => {
+    const res = await apiClient.delete(`/stats/settlement/transfers/${id}`);
+    return res.data;
+  },
 };
 
 export default apiClient;

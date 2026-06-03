@@ -10,6 +10,7 @@ export const BUTTON_LABELS = {
   add: '追加',
   create: '新規作成',
   recordTransfer: '送金を記録',
+  cancelTransfer: '取消',
   setDefault: 'デフォルトに設定',
   splitEqual: '均等',
 } as const;
