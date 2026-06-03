@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prismaClient';
 import { getFamilyGroupId } from '../utils/context';
+import { AppError } from '../utils/appError';
 import {
   getCurrentYearMonthLocal,
   getLocalMonthDateRange,
@@ -195,6 +196,46 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
       data: newTransfer
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * [Issue #88] 送金記録の取消（物理削除）
+ * DELETE /api/stats/settlement/transfers/:id
+ */
+export const deleteSettlementTransfer = async (
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  const familyGroupId = getFamilyGroupId();
+  const transferId = Number(req.params.id);
+
+  if (!Number.isFinite(transferId) || transferId <= 0) {
+    return res.status(400).json({ success: false, message: '送金記録IDが不正です。' });
+  }
+
+  try {
+    const transfer = await prisma.settlementTransfer.findUnique({
+      where: { id: transferId },
+      include: {
+        sender: { select: { familyGroupId: true } },
+      },
+    });
+
+    if (!transfer) {
+      throw new AppError('送金記録が見つかりません。', 404);
+    }
+
+    if (transfer.sender.familyGroupId !== familyGroupId) {
+      throw new AppError('この送金記録を操作する権限がありません。', 403);
+    }
+
+    await prisma.settlementTransfer.delete({ where: { id: transferId } });
+
+    res.status(200).json({ success: true, data: { id: transferId } });
   } catch (error) {
     next(error);
   }

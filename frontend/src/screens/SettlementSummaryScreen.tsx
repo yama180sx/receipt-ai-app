@@ -21,11 +21,26 @@ import { theme, tableStyles, BREAKPOINTS } from '../theme';
 import { api } from '../utils/apiClient';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { showAlert } from '../utils/alertMessage';
+import { showConfirmDialog } from '../utils/confirmDialog';
 import {
   hasNegativeAmountSign,
   parsePositiveYenAmount,
 } from '../utils/parsePositiveYenAmount';
-import type { SettlementMemberSummary } from '../types/settlement';
+import type {
+  SettlementMemberSummary,
+  SettlementTransfer,
+} from '../types/settlement';
+
+function formatTransferDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 interface SettlementSummaryScreenProps {
   onBack: () => void;
@@ -38,6 +53,10 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [summaryData, setSummaryData] = useState<SettlementMemberSummary[]>([]);
+  const [transferList, setTransferList] = useState<SettlementTransfer[]>([]);
+  const [cancellingTransferId, setCancellingTransferId] = useState<number | null>(
+    null
+  );
 
   // 送金モーダル用ステート
   const [isTransferModalVisible, setTransferModalVisible] = useState(false);
@@ -64,6 +83,21 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   );
 
   const monthSelectOptions = useMonthSelectOptions(months, isWide);
+
+  const memberNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    summaryData.forEach((m) => map.set(m.memberId, m.name));
+    return map;
+  }, [summaryData]);
+
+  const sortedTransfers = useMemo(
+    () =>
+      [...transferList].sort(
+        (a, b) =>
+          new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime()
+      ),
+    [transferList]
+  );
 
   const openTransferModal = () => {
     setTransferFieldErrors({});
@@ -94,12 +128,15 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
     return Object.keys(errors).length === 0;
   };
 
-  const loadSettlementData = async () => {
+  const loadSettlementData = async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
       const res = await api.getSettlementStatus(selectedMonth);
       if (res.success) {
         setSummaryData(res.data?.members ?? []);
+        setTransferList(res.data?.transfers ?? []);
       }
     } catch (err) {
       console.error('精算サマリーの取得失敗:', err);
@@ -146,6 +183,50 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const executeCancelTransfer = async (transfer: SettlementTransfer) => {
+    const fromName =
+      memberNameById.get(transfer.fromMemberId) ?? `ID:${transfer.fromMemberId}`;
+    const toName =
+      memberNameById.get(transfer.toMemberId) ?? `ID:${transfer.toMemberId}`;
+
+    setCancellingTransferId(transfer.id);
+    try {
+      const res = await api.deleteSettlementTransfer(transfer.id);
+      if (res.success) {
+        showAlert('完了', '送金記録を取り消しました。');
+        await loadSettlementData({ silent: true });
+      }
+    } catch (err) {
+      console.error('送金取消エラー', err);
+      showAlert(
+        'エラー',
+        `${fromName} → ${toName} ¥${transfer.amount.toLocaleString()} の取消に失敗しました。`
+      );
+    } finally {
+      setCancellingTransferId(null);
+    }
+  };
+
+  const handleCancelTransfer = (transfer: SettlementTransfer) => {
+    const fromName =
+      memberNameById.get(transfer.fromMemberId) ?? `ID:${transfer.fromMemberId}`;
+    const toName =
+      memberNameById.get(transfer.toMemberId) ?? `ID:${transfer.toMemberId}`;
+
+    showConfirmDialog(
+      '送金記録の取消',
+      `${fromName} → ${toName}\n¥${transfer.amount.toLocaleString()}\n\nこの送金記録を取り消しますか？精算残額が更新されます。`,
+      [
+        { text: BUTTON_LABELS.cancel, style: 'cancel' },
+        {
+          text: BUTTON_LABELS.cancelTransfer,
+          style: 'destructive',
+          onPress: () => executeCancelTransfer(transfer),
+        },
+      ]
+    );
   };
 
   return (
@@ -292,6 +373,44 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
                 );
               })}
             </View>
+          </View>
+
+          <View style={styles.transferHistoryContainer}>
+            <Text style={styles.tableTitle}>💸 送金履歴（{selectedMonth}）</Text>
+            {sortedTransfers.length === 0 ? (
+              <Text style={styles.transferHistoryEmpty}>
+                この月に登録された送金はありません。
+              </Text>
+            ) : (
+              sortedTransfers.map((t) => {
+                const fromName =
+                  memberNameById.get(t.fromMemberId) ?? `ID:${t.fromMemberId}`;
+                const toName =
+                  memberNameById.get(t.toMemberId) ?? `ID:${t.toMemberId}`;
+                const isCancelling = cancellingTransferId === t.id;
+
+                return (
+                  <View key={t.id} style={styles.transferHistoryRow}>
+                    <View style={styles.transferHistoryMain}>
+                      <Text style={styles.transferHistoryLine}>
+                        {fromName} → {toName}
+                      </Text>
+                      <Text style={styles.transferHistoryMeta}>
+                        ¥{t.amount.toLocaleString()} · {formatTransferDate(t.settledAt)}
+                      </Text>
+                    </View>
+                    <AppButton
+                      title={BUTTON_LABELS.cancelTransfer}
+                      onPress={() => handleCancelTransfer(t)}
+                      variant="danger"
+                      size="sm"
+                      loading={isCancelling}
+                      disabled={cancellingTransferId !== null}
+                    />
+                  </View>
+                );
+              })
+            )}
           </View>
 
         </ScrollView>
@@ -444,4 +563,37 @@ const styles = StyleSheet.create({
   tableTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: theme.colors.text.main },
   cellName: { flex: 1.5, minWidth: 100 },
   cellAmount: { flex: 1, textAlign: 'right' },
+
+  transferHistoryContainer: {
+    marginTop: 24,
+    backgroundColor: theme.colors.surface,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  transferHistoryEmpty: {
+    fontSize: 14,
+    color: theme.colors.text.muted,
+  },
+  transferHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  transferHistoryMain: { flex: 1, minWidth: 0 },
+  transferHistoryLine: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.text.main,
+  },
+  transferHistoryMeta: {
+    fontSize: 13,
+    color: theme.colors.text.muted,
+    marginTop: 4,
+  },
 });
