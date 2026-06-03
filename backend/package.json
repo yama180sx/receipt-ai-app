@@ -9,7 +9,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts"
+    "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
