@@ -96,8 +96,8 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 
 | トリガー | 内容 | ランナー |
 |----------|------|----------|
-| PR → `develop` | `npm test`（backend + frontend unit） | `ubuntu-latest` |
-| PR → `develop` | API 結合（#91-3 完了後） | `ubuntu-latest` + Postgres service |
+| PR → `develop` | `npm test`（backend + frontend unit） | `ubuntu-latest` — `.github/workflows/test.yml` |
+| PR → `develop` | API 結合（`npm run test:integration`） | 同上ジョブ `backend-integration`（Postgres service） |
 | push → `main` | 既存 deploy workflow（変更なし） | self-hosted (T320) |
 
 **スコープ外:** ESLint / Prettier（未導入のため別 Issue）
