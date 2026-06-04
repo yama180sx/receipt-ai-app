@@ -9,7 +9,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts"
+    "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
+    "test": "vitest run",
+    "test:integration": "RUN_API_INTEGRATION=1 vitest run src/app.integration.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -36,11 +38,14 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^25.8.0",
     "@types/sharp": "^0.31.1",
+    "@types/supertest": "^6.0.3",
     "prisma": "^6.4.1",
+    "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
