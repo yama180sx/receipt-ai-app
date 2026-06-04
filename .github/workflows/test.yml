@@ -30,6 +30,8 @@ jobs:
         run: npm test
         env:
           JWT_SECRET: ci-test-jwt-secret
+          # app.integration.test.ts が createApp 経由で Prisma を import するため必須（DB 結合は skip）
+          DATABASE_URL: postgresql://vitest:vitest@127.0.0.1:5432/vitest?schema=public
 
   frontend-unit:
     name: Frontend unit tests
