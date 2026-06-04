@@ -77,6 +77,11 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 
 **対策:** `app.ts`（Express 定義のみ）+ `server.ts`（listen + worker 起動）に分離。テスト時は worker を起動しない。
 
+**実行:**
+
+- 通常: `cd backend && npm test`（DB 不要の結合テスト 3 件 + 単体 25 件）
+- DB 結合: `docker compose exec -e RUN_API_INTEGRATION=1 backend npm run test:integration`
+
 ### テスト DB
 
 - Docker Compose の Postgres を利用（`DATABASE_URL` をテスト用に切替）

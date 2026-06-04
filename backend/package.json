@@ -10,7 +10,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "RUN_API_INTEGRATION=1 vitest run src/app.integration.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
