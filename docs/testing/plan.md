@@ -13,7 +13,7 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 | Frontend utils | **Vitest**（`environment: 'node'`） |
 | Frontend UI | **Jest** + **jest-expo** + **React Native Testing Library**（Phase 2） |
 | E2E | **Maestro**（Native, Later）/ **Playwright**（Web, Later） |
-| 手動 | カメラ・Gemini 実 OCR・全画面フロー（チェックリスト） |
+| 手動 | カメラ・Gemini 実 OCR・全画面フロー（[regression-checklist.md](./regression-checklist.md)） |
 | CI | PR 時に unit テスト（GitHub ホストランナー）。deploy 用 self-hosted とは分離 |
 
 ### ツール選定の根拠
@@ -104,7 +104,7 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 | 1 | #91-1 | Vitest 基盤、`npm test` |
 | 2 | #91-2 | Backend utils 単体 |
 | 3 | #91-4 | Frontend utils 単体 |
-| 4 | #91-5 | 手動回帰チェックリスト（#87-5 拡張） |
+| 4 | #91-5 | 手動回帰チェックリスト（[regression-checklist.md](./regression-checklist.md)） |
 | 5 | #91-3 | `app.ts` 分離 + Supertest API |
 | 6 | #91-6 | CI テストゲート |
 | 7 | #91-7 | Gemini/Worker モック方針（Should） |
