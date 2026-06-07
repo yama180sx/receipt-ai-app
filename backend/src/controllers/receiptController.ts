@@ -15,8 +15,14 @@ import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
  */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
+    const familyGroupId = getFamilyGroupId();
     const job = await receiptQueue.getJob(req.params.jobId!);
     if (!job) throw new AppError('ジョブが見つかりません。', 404);
+
+    const jobFamilyGroupId = Number(job.data?.familyGroupId);
+    if (!jobFamilyGroupId || jobFamilyGroupId !== familyGroupId) {
+      throw new AppError('ジョブが見つかりません。', 404);
+    }
 
     const state = await job.getState();
     res.status(200).json({
@@ -247,7 +253,9 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
         include: { receipt: true }
       });
 
-      if (!currentItem) throw new AppError('ItemNotFound', 404);
+      if (!currentItem || currentItem.receipt.familyGroupId !== familyGroupId) {
+        throw new AppError('ItemNotFound', 404);
+      }
 
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },

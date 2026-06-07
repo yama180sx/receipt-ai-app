@@ -36,3 +36,30 @@ export async function loginAsTestMember(app: Express, memberId = 1): Promise<str
   }
   return res.body.data.token as string;
 }
+
+/** 第2世帯（佐藤家）のテスト用メンバー ID */
+export const TENANT_B_ADMIN_MEMBER_ID = 4;
+
+/** 他世帯の Item ID を DB から取得（seed 済み前提） */
+export async function getTenantBItemId(): Promise<number> {
+  const item = await prisma.item.findFirst({
+    where: { receipt: { familyGroupId: 2 } },
+    select: { id: true },
+  });
+  if (!item) {
+    throw new Error('Tenant B fixture item not found. Run prisma seed.');
+  }
+  return item.id;
+}
+
+/** 他世帯の Receipt ID（画像 fixture 用） */
+export async function getTenantBReceiptWithImage(): Promise<{ id: number; imagePath: string }> {
+  const receipt = await prisma.receipt.findFirst({
+    where: { familyGroupId: 2, imagePath: { not: null } },
+    select: { id: true, imagePath: true },
+  });
+  if (!receipt?.imagePath) {
+    throw new Error('Tenant B fixture receipt not found. Run prisma seed.');
+  }
+  return { id: receipt.id, imagePath: receipt.imagePath };
+}

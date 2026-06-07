@@ -11,6 +11,7 @@ async function main() {
 
   // 0. 既存データのクリーンアップ
   await prisma.item.deleteMany();
+  await prisma.settlementTransfer.deleteMany();
   await prisma.productMaster.deleteMany();
   await prisma.receipt.deleteMany();
   await prisma.familyMember.deleteMany();
@@ -41,7 +42,24 @@ async function main() {
   for (const m of familyMembers) {
     await prisma.familyMember.create({ data: m });
   }
-  console.log('👥 FamilyMembers created.');
+  console.log('👥 FamilyMembers created (山本家).');
+
+  // 1b. 第2世帯（テナント分離テスト用 — Issue #93-1）
+  const familyGroup2 = await prisma.familyGroup.create({
+    data: {
+      id: 2,
+      name: '佐藤家',
+      inviteCode: 'SATO-2026',
+    },
+  });
+  const family2Members = [
+    { id: 4, name: '佐藤（管理者）', familyGroupId: familyGroup2.id, role: 'ADMIN' as const },
+    { id: 5, name: '佐藤（配偶者）', familyGroupId: familyGroup2.id, role: 'USER' as const },
+  ];
+  for (const m of family2Members) {
+    await prisma.familyMember.create({ data: m });
+  }
+  console.log(`👥 FamilyMembers created (${familyGroup2.name}).`);
 
   // 3. 費目カテゴリー
   const categories = [
@@ -61,8 +79,26 @@ async function main() {
     await prisma.category.create({ data: c });
   }
 
-  // 明示 id 投入後は PostgreSQL の serial を同期（未同期だと Category 追加で id 重複）
-  await syncAllSeedTableSequences(prisma);
+  // 第2世帯のテナント分離 fixture（Category 投入後）
+  await prisma.receipt.create({
+    data: {
+      familyGroupId: familyGroup2.id,
+      memberId: 4,
+      storeName: '佐藤家テスト店',
+      date: new Date('2026-01-15T12:00:00.000Z'),
+      totalAmount: 500,
+      imagePath: 'uploads/tenant-isolation-fixture.webp',
+      items: {
+        create: {
+          name: '他世帯テスト商品',
+          price: 500,
+          quantity: 1,
+          categoryId: 1,
+        },
+      },
+    },
+  });
+  console.log('🧾 Tenant isolation fixture receipt created (佐藤家).');
 
   // 4. 店舗正規化マスタ
   const stores = [
@@ -161,6 +197,8 @@ async function main() {
     });
   }
   console.log('🤖 PromptTemplates seeded.');
+
+  await syncAllSeedTableSequences(prisma);
 
   console.log('✅ Seeding Completed.');
 }

@@ -25,6 +25,7 @@ import {
   getFamilyMembers,
   updateItemSplits // ★ Issue #78: 按分保存関数をインポート
 } from '../controllers/receiptController';
+import { serveReceiptImage } from '../controllers/uploadController';
 
 const router = express.Router();
 
@@ -89,6 +90,9 @@ router.use(authMiddleware, tenantMiddleware);
 
 // 所属世帯のメンバー一覧を取得するエンドポイント
 router.get('/family-groups/members', getFamilyMembers);
+
+// [Issue #93-1 / G3] 認証・テナント検証付き画像配信（公開 /uploads は廃止）
+router.get('/uploads/:filename', serveReceiptImage);
 
 router.get('/receipts', getReceipts);
 router.get('/receipts/latest', getLatestReceipt);

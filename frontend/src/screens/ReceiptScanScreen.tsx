@@ -17,6 +17,7 @@ import { AppBackButton, AppButton, AppFormField, AppSelect, AppTextInput } from 
 import { modalStyles } from '../theme';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
+import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 const c = theme.colors;
 const s = theme.colors.semantic.scan;
@@ -74,12 +75,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     [categories]
   );
 
-  const imageUri = useMemo(() => {
-    if (!initialData.imagePath) return null;
-    const baseUrl = apiClient.defaults.baseURL?.replace('/api', '') || '';
-    const path = initialData.imagePath.startsWith('/') ? initialData.imagePath : `/${initialData.imagePath}`;
-    return `${baseUrl}${path}`;
-  }, [initialData.imagePath]);
+  const imageSource = useReceiptImageSource(initialData.imagePath);
 
   // 合計金額の計算（明細合計 + 外税）
   const calculatedTotal = useMemo(() => {
@@ -171,9 +167,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {imageUri && (
+          {imageSource && (
             <View style={styles.imageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.receiptImage} resizeMode="contain" />
+              <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
               <View style={styles.imageLabel}><Text style={styles.imageLabelText}>加工済みプレビュー</Text></View>
             </View>
           )}

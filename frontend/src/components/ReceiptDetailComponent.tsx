@@ -12,6 +12,7 @@ import { AppButton, AppSelect, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, BREAKPOINTS } from '../theme';
 import apiClient from '../utils/apiClient';
+import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 interface ReceiptDetailComponentProps {
   receipt: any;
@@ -44,6 +45,11 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   const [editData, setEditData] = useState<any>(null);
 
   const cacheKey = useMemo(() => Date.now(), []);
+  const imageSource = useReceiptImageSource(receipt?.imagePath);
+  const imageSourceWithCache = useMemo(() => {
+    if (!imageSource) return null;
+    return { ...imageSource, uri: `${imageSource.uri}?v=${cacheKey}` };
+  }, [imageSource, cacheKey]);
 
   const categorySelectOptions = useMemo(
     () => categories.map((c) => ({ label: c.name, value: c.id as number })),
@@ -80,11 +86,6 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
       </View>
     );
   }
-
-  const getImageUrl = (imagePath: string) => {
-    if (!imagePath) return null;
-    return `${baseUrl}/${imagePath}?v=${cacheKey}`;
-  };
 
   const updateEditField = (key: string, value: any) => {
     setEditData({ ...editData, [key]: value });
@@ -132,9 +133,9 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
       {/* 左側：画像エリア */}
       <View style={isWide ? styles.wideImageColumn : styles.mobileImageArea}>
         <View style={[styles.imageWrapper, !isWide && { height: 350 }]}>
-          {receipt.imagePath ? (
+          {receipt.imagePath && imageSourceWithCache ? (
             <Image 
-              source={{ uri: getImageUrl(receipt.imagePath) as string }}
+              source={imageSourceWithCache}
               style={styles.receiptImage}
               resizeMode="contain"
             />
