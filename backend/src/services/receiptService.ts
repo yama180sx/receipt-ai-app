@@ -62,7 +62,9 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
       const mastered = await prisma.productMaster.findUnique({
         where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } }
       });
-      initialCategoryId = mastered ? mastered.categoryId : await estimateCategoryId(cleanName, cleanStore, prisma);
+      initialCategoryId = mastered
+        ? mastered.categoryId
+        : await estimateCategoryId(cleanName, cleanStore, familyGroupId, prisma);
     }
 
     return {

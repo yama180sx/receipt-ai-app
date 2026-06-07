@@ -52,6 +52,23 @@ export async function getTenantBItemId(): Promise<number> {
   return item.id;
 }
 
+/** 他世帯の Category ID を DB から取得（seed 済み前提） */
+export async function getTenantBCategoryId(name = '食費'): Promise<number> {
+  const category = await prisma.category.findFirst({
+    where: { familyGroupId: 2, name },
+    select: { id: true },
+  });
+  if (!category) {
+    throw new Error(`Tenant B category "${name}" not found. Run prisma seed.`);
+  }
+  return category.id;
+}
+
+/** 自世帯の Category 件数 */
+export async function countCategoriesForFamily(familyGroupId: number): Promise<number> {
+  return prisma.category.count({ where: { familyGroupId } });
+}
+
 /** 他世帯の Receipt ID（画像 fixture 用） */
 export async function getTenantBReceiptWithImage(): Promise<{ id: number; imagePath: string }> {
   const receipt = await prisma.receipt.findFirst({

@@ -63,7 +63,8 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRoutes);
-  app.use('/api/admin', authMiddleware, adminRoutes);
+  // [Issue #93-4] Admin API も tenantMiddleware で世帯スコープを強制
+  app.use('/api/admin', authMiddleware, tenantMiddleware, adminRoutes);
   app.use('/api/admin', (req: Request, _res: Response, next: NextFunction) => {
     next(new AppError(`Admin Route Not Found - ${req.method} ${req.originalUrl}`, 404));
   });

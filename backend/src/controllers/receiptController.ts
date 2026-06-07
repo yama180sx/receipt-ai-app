@@ -257,6 +257,13 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
         throw new AppError('ItemNotFound', 404);
       }
 
+      if (categoryId) {
+        const category = await tx.category.findFirst({
+          where: { id: Number(categoryId), familyGroupId },
+        });
+        if (!category) throw new AppError('CategoryNotFound', 404);
+      }
+
       const updatedItem = await tx.item.update({
         where: { id: Number(id) },
         data: { categoryId: categoryId ? Number(categoryId) : null },

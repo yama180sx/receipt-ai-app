@@ -3,6 +3,7 @@ import prisma from '../utils/prismaClient';
 import logger from '../utils/logger';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getFamilyGroupId } from '../utils/context';
 
 // --- [Issue #73] AI Cost Constants ---
 const RATE_USD_TO_JPY = 150; 
@@ -12,10 +13,11 @@ const PRICE_USD_PER_OUTPUT = 0.30 / 1000000;
 /**
  * プロンプトの変更をJSONファイルにダンプ（同期）するヘルパー関数
  */
-const syncPromptsToJson = async () => {
+const syncPromptsToJson = async (familyGroupId: number) => {
   try {
     const prompts = await prisma.promptTemplate.findMany({
-      orderBy: { id: 'asc' }
+      where: { familyGroupId },
+      orderBy: { id: 'asc' },
     });
     const seedsDir = path.join(__dirname, '../../prisma/seeds');
     const filePath = path.join(seedsDir, 'prompt_templates.json');
@@ -40,8 +42,8 @@ export const getPrompts = async (req: Request, res: Response) => {
       orderBy: [
         { key: 'asc' },
         { isActive: 'desc' },
-        { updatedAt: 'desc' }
-      ]
+        { updatedAt: 'desc' },
+      ],
     });
     res.json({ success: true, data: prompts });
   } catch (error) {
@@ -61,19 +63,19 @@ export const createPrompt = async (req: Request, res: Response) => {
   }
 
   try {
-    // 新規作成するものがデフォルト(isActive: true)の場合、同キーの他レコードをfalseにする
+    const familyGroupId = getFamilyGroupId();
     if (isActive) {
       await prisma.promptTemplate.updateMany({
-        where: { key },
-        data: { isActive: false }
+        where: { key, familyGroupId },
+        data: { isActive: false },
       });
     }
 
     const newPrompt = await prisma.promptTemplate.create({
-      data: { key, name, description, systemPrompt, domainHints, isActive, version: 1 }
+      data: { key, name, description, systemPrompt, domainHints, isActive, version: 1 },
     });
-    
-    await syncPromptsToJson();
+
+    await syncPromptsToJson(familyGroupId);
     res.json({ success: true, data: newPrompt });
   } catch (error) {
     logger.error(`[AdminAPI] createPrompt Error: ${error}`);
@@ -94,6 +96,7 @@ export const updatePrompt = async (req: Request, res: Response) => {
   }
 
   try {
+    const familyGroupId = getFamilyGroupId();
     const updated = await prisma.promptTemplate.update({
       where: { id: Number(id) },
       data: { 
@@ -105,7 +108,7 @@ export const updatePrompt = async (req: Request, res: Response) => {
       }
     });
     
-    await syncPromptsToJson();
+    await syncPromptsToJson(familyGroupId);
     res.json({ success: true, data: updated });
   } catch (error) {
     logger.error(`[AdminAPI] updatePrompt Error: ${error}`);
@@ -125,24 +128,24 @@ export const activatePrompt = async (req: Request, res: Response) => {
   }
 
   try {
+    const familyGroupId = getFamilyGroupId();
     const target = await prisma.promptTemplate.findUnique({ where: { id: Number(id) } });
     if (!target) {
       return res.status(404).json({ success: false, error: '対象のプロンプトが見つかりません' });
     }
 
-    // トランザクションで同一キーの他レコードを非アクティブ化し、対象をアクティブ化
     await prisma.$transaction([
       prisma.promptTemplate.updateMany({
-        where: { key: target.key },
-        data: { isActive: false }
+        where: { key: target.key, familyGroupId },
+        data: { isActive: false },
       }),
       prisma.promptTemplate.update({
         where: { id: Number(id) },
-        data: { isActive: true }
-      })
+        data: { isActive: true },
+      }),
     ]);
 
-    await syncPromptsToJson();
+    await syncPromptsToJson(familyGroupId);
     res.json({ success: true, message: 'デフォルトを切り替えました' });
   } catch (error) {
     logger.error(`[AdminAPI] activatePrompt Error: ${error}`);
@@ -162,13 +165,14 @@ export const deletePrompt = async (req: Request, res: Response) => {
   }
 
   try {
+    const familyGroupId = getFamilyGroupId();
     const target = await prisma.promptTemplate.findUnique({ where: { id: Number(id) } });
     if (target?.isActive) {
       return res.status(400).json({ success: false, error: '使用中のプロンプトは削除できません' });
     }
 
     await prisma.promptTemplate.delete({ where: { id: Number(id) } });
-    await syncPromptsToJson();
+    await syncPromptsToJson(familyGroupId);
     res.json({ success: true, message: '削除しました' });
   } catch (error) {
     logger.error(`[AdminAPI] deletePrompt Error: ${error}`);
@@ -181,14 +185,17 @@ export const deletePrompt = async (req: Request, res: Response) => {
  */
 export const getCostStats = async (req: Request, res: Response) => {
   try {
+    const familyGroupId = getFamilyGroupId();
     const stats: any[] = await prisma.$queryRaw`
       SELECT
-        TO_CHAR("createdAt", 'YYYY-MM') AS month,
-        "modelId",
-        SUM("promptTokens")::int AS "totalPromptTokens",
-        SUM("candidatesTokens")::int AS "totalCandidatesTokens"
-      FROM "ApiUsageLog"
-      GROUP BY month, "modelId"
+        TO_CHAR(l."createdAt", 'YYYY-MM') AS month,
+        l."modelId",
+        SUM(l."promptTokens")::int AS "totalPromptTokens",
+        SUM(l."candidatesTokens")::int AS "totalCandidatesTokens"
+      FROM "ApiUsageLog" l
+      INNER JOIN "FamilyMember" fm ON l."familyMemberId" = fm.id
+      WHERE fm."familyGroupId" = ${familyGroupId}
+      GROUP BY month, l."modelId"
       ORDER BY month DESC;
     `;
 

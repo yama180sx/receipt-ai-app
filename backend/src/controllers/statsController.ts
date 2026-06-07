@@ -91,7 +91,7 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
     const transfers = await prisma.settlementTransfer.findMany({
       where: {
         month: targetMonth,
-        sender: { familyGroupId }, // テナント検証
+        familyGroupId,
       },
       select: {
         id: true,
@@ -183,6 +183,7 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
     // 送金記録の作成
     const newTransfer = await prisma.settlementTransfer.create({
       data: {
+        familyGroupId,
         month: normalizedMonth,
         fromMemberId: fromId,
         toMemberId: toId,
@@ -220,16 +221,13 @@ export const deleteSettlementTransfer = async (
   try {
     const transfer = await prisma.settlementTransfer.findUnique({
       where: { id: transferId },
-      include: {
-        sender: { select: { familyGroupId: true } },
-      },
     });
 
     if (!transfer) {
       throw new AppError('送金記録が見つかりません。', 404);
     }
 
-    if (transfer.sender.familyGroupId !== familyGroupId) {
+    if (transfer.familyGroupId !== familyGroupId) {
       throw new AppError('この送金記録を操作する権限がありません。', 403);
     }
 
