@@ -8,6 +8,7 @@ import { createApp } from './app';
 import {
   ensureTestMemberPassword,
   getTenantBItemId,
+  getTenantBCategoryId,
   getTenantBReceiptWithImage,
   loginAsTestMember,
   shouldRunDbIntegration,
@@ -172,5 +173,81 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
       .get(`/api/uploads/${filename}`)
       .set('Authorization', `Bearer ${tokenB}`);
     expect(allowed.status).toBe(200);
+  });
+});
+
+describe.skipIf(!shouldRunDbIntegration())('Master tenant isolation (#93-4)', () => {
+  beforeAll(async () => {
+    await ensureTestMemberPassword(1);
+    await ensureTestMemberPassword(TENANT_B_ADMIN_MEMBER_ID);
+  });
+
+  it('returns only own family categories', async () => {
+    const tokenA = await loginAsTestMember(app, 1);
+    const tokenB = await loginAsTestMember(app, TENANT_B_ADMIN_MEMBER_ID);
+
+    const resA = await request(app)
+      .get('/api/categories')
+      .set('Authorization', `Bearer ${tokenA}`);
+    const resB = await request(app)
+      .get('/api/categories')
+      .set('Authorization', `Bearer ${tokenB}`);
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(resA.body.data).toHaveLength(10);
+    expect(resB.body.data).toHaveLength(10);
+
+    const idsA = resA.body.data.map((c: { id: number }) => c.id);
+    const idsB = resB.body.data.map((c: { id: number }) => c.id);
+    expect(idsA.some((id: number) => idsB.includes(id))).toBe(false);
+  });
+
+  it('rejects cross-tenant category delete', async () => {
+    const tenantBCategoryId = await getTenantBCategoryId();
+    const tokenA = await loginAsTestMember(app, 1);
+
+    const res = await request(app)
+      .delete(`/api/categories/${tenantBCategoryId}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects cross-tenant item category assignment', async () => {
+    const tokenA = await loginAsTestMember(app, 1);
+    const tenantBCategoryId = await getTenantBCategoryId();
+
+    const ownReceipt = await request(app)
+      .get('/api/receipts')
+      .set('Authorization', `Bearer ${tokenA}`);
+    const ownItemId = ownReceipt.body.data?.[0]?.items?.[0]?.id;
+    if (!ownItemId) return;
+
+    const res = await request(app)
+      .patch(`/api/receipts/items/${ownItemId}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ categoryId: tenantBCategoryId });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('admin prompts are scoped to own family', async () => {
+    const tokenA = await loginAsTestMember(app, 1);
+    const tokenB = await loginAsTestMember(app, TENANT_B_ADMIN_MEMBER_ID);
+
+    const resA = await request(app)
+      .get('/api/admin/prompts')
+      .set('Authorization', `Bearer ${tokenA}`);
+    const resB = await request(app)
+      .get('/api/admin/prompts')
+      .set('Authorization', `Bearer ${tokenB}`);
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(resA.body.data.length).toBeGreaterThan(0);
+    expect(resB.body.data.length).toBeGreaterThan(0);
+    expect(resA.body.data[0].familyGroupId).toBe(1);
+    expect(resB.body.data[0].familyGroupId).toBe(2);
   });
 });

@@ -72,8 +72,15 @@ export const deleteCategory = async (req: Request, res: Response, next: NextFunc
   try {
     const { id } = req.params;
 
+    const existing = await prisma.category.findFirst({
+      where: { id: Number(id) },
+    });
+    if (!existing) {
+      return next(new AppError('Category not found', 404));
+    }
+
     await prisma.category.delete({
-      where: { id: Number(id) }
+      where: { id: existing.id },
     });
 
     logger.info(`[CATEGORY] Deleted: ID ${id}`);

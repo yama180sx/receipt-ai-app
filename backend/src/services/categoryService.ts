@@ -1,47 +1,46 @@
 import { Prisma } from '@prisma/client';
-// 1. シングルトンを 'db' という名前でインポートして、変数名の衝突を避ける
 import { prisma as db } from '../utils/prismaClient';
 
 /**
- * [Issue #39] カテゴリー推定ロジック
- * @param tx - トランザクションクライアント。デフォルトはシングルトンの db。
+ * [Issue #39 / #93-4] カテゴリー推定（世帯スコープ）
  */
 export const estimateCategoryId = async (
-  itemName: string, 
+  itemName: string,
   storeName: string,
-  // 2. PrismaClient と TransactionClient は厳密には別型なので 'as any' で波線を消す
-  // これにより、通常の呼び出し（db使用）とトランザクション内（tx使用）の両方に対応
+  familyGroupId: number,
   tx: Prisma.TransactionClient = db as any
 ): Promise<number> => {
   try {
-    // Phase 1: 学習データ (店舗込み優先)
     const matchWithStore = await tx.productMaster.findFirst({
-      where: { name: itemName, storeName: storeName },
-      select: { categoryId: true }
+      where: { name: itemName, storeName, familyGroupId },
+      select: { categoryId: true },
     });
     if (matchWithStore) return matchWithStore.categoryId;
 
-    // Phase 2: 学習データ (品名のみ)
     const matchAnyStore = await tx.productMaster.findFirst({
-      where: { name: itemName },
-      select: { categoryId: true }
+      where: { name: itemName, familyGroupId },
+      select: { categoryId: true },
     });
     if (matchAnyStore) return matchAnyStore.categoryId;
 
-    // Phase 3: Category.keywords (JSONB 部分一致検索)
-    const categoryByKeyword = await tx.$queryRaw<any[]>`
-      SELECT id FROM "Category", jsonb_array_elements_text(keywords) AS kw
-      WHERE ${itemName} LIKE '%' || kw || '%'
+    const categoryByKeyword = await tx.$queryRaw<{ id: number }[]>`
+      SELECT c.id FROM "Category" c, jsonb_array_elements_text(c.keywords) AS kw
+      WHERE c."familyGroupId" = ${familyGroupId}
+        AND ${itemName} LIKE '%' || kw || '%'
       LIMIT 1;
     `;
 
-    if (categoryByKeyword && categoryByKeyword.length > 0) {
+    if (categoryByKeyword.length > 0) {
       return categoryByKeyword[0].id;
     }
 
-    return 99; // その他
+    const fallback = await tx.category.findFirst({
+      where: { familyGroupId, name: 'その他' },
+      select: { id: true },
+    });
+    return fallback?.id ?? 0;
   } catch (error) {
     console.error('[CategoryService] Estimation Error:', error);
-    return 99;
+    return 0;
   }
 };
