@@ -46,6 +46,7 @@ describe('API integration (no DB)', () => {
 describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () => {
   beforeAll(async () => {
     await ensureTestMemberPassword(1);
+    await ensureTestMemberPassword(2);
     await ensureTestMemberPassword(TENANT_B_ADMIN_MEMBER_ID);
 
     const fixturePath = path.join(process.cwd(), 'uploads', 'tenant-isolation-fixture.webp');
@@ -63,12 +64,115 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
   it('POST /api/auth/login succeeds with test password', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ memberId: 1, password: 'integration-test-password' });
+      .send({
+        familyGroupId: 1,
+        memberId: 1,
+        password: 'integration-test-password',
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.token).toBeDefined();
-    expect(res.body.data.member.familyGroupId).toBeDefined();
+    expect(res.body.data.member.familyGroupId).toBe(1);
+    expect(res.body.data.requiresTwoFactor).toBe(true);
+  });
+
+  describe('Auth API (#93-2)', () => {
+    const YAMAMOTO_INVITE = 'YAMAMOTO-2026';
+    const SATO_INVITE = 'SATO-2026';
+
+    it('POST /api/auth/resolve-family returns family for valid invite code', async () => {
+      const res = await request(app)
+        .post('/api/auth/resolve-family')
+        .send({ inviteCode: YAMAMOTO_INVITE });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({ familyGroupId: 1, name: '山本家' });
+    });
+
+    it('POST /api/auth/resolve-family rejects unknown invite code', async () => {
+      const res = await request(app)
+        .post('/api/auth/resolve-family')
+        .send({ inviteCode: 'INVALID-CODE' });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('GET members returns list when inviteCode matches family', async () => {
+      const res = await request(app)
+        .get('/api/auth/families/1/members')
+        .query({ inviteCode: YAMAMOTO_INVITE });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(3);
+      expect(res.body.data[0]).toMatchObject({ id: expect.any(Number), name: expect.any(String) });
+      expect(res.body.data.some((m: { id: number }) => m.id === 1)).toBe(true);
+    });
+
+    it('GET members rejects mismatched inviteCode', async () => {
+      const res = await request(app)
+        .get('/api/auth/families/1/members')
+        .query({ inviteCode: SATO_INVITE });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('full login flow: resolve → members → login', async () => {
+      const resolved = await request(app)
+        .post('/api/auth/resolve-family')
+        .send({ inviteCode: SATO_INVITE });
+      expect(resolved.status).toBe(200);
+      const { familyGroupId } = resolved.body.data;
+
+      const members = await request(app)
+        .get(`/api/auth/families/${familyGroupId}/members`)
+        .query({ inviteCode: SATO_INVITE });
+      expect(members.status).toBe(200);
+      const adminMember = members.body.data.find(
+        (m: { id: number }) => m.id === TENANT_B_ADMIN_MEMBER_ID
+      );
+      expect(adminMember).toBeDefined();
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId,
+          memberId: adminMember.id,
+          password: 'integration-test-password',
+        });
+
+      expect(loginRes.status).toBe(200);
+      expect(loginRes.body.data.token).toBeDefined();
+      expect(loginRes.body.data.member.familyGroupId).toBe(2);
+      expect(loginRes.body.data.requiresTwoFactor).toBe(true);
+    });
+
+    it('POST /api/auth/login rejects member from another family', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId: 1,
+          memberId: TENANT_B_ADMIN_MEMBER_ID,
+          password: 'integration-test-password',
+        });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('POST /api/auth/login sets requiresTwoFactor false for USER role', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId: 1,
+          memberId: 2,
+          password: 'integration-test-password',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.requiresTwoFactor).toBe(false);
+    });
   });
 
   it('GET /api/receipts with token returns success envelope', async () => {
