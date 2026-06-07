@@ -27,9 +27,21 @@ export async function ensureTestMemberPassword(memberId = 1): Promise<void> {
 }
 
 export async function loginAsTestMember(app: Express, memberId = 1): Promise<string> {
+  const member = await prisma.familyMember.findUnique({
+    where: { id: memberId },
+    select: { familyGroupId: true },
+  });
+  if (!member) {
+    throw new Error(`Test member id=${memberId} not found. Run prisma seed first.`);
+  }
+
   const res = await request(app)
     .post('/api/auth/login')
-    .send({ memberId, password: TEST_MEMBER_PASSWORD });
+    .send({
+      familyGroupId: member.familyGroupId,
+      memberId,
+      password: TEST_MEMBER_PASSWORD,
+    });
 
   if (res.status !== 200 || !res.body?.success || !res.body?.data?.token) {
     throw new Error(`Login failed: status=${res.status} body=${JSON.stringify(res.body)}`);
