@@ -18,6 +18,7 @@ import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from 
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
+import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 // --- interface 定義 ---
 interface Category { id: number; name: string; color: string; }
@@ -73,6 +74,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   const BASE_URL = API_URL.replace(/\/api\/?$/, '');
+  const latestReceiptImageSource = useReceiptImageSource(data?.latestReceipt?.imagePath);
 
   const monthOptions = useMemo(() => getRecentYearMonths(12), []);
 
@@ -211,9 +213,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>最新の解析レシート</Text>
-                {data?.latestReceipt?.imagePath ? (
+                {data?.latestReceipt?.imagePath && latestReceiptImageSource ? (
                   <TouchableOpacity style={styles.receiptPreviewCard} onPress={() => setMainModalVisible(true)}>
-                    <Image source={{ uri: `${BASE_URL}/${data.latestReceipt.imagePath}` }} style={styles.receiptImage} resizeMode="cover" />
+                    <Image source={latestReceiptImageSource} style={styles.receiptImage} resizeMode="cover" />
                     <View style={styles.receiptInfoOverlay}>
                       <View style={{ flex: 1, marginRight: 10 }}>
                         <Text style={styles.receiptStoreName} numberOfLines={1}>

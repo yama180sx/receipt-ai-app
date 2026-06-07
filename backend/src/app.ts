@@ -53,7 +53,6 @@ export function createApp() {
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
-  app.use('/uploads', express.static(uploadDir));
 
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
