@@ -11,6 +11,7 @@ export const AUTH_STORAGE_KEYS = {
   FAMILY_GROUP_ID: 'currentFamilyGroupId',
   FAMILY_GROUP_NAME: 'currentFamilyGroupName',
   INVITE_CODE: 'savedInviteCode',
+  BIOMETRIC_ENABLED: 'biometricEnabled',
 } as const;
 
 async function setItem(key: string, value: string): Promise<void> {
@@ -150,8 +151,18 @@ export const authService = {
     );
   },
 
-  /** [#306 連携用] 生体認証 ON/OFF — 現時点は空実装 */
+  async setBiometricEnabled(enabled: boolean): Promise<void> {
+    if (Platform.OS === 'web') return;
+    if (enabled) {
+      await setItem(AUTH_STORAGE_KEYS.BIOMETRIC_ENABLED, 'true');
+    } else {
+      await removeItem(AUTH_STORAGE_KEYS.BIOMETRIC_ENABLED);
+    }
+  },
+
   async isBiometricEnabled(): Promise<boolean> {
-    return false;
+    if (Platform.OS === 'web') return false;
+    const value = await getItem(AUTH_STORAGE_KEYS.BIOMETRIC_ENABLED);
+    return value === 'true';
   },
 };
