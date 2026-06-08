@@ -1,52 +1,157 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import type { StoredSession } from '../types/auth';
 
-const TOKEN_KEY = 'userToken';
-// [Issue #73] Role保存用のキー
-const ROLE_KEY = 'currentUserRole';
+export const AUTH_STORAGE_KEYS = {
+  TOKEN: 'userToken',
+  ROLE: 'currentUserRole',
+  MEMBER_ID: 'currentMemberId',
+  MEMBER_NAME: 'currentMemberName',
+  FAMILY_GROUP_ID: 'currentFamilyGroupId',
+  FAMILY_GROUP_NAME: 'currentFamilyGroupName',
+  INVITE_CODE: 'savedInviteCode',
+} as const;
+
+async function setItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+}
+
+async function getItem(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return AsyncStorage.getItem(key);
+  }
+  return SecureStore.getItemAsync(key);
+}
+
+async function removeItem(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+}
 
 export const authService = {
-  // トークンを保存する
   async saveToken(token: string) {
-    if (Platform.OS === 'web') {
-      await AsyncStorage.setItem(TOKEN_KEY, token);
-    } else {
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
-    }
+    await setItem(AUTH_STORAGE_KEYS.TOKEN, token);
   },
-  // 保存されているトークンを読み出す
+
   async getToken() {
-    if (Platform.OS === 'web') {
-      return await AsyncStorage.getItem(TOKEN_KEY);
-    } else {
-      return await SecureStore.getItemAsync(TOKEN_KEY);
-    }
+    return getItem(AUTH_STORAGE_KEYS.TOKEN);
   },
-  // [Issue #73] Roleを保存する
+
   async saveRole(role: string) {
-    if (Platform.OS === 'web') {
-      await AsyncStorage.setItem(ROLE_KEY, role);
-    } else {
-      await SecureStore.setItemAsync(ROLE_KEY, role);
-    }
+    await setItem(AUTH_STORAGE_KEYS.ROLE, role);
   },
-  // [Issue #73] 保存されているRoleを読み出す
+
   async getRole() {
-    if (Platform.OS === 'web') {
-      return await AsyncStorage.getItem(ROLE_KEY);
-    } else {
-      return await SecureStore.getItemAsync(ROLE_KEY);
+    return getItem(AUTH_STORAGE_KEYS.ROLE);
+  },
+
+  async saveMemberId(memberId: number) {
+    await setItem(AUTH_STORAGE_KEYS.MEMBER_ID, String(memberId));
+  },
+
+  async getMemberId(): Promise<number | null> {
+    const value = await getItem(AUTH_STORAGE_KEYS.MEMBER_ID);
+    if (!value) return null;
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  },
+
+  async saveMemberName(name: string) {
+    await setItem(AUTH_STORAGE_KEYS.MEMBER_NAME, name);
+  },
+
+  async getMemberName() {
+    return getItem(AUTH_STORAGE_KEYS.MEMBER_NAME);
+  },
+
+  async saveFamilyGroupId(familyGroupId: number) {
+    await setItem(AUTH_STORAGE_KEYS.FAMILY_GROUP_ID, String(familyGroupId));
+  },
+
+  async getFamilyGroupId(): Promise<number | null> {
+    const value = await getItem(AUTH_STORAGE_KEYS.FAMILY_GROUP_ID);
+    if (!value) return null;
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  },
+
+  async saveFamilyGroupName(name: string) {
+    await setItem(AUTH_STORAGE_KEYS.FAMILY_GROUP_NAME, name);
+  },
+
+  async getFamilyGroupName() {
+    return getItem(AUTH_STORAGE_KEYS.FAMILY_GROUP_NAME);
+  },
+
+  /** 端末保持用（メンバー選択の再表示には使わない） */
+  async saveInviteCode(inviteCode: string) {
+    await setItem(AUTH_STORAGE_KEYS.INVITE_CODE, inviteCode);
+  },
+
+  async getInviteCode() {
+    return getItem(AUTH_STORAGE_KEYS.INVITE_CODE);
+  },
+
+  async saveSession(session: {
+    token: string;
+    member: { id: number; name: string; familyGroupId: number; role: string };
+    familyGroupName: string;
+    inviteCode?: string;
+  }) {
+    await this.saveToken(session.token);
+    await this.saveMemberId(session.member.id);
+    await this.saveMemberName(session.member.name);
+    await this.saveFamilyGroupId(session.member.familyGroupId);
+    await this.saveFamilyGroupName(session.familyGroupName);
+    if (session.member.role) {
+      await this.saveRole(session.member.role);
+    }
+    if (session.inviteCode) {
+      await this.saveInviteCode(session.inviteCode);
     }
   },
-  // ログアウト時にトークンとRoleを消去する
-  async logout() {
-    if (Platform.OS === 'web') {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      await AsyncStorage.removeItem(ROLE_KEY);
-    } else {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(ROLE_KEY);
+
+  async loadSession(): Promise<StoredSession | null> {
+    const [token, memberId, memberName, familyGroupId, familyGroupName, role] =
+      await Promise.all([
+        this.getToken(),
+        this.getMemberId(),
+        this.getMemberName(),
+        this.getFamilyGroupId(),
+        this.getFamilyGroupName(),
+        this.getRole(),
+      ]);
+
+    if (!token || memberId == null || familyGroupId == null) {
+      return null;
     }
-  }
+
+    return {
+      token,
+      memberId,
+      memberName: memberName ?? '',
+      familyGroupId,
+      familyGroupName: familyGroupName ?? '',
+      role,
+    };
+  },
+
+  async logout() {
+    await Promise.all(
+      Object.values(AUTH_STORAGE_KEYS).map((key) => removeItem(key))
+    );
+  },
+
+  /** [#306 連携用] 生体認証 ON/OFF — 現時点は空実装 */
+  async isBiometricEnabled(): Promise<boolean> {
+    return false;
+  },
 };

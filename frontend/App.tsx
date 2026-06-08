@@ -1,37 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Alert, ActivityIndicator, Platform, TextInput, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-import * as SplashScreen from 'expo-splash-screen'; 
+import * as SplashScreen from 'expo-splash-screen';
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
-import { authService } from './src/services/authService'; 
+import { authService } from './src/services/authService';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
-import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
-import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
-import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
-import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; 
+import { StatisticsScreen } from './src/screens/StatisticsScreen';
+import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen';
+import { ProductMasterScreen } from './src/screens/ProductMasterScreen';
+import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen';
 import { PromptEditorScreen } from './src/screens/PromptEditorScreen';
 import { AdminStatsScreen } from './src/screens/AdminStatsScreen';
 import { AdminMenuScreen } from './src/screens/AdminMenuScreen';
-import { SplitEditorScreen } from './src/screens/SplitEditorScreen'; 
-import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen'; // ★ [Issue #80] 追加
+import { SplitEditorScreen } from './src/screens/SplitEditorScreen';
+import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen';
+import { LoginScreen } from './src/screens/LoginScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+import type { LoginResult } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// ★ 'settlement_summary' を追加
 type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
   RESULT: '@app_result',
-  MEMBER_ID: 'currentMemberId',
 };
 
 export default function App() {
@@ -39,31 +38,26 @@ export default function App() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [loginPassword, setLoginPassword] = useState('');
 
-  const [resultData, setResultData] = useState<any>(null); 
+  const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
-  
+
   const [targetReceipt, setTargetReceipt] = useState<any>(null);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const [token, midStr, role, v, res] = await Promise.all([
-          authService.getToken(),
-          Platform.OS === 'web'
-            ? AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
-            : SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID),
-          authService.getRole(),
+        const [session, v, res] = await Promise.all([
+          authService.loadSession(),
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
           AsyncStorage.getItem(STORAGE_KEYS.RESULT),
         ]);
 
-        if (token) {
-          setUserToken(token);
-          setCurrentMemberId(midStr ? parseInt(midStr, 10) : 1);
-          setCurrentUserRole(role);
+        if (session) {
+          setUserToken(session.token);
+          setCurrentMemberId(session.memberId);
+          setCurrentUserRole(session.role);
 
           try {
             const catRes = await apiClient.get('/categories');
@@ -77,7 +71,6 @@ export default function App() {
 
         if (v) setCurrentView(v as ViewType);
         if (res) setResultData(JSON.parse(res));
-
       } catch (e) {
         console.error('初期化失敗', e);
       } finally {
@@ -91,55 +84,28 @@ export default function App() {
   useEffect(() => {
     setOnUnauthorized(() => {
       handleLogout();
-      Alert.alert("セッション切れ", "有効期限が切れたため、再度ログインしてください。");
+      Alert.alert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
     });
   }, []);
 
-  const handleLogin = async (memberId: number) => {
-    if (!loginPassword) {
-      Alert.alert("入力エラー", "パスワードを入力してください。");
-      return;
-    }
+  const handleLoginSuccess = async (
+    result: LoginResult,
+    context: { familyName: string; inviteCode: string }
+  ) => {
+    await authService.saveSession({
+      token: result.token,
+      member: result.member,
+      familyGroupName: context.familyName,
+      inviteCode: context.inviteCode,
+    });
 
-    try {
-      const response = await apiClient.post('/auth/login', { 
-        memberId, 
-        password: loginPassword 
-      });
-      
-      if (response.data && response.data.success) {
-        const { token, member } = response.data.data;
-        
-        await authService.saveToken(token);
-        if (member.role) {
-          await authService.saveRole(member.role);
-          setCurrentUserRole(member.role);
-        }
-
-        if (Platform.OS === 'web') {
-          await AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, member.id.toString());
-        } else {
-          await SecureStore.setItemAsync(STORAGE_KEYS.MEMBER_ID, member.id.toString());
-        }
-        
-        setUserToken(token);
-        setCurrentMemberId(member.id);
-        setLoginPassword('');
-        fetchCategories();
-      }
-    } catch (e: any) {
-      Alert.alert("認証エラー", "ログインに失敗しました。");
-      setLoginPassword('');
-    }
+    setUserToken(result.token);
+    setCurrentMemberId(result.member.id);
+    setCurrentUserRole(result.member.role);
   };
 
   const handleLogout = async () => {
     await authService.logout();
-    if (Platform.OS === 'web') {
-      await AsyncStorage.removeItem(STORAGE_KEYS.MEMBER_ID);
-    } else {
-      await SecureStore.deleteItemAsync(STORAGE_KEYS.MEMBER_ID);
-    }
 
     setUserToken(null);
     setCurrentMemberId(null);
@@ -147,7 +113,6 @@ export default function App() {
     setCurrentView('main');
     setResultData(null);
     setTargetReceipt(null);
-    setLoginPassword('');
   };
 
   const fetchCategories = useCallback(async () => {
@@ -198,34 +163,12 @@ export default function App() {
     );
   }
 
-  // ★ isFullWidth に 'settlement_summary' を追加
   const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary'].includes(currentView);
 
   if (!userToken) {
     return (
       <ResponsiveContainer fullWidth={false}>
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginTitle}>家計簿アプリ</Text>
-          <Text style={styles.loginSub}>パスワードを入力して開始</Text>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="パスワードを入力"
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              secureTextEntry={true}
-              value={loginPassword}
-              onChangeText={setLoginPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
-            <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(2)}>
-            <Text style={styles.loginButtonText}>その他 (ID: 2) でログイン</Text>
-          </TouchableOpacity>
-        </View>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
       </ResponsiveContainer>
     );
   }
@@ -234,10 +177,10 @@ export default function App() {
     const memberId = currentMemberId!;
 
     switch (currentView) {
-      case 'history': 
+      case 'history':
         return (
-          <HistoryScreen 
-            onBack={() => setCurrentView('main')} 
+          <HistoryScreen
+            onBack={() => setCurrentView('main')}
             currentMemberId={memberId}
             onGoToSplitEditor={(receipt) => {
               setTargetReceipt(receipt);
@@ -245,32 +188,32 @@ export default function App() {
             }}
           />
         );
-      case 'split_editor': 
+      case 'split_editor':
         return (
           <SplitEditorScreen
             receipt={targetReceipt}
             onBack={() => {
               setTargetReceipt(null);
-              setCurrentView('history'); 
+              setCurrentView('history');
             }}
           />
         );
-      case 'settlement_summary': // ★ [Issue #80] 精算サマリー画面のルーティング追加
+      case 'settlement_summary':
         return (
           <SettlementSummaryScreen
             onBack={() => setCurrentView('main')}
           />
         );
-      case 'stats': 
+      case 'stats':
         return <StatisticsScreen currentMemberId={memberId} onBack={() => setCurrentView('main')} />;
-      case 'category_mgr': 
+      case 'category_mgr':
         return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('admin_menu'); }} currentMemberId={memberId} />;
-      case 'product_master': 
+      case 'product_master':
         return <ProductMasterScreen onBack={() => setCurrentView('admin_menu')} currentMemberId={memberId} />;
-      case 'receipt_scan': 
+      case 'receipt_scan':
         return (
-          <ReceiptScanScreen 
-            initialData={resultData} 
+          <ReceiptScanScreen
+            initialData={resultData}
             categories={categories}
             onSuccess={() => {
               setResultData(null);
@@ -282,13 +225,13 @@ export default function App() {
             }}
           />
         );
-      case 'prompt_editor': 
+      case 'prompt_editor':
         return <PromptEditorScreen onBack={() => setCurrentView('admin_menu')} />;
       case 'admin_stats':
         return <AdminStatsScreen onBack={() => setCurrentView('admin_menu')} />;
       case 'admin_menu':
         return (
-          <AdminMenuScreen 
+          <AdminMenuScreen
             onBack={() => setCurrentView('main')}
             onGoToCategories={() => setCurrentView('category_mgr')}
             onGoToProductMaster={() => setCurrentView('product_master')}
@@ -303,13 +246,12 @@ export default function App() {
               <Text style={styles.logoutText}>ログアウト</Text>
             </TouchableOpacity>
 
-            <HomeScreen 
-              onAnalysisReady={handleAnalysisReady} 
+            <HomeScreen
+              onAnalysisReady={handleAnalysisReady}
               onGoToHistory={() => setCurrentView('history')}
               onGoToStats={() => setCurrentView('stats')}
-              // ★ [Issue #80] ハンドラを注入
               onGoToSettlement={() => setCurrentView('settlement_summary')}
-              onGoToAdminMenu={() => setCurrentView('admin_menu')} 
+              onGoToAdminMenu={() => setCurrentView('admin_menu')}
               currentMemberId={memberId}
               userRole={currentUserRole}
             />
@@ -331,21 +273,6 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.primary, padding: 40 },
-  loginTitle: { fontSize: 32, fontWeight: 'bold', color: 'white', marginBottom: 10 },
-  loginSub: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 30 },
-  inputWrapper: { width: '100%', marginBottom: 20 },
-  passwordInput: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-    padding: 15,
-    color: 'white',
-    fontSize: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  loginButton: { backgroundColor: 'white', width: '100%', padding: 18, borderRadius: 15, marginBottom: 15, alignItems: 'center' },
-  loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
   logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
   logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
 });

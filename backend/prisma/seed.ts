@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 import process from 'node:process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,6 +91,9 @@ async function seedMastersForFamily(
 async function main() {
   console.log('--- 🚀 Seeding Start (Multi-Tenancy Architecture) ---');
 
+  const devPassword = process.env.SEED_MEMBER_PASSWORD ?? 'dev-password';
+  const password_hash = await bcrypt.hash(devPassword, 10);
+
   await prisma.item.deleteMany();
   await prisma.settlementTransfer.deleteMany();
   await prisma.productMaster.deleteMany();
@@ -113,7 +117,7 @@ async function main() {
     { id: 3, name: '息子（高校生）', familyGroupId: familyGroup.id, role: 'USER' as const },
   ];
   for (const m of familyMembers) {
-    await prisma.familyMember.create({ data: m });
+    await prisma.familyMember.create({ data: { ...m, password_hash } });
   }
   console.log('👥 FamilyMembers created (山本家).');
 
@@ -150,7 +154,7 @@ async function main() {
     { id: 5, name: '佐藤（配偶者）', familyGroupId: familyGroup2.id, role: 'USER' as const },
   ];
   for (const m of family2Members) {
-    await prisma.familyMember.create({ data: m });
+    await prisma.familyMember.create({ data: { ...m, password_hash } });
   }
   console.log(`👥 FamilyMembers created (${familyGroup2.name}).`);
 
