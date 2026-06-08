@@ -35,6 +35,9 @@ model FamilyMember {
   password_hash String?
   familyGroupId Int           // ★ 所属世帯
   role          Role          @default(USER) // [Issue #73] デフォルトは一般ユーザー
+  totpSecret    String?       // [Issue #93-5] TOTP シークレット（暗号化保存）
+  totpEnabled   Boolean       @default(false)
+  totpVerifiedAt DateTime?    @db.Timestamptz(3)
   familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション

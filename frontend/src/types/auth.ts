@@ -13,12 +13,25 @@ export type LoginMember = {
   name: string;
   familyGroupId: number;
   role: string;
+  totpEnabled?: boolean;
+};
+
+export type LoginResponse = {
+  token: string | null;
+  pendingToken: string | null;
+  member: LoginMember;
+  requiresTotpVerification: boolean;
+  requiresTotpSetup: boolean;
 };
 
 export type LoginResult = {
   token: string;
   member: LoginMember;
-  requiresTwoFactor: boolean;
+};
+
+export type TotpSetupInfo = {
+  secret: string;
+  otpauthUrl: string;
 };
 
 export type StoredSession = {

@@ -29,6 +29,7 @@ import { SplitEditorScreen } from './src/screens/SplitEditorScreen';
 import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
+import { TotpSettingsScreen } from './src/screens/TotpSettingsScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
@@ -36,7 +37,7 @@ import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary';
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary' | 'totp_settings';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -51,6 +52,7 @@ export default function App() {
   const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
   const [biometricLockActive, setBiometricLockActive] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(false);
 
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -159,6 +161,7 @@ export default function App() {
     });
     setBiometricLockActive(false);
     setPendingSession(null);
+    setTotpEnabled(Boolean(result.member.totpEnabled));
     await fetchCategoriesForSession();
     await promptEnableBiometric();
   };
@@ -176,6 +179,7 @@ export default function App() {
     setPendingSession(null);
     setBiometricLockActive(false);
     setBiometricEnabled(false);
+    setTotpEnabled(false);
     setUserToken(null);
     setCurrentMemberId(null);
     setCurrentUserRole(null);
@@ -200,6 +204,7 @@ export default function App() {
     setPendingSession(null);
     setBiometricLockActive(false);
     setBiometricEnabled(false);
+    setTotpEnabled(false);
     setCurrentView('main');
     setResultData(null);
     setTargetReceipt(null);
@@ -254,7 +259,7 @@ export default function App() {
     );
   }
 
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary'].includes(currentView);
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary', 'totp_settings'].includes(currentView);
 
   if (biometricLockActive && pendingSession) {
     return (
@@ -342,10 +347,26 @@ export default function App() {
             onGoToAdminStats={() => setCurrentView('admin_stats')}
           />
         );
+      case 'totp_settings':
+        return (
+          <TotpSettingsScreen
+            totpEnabled={totpEnabled}
+            onBack={() => setCurrentView('main')}
+            onChanged={setTotpEnabled}
+          />
+        );
       default:
         return (
           <View style={{ flex: 1 }}>
             <View style={styles.topActions}>
+              {currentUserRole === 'USER' ? (
+                <TouchableOpacity
+                  style={styles.topActionButton}
+                  onPress={() => setCurrentView('totp_settings')}
+                >
+                  <Text style={styles.topActionText}>2FA設定</Text>
+                </TouchableOpacity>
+              ) : null}
               {biometricEnabled && Platform.OS !== 'web' ? (
                 <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
                   <Text style={styles.topActionText}>生体認証オフ</Text>
