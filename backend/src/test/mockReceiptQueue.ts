@@ -22,5 +22,6 @@ vi.mock('../queues/receiptQueue', () => ({
       return { id };
     }),
     getJob: vi.fn().mockImplementation(async (id: string) => mockReceiptJobs.get(id) ?? null),
+    getJobs: vi.fn().mockImplementation(async () => Array.from(mockReceiptJobs.values())),
   },
 }));
