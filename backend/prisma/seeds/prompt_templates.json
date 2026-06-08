@@ -1,6 +1,6 @@
 [
   {
-    "id": 13,
+    "id": 9,
     "familyGroupId": 1,
     "key": "RECEIPT_ANALYSIS",
     "name": "システム標準プロンプト",
@@ -13,7 +13,7 @@
     },
     "isActive": true,
     "version": 1,
-    "createdAt": "2026-06-08T13:21:55.037Z",
-    "updatedAt": "2026-06-08T13:21:55.037Z"
+    "createdAt": "2026-06-07T20:55:48.904Z",
+    "updatedAt": "2026-06-07T20:55:48.904Z"
   }
 ]
