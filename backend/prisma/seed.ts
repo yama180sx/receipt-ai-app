@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import process from 'node:process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { syncAllSeedTableSequences } from './syncSequences';
+import { syncAllSeedTableSequences, syncPostgresIdSequence } from './syncSequences';
 
 const prisma = new PrismaClient();
 
@@ -122,6 +122,8 @@ async function main() {
   console.log('👥 FamilyMembers created (山本家).');
 
   await seedMastersForFamily(familyGroup.id, { useExplicitCategoryIds: true });
+  // 明示 id 投入後はシーケンスを進めないと第2世帯の auto-increment が id=1 で衝突する
+  await syncPostgresIdSequence(prisma, 'Category');
   console.log('📂 Masters seeded (山本家).');
 
   await prisma.productMaster.create({
