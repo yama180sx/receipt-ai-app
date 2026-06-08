@@ -1,11 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Alert, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Alert,
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService';
+import { canUseBiometric } from './src/services/biometricService';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -19,10 +28,11 @@ import { AdminMenuScreen } from './src/screens/AdminMenuScreen';
 import { SplitEditorScreen } from './src/screens/SplitEditorScreen';
 import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
-import type { LoginResult } from './src/types/auth';
+import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -38,6 +48,9 @@ export default function App() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
+  const [biometricLockActive, setBiometricLockActive] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -45,27 +58,43 @@ export default function App() {
 
   const [targetReceipt, setTargetReceipt] = useState<any>(null);
 
+  const applySession = useCallback((session: StoredSession) => {
+    setUserToken(session.token);
+    setCurrentMemberId(session.memberId);
+    setCurrentUserRole(session.role);
+  }, []);
+
+  const fetchCategoriesForSession = useCallback(async () => {
+    try {
+      const catRes = await apiClient.get('/categories');
+      if (catRes.data?.success) {
+        setCategories(catRes.data.data);
+      }
+    } catch (catErr) {
+      console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
+    }
+  }, []);
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const [session, v, res] = await Promise.all([
+        const [session, bioEnabled, v, res] = await Promise.all([
           authService.loadSession(),
+          authService.isBiometricEnabled(),
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
           AsyncStorage.getItem(STORAGE_KEYS.RESULT),
         ]);
 
-        if (session) {
-          setUserToken(session.token);
-          setCurrentMemberId(session.memberId);
-          setCurrentUserRole(session.role);
+        setBiometricEnabled(bioEnabled);
 
-          try {
-            const catRes = await apiClient.get('/categories');
-            if (catRes.data?.success) {
-              setCategories(catRes.data.data);
-            }
-          } catch (catErr) {
-            console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
+        if (session) {
+          const needsBiometricLock = bioEnabled && Platform.OS !== 'web';
+          if (needsBiometricLock) {
+            setPendingSession(session);
+            setBiometricLockActive(true);
+          } else {
+            applySession(session);
+            await fetchCategoriesForSession();
           }
         }
 
@@ -79,13 +108,34 @@ export default function App() {
       }
     };
     initializeApp();
-  }, []);
+  }, [applySession, fetchCategoriesForSession]);
 
   useEffect(() => {
     setOnUnauthorized(() => {
-      handleLogout();
+      void handleLogout();
       Alert.alert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
     });
+  }, []);
+
+  const promptEnableBiometric = useCallback(async () => {
+    if (Platform.OS === 'web') return;
+    const available = await canUseBiometric();
+    if (!available) return;
+
+    Alert.alert(
+      '生体認証',
+      '次回起動時に生体認証でロック解除しますか？',
+      [
+        { text: 'あとで', style: 'cancel' },
+        {
+          text: '有効にする',
+          onPress: async () => {
+            await authService.setBiometricEnabled(true);
+            setBiometricEnabled(true);
+          },
+        },
+      ]
+    );
   }, []);
 
   const handleLoginSuccess = async (
@@ -99,10 +149,47 @@ export default function App() {
       inviteCode: context.inviteCode,
     });
 
-    setUserToken(result.token);
-    setCurrentMemberId(result.member.id);
-    setCurrentUserRole(result.member.role);
+    applySession({
+      token: result.token,
+      memberId: result.member.id,
+      memberName: result.member.name,
+      familyGroupId: result.member.familyGroupId,
+      familyGroupName: context.familyName,
+      role: result.member.role,
+    });
+    setBiometricLockActive(false);
+    setPendingSession(null);
+    await fetchCategoriesForSession();
+    await promptEnableBiometric();
   };
+
+  const handleBiometricUnlock = useCallback(async () => {
+    if (!pendingSession) return;
+    applySession(pendingSession);
+    setBiometricLockActive(false);
+    setPendingSession(null);
+    await fetchCategoriesForSession();
+  }, [applySession, fetchCategoriesForSession, pendingSession]);
+
+  const handleUsePasswordFromLock = useCallback(async () => {
+    await authService.logout();
+    setPendingSession(null);
+    setBiometricLockActive(false);
+    setBiometricEnabled(false);
+    setUserToken(null);
+    setCurrentMemberId(null);
+    setCurrentUserRole(null);
+    setCurrentView('main');
+    setResultData(null);
+    setTargetReceipt(null);
+    setCategories([]);
+  }, []);
+
+  const handleDisableBiometric = useCallback(async () => {
+    await authService.setBiometricEnabled(false);
+    setBiometricEnabled(false);
+    Alert.alert('生体認証', '生体認証によるロック解除をオフにしました。');
+  }, []);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -110,9 +197,13 @@ export default function App() {
     setUserToken(null);
     setCurrentMemberId(null);
     setCurrentUserRole(null);
+    setPendingSession(null);
+    setBiometricLockActive(false);
+    setBiometricEnabled(false);
     setCurrentView('main');
     setResultData(null);
     setTargetReceipt(null);
+    setCategories([]);
   };
 
   const fetchCategories = useCallback(async () => {
@@ -164,6 +255,18 @@ export default function App() {
   }
 
   const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary'].includes(currentView);
+
+  if (biometricLockActive && pendingSession) {
+    return (
+      <ResponsiveContainer fullWidth={false}>
+        <BiometricLockScreen
+          memberName={pendingSession.memberName}
+          onUnlocked={handleBiometricUnlock}
+          onUsePassword={handleUsePasswordFromLock}
+        />
+      </ResponsiveContainer>
+    );
+  }
 
   if (!userToken) {
     return (
@@ -242,9 +345,16 @@ export default function App() {
       default:
         return (
           <View style={{ flex: 1 }}>
-            <TouchableOpacity style={styles.logoutTrigger} onPress={handleLogout}>
-              <Text style={styles.logoutText}>ログアウト</Text>
-            </TouchableOpacity>
+            <View style={styles.topActions}>
+              {biometricEnabled && Platform.OS !== 'web' ? (
+                <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
+                  <Text style={styles.topActionText}>生体認証オフ</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
+                <Text style={styles.topActionText}>ログアウト</Text>
+              </TouchableOpacity>
+            </View>
 
             <HomeScreen
               onAnalysisReady={handleAnalysisReady}
@@ -273,6 +383,18 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
-  logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
+  topActions: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  topActionButton: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    padding: 8,
+    borderRadius: 10,
+  },
+  topActionText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
 });
