@@ -395,6 +395,26 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
       .set('Authorization', `Bearer ${tokenB}`);
     expect(allowed.status).toBe(200);
   });
+
+  it('allows pending job image access before receipt is saved', async () => {
+    const pendingImagePath = 'uploads/pending-preview-fixture.webp';
+    const fixturePath = path.join(process.cwd(), pendingImagePath);
+    fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
+    fs.writeFileSync(fixturePath, Buffer.from('pending-preview-test'));
+
+    registerMockReceiptJob('pending-preview-job', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: pendingImagePath,
+    });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .get(`/api/uploads/${path.basename(pendingImagePath)}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe.skipIf(!shouldRunDbIntegration())('Master tenant isolation (#93-4)', () => {

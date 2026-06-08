@@ -1,24 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+import { File, Paths } from 'expo-file-system';
 import apiClient from './apiClient';
+import { authService } from '../services/authService';
 
 export type ReceiptImageSource = {
   uri: string;
-  headers: Record<string, string>;
+  headers?: Record<string, string>;
 };
 
-const TOKEN_KEY = 'userToken';
+function getUploadApiPath(imagePath: string): string {
+  const normalized = imagePath.replace(/^\//, '');
+  const filename = normalized.startsWith('uploads/')
+    ? normalized.slice('uploads/'.length)
+    : normalized;
+  return `/uploads/${encodeURIComponent(filename)}`;
+}
 
-async function getAuthToken(): Promise<string | null> {
-  try {
-    return Platform.OS === 'web'
-      ? await AsyncStorage.getItem(TOKEN_KEY)
-      : await SecureStore.getItemAsync(TOKEN_KEY);
-  } catch {
-    return null;
+function getCacheFilename(imagePath: string): string {
+  const normalized = imagePath.replace(/^\//, '');
+  return normalized.replace(/\//g, '_');
+}
+
+async function buildAuthHeaders(): Promise<Record<string, string>> {
+  const [token, memberId] = await Promise.all([
+    authService.getToken(),
+    authService.getMemberId(),
+  ]);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
+  if (memberId != null) {
+    headers['x-member-id'] = String(memberId);
+  }
+  return headers;
 }
 
 /** imagePath (uploads/xxx.webp) を認証付き API URL に変換 */
@@ -35,28 +51,57 @@ export async function buildReceiptImageSource(
   imagePath: string | null | undefined
 ): Promise<ReceiptImageSource | null> {
   if (!imagePath) return null;
-  const token = await getAuthToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+
+  try {
+    if (Platform.OS === 'web') {
+      const res = await apiClient.get(getUploadApiPath(imagePath), {
+        responseType: 'blob',
+      });
+      return { uri: URL.createObjectURL(res.data) };
+    }
+
+    const destination = new File(Paths.cache, `receipt-${getCacheFilename(imagePath)}`);
+    const downloaded = await File.downloadFileAsync(
+      getReceiptImageApiUrl(imagePath),
+      destination,
+      {
+        headers: await buildAuthHeaders(),
+        idempotent: true,
+      }
+    );
+    return { uri: downloaded.uri };
+  } catch (error) {
+    console.warn('[ReceiptImage] Failed to load image:', error);
+    return null;
   }
-  return {
-    uri: getReceiptImageApiUrl(imagePath),
-    headers,
-  };
 }
 
-/** React Native Image 用 — Authorization ヘッダ付き source */
+/** 認証付き API から取得したローカル URI（Web: blob / Native: cache file） */
 export function useReceiptImageSource(imagePath: string | null | undefined) {
   const [source, setSource] = useState<ReceiptImageSource | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let blobUrl: string | null = null;
+
     buildReceiptImageSource(imagePath).then((next) => {
-      if (!cancelled) setSource(next);
+      if (cancelled) {
+        if (next?.uri.startsWith('blob:')) {
+          URL.revokeObjectURL(next.uri);
+        }
+        return;
+      }
+      if (next?.uri.startsWith('blob:')) {
+        blobUrl = next.uri;
+      }
+      setSource(next);
     });
+
     return () => {
       cancelled = true;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     };
   }, [imagePath]);
 

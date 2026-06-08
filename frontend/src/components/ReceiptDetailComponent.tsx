@@ -48,6 +48,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   const imageSource = useReceiptImageSource(receipt?.imagePath);
   const imageSourceWithCache = useMemo(() => {
     if (!imageSource) return null;
+    if (!imageSource.uri.startsWith('http')) return imageSource;
     return { ...imageSource, uri: `${imageSource.uri}?v=${cacheKey}` };
   }, [imageSource, cacheKey]);
 
