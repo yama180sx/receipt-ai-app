@@ -13,7 +13,7 @@ import { loginService } from '../services/loginService';
 import type { AuthFamilyMember, LoginResult, ResolvedFamily } from '../types/auth';
 import { theme } from '../theme';
 
-type LoginStep = 'invite' | 'member' | 'password';
+type LoginStep = 'invite' | 'member' | 'password' | 'totp_setup' | 'totp_verify';
 
 type Props = {
   onLoginSuccess: (result: LoginResult, context: { familyName: string; inviteCode: string }) => void;
@@ -26,7 +26,15 @@ export function LoginScreen({ onLoginSuccess }: Props) {
   const [members, setMembers] = useState<AuthFamilyMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<AuthFamilyMember | null>(null);
   const [password, setPassword] = useState('');
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const finishLogin = (result: LoginResult) => {
+    if (!family) return;
+    onLoginSuccess(result, { familyName: family.name, inviteCode: inviteCode.trim() });
+  };
 
   const resetToInvite = () => {
     setStep('invite');
@@ -34,6 +42,9 @@ export function LoginScreen({ onLoginSuccess }: Props) {
     setMembers([]);
     setSelectedMember(null);
     setPassword('');
+    setPendingToken(null);
+    setTotpSecret(null);
+    setTotpCode('');
   };
 
   const handleResolveFamily = async () => {
@@ -76,12 +87,38 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
     setLoading(true);
     try {
-      const result = await loginService.login(
+      const response = await loginService.login(
         family.familyGroupId,
         selectedMember.id,
         password
       );
-      onLoginSuccess(result, { familyName: family.name, inviteCode: inviteCode.trim() });
+
+      if (response.token) {
+        finishLogin({ token: response.token, member: response.member });
+        return;
+      }
+
+      if (!response.pendingToken) {
+        throw new Error('認証トークンを取得できませんでした。');
+      }
+
+      setPendingToken(response.pendingToken);
+
+      if (response.requiresTotpSetup) {
+        const setup = await loginService.startTotpSetup(response.pendingToken);
+        setTotpSecret(setup.secret);
+        setTotpCode('');
+        setStep('totp_setup');
+        return;
+      }
+
+      if (response.requiresTotpVerification) {
+        setTotpCode('');
+        setStep('totp_verify');
+        return;
+      }
+
+      throw new Error('想定外のログイン応答です。');
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : 'ログインに失敗しました。';
@@ -91,6 +128,86 @@ export function LoginScreen({ onLoginSuccess }: Props) {
       setLoading(false);
     }
   };
+
+  const handleConfirmTotpSetup = async () => {
+    if (!pendingToken || !totpCode.trim()) {
+      Alert.alert('入力エラー', '認証アプリの6桁コードを入力してください。');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await loginService.confirmTotpSetup(pendingToken, totpCode);
+      finishLogin(result);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '認証コードの確認に失敗しました。';
+      Alert.alert('エラー', message);
+      setTotpCode('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyTotp = async () => {
+    if (!pendingToken || !totpCode.trim()) {
+      Alert.alert('入力エラー', '認証アプリの6桁コードを入力してください。');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await loginService.verifyTotp(pendingToken, totpCode);
+      finishLogin(result);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '認証コードが正しくありません。';
+      Alert.alert('認証エラー', message);
+      setTotpCode('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderTotpStep = (isSetup: boolean) => (
+    <>
+      <Text style={styles.familyLabel}>{family?.name}</Text>
+      <Text style={styles.subtitle}>
+        {isSetup
+          ? '二要素認証の設定（管理者必須）'
+          : '二要素認証コードを入力'}
+      </Text>
+      {isSetup && totpSecret ? (
+        <View style={styles.secretBox}>
+          <Text style={styles.secretLabel}>認証アプリに登録するキー</Text>
+          <Text style={styles.secretText} selectable>
+            {totpSecret}
+          </Text>
+        </View>
+      ) : null}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={styles.input}
+          placeholder="6桁コード"
+          placeholderTextColor="rgba(255,255,255,0.6)"
+          value={totpCode}
+          onChangeText={setTotpCode}
+          keyboardType="number-pad"
+          maxLength={6}
+          editable={!loading}
+        />
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryButton, loading && styles.buttonDisabled]}
+        onPress={isSetup ? handleConfirmTotpSetup : handleVerifyTotp}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color={theme.colors.primary} />
+        ) : (
+          <Text style={styles.primaryButtonText}>{isSetup ? '設定を完了' : '確認'}</Text>
+        )}
+      </TouchableOpacity>
+    </>
+  );
 
   const renderInviteStep = () => (
     <>
@@ -195,6 +312,8 @@ export function LoginScreen({ onLoginSuccess }: Props) {
       {step === 'invite' && renderInviteStep()}
       {step === 'member' && renderMemberStep()}
       {step === 'password' && renderPasswordStep()}
+      {step === 'totp_setup' && renderTotpStep(true)}
+      {step === 'totp_verify' && renderTotpStep(false)}
     </View>
   );
 }
@@ -225,6 +344,23 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  secretBox: {
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  secretLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  secretText: {
+    color: 'white',
+    fontSize: 14,
+    fontFamily: 'monospace',
   },
   inputWrapper: {
     width: '100%',

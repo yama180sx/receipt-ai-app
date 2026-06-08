@@ -22,7 +22,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   }
 
   const token = authHeader.split(' ')[1];
-  const decoded = verifyToken(token);
+  const decoded = verifyToken(token, ['access']);
 
   if (!decoded) {
     logger.warn(`[AUTH] Invalid or Expired Token: ${req.path}`);
@@ -54,8 +54,17 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction) =
 
     const user = await prisma.familyMember.findUnique({
       where: { id: userId },
-      select: { role: true }
+      select: { role: true, totpEnabled: true },
     });
+
+    if (user?.role === 'ADMIN' && !user.totpEnabled) {
+      logger.warn(`[AUTH] Admin without TOTP attempted access: User ID ${userId}`);
+      return res.status(403).json({
+        success: false,
+        code: 'TOTP_REQUIRED',
+        message: '管理者機能を利用するには二要素認証の設定が必要です',
+      });
+    }
 
     if (user?.role !== 'ADMIN') {
       logger.warn(`[AUTH] Forbidden Admin Access Attempt by User ID: ${userId}`);

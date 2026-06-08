@@ -1,13 +1,62 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
-import { generateToken } from '../utils/auth';
+import {
+  generateAccessToken,
+  generatePendingToken,
+  JWTPayload,
+} from '../utils/auth';
 import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
+import {
+  buildOtpauthUrl,
+  decryptSecretFromStorage,
+  encryptSecretForStorage,
+  generateTotpSecret,
+  isTotpRequiredForRole,
+  verifyTotpCode,
+} from '../services/totpService';
 
-/**
- * [Issue #93-2] Step 1: 招待コードから世帯を特定
- */
+type AuthUser = JWTPayload;
+
+function formatMember(member: {
+  id: number;
+  name: string;
+  familyGroupId: number;
+  role: Role;
+  totpEnabled: boolean;
+}) {
+  return {
+    id: member.id,
+    name: member.name,
+    familyGroupId: member.familyGroupId,
+    role: member.role,
+    totpEnabled: member.totpEnabled,
+  };
+}
+
+function buildAccessResponse(member: {
+  id: number;
+  name: string;
+  familyGroupId: number;
+  role: Role;
+  totpEnabled: boolean;
+}) {
+  const memberDto = formatMember(member);
+  return {
+    token: generateAccessToken({
+      id: member.id,
+      name: member.name,
+      familyGroupId: member.familyGroupId,
+      role: member.role,
+    }),
+    pendingToken: null,
+    member: memberDto,
+    requiresTotpVerification: false,
+    requiresTotpSetup: false,
+  };
+}
+
 export const resolveFamily = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { inviteCode } = req.body;
@@ -37,9 +86,6 @@ export const resolveFamily = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-/**
- * [Issue #93-2] Step 2: 世帯メンバー一覧（inviteCode で世帯アクセスを検証）
- */
 export const getFamilyMembers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const familyGroupId = parseInt(req.params.familyGroupId, 10);
@@ -77,14 +123,6 @@ export const getFamilyMembers = async (req: Request, res: Response, next: NextFu
   }
 };
 
-/** [#306 連携用] Admin は 2FA 必須、USER は任意 */
-function requiresTwoFactor(role: Role): boolean {
-  return role === Role.ADMIN;
-}
-
-/**
- * [Issue #54 / #73 / #93-2] Step 4: ログイン（familyGroupId 必須）
- */
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { familyGroupId, memberId, password } = req.body;
@@ -122,26 +160,196 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('メンバーIDまたはパスワードが正しくありません。', 401);
     }
 
-    const token = generateToken({
+    const tokenInput = {
       id: member.id,
-      memberId: member.id,
-      familyGroupId: member.familyGroup.id,
       name: member.name,
+      familyGroupId: member.familyGroupId,
       role: member.role,
+    };
+    const memberDto = formatMember(member);
+
+    if (member.totpEnabled) {
+      res.status(200).json({
+        success: true,
+        data: {
+          token: null,
+          pendingToken: generatePendingToken(tokenInput, 'totp_pending'),
+          member: memberDto,
+          requiresTotpVerification: true,
+          requiresTotpSetup: false,
+        },
+      });
+      return;
+    }
+
+    if (isTotpRequiredForRole(member.role)) {
+      res.status(200).json({
+        success: true,
+        data: {
+          token: null,
+          pendingToken: generatePendingToken(tokenInput, 'totp_setup'),
+          member: memberDto,
+          requiresTotpVerification: false,
+          requiresTotpSetup: true,
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: buildAccessResponse(member),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** TOTP セットアップ開始（pending setup またはログイン済み USER） */
+export const startTotpSetup = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as Request & { user: AuthUser }).user;
+    const member = await prisma.familyMember.findUnique({ where: { id: user.id } });
+    if (!member) {
+      throw new AppError('メンバーが見つかりません。', 404);
+    }
+    if (member.totpEnabled) {
+      throw new AppError('二要素認証は既に有効です。', 400);
+    }
+
+    const secret = generateTotpSecret();
+    await prisma.familyMember.update({
+      where: { id: member.id },
+      data: {
+        totpSecret: encryptSecretForStorage(secret),
+        totpEnabled: false,
+        totpVerifiedAt: null,
+      },
     });
 
     res.status(200).json({
       success: true,
       data: {
-        token,
-        member: {
-          id: member.id,
-          name: member.name,
-          familyGroupId: member.familyGroupId,
-          role: member.role,
-        },
-        requiresTwoFactor: requiresTwoFactor(member.role),
+        secret,
+        otpauthUrl: buildOtpauthUrl(member.name, secret),
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** TOTP セットアップ完了 → フル JWT 発行（setup 時）または有効化のみ */
+export const confirmTotpSetup = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as Request & { user: AuthUser }).user;
+    const { code } = req.body;
+    if (!code || typeof code !== 'string') {
+      throw new AppError('認証コードを入力してください。', 400);
+    }
+
+    const member = await prisma.familyMember.findUnique({ where: { id: user.id } });
+    if (!member?.totpSecret) {
+      throw new AppError('二要素認証のセットアップが開始されていません。', 400);
+    }
+    if (member.totpEnabled) {
+      throw new AppError('二要素認証は既に有効です。', 400);
+    }
+
+    const secret = decryptSecretFromStorage(member.totpSecret);
+    if (!verifyTotpCode(secret, code.trim())) {
+      throw new AppError('認証コードが正しくありません。', 401);
+    }
+
+    const updated = await prisma.familyMember.update({
+      where: { id: member.id },
+      data: {
+        totpEnabled: true,
+        totpVerifiedAt: new Date(),
+      },
+    });
+
+    const memberDto = formatMember(updated);
+    const isSetupFlow = user.purpose === 'totp_setup';
+
+    res.status(200).json({
+      success: true,
+      data: isSetupFlow
+        ? buildAccessResponse(updated)
+        : { member: memberDto, totpEnabled: true },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** ログイン時 TOTP 検証 */
+export const verifyTotp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as Request & { user: AuthUser }).user;
+    const { code } = req.body;
+    if (!code || typeof code !== 'string') {
+      throw new AppError('認証コードを入力してください。', 400);
+    }
+
+    const member = await prisma.familyMember.findUnique({ where: { id: user.id } });
+    if (!member?.totpEnabled || !member.totpSecret) {
+      throw new AppError('二要素認証が有効ではありません。', 400);
+    }
+
+    const secret = decryptSecretFromStorage(member.totpSecret);
+    if (!verifyTotpCode(secret, code.trim())) {
+      throw new AppError('認証コードが正しくありません。', 401);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: buildAccessResponse(member),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** USER 任意: 二要素認証を無効化 */
+export const disableTotp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as Request & { user: AuthUser }).user;
+    const { password, code } = req.body;
+    if (!password || !code) {
+      throw new AppError('パスワードと認証コードを入力してください。', 400);
+    }
+
+    const member = await prisma.familyMember.findUnique({ where: { id: user.id } });
+    if (!member?.password_hash || !member.totpEnabled || !member.totpSecret) {
+      throw new AppError('二要素認証が有効ではありません。', 400);
+    }
+    if (isTotpRequiredForRole(member.role)) {
+      throw new AppError('管理者は二要素認証を無効にできません。', 403);
+    }
+
+    const passwordOk = await bcrypt.compare(password, member.password_hash);
+    if (!passwordOk) {
+      throw new AppError('パスワードが正しくありません。', 401);
+    }
+
+    const secret = decryptSecretFromStorage(member.totpSecret);
+    if (!verifyTotpCode(secret, String(code).trim())) {
+      throw new AppError('認証コードが正しくありません。', 401);
+    }
+
+    await prisma.familyMember.update({
+      where: { id: member.id },
+      data: {
+        totpSecret: null,
+        totpEnabled: false,
+        totpVerifiedAt: null,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { totpEnabled: false },
     });
   } catch (error) {
     next(error);

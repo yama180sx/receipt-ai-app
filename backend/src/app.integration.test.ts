@@ -6,7 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
 import {
+  ensureTestAdminTotp,
   ensureTestMemberPassword,
+  getTestTotpCode,
   getTenantBItemId,
   getTenantBCategoryId,
   getTenantBReceiptWithImage,
@@ -48,6 +50,8 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
     await ensureTestMemberPassword(1);
     await ensureTestMemberPassword(2);
     await ensureTestMemberPassword(TENANT_B_ADMIN_MEMBER_ID);
+    await ensureTestAdminTotp(1);
+    await ensureTestAdminTotp(TENANT_B_ADMIN_MEMBER_ID);
 
     const fixturePath = path.join(process.cwd(), 'uploads', 'tenant-isolation-fixture.webp');
     fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
@@ -61,8 +65,8 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
     await prisma.$disconnect();
   });
 
-  it('POST /api/auth/login succeeds with test password', async () => {
-    const res = await request(app)
+  it('POST /api/auth/login succeeds with test password (admin TOTP verify)', async () => {
+    const loginRes = await request(app)
       .post('/api/auth/login')
       .send({
         familyGroupId: 1,
@@ -70,11 +74,18 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
         password: 'integration-test-password',
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.token).toBeDefined();
-    expect(res.body.data.member.familyGroupId).toBe(1);
-    expect(res.body.data.requiresTwoFactor).toBe(true);
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.data.requiresTotpVerification).toBe(true);
+    expect(loginRes.body.data.pendingToken).toBeDefined();
+
+    const verifyRes = await request(app)
+      .post('/api/auth/verify-totp')
+      .set('Authorization', `Bearer ${loginRes.body.data.pendingToken}`)
+      .send({ code: getTestTotpCode() });
+
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.token).toBeDefined();
+    expect(verifyRes.body.data.member.familyGroupId).toBe(1);
   });
 
   describe('Auth API (#93-2)', () => {
@@ -144,9 +155,16 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
         });
 
       expect(loginRes.status).toBe(200);
-      expect(loginRes.body.data.token).toBeDefined();
-      expect(loginRes.body.data.member.familyGroupId).toBe(2);
-      expect(loginRes.body.data.requiresTwoFactor).toBe(true);
+      expect(loginRes.body.data.requiresTotpVerification).toBe(true);
+
+      const verifyRes = await request(app)
+        .post('/api/auth/verify-totp')
+        .set('Authorization', `Bearer ${loginRes.body.data.pendingToken}`)
+        .send({ code: getTestTotpCode() });
+
+      expect(verifyRes.status).toBe(200);
+      expect(verifyRes.body.data.token).toBeDefined();
+      expect(verifyRes.body.data.member.familyGroupId).toBe(2);
     });
 
     it('POST /api/auth/login rejects member from another family', async () => {
@@ -161,7 +179,7 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
       expect(res.status).toBe(401);
     });
 
-    it('POST /api/auth/login sets requiresTwoFactor false for USER role', async () => {
+    it('POST /api/auth/login issues token directly for USER without TOTP', async () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({
@@ -171,7 +189,106 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.requiresTwoFactor).toBe(false);
+      expect(res.body.data.token).toBeDefined();
+      expect(res.body.data.requiresTotpSetup).toBe(false);
+      expect(res.body.data.requiresTotpVerification).toBe(false);
+    });
+  });
+
+  describe('TOTP 2FA (#93-5)', () => {
+    it('admin without TOTP gets requiresTotpSetup on login', async () => {
+      await prisma.familyMember.update({
+        where: { id: 1 },
+        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+      });
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId: 1,
+          memberId: 1,
+          password: 'integration-test-password',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.requiresTotpSetup).toBe(true);
+      expect(res.body.data.pendingToken).toBeDefined();
+      expect(res.body.data.token).toBeNull();
+
+      await ensureTestAdminTotp(1);
+    });
+
+    it('admin setup flow issues access token', async () => {
+      await prisma.familyMember.update({
+        where: { id: 1 },
+        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+      });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId: 1,
+          memberId: 1,
+          password: 'integration-test-password',
+        });
+      const pendingToken = loginRes.body.data.pendingToken;
+
+      const setupRes = await request(app)
+        .post('/api/auth/totp/setup')
+        .set('Authorization', `Bearer ${pendingToken}`);
+      expect(setupRes.status).toBe(200);
+      const { secret } = setupRes.body.data;
+
+      const { authenticator } = await import('otplib');
+      const confirmRes = await request(app)
+        .post('/api/auth/totp/confirm')
+        .set('Authorization', `Bearer ${pendingToken}`)
+        .send({ code: authenticator.generate(secret) });
+
+      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.body.data.token).toBeDefined();
+
+      await ensureTestAdminTotp(1);
+    });
+
+    it('blocks admin API when TOTP not enabled', async () => {
+      await prisma.familyMember.update({
+        where: { id: 1 },
+        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+      });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          familyGroupId: 1,
+          memberId: 1,
+          password: 'integration-test-password',
+        });
+
+      const setupRes = await request(app)
+        .post('/api/auth/totp/setup')
+        .set('Authorization', `Bearer ${loginRes.body.data.pendingToken}`);
+      const { secret } = setupRes.body.data;
+      const { authenticator } = await import('otplib');
+      const confirmRes = await request(app)
+        .post('/api/auth/totp/confirm')
+        .set('Authorization', `Bearer ${loginRes.body.data.pendingToken}`)
+        .send({ code: authenticator.generate(secret) });
+      const token = confirmRes.body.data.token;
+
+      await prisma.familyMember.update({
+        where: { id: 1 },
+        data: { totpEnabled: false },
+      });
+
+      const adminRes = await request(app)
+        .get('/api/admin/prompts')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(adminRes.status).toBe(403);
+      expect(adminRes.body.code).toBe('TOTP_REQUIRED');
+
+      await ensureTestAdminTotp(1);
     });
   });
 
