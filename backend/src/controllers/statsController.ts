@@ -8,6 +8,7 @@ import {
   normalizeYearMonth,
 } from '../utils/yearMonth';
 import { calcItemLineTotal } from '../utils/itemLineTotal';
+import { getRouteParam } from '../utils/routeParams';
 
 /**
  * [Issue #78 / #81] 月間精算ステータスの取得（暗黙的デフォルト対応 ＆ 送金実績の反映）
@@ -212,7 +213,7 @@ export const deleteSettlementTransfer = async (
   next: NextFunction
 ) => {
   const familyGroupId = getFamilyGroupId();
-  const transferId = Number(req.params.id);
+  const transferId = Number(getRouteParam(req, 'id'));
 
   if (!Number.isFinite(transferId) || transferId <= 0) {
     return res.status(400).json({ success: false, message: '送金記録IDが不正です。' });

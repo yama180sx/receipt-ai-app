@@ -4,6 +4,7 @@ import path from 'path';
 import { AppError } from '../utils/appError';
 import { getFamilyGroupId } from '../utils/context';
 import { canAccessReceiptImage, getImageFullPath } from '../services/imageAccessService';
+import { getRouteParam } from '../utils/routeParams';
 
 /**
  * [Issue #93-1 / G3] レシート画像の認証付き配信。
@@ -16,7 +17,7 @@ export const serveReceiptImage = async (
 ) => {
   try {
     const familyGroupId = getFamilyGroupId();
-    const rawFilename = req.params.filename;
+    const rawFilename = getRouteParam(req, 'filename');
     const filename = path.basename(rawFilename);
 
     if (!filename || filename !== rawFilename || filename.includes('..')) {
