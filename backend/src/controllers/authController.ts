@@ -16,6 +16,7 @@ import {
   isTotpRequiredForRole,
   verifyTotpCode,
 } from '../services/totpService';
+import { getRouteParam } from '../utils/routeParams';
 
 type AuthUser = JWTPayload;
 
@@ -88,7 +89,7 @@ export const resolveFamily = async (req: Request, res: Response, next: NextFunct
 
 export const getFamilyMembers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const familyGroupId = parseInt(req.params.familyGroupId, 10);
+    const familyGroupId = parseInt(getRouteParam(req, 'familyGroupId'), 10);
     const inviteCode = typeof req.query.inviteCode === 'string' ? req.query.inviteCode.trim() : '';
 
     if (Number.isNaN(familyGroupId)) {

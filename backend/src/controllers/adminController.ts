@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getFamilyGroupId } from '../utils/context';
+import { getRouteParam } from '../utils/routeParams';
 
 // --- [Issue #73] AI Cost Constants ---
 const RATE_USD_TO_JPY = 150; 
@@ -87,7 +88,7 @@ export const createPrompt = async (req: Request, res: Response) => {
  * プロンプトテンプレートの更新
  */
 export const updatePrompt = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   const { name, description, systemPrompt, domainHints } = req.body;
 
   // ★ 追加: IDが正しく数値として渡ってきているかのバリデーション
@@ -120,7 +121,7 @@ export const updatePrompt = async (req: Request, res: Response) => {
  * プロンプトテンプレートのデフォルト（使用中）切り替え
  */
 export const activatePrompt = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   
   // バリデーション
   if (!id || isNaN(Number(id))) {
@@ -157,7 +158,7 @@ export const activatePrompt = async (req: Request, res: Response) => {
  * プロンプトテンプレートの削除
  */
 export const deletePrompt = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   
   // バリデーション
   if (!id || isNaN(Number(id))) {
