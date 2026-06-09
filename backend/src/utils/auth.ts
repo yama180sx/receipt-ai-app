@@ -1,15 +1,17 @@
 import jwt from 'jsonwebtoken';
 import logger from './logger';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const rawJwtSecret = process.env.JWT_SECRET;
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 const PENDING_EXPIRES_IN = '10m';
 
-if (!JWT_SECRET) {
+if (!rawJwtSecret) {
   const errorMsg = 'FATAL: JWT_SECRET is not defined in environment variables.';
   logger.error(`[AUTH] ${errorMsg}`);
   throw new Error(errorMsg);
 }
+
+const JWT_SECRET: string = rawJwtSecret;
 
 export type TokenPurpose = 'access' | 'totp_pending' | 'totp_setup';
 
@@ -67,13 +69,17 @@ export function verifyToken(
   allowedPurposes: TokenPurpose[] = ['access']
 ): JWTPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    const purpose = getTokenPurpose(decoded);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (typeof decoded === 'string') {
+      return null;
+    }
+    const payload = decoded as JWTPayload;
+    const purpose = getTokenPurpose(payload);
     if (!allowedPurposes.includes(purpose)) {
       logger.warn(`[AUTH] Token purpose mismatch: expected ${allowedPurposes.join('|')}, got ${purpose}`);
       return null;
     }
-    return decoded;
+    return payload;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[AUTH] トークン検証失敗: ${message}`);
