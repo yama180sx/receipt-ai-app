@@ -9,6 +9,7 @@ import { getFamilyGroupId, getMemberId } from '../utils/context';
 import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
 import { calcItemLineTotal } from '../utils/itemLineTotal';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
+import { getRouteParam } from '../utils/routeParams';
 
 /**
  * [Issue #43] ジョブステータス取得
@@ -16,7 +17,7 @@ import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
     const familyGroupId = getFamilyGroupId();
-    const job = await receiptQueue.getJob(req.params.jobId!);
+    const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
     if (!job) throw new AppError('ジョブが見つかりません。', 404);
 
     const jobFamilyGroupId = Number(job.data?.familyGroupId);
@@ -161,7 +162,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
  * [Issue #67] 保存済みレシートの完全編集
  */
 export const updateReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   const { date, storeName, items } = req.body;
   const familyGroupId = getFamilyGroupId();
 
@@ -242,7 +243,7 @@ export const updateReceipt = async (req: Request, res: Response, next: NextFunct
  * カテゴリ更新 ＋ 学習マスタ反映
  */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   const { categoryId } = req.body;
   const familyGroupId = getFamilyGroupId();
 
@@ -354,7 +355,7 @@ export const getLatestReceipt = async (_req: Request, res: Response, next: NextF
 export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.receipt.delete({ 
-      where: { id: Number(req.params.id) } 
+      where: { id: Number(getRouteParam(req, 'id')) } 
     });
     res.json({ success: true, message: 'Deleted' });
   } catch (error) { next(error); }
@@ -495,7 +496,7 @@ export const getFamilyMembers = async (_req: Request, res: Response, next: NextF
  * 配列が空の場合は「按分なし」とみなし、既存のSplitを全削除します。
  */
 export const updateItemSplits = async (req: Request, res: Response, next: NextFunction) => {
-  const { itemId } = req.params;
+  const itemId = getRouteParam(req, 'itemId');
   const { splits } = req.body;
   const familyGroupId = getFamilyGroupId();
 

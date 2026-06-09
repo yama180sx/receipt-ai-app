@@ -3,6 +3,7 @@ import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
 import { AppError } from '../utils/appError';
 import { getFamilyGroupId } from '../utils/context';
+import { getRouteParam } from '../utils/routeParams';
 
 /**
  * 📂 学習マスタ一覧取得
@@ -37,7 +38,7 @@ export const getProductMasters = async (req: Request, res: Response, next: NextF
  * 📂 マスタの個別更新
  */
 export const updateProductMaster = async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   const { name, storeName, categoryId } = req.body;
 
   try {
@@ -111,7 +112,7 @@ export const mergeStoreNames = async (req: Request, res: Response, next: NextFun
  * 📂 マスタ削除
  */
 export const deleteProductMaster = async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
+  const id = getRouteParam(req, 'id');
   try {
     await prisma.productMaster.delete({ 
       where: { id: Number(id) } 
