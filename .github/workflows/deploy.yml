@@ -75,20 +75,22 @@ jobs:
           echo "EXPO_PUBLIC_API_URL=http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_BACKEND_PORT }}/api" >> ./frontend/.env
           echo "EXPO_PUBLIC_API_TOKEN=${{ secrets.EXPO_PUBLIC_API_TOKEN }}" >> ./frontend/.env
 
-      - name: Install dependencies
+      - name: Install dependencies and Prisma Client
         run: |
           cd ~/stable/receipt-ai-app/backend && npm install
-          cd ../frontend && npm install
+          cd ~/stable/receipt-ai-app/backend && npx prisma generate
+          cd ~/stable/receipt-ai-app/frontend && npm install
+
+      - name: Prisma Migrate (Stable DB)
+        run: |
+          cd ~/stable/receipt-ai-app
+          docker compose up -d db redis
+          sleep 5
+          docker compose run --rm --no-deps backend npx prisma migrate deploy
 
       - name: Docker Deploy
         run: |
           cd ~/stable/receipt-ai-app
           docker compose up -d --build --remove-orphans
-
-      - name: Prisma Migrate (Stable DB)
-        run: |
-          cd ~/stable/receipt-ai-app
-          docker compose exec -T backend npx prisma migrate deploy
-          
       - name: Cleanup
         run: docker image prune -f
