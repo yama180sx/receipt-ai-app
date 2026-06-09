@@ -4,6 +4,7 @@ import { AppError } from '../utils/appError';
 import logger from '../utils/logger';
 import { pickNextCategoryColor } from '../utils/categoryColor';
 import { getRouteParam } from '../utils/routeParams';
+import { getFamilyGroupId } from '../utils/context';
 
 /**
  * 📂 カテゴリー一覧取得
@@ -34,7 +35,11 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
       return next(new AppError('Name is required', 400));
     }
 
-    const existing = await prisma.category.findMany({ select: { color: true } });
+    const familyGroupId = getFamilyGroupId();
+    const existing = await prisma.category.findMany({
+      where: { familyGroupId },
+      select: { color: true },
+    });
     const existingColors = existing.map((c) => c.color);
     const requested =
       typeof color === 'string' && color.trim() ? color.trim() : '';
@@ -52,6 +57,7 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
       data: {
         name,
         color: resolvedColor,
+        familyGroupId,
       },
     });
 

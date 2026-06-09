@@ -73,7 +73,16 @@ export const createPrompt = async (req: Request, res: Response) => {
     }
 
     const newPrompt = await prisma.promptTemplate.create({
-      data: { key, name, description, systemPrompt, domainHints, isActive, version: 1 },
+      data: {
+        key,
+        name,
+        description,
+        systemPrompt,
+        domainHints,
+        isActive,
+        version: 1,
+        familyGroupId,
+      },
     });
 
     await syncPromptsToJson(familyGroupId);
