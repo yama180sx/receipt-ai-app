@@ -2,13 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Alert } from 'react-native';
-
-// --- 定数定義 ---
-const STORAGE_KEYS = {
-  TOKEN: 'userToken',
-  MEMBER_ID: 'currentMemberId',
-  USER_ROLE: 'currentUserRole', 
-} as const;
+import { AUTH_STORAGE_KEYS } from '../services/authService';
 
 /**
  * [Issue #52] 401エラー時に App.tsx 等の UI 側でログアウト処理を発火させるためのハンドラ
@@ -49,17 +43,17 @@ const getStorageItem = async (key: string): Promise<string | null> => {
  * [Issue #73] 現在ログイン中のユーザーの Role を取得するユーティリティ
  */
 export const getUserRole = async (): Promise<string | null> => {
-  return await getStorageItem(STORAGE_KEYS.USER_ROLE);
+  return await getStorageItem(AUTH_STORAGE_KEYS.ROLE);
 };
 
 // --- リクエストインターセプター：送信前に認証情報を自動注入 ---
 apiClient.interceptors.request.use(async (config) => {
-  const token = await getStorageItem(STORAGE_KEYS.TOKEN);
+  const token = await getStorageItem(AUTH_STORAGE_KEYS.TOKEN);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  const memberId = await getStorageItem(STORAGE_KEYS.MEMBER_ID);
+  const memberId = await getStorageItem(AUTH_STORAGE_KEYS.MEMBER_ID);
   if (memberId) {
     config.headers['x-member-id'] = memberId;
   }

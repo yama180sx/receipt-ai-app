@@ -14,4 +14,12 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 
 ## 記録一覧
 
-（テスト着手後に追記）
+（テスト・レビュー実施時に追記。反映先は [design/plan.md](../design/plan.md) セクション 7）
+
+### 既知の仕様（テストで確認済み — ドキュメント化候補）
+
+| ID | 概要 | #90 反映先 |
+|----|------|-----------|
+| T-ref-01 | 按分端数は配列末尾メンバーに残額 | #90-2, #90-3 |
+| T-ref-02 | ItemSplit 0 件 = 登録者全額負担（暗黙） | #90-2 |
+| T-ref-03 | Frontend payload 末尾配置と Backend allocate 一致 | #90-2, #90-5 |

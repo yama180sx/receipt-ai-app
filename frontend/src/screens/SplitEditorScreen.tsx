@@ -26,6 +26,7 @@ import type {
   ReceiptForSplitEditor,
   ReceiptItemForSplit,
 } from '../types/settlement';
+import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 interface SplitEditorScreenProps {
   receipt: ReceiptForSplitEditor;
@@ -46,8 +47,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   // { itemId: { memberId: 500 } }
   const [editSplits, setEditSplits] = useState<Record<number, Record<number, number>>>({});
 
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
-  const BASE_URL = API_URL.replace(/\/api\/?$/, '');
+  const imageSource = useReceiptImageSource(receipt?.imagePath);
 
   useEffect(() => {
     const init = async () => {
@@ -318,8 +318,6 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
     );
   }
 
-  const getImageUrl = () => receipt.imagePath ? `${BASE_URL}/${receipt.imagePath}` : null;
-
   // レシート全体の合計額を算出
   const receiptTotalAmount = receipt.items.reduce(
     (sum, item) => sum + calcItemTotal(item),
@@ -391,8 +389,8 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
       <View style={[styles.mainLayout, isWide ? styles.rowLayout : styles.colLayout]}>
         <View style={[styles.imagePane, isWide && { width: 350 }]}>
           <View style={styles.imageBox}>
-            {getImageUrl() ? (
-              <Image source={{ uri: getImageUrl()! }} style={styles.receiptImage} resizeMode="contain" />
+            {imageSource ? (
+              <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
             ) : (
               <Text style={styles.noImageText}>画像がありません</Text>
             )}

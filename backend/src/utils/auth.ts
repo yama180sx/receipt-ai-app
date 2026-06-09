@@ -1,50 +1,82 @@
 import jwt from 'jsonwebtoken';
 import logger from './logger';
 
-// [Issue #69] 環境変数の必須化と安全性の向上
 const JWT_SECRET = process.env.JWT_SECRET;
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
+const PENDING_EXPIRES_IN = '10m';
 
-// 起動時に秘密鍵の存在を保証する
 if (!JWT_SECRET) {
   const errorMsg = 'FATAL: JWT_SECRET is not defined in environment variables.';
   logger.error(`[AUTH] ${errorMsg}`);
   throw new Error(errorMsg);
 }
 
-/**
- * [Issue #52 / #73] トークンのペイロード定義
- * familyGroupId を含み、マルチテナント対応の基盤となります。
- * 権限管理(isAdmin)のために id と role を追加しました。
- */
+export type TokenPurpose = 'access' | 'totp_pending' | 'totp_setup';
+
 export interface JWTPayload {
-  id: number;           // [Issue #73] authMiddleware (req.user.id) 用
-  memberId: number;     // 互換性維持
+  id: number;
+  memberId: number;
   familyGroupId: number;
   name: string;
-  role?: string;        // [Issue #73] 権限 (例: 'ADMIN')
+  role?: string;
+  purpose?: TokenPurpose;
 }
 
-/**
- * トークンの生成
- */
-export const generateToken = (payload: JWTPayload): string => {
-  // ペイロードを展開して署名
-  return jwt.sign({ ...payload }, JWT_SECRET, { 
-    expiresIn: EXPIRES_IN as any 
-  });
+type MemberTokenInput = {
+  id: number;
+  name: string;
+  familyGroupId: number;
+  role: string;
 };
 
-/**
- * トークンの検証
- */
-export const verifyToken = (token: string): JWTPayload | null => {
+function toPayload(member: MemberTokenInput, purpose: TokenPurpose): JWTPayload {
+  return {
+    id: member.id,
+    memberId: member.id,
+    familyGroupId: member.familyGroupId,
+    name: member.name,
+    role: member.role,
+    purpose,
+  };
+}
+
+export function generateAccessToken(member: MemberTokenInput): string {
+  return jwt.sign(toPayload(member, 'access'), JWT_SECRET, {
+    expiresIn: EXPIRES_IN as jwt.SignOptions['expiresIn'],
+  });
+}
+
+export function generatePendingToken(
+  member: MemberTokenInput,
+  purpose: 'totp_pending' | 'totp_setup'
+): string {
+  return jwt.sign(toPayload(member, purpose), JWT_SECRET, {
+    expiresIn: PENDING_EXPIRES_IN,
+  });
+}
+
+/** @deprecated generateAccessToken を使用 */
+export const generateToken = generateAccessToken;
+
+export function getTokenPurpose(payload: JWTPayload): TokenPurpose {
+  return payload.purpose ?? 'access';
+}
+
+export function verifyToken(
+  token: string,
+  allowedPurposes: TokenPurpose[] = ['access']
+): JWTPayload | null {
   try {
-    // 署名の検証
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
-  } catch (error: any) {
-    // 期限切れや改ざんをログに記録
-    logger.error(`[AUTH] トークン検証失敗: ${error.message}`);
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const purpose = getTokenPurpose(decoded);
+    if (!allowedPurposes.includes(purpose)) {
+      logger.warn(`[AUTH] Token purpose mismatch: expected ${allowedPurposes.join('|')}, got ${purpose}`);
+      return null;
+    }
+    return decoded;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[AUTH] トークン検証失敗: ${message}`);
     return null;
   }
-};
+}

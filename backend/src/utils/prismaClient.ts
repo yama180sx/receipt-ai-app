@@ -29,7 +29,15 @@ export const prisma = basePrisma.$extends({
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
         // 世帯ID（familyGroupId）による分離が必要なモデル定義
-        const tenantModels = ['Receipt', 'ProductMaster', 'FamilyMember'];
+        const tenantModels = [
+          'Receipt',
+          'ProductMaster',
+          'FamilyMember',
+          'Category',
+          'Store',
+          'PromptTemplate',
+          'SettlementTransfer',
+        ];
         
         if (!tenantModels.includes(model)) {
           return query(args);

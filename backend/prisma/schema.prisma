@@ -15,13 +15,17 @@ enum Role {
 
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
-  id             Int             @id @default(autoincrement())
-  name           String          // 世帯名 (例: 山本家)
-  inviteCode     String          @unique @default(cuid()) // 家族招待用のコード
-  members        FamilyMember[]
-  receipts       Receipt[]
-  productMasters ProductMaster[]
-  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  id                 Int                  @id @default(autoincrement())
+  name               String               // 世帯名 (例: 山本家)
+  inviteCode         String               @unique @default(cuid()) // 家族招待用のコード
+  members            FamilyMember[]
+  receipts           Receipt[]
+  productMasters     ProductMaster[]
+  categories         Category[]
+  stores             Store[]
+  promptTemplates    PromptTemplate[]
+  settlementTransfers SettlementTransfer[]
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
 }
 
 // 家族構成
@@ -31,6 +35,9 @@ model FamilyMember {
   password_hash String?
   familyGroupId Int           // ★ 所属世帯
   role          Role          @default(USER) // [Issue #73] デフォルトは一般ユーザー
+  totpSecret    String?       // [Issue #93-5] TOTP シークレット（暗号化保存）
+  totpEnabled   Boolean       @default(false)
+  totpVerifiedAt DateTime?    @db.Timestamptz(3)
   familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   receipts      Receipt[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
@@ -43,21 +50,31 @@ model FamilyMember {
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
 }
 
-// 費目カテゴリー (共通マスタ)
+// 費目カテゴリー (世帯別マスタ — Issue #93-4)
 model Category {
   id             Int             @id @default(autoincrement())
-  name           String          @unique
-  color          String?         
-  keywords       Json            @default("[]") 
+  name           String
+  familyGroupId  Int
+  familyGroup    FamilyGroup     @relation(fields: [familyGroupId], references: [id])
+  color          String?
+  keywords       Json            @default("[]")
   items          Item[]
   productMasters ProductMaster[]
+
+  @@unique([name, familyGroupId])
+  @@index([familyGroupId])
 }
 
-// 店舗正規化マスタ (共通マスタ)
+// 店舗正規化マスタ (世帯別マスタ — Issue #93-4)
 model Store {
-  id           Int    @id @default(autoincrement())
-  officialName String @unique
-  aliases      Json   @default("[]") 
+  id            Int         @id @default(autoincrement())
+  officialName  String
+  familyGroupId Int
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  aliases       Json        @default("[]")
+
+  @@unique([officialName, familyGroupId])
+  @@index([familyGroupId])
 }
 
 model Receipt {
@@ -112,19 +129,22 @@ model ItemSplit {
 
 // ★ [Issue #81] 送金履歴（締め処理の実績管理）
 model SettlementTransfer {
-  id           Int          @id @default(autoincrement())
-  month        String       // 例: "2026-05" (精算対象月)
-  fromMemberId Int          // 送金した人
-  toMemberId   Int          // 受け取った人
-  amount       Int          // 送金額
-  settledAt    DateTime     @default(now()) @db.Timestamptz(3)
+  id            Int          @id @default(autoincrement())
+  familyGroupId Int
+  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
+  month         String       // 例: "2026-05" (精算対象月)
+  fromMemberId  Int          // 送金した人
+  toMemberId    Int          // 受け取った人
+  amount        Int          // 送金額
+  settledAt     DateTime     @default(now()) @db.Timestamptz(3)
 
-  sender       FamilyMember @relation("TransferSender", fields: [fromMemberId], references: [id])
-  receiver     FamilyMember @relation("TransferReceiver", fields: [toMemberId], references: [id])
+  sender   FamilyMember @relation("TransferSender", fields: [fromMemberId], references: [id])
+  receiver FamilyMember @relation("TransferReceiver", fields: [toMemberId], references: [id])
 
   @@index([month])
   @@index([fromMemberId])
   @@index([toMemberId])
+  @@index([familyGroupId])
 }
 
 // 学習マスタ (世帯ごとに学習結果を分離)
@@ -158,19 +178,20 @@ model ApiUsageLog {
   @@index([createdAt])
 }
 
-// [Issue #72/76] AIプロンプト管理マスタ
-// 履歴を保持し、isActive = true のものがデフォルトとして使用されます。
+// [Issue #72/76] AIプロンプト管理マスタ (世帯別 — Issue #93-4)
 model PromptTemplate {
-  id           Int      @id @default(autoincrement())
-  key          String   // 例: "RECEIPT_ANALYSIS" (複数バージョン保持のため @unique は削除)
-  name         String   @default("デフォルトプロンプト") // 例: "本番用", "テスト用(外税修正版)"
-  description  String?  // プロンプトの用途説明
-  systemPrompt String   @db.Text // Chain of Thoughtを含む基本命令文
-  domainHints  Json?    // 業態別の追加指示集 (JSON)
-  isActive     Boolean  @default(false) // 現在のデフォルトとして使用中かどうか
-  version      Int      @default(1) // 世代管理用
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  id            Int         @id @default(autoincrement())
+  familyGroupId Int
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  key           String      // 例: "RECEIPT_ANALYSIS"
+  name          String      @default("デフォルトプロンプト")
+  description   String?
+  systemPrompt  String      @db.Text
+  domainHints   Json?
+  isActive      Boolean     @default(false)
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(3)
 
-  @@index([key, isActive]) // 検索効率化のためインデックスを追加
+  @@index([familyGroupId, key, isActive])
 }

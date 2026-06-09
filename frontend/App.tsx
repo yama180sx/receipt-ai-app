@@ -1,37 +1,47 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Alert, ActivityIndicator, Platform, TextInput, Text, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Alert,
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-import * as SplashScreen from 'expo-splash-screen'; 
+import * as SplashScreen from 'expo-splash-screen';
 
 import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
-import { authService } from './src/services/authService'; 
+import { authService } from './src/services/authService';
+import { canUseBiometric } from './src/services/biometricService';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
-import { StatisticsScreen } from './src/screens/StatisticsScreen'; 
-import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen'; 
-import { ProductMasterScreen } from './src/screens/ProductMasterScreen'; 
-import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen'; 
+import { StatisticsScreen } from './src/screens/StatisticsScreen';
+import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen';
+import { ProductMasterScreen } from './src/screens/ProductMasterScreen';
+import { ReceiptScanScreen } from './src/screens/ReceiptScanScreen';
 import { PromptEditorScreen } from './src/screens/PromptEditorScreen';
 import { AdminStatsScreen } from './src/screens/AdminStatsScreen';
 import { AdminMenuScreen } from './src/screens/AdminMenuScreen';
-import { SplitEditorScreen } from './src/screens/SplitEditorScreen'; 
-import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen'; // ★ [Issue #80] 追加
+import { SplitEditorScreen } from './src/screens/SplitEditorScreen';
+import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
+import { TotpSettingsScreen } from './src/screens/TotpSettingsScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// ★ 'settlement_summary' を追加
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary';
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary' | 'totp_settings';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
   RESULT: '@app_result',
-  MEMBER_ID: 'currentMemberId',
 };
 
 export default function App() {
@@ -39,45 +49,59 @@ export default function App() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [loginPassword, setLoginPassword] = useState('');
+  const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
+  const [biometricLockActive, setBiometricLockActive] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(false);
 
-  const [resultData, setResultData] = useState<any>(null); 
+  const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
-  
+
   const [targetReceipt, setTargetReceipt] = useState<any>(null);
+
+  const applySession = useCallback((session: StoredSession) => {
+    setUserToken(session.token);
+    setCurrentMemberId(session.memberId);
+    setCurrentUserRole(session.role);
+  }, []);
+
+  const fetchCategoriesForSession = useCallback(async () => {
+    try {
+      const catRes = await apiClient.get('/categories');
+      if (catRes.data?.success) {
+        setCategories(catRes.data.data);
+      }
+    } catch (catErr) {
+      console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
+    }
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const [token, midStr, role, v, res] = await Promise.all([
-          authService.getToken(),
-          Platform.OS === 'web'
-            ? AsyncStorage.getItem(STORAGE_KEYS.MEMBER_ID)
-            : SecureStore.getItemAsync(STORAGE_KEYS.MEMBER_ID),
-          authService.getRole(),
+        const [session, bioEnabled, v, res] = await Promise.all([
+          authService.loadSession(),
+          authService.isBiometricEnabled(),
           AsyncStorage.getItem(STORAGE_KEYS.VIEW),
           AsyncStorage.getItem(STORAGE_KEYS.RESULT),
         ]);
 
-        if (token) {
-          setUserToken(token);
-          setCurrentMemberId(midStr ? parseInt(midStr, 10) : 1);
-          setCurrentUserRole(role);
+        setBiometricEnabled(bioEnabled);
 
-          try {
-            const catRes = await apiClient.get('/categories');
-            if (catRes.data?.success) {
-              setCategories(catRes.data.data);
-            }
-          } catch (catErr) {
-            console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
+        if (session) {
+          const needsBiometricLock = bioEnabled && Platform.OS !== 'web';
+          if (needsBiometricLock) {
+            setPendingSession(session);
+            setBiometricLockActive(true);
+          } else {
+            applySession(session);
+            await fetchCategoriesForSession();
           }
         }
 
         if (v) setCurrentView(v as ViewType);
         if (res) setResultData(JSON.parse(res));
-
       } catch (e) {
         console.error('初期化失敗', e);
       } finally {
@@ -86,68 +110,105 @@ export default function App() {
       }
     };
     initializeApp();
-  }, []);
+  }, [applySession, fetchCategoriesForSession]);
 
   useEffect(() => {
     setOnUnauthorized(() => {
-      handleLogout();
-      Alert.alert("セッション切れ", "有効期限が切れたため、再度ログインしてください。");
+      void handleLogout();
+      Alert.alert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
     });
   }, []);
 
-  const handleLogin = async (memberId: number) => {
-    if (!loginPassword) {
-      Alert.alert("入力エラー", "パスワードを入力してください。");
-      return;
-    }
+  const promptEnableBiometric = useCallback(async () => {
+    if (Platform.OS === 'web') return;
+    const available = await canUseBiometric();
+    if (!available) return;
 
-    try {
-      const response = await apiClient.post('/auth/login', { 
-        memberId, 
-        password: loginPassword 
-      });
-      
-      if (response.data && response.data.success) {
-        const { token, member } = response.data.data;
-        
-        await authService.saveToken(token);
-        if (member.role) {
-          await authService.saveRole(member.role);
-          setCurrentUserRole(member.role);
-        }
+    Alert.alert(
+      '生体認証',
+      '次回起動時に生体認証でロック解除しますか？',
+      [
+        { text: 'あとで', style: 'cancel' },
+        {
+          text: '有効にする',
+          onPress: async () => {
+            await authService.setBiometricEnabled(true);
+            setBiometricEnabled(true);
+          },
+        },
+      ]
+    );
+  }, []);
 
-        if (Platform.OS === 'web') {
-          await AsyncStorage.setItem(STORAGE_KEYS.MEMBER_ID, member.id.toString());
-        } else {
-          await SecureStore.setItemAsync(STORAGE_KEYS.MEMBER_ID, member.id.toString());
-        }
-        
-        setUserToken(token);
-        setCurrentMemberId(member.id);
-        setLoginPassword('');
-        fetchCategories();
-      }
-    } catch (e: any) {
-      Alert.alert("認証エラー", "ログインに失敗しました。");
-      setLoginPassword('');
-    }
+  const handleLoginSuccess = async (
+    result: LoginResult,
+    context: { familyName: string; inviteCode: string }
+  ) => {
+    await authService.saveSession({
+      token: result.token,
+      member: result.member,
+      familyGroupName: context.familyName,
+      inviteCode: context.inviteCode,
+    });
+
+    applySession({
+      token: result.token,
+      memberId: result.member.id,
+      memberName: result.member.name,
+      familyGroupId: result.member.familyGroupId,
+      familyGroupName: context.familyName,
+      role: result.member.role,
+    });
+    setBiometricLockActive(false);
+    setPendingSession(null);
+    setTotpEnabled(Boolean(result.member.totpEnabled));
+    await fetchCategoriesForSession();
+    await promptEnableBiometric();
   };
 
-  const handleLogout = async () => {
-    await authService.logout();
-    if (Platform.OS === 'web') {
-      await AsyncStorage.removeItem(STORAGE_KEYS.MEMBER_ID);
-    } else {
-      await SecureStore.deleteItemAsync(STORAGE_KEYS.MEMBER_ID);
-    }
+  const handleBiometricUnlock = useCallback(async () => {
+    if (!pendingSession) return;
+    applySession(pendingSession);
+    setBiometricLockActive(false);
+    setPendingSession(null);
+    await fetchCategoriesForSession();
+  }, [applySession, fetchCategoriesForSession, pendingSession]);
 
+  const handleUsePasswordFromLock = useCallback(async () => {
+    await authService.logout();
+    setPendingSession(null);
+    setBiometricLockActive(false);
+    setBiometricEnabled(false);
+    setTotpEnabled(false);
     setUserToken(null);
     setCurrentMemberId(null);
     setCurrentUserRole(null);
     setCurrentView('main');
     setResultData(null);
     setTargetReceipt(null);
-    setLoginPassword('');
+    setCategories([]);
+  }, []);
+
+  const handleDisableBiometric = useCallback(async () => {
+    await authService.setBiometricEnabled(false);
+    setBiometricEnabled(false);
+    Alert.alert('生体認証', '生体認証によるロック解除をオフにしました。');
+  }, []);
+
+  const handleLogout = async () => {
+    await authService.logout();
+
+    setUserToken(null);
+    setCurrentMemberId(null);
+    setCurrentUserRole(null);
+    setPendingSession(null);
+    setBiometricLockActive(false);
+    setBiometricEnabled(false);
+    setTotpEnabled(false);
+    setCurrentView('main');
+    setResultData(null);
+    setTargetReceipt(null);
+    setCategories([]);
   };
 
   const fetchCategories = useCallback(async () => {
@@ -198,34 +259,24 @@ export default function App() {
     );
   }
 
-  // ★ isFullWidth に 'settlement_summary' を追加
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary'].includes(currentView);
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary', 'totp_settings'].includes(currentView);
+
+  if (biometricLockActive && pendingSession) {
+    return (
+      <ResponsiveContainer fullWidth={false}>
+        <BiometricLockScreen
+          memberName={pendingSession.memberName}
+          onUnlocked={handleBiometricUnlock}
+          onUsePassword={handleUsePasswordFromLock}
+        />
+      </ResponsiveContainer>
+    );
+  }
 
   if (!userToken) {
     return (
       <ResponsiveContainer fullWidth={false}>
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginTitle}>家計簿アプリ</Text>
-          <Text style={styles.loginSub}>パスワードを入力して開始</Text>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="パスワードを入力"
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              secureTextEntry={true}
-              value={loginPassword}
-              onChangeText={setLoginPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(1)}>
-            <Text style={styles.loginButtonText}>自分 (ID: 1) でログイン</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.loginButton} onPress={() => handleLogin(2)}>
-            <Text style={styles.loginButtonText}>その他 (ID: 2) でログイン</Text>
-          </TouchableOpacity>
-        </View>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
       </ResponsiveContainer>
     );
   }
@@ -234,10 +285,10 @@ export default function App() {
     const memberId = currentMemberId!;
 
     switch (currentView) {
-      case 'history': 
+      case 'history':
         return (
-          <HistoryScreen 
-            onBack={() => setCurrentView('main')} 
+          <HistoryScreen
+            onBack={() => setCurrentView('main')}
             currentMemberId={memberId}
             onGoToSplitEditor={(receipt) => {
               setTargetReceipt(receipt);
@@ -245,32 +296,32 @@ export default function App() {
             }}
           />
         );
-      case 'split_editor': 
+      case 'split_editor':
         return (
           <SplitEditorScreen
             receipt={targetReceipt}
             onBack={() => {
               setTargetReceipt(null);
-              setCurrentView('history'); 
+              setCurrentView('history');
             }}
           />
         );
-      case 'settlement_summary': // ★ [Issue #80] 精算サマリー画面のルーティング追加
+      case 'settlement_summary':
         return (
           <SettlementSummaryScreen
             onBack={() => setCurrentView('main')}
           />
         );
-      case 'stats': 
+      case 'stats':
         return <StatisticsScreen currentMemberId={memberId} onBack={() => setCurrentView('main')} />;
-      case 'category_mgr': 
+      case 'category_mgr':
         return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('admin_menu'); }} currentMemberId={memberId} />;
-      case 'product_master': 
+      case 'product_master':
         return <ProductMasterScreen onBack={() => setCurrentView('admin_menu')} currentMemberId={memberId} />;
-      case 'receipt_scan': 
+      case 'receipt_scan':
         return (
-          <ReceiptScanScreen 
-            initialData={resultData} 
+          <ReceiptScanScreen
+            initialData={resultData}
             categories={categories}
             onSuccess={() => {
               setResultData(null);
@@ -282,13 +333,13 @@ export default function App() {
             }}
           />
         );
-      case 'prompt_editor': 
+      case 'prompt_editor':
         return <PromptEditorScreen onBack={() => setCurrentView('admin_menu')} />;
       case 'admin_stats':
         return <AdminStatsScreen onBack={() => setCurrentView('admin_menu')} />;
       case 'admin_menu':
         return (
-          <AdminMenuScreen 
+          <AdminMenuScreen
             onBack={() => setCurrentView('main')}
             onGoToCategories={() => setCurrentView('category_mgr')}
             onGoToProductMaster={() => setCurrentView('product_master')}
@@ -296,20 +347,42 @@ export default function App() {
             onGoToAdminStats={() => setCurrentView('admin_stats')}
           />
         );
+      case 'totp_settings':
+        return (
+          <TotpSettingsScreen
+            totpEnabled={totpEnabled}
+            onBack={() => setCurrentView('main')}
+            onChanged={setTotpEnabled}
+          />
+        );
       default:
         return (
           <View style={{ flex: 1 }}>
-            <TouchableOpacity style={styles.logoutTrigger} onPress={handleLogout}>
-              <Text style={styles.logoutText}>ログアウト</Text>
-            </TouchableOpacity>
+            <View style={styles.topActions}>
+              {currentUserRole === 'USER' ? (
+                <TouchableOpacity
+                  style={styles.topActionButton}
+                  onPress={() => setCurrentView('totp_settings')}
+                >
+                  <Text style={styles.topActionText}>2FA設定</Text>
+                </TouchableOpacity>
+              ) : null}
+              {biometricEnabled && Platform.OS !== 'web' ? (
+                <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
+                  <Text style={styles.topActionText}>生体認証オフ</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
+                <Text style={styles.topActionText}>ログアウト</Text>
+              </TouchableOpacity>
+            </View>
 
-            <HomeScreen 
-              onAnalysisReady={handleAnalysisReady} 
+            <HomeScreen
+              onAnalysisReady={handleAnalysisReady}
               onGoToHistory={() => setCurrentView('history')}
               onGoToStats={() => setCurrentView('stats')}
-              // ★ [Issue #80] ハンドラを注入
               onGoToSettlement={() => setCurrentView('settlement_summary')}
-              onGoToAdminMenu={() => setCurrentView('admin_menu')} 
+              onGoToAdminMenu={() => setCurrentView('admin_menu')}
               currentMemberId={memberId}
               userRole={currentUserRole}
             />
@@ -331,21 +404,18 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.primary, padding: 40 },
-  loginTitle: { fontSize: 32, fontWeight: 'bold', color: 'white', marginBottom: 10 },
-  loginSub: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 30 },
-  inputWrapper: { width: '100%', marginBottom: 20 },
-  passwordInput: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-    padding: 15,
-    color: 'white',
-    fontSize: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+  topActions: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    flexDirection: 'row',
+    gap: 8,
   },
-  loginButton: { backgroundColor: 'white', width: '100%', padding: 18, borderRadius: 15, marginBottom: 15, alignItems: 'center' },
-  loginButtonText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 },
-  logoutTrigger: { position: 'absolute', top: 60, right: 20, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 8, borderRadius: 10 },
-  logoutText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
+  topActionButton: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    padding: 8,
+    borderRadius: 10,
+  },
+  topActionText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
 });
