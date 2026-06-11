@@ -1,6 +1,6 @@
 # モバイル・Web アクセスガイド（Issue #94）
 
-RecAlpt（読み：レシート）の **本番入口** と **開発用 Expo** の使い分け。
+RecAIpt（読み：レシート、Receipt + AI）の **本番入口** と **開発用 Expo** の使い分け。
 
 ## URL 一覧（stable 環境の例）
 

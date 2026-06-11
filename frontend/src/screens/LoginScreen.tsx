@@ -308,7 +308,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>RecAlpt</Text>
+      <Text style={styles.title}>RecAIpt</Text>
       <Text style={styles.tagline}>レシートで家計を管理</Text>
       {step === 'invite' && renderInviteStep()}
       {step === 'member' && renderMemberStep()}

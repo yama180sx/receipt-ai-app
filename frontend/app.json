@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "RecAlpt",
-    "slug": "recalpt",
+    "name": "RecAIpt",
+    "slug": "recaipt",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "RecAlpt のロック解除に Face ID を使用します。"
+        "NSFaceIDUsageDescription": "RecAIpt のロック解除に Face ID を使用します。"
       }
     },
     "android": {
@@ -28,8 +28,8 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "RecAlpt",
-      "shortName": "RecAlpt",
+      "name": "RecAIpt",
+      "shortName": "RecAIpt",
       "display": "standalone",
       "themeColor": "#2563eb",
       "backgroundColor": "#ffffff"
@@ -39,7 +39,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "RecAlpt のロック解除に Face ID を使用します。"
+          "faceIDPermission": "RecAIpt のロック解除に Face ID を使用します。"
         }
       ]
     ]
