@@ -15,6 +15,8 @@ import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
+import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
+import { showAlert } from '../utils/alertMessage';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
@@ -104,24 +106,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const uploadReceiptImage = async (imageUri: string) => {
-    const formData = new FormData();
-    const uriParts = imageUri.split('.');
-    const fileType = uriParts[uriParts.length - 1] || 'jpg';
-
-    // @ts-ignore — React Native FormData blob
-    formData.append('image', {
-      uri: imageUri,
-      name: `receipt_upload.${fileType}`,
-      type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
-    });
-    formData.append('memberId', currentMemberId.toString());
+    const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
 
     setIsAnalyzing(true);
     setJobStatus('uploading');
 
     const uploadRes = await apiClient.post('/receipts/upload', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
         'x-member-id': currentMemberId.toString(),
       },
     });
@@ -192,7 +183,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     } catch (err) {
       setIsAnalyzing(false);
       console.error('upload after crop', err);
-      Alert.alert('エラー', '画像のアップロードに失敗しました。');
+      const message = err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
+      if (Platform.OS === 'web') {
+        showAlert('エラー', message);
+      } else {
+        Alert.alert('エラー', message);
+      }
     }
   };
 
