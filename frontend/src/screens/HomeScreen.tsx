@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { AppButton, AppListItem } from '../components/ui';
+import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
@@ -46,6 +46,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [jobStatus, setJobStatus] = useState('');
   const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
+  const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -170,11 +171,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleScan = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('レシート画像', '取得方法を選んでください', [
-        { text: 'カメラ', onPress: () => void pickImageForWeb('camera') },
-        { text: 'ギャラリー', onPress: () => void pickImageForWeb('library') },
-        { text: 'キャンセル', style: 'cancel' },
-      ]);
+      // Web では Alert.alert の複数ボタンが効かないためモーダルを使う
+      setShowImageSourcePicker(true);
       return;
     }
 
@@ -320,6 +318,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </ScrollView>
 
+      <AppModal
+        visible={showImageSourcePicker}
+        onRequestClose={() => setShowImageSourcePicker(false)}
+        title="レシート画像"
+        description="取得方法を選んでください"
+        footer={
+          <View style={styles.sourcePickerActions}>
+            <AppButton
+              title="カメラ"
+              onPress={() => {
+                setShowImageSourcePicker(false);
+                void pickImageForWeb('camera');
+              }}
+            />
+            <AppButton
+              title="ギャラリー"
+              variant="secondary"
+              onPress={() => {
+                setShowImageSourcePicker(false);
+                void pickImageForWeb('library');
+              }}
+            />
+            <AppButton
+              title="キャンセル"
+              variant="outline"
+              onPress={() => setShowImageSourcePicker(false)}
+            />
+          </View>
+        }
+      />
+
       {pendingCropUri ? (
         <ReceiptImageCropModal
           visible
@@ -355,6 +384,7 @@ const styles = StyleSheet.create({
   captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },
   iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   captureButtonText: { ...theme.typography.h2, color: theme.colors.primary },
+  sourcePickerActions: { gap: 10, width: '100%' },
   jobStatusText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
   
   // ★ メニュー部分を Grid (flexWrap) 対応に変更
