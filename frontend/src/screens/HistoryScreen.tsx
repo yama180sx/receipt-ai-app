@@ -7,14 +7,14 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   Platform, 
-  Alert, 
-  useWindowDimensions 
+  Alert,
 } from 'react-native';
 import apiClient from '../utils/apiClient';
 import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
-import { theme, BREAKPOINTS } from '../theme';
+import { theme } from '../theme';
+import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 
 interface HistoryScreenProps {
@@ -27,9 +27,7 @@ interface HistoryScreenProps {
  * [Issue #67 / #64 / Web・ネイティブ完全互換] 履歴一覧画面
  */
 export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEditor }: HistoryScreenProps) {
-  const { width: windowWidth } = useWindowDimensions();
-  // Issue #66: 定数によるレスポンシブ判定
-  const isWide = windowWidth >= BREAKPOINTS.TABLET; 
+  const isWide = useIsWideLayout();
 
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<any[]>([]);

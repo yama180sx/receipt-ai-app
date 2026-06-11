@@ -308,7 +308,8 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>家計簿アプリ</Text>
+      <Text style={styles.title}>RecAlpt</Text>
+      <Text style={styles.tagline}>レシートで家計を管理</Text>
       {step === 'invite' && renderInviteStep()}
       {step === 'member' && renderMemberStep()}
       {step === 'password' && renderPasswordStep()}
@@ -329,7 +330,13 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 10,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  tagline: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+    marginBottom: 16,
     textAlign: 'center',
   },
   familyLabel: {

@@ -5,7 +5,6 @@ import {
   View, 
   ScrollView, 
   ActivityIndicator, 
-  useWindowDimensions,
 } from 'react-native';
 import {
   AppBackButton,
@@ -17,7 +16,8 @@ import {
   modalStyles,
 } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme, tableStyles, BREAKPOINTS } from '../theme';
+import { theme, tableStyles } from '../theme';
+import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { api } from '../utils/apiClient';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { showAlert } from '../utils/alertMessage';
@@ -47,8 +47,7 @@ interface SettlementSummaryScreenProps {
 }
 
 export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = ({ onBack }) => {
-  const { width } = useWindowDimensions();
-  const isWide = width >= BREAKPOINTS.TABLET;
+  const isWide = useIsWideLayout();
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);

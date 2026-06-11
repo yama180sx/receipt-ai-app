@@ -17,6 +17,7 @@ import apiClient from '../utils/apiClient';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
+import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 
@@ -62,7 +63,7 @@ interface StatisticsScreenProps {
  */
 export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMemberId, onBack }) => {
   const { width: windowWidth } = useWindowDimensions();
-  const isWide = windowWidth > 768;
+  const isWide = useIsWideLayout();
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);

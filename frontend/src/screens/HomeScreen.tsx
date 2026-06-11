@@ -5,18 +5,18 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView, 
-  Dimensions, 
   ActivityIndicator, 
-  Alert 
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem } from '../components/ui';
+import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
-
-const { width: windowWidth } = Dimensions.get('window');
+import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
 interface HomeScreenProps {
   onAnalysisReady: (data: any) => void; 
@@ -45,6 +45,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [jobStatus, setJobStatus] = useState('');
+  const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -101,51 +102,84 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, 2000);
   };
 
-  const handleScan = async () => {
+  const uploadReceiptImage = async (imageUri: string) => {
+    const formData = new FormData();
+    const uriParts = imageUri.split('.');
+    const fileType = uriParts[uriParts.length - 1] || 'jpg';
+
+    // @ts-ignore — React Native FormData blob
+    formData.append('image', {
+      uri: imageUri,
+      name: `receipt_upload.${fileType}`,
+      type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+    });
+    formData.append('memberId', currentMemberId.toString());
+
+    setIsAnalyzing(true);
+    setJobStatus('uploading');
+
+    const uploadRes = await apiClient.post('/receipts/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'x-member-id': currentMemberId.toString(),
+      },
+    });
+
+    if (uploadRes.data?.success) {
+      const jobId = uploadRes.data.data.jobId;
+      setJobStatus('queued');
+      pollJobStatus(jobId);
+    }
+  };
+
+  const openWebCrop = (imageUri: string) => {
+    setPendingCropUri(imageUri);
+  };
+
+  const pickImageForWeb = async (source: 'camera' | 'library') => {
+    try {
+      const picker =
+        source === 'camera'
+          ? ImagePicker.launchCameraAsync({ mediaTypes: 'images' as const, quality: 0.8 })
+          : ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as const, quality: 0.8 });
+      const result = await picker;
+      if (result.canceled || !result.assets?.[0]) return;
+      openWebCrop(result.assets[0].uri);
+    } catch (err) {
+      console.error('pickImageForWeb', err);
+      Alert.alert('エラー', '画像の取得に失敗しました。ギャラリーから選択をお試しください。');
+    }
+  };
+
+  const pickImageNative = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('権限エラー', 'カメラの使用を許可してください。');
       return;
     }
 
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: 'images' as const,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    await uploadReceiptImage(result.assets[0].uri);
+  };
+
+  const handleScan = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('レシート画像', '取得方法を選んでください', [
+        { text: 'カメラ', onPress: () => void pickImageForWeb('camera') },
+        { text: 'ギャラリー', onPress: () => void pickImageForWeb('library') },
+        { text: 'キャンセル', style: 'cancel' },
+      ]);
+      return;
+    }
+
     try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: 'images' as any, 
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (result.canceled || !result.assets) return;
-
-      const imageUri = result.assets[0].uri;
-      const formData = new FormData();
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      // @ts-ignore
-      formData.append('image', {
-        uri: imageUri,
-        name: `receipt_upload.${fileType}`,
-        type: `image/${fileType}`,
-      });
-
-      formData.append('memberId', currentMemberId.toString());
-
-      setIsAnalyzing(true);
-      setJobStatus('uploading');
-
-      const uploadRes = await apiClient.post('/receipts/upload', formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'x-member-id': currentMemberId.toString()
-        },
-      });
-
-      if (uploadRes.data && uploadRes.data.success) {
-        const jobId = uploadRes.data.data.jobId;
-        setJobStatus('queued');
-        pollJobStatus(jobId);
-      }
+      await pickImageNative();
     } catch (err) {
       setIsAnalyzing(false);
       console.error('handleScan Error:', err);
@@ -153,14 +187,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
-  const isWide = windowWidth > 600;
+  const handleCropConfirm = async (croppedUri: string) => {
+    setPendingCropUri(null);
+    try {
+      await uploadReceiptImage(croppedUri);
+    } catch (err) {
+      setIsAnalyzing(false);
+      console.error('upload after crop', err);
+      Alert.alert('エラー', '画像のアップロードに失敗しました。');
+    }
+  };
+
+  const isWide = useIsWideHomeMenu();
   const isAdmin = userRole === 'ADMIN';
  
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
+          <Text style={styles.headerSubtitle}>RecAlpt</Text>
           <Text style={styles.headerTitle}>
             {currentMemberId === 1 ? '山本さんのダッシュボード' : '共有メニュー'}
           </Text>
@@ -274,6 +319,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
       </ScrollView>
+
+      {pendingCropUri ? (
+        <ReceiptImageCropModal
+          visible
+          imageUri={pendingCropUri}
+          onConfirm={(uri) => void handleCropConfirm(uri)}
+          onCancel={() => setPendingCropUri(null)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 };
