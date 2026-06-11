@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type DisplayLayoutMode = 'auto' | 'mobile' | 'web';
 
-const STORAGE_KEY = '@recalpt_display_layout_mode';
+const STORAGE_KEY = '@recaipt_display_layout_mode';
 
 export async function loadDisplayLayoutMode(): Promise<DisplayLayoutMode> {
   try {
