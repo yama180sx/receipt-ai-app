@@ -57,7 +57,15 @@ apiClient.interceptors.request.use(async (config) => {
   if (memberId) {
     config.headers['x-member-id'] = memberId;
   }
-  
+
+  // FormData 送信時は application/json を外し、boundary 付き multipart を自動設定させる
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (config.headers) {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+  }
+
   return config;
 }, (error) => Promise.reject(error));
 

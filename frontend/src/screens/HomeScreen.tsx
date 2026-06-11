@@ -16,6 +16,12 @@ import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
+import {
+  consumePendingCropUri,
+  persistPendingCropUri,
+  registerWebImageFile,
+  clearPendingCropUri,
+} from '../utils/webImageFileRegistry';
 import { showAlert } from '../utils/alertMessage';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
@@ -78,6 +84,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     fetchData();
   }, [fetchData]);
 
+  // Android Web: カメラ撮影後にページが再描画されても切り取り画面を復元
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const restored = consumePendingCropUri();
+    if (restored) {
+      setPendingCropUri(restored);
+    }
+  }, []);
+
   const pollJobStatus = async (jobId: string) => {
     const interval = setInterval(async () => {
       try {
@@ -125,6 +140,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const openWebCrop = (imageUri: string) => {
+    if (Platform.OS === 'web') {
+      persistPendingCropUri(imageUri);
+    }
     setPendingCropUri(imageUri);
   };
 
@@ -136,10 +154,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           : ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as const, quality: 0.8 });
       const result = await picker;
       if (result.canceled || !result.assets?.[0]) return;
-      openWebCrop(result.assets[0].uri);
+      const asset = result.assets[0];
+      if (Platform.OS === 'web' && asset.file) {
+        registerWebImageFile(asset.uri, asset.file);
+      }
+      openWebCrop(asset.uri);
     } catch (err) {
       console.error('pickImageForWeb', err);
-      Alert.alert('エラー', '画像の取得に失敗しました。ギャラリーから選択をお試しください。');
+      showAlert('エラー', '画像の取得に失敗しました。ギャラリーから選択をお試しください。');
     }
   };
 
@@ -177,6 +199,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const handleCropConfirm = async (croppedUri: string) => {
+    clearPendingCropUri();
     setPendingCropUri(null);
     try {
       await uploadReceiptImage(croppedUri);
@@ -192,10 +215,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const handleCropCancel = () => {
+    clearPendingCropUri();
+    setPendingCropUri(null);
+  };
+
   const isWide = useIsWideHomeMenu();
   const isAdmin = userRole === 'ADMIN';
  
   return (
+    <>
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
@@ -345,15 +374,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
       />
 
+    </SafeAreaView>
+
       {pendingCropUri ? (
         <ReceiptImageCropModal
           visible
           imageUri={pendingCropUri}
           onConfirm={(uri) => void handleCropConfirm(uri)}
-          onCancel={() => setPendingCropUri(null)}
+          onCancel={handleCropCancel}
         />
       ) : null}
-    </SafeAreaView>
+    </>
   );
 };
 
