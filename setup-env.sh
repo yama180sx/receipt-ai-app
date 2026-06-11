@@ -56,7 +56,8 @@ else
     REDIS_PORT=6379
     BACKEND_COMMAND="npm run start"
     # ブラウザ Origin は :80 省略のことがあるため両方許可（Issue #89 ログイン CORS）
-    CORS_ORIGIN="http://$HOST_IP,http://$HOST_IP:$WEB_PORT"
+    # Expo dev（:8082）と Expo Go（exp://）も許可
+    CORS_ORIGIN="http://$HOST_IP,http://$HOST_IP:$WEB_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT"
     GEMINI_MODEL="gemini-flash-latest"
     CRON_SCHEDULE="0 4 * * *" # stable環境は毎日午前4時に実行
 fi
