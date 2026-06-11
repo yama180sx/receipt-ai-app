@@ -33,6 +33,8 @@ import { TotpSettingsScreen } from './src/screens/TotpSettingsScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+import { DisplayModeProvider } from './src/contexts/DisplayModeContext';
+import { DisplayModeSettings } from './src/components/DisplayModeSettings';
 import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -359,6 +361,7 @@ export default function App() {
         return (
           <View style={{ flex: 1 }}>
             <View style={styles.topActions}>
+              {Platform.OS === 'web' ? <DisplayModeSettings /> : null}
               {currentUserRole === 'USER' ? (
                 <TouchableOpacity
                   style={styles.topActionButton}
@@ -393,11 +396,13 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ResponsiveContainer fullWidth={isFullWidth}>
-        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-          {renderMainContent()}
-        </View>
-      </ResponsiveContainer>
+      <DisplayModeProvider>
+        <ResponsiveContainer fullWidth={isFullWidth}>
+          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            {renderMainContent()}
+          </View>
+        </ResponsiveContainer>
+      </DisplayModeProvider>
     </SafeAreaProvider>
   );
 }

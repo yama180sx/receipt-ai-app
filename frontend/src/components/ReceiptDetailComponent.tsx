@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { AppButton, AppSelect, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme, BREAKPOINTS } from '../theme';
+import { theme } from '../theme';
+import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import apiClient from '../utils/apiClient';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 
@@ -38,7 +39,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 }) => {
   const { width: windowWidth } = useWindowDimensions();
   const effectiveWidth = fullWidth ? windowWidth : windowWidth - 350;
-  const isWide = effectiveWidth >= BREAKPOINTS.TABLET;
+  const isWide = useIsWideLayout({ width: effectiveWidth });
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);

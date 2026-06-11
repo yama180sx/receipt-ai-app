@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "tmp_project",
-    "slug": "tmp_project",
+    "name": "RecAlpt",
+    "slug": "recalpt",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "家計簿アプリのロック解除に Face ID を使用します。"
+        "NSFaceIDUsageDescription": "RecAlpt のロック解除に Face ID を使用します。"
       }
     },
     "android": {
@@ -27,14 +27,19 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "RecAlpt",
+      "shortName": "RecAlpt",
+      "display": "standalone",
+      "themeColor": "#2563eb",
+      "backgroundColor": "#ffffff"
     },
     "plugins": [
       "expo-secure-store",
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "家計簿アプリのロック解除に Face ID を使用します。"
+          "faceIDPermission": "RecAlpt のロック解除に Face ID を使用します。"
         }
       ]
     ]
