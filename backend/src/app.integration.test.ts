@@ -465,6 +465,43 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     expect(res.body.data.existingReceiptId).toBeGreaterThan(0);
   });
 
+  it('DELETE /receipts/jobs/:jobId removes owned job', async () => {
+    clearMockReceiptJobs();
+    registerMockReceiptJob('discard-me', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: 'uploads/discard-me.webp',
+    });
+
+    const token = await loginAsTestMember(app, 1);
+    const del = await request(app)
+      .delete('/api/receipts/jobs/discard-me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(del.status).toBe(200);
+    expect(del.body.success).toBe(true);
+
+    const list = await request(app)
+      .get('/api/receipts/jobs')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(list.body.data.find((j: { id: string }) => j.id === 'discard-me')).toBeUndefined();
+  });
+
+  it('DELETE /receipts/jobs rejects cross-member job', async () => {
+    registerMockReceiptJob('other-member-job', {
+      memberId: 2,
+      familyGroupId: 1,
+    });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .delete('/api/receipts/jobs/other-member-job')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+
   it('rejects unauthenticated upload image access', async () => {
     const res = await request(app).get('/api/uploads/tenant-isolation-fixture.webp');
     expect(res.status).toBe(401);

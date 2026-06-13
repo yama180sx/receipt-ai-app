@@ -1,6 +1,10 @@
 import type { Job } from 'bullmq';
+import fs from 'fs/promises';
+import path from 'path';
 import { receiptQueue } from '../queues/receiptQueue';
 import { checkDuplicateReceipt } from './duplicateReceiptService';
+import { prisma } from '../utils/prismaClient';
+import { AppError } from '../utils/appError';
 
 const LIST_JOB_STATES = ['waiting', 'active', 'completed', 'failed', 'delayed', 'paused'] as const;
 
@@ -140,4 +144,69 @@ export async function enrichCompletedJobPayload(
     duplicateSuspected: duplicate.duplicateSuspected,
     existingReceiptId: duplicate.existingReceiptId,
   };
+}
+
+async function getOwnedReceiptJob(
+  jobId: string,
+  familyGroupId: number,
+  memberId: number
+): Promise<Job> {
+  const job = await receiptQueue.getJob(jobId);
+  if (!job) {
+    throw new AppError('ジョブが見つかりません。', 404);
+  }
+
+  const jobFamilyGroupId = Number(job.data?.familyGroupId);
+  const jobMemberId = Number(job.data?.memberId);
+  if (
+    !jobFamilyGroupId ||
+    jobFamilyGroupId !== familyGroupId ||
+    jobMemberId !== memberId
+  ) {
+    throw new AppError('ジョブが見つかりません。', 404);
+  }
+
+  return job;
+}
+
+async function deletePendingJobImage(
+  imagePath: string | undefined,
+  familyGroupId: number
+): Promise<void> {
+  if (!imagePath || typeof imagePath !== 'string') return;
+
+  const normalized = imagePath.replace(/\\/g, '/');
+  const saved = await prisma.receipt.findFirst({
+    where: { familyGroupId, imagePath: normalized },
+    select: { id: true },
+  });
+  if (saved) return;
+
+  try {
+    await fs.unlink(path.resolve(normalized));
+  } catch {
+    // ファイルが無い場合は無視
+  }
+}
+
+/** commit 成功後: キューから除去（画像は保存済みのため残す） */
+export async function removeReceiptJobAfterCommit(
+  jobId: string,
+  familyGroupId: number,
+  memberId: number
+): Promise<void> {
+  const job = await getOwnedReceiptJob(jobId, familyGroupId, memberId);
+  await job.remove();
+}
+
+/** 未取り込みジョブの破棄（キュー除去 + 未保存画像の削除） */
+export async function discardReceiptJobForMember(
+  jobId: string,
+  familyGroupId: number,
+  memberId: number
+): Promise<void> {
+  const job = await getOwnedReceiptJob(jobId, familyGroupId, memberId);
+  const imagePath = job.data?.imagePath;
+  await job.remove();
+  await deletePendingJobImage(imagePath, familyGroupId);
 }

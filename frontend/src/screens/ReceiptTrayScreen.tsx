@@ -1,28 +1,26 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackButton } from '../components/ui';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
-import { useReceiptTrayLocalFailures } from '../contexts/ReceiptTrayContext';
-import { useReceiptJobs } from '../hooks/useReceiptJobs';
+import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { theme } from '../theme';
-import { countReceiptTrayItems, sortReceiptTrayItems } from '../utils/receiptJobDisplay';
 
 type Props = {
   onBack: () => void;
-  enabled: boolean;
 };
 
-export function ReceiptTrayScreen({ onBack, enabled }: Props) {
-  const { jobs, refreshing, refresh } = useReceiptJobs(enabled);
-  const { localFailedJobs } = useReceiptTrayLocalFailures();
-
-  const trayItems = useMemo(
-    () => sortReceiptTrayItems([...jobs, ...localFailedJobs]),
-    [jobs, localFailedJobs]
-  );
-
-  const totalCount = countReceiptTrayItems(trayItems);
+export function ReceiptTrayScreen({ onBack }: Props) {
+  const {
+    trayItems,
+    trayItemCount,
+    refreshing,
+    refresh,
+    openTrayItem,
+    discardTrayItem,
+    canOpenTrayItem,
+    canDiscardTrayItem,
+  } = useReceiptTray();
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
@@ -31,12 +29,12 @@ export function ReceiptTrayScreen({ onBack, enabled }: Props) {
         <View style={styles.headerText}>
           <Text style={styles.title}>確認トレイ</Text>
           <Text style={styles.subtitle}>
-            {totalCount > 0 ? `${totalCount} 件の受付` : '受付中のレシートはありません'}
+            {trayItemCount > 0 ? `${trayItemCount} 件の受付` : '受付中のレシートはありません'}
           </Text>
         </View>
-        {totalCount > 0 ? (
+        {trayItemCount > 0 ? (
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{totalCount}</Text>
+            <Text style={styles.countBadgeText}>{trayItemCount}</Text>
           </View>
         ) : (
           <View style={styles.headerSpacer} />
@@ -57,6 +55,10 @@ export function ReceiptTrayScreen({ onBack, enabled }: Props) {
         <ReceiptTrayPanel
           items={trayItems}
           showSectionHeaders
+          onItemPress={(item) => void openTrayItem(item)}
+          onItemDiscard={(item) => void discardTrayItem(item)}
+          canOpenItem={canOpenTrayItem}
+          canDiscardItem={canDiscardTrayItem}
           emptyTitle="確認待ちのレシートはありません"
           emptyDescription="ホームからレシートを撮影すると、解析状況がここに表示されます。"
         />

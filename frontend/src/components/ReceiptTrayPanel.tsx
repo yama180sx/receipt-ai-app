@@ -13,6 +13,10 @@ type Props = {
   maxItems?: number;
   showSectionHeaders?: boolean;
   onOpenFullTray?: () => void;
+  onItemPress?: (item: ReceiptTrayItem) => void;
+  onItemDiscard?: (item: ReceiptTrayItem) => void;
+  canOpenItem?: (item: ReceiptTrayItem) => boolean;
+  canDiscardItem?: (item: ReceiptTrayItem) => boolean;
 };
 
 export function ReceiptTrayPanel({
@@ -22,6 +26,10 @@ export function ReceiptTrayPanel({
   maxItems,
   showSectionHeaders = true,
   onOpenFullTray,
+  onItemPress,
+  onItemDiscard,
+  canOpenItem,
+  canDiscardItem,
 }: Props) {
   const sections = useMemo(() => groupReceiptTrayItems(items), [items]);
   const totalCount = items.length;
@@ -64,7 +72,14 @@ export function ReceiptTrayPanel({
           ) : null}
           <View style={styles.sectionItems}>
             {section.items.map((item) => (
-              <ReceiptJobTrayRow key={item.id} item={item} />
+              <ReceiptJobTrayRow
+                key={item.id}
+                item={item}
+                canOpen={canOpenItem?.(item) ?? false}
+                canDiscard={canDiscardItem?.(item) ?? false}
+                onPress={onItemPress ? () => onItemPress(item) : undefined}
+                onDiscard={onItemDiscard ? () => onItemDiscard(item) : undefined}
+              />
             ))}
           </View>
         </View>

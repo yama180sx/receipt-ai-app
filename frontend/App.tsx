@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -31,6 +31,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
 import { ReceiptTrayScreen } from './src/screens/ReceiptTrayScreen';
 import { ReceiptTrayProvider } from './src/contexts/ReceiptTrayContext';
+import type { ReceiptScanInitialData } from './src/types/receiptScan';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
@@ -63,8 +64,10 @@ export default function App() {
   const [resultData, setResultData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [scanReturnView, setScanReturnView] = useState<ViewType>('main');
 
   const [targetReceipt, setTargetReceipt] = useState<any>(null);
+  const refreshTrayRef = useRef<(() => Promise<void>) | null>(null);
 
   const applySession = useCallback((session: StoredSession) => {
     setUserToken(session.token);
@@ -256,9 +259,30 @@ export default function App() {
   }, [currentView, resultData, isReady, userToken]);
 
   const handleAnalysisReady = (data: any) => {
+    setScanReturnView('main');
     setResultData(data);
     setCurrentView('receipt_scan');
   };
+
+  const handleOpenScanFromTray = useCallback(
+    (data: ReceiptScanInitialData) => {
+      setScanReturnView(currentView === 'receipt_tray' ? 'receipt_tray' : 'main');
+      setResultData(data);
+      setCurrentView('receipt_scan');
+    },
+    [currentView]
+  );
+
+  const handleScanClose = useCallback(
+    (options?: { refreshTray?: boolean }) => {
+      if (options?.refreshTray) {
+        void refreshTrayRef.current?.();
+      }
+      setResultData(null);
+      setCurrentView(scanReturnView);
+    },
+    [scanReturnView]
+  );
 
   if (!isReady) {
     return (
@@ -332,25 +356,14 @@ export default function App() {
       case 'product_master':
         return <ProductMasterScreen onBack={() => setCurrentView('admin_menu')} currentMemberId={memberId} />;
       case 'receipt_tray':
-        return (
-          <ReceiptTrayScreen
-            enabled={memberId > 0}
-            onBack={() => setCurrentView('main')}
-          />
-        );
+        return <ReceiptTrayScreen onBack={() => setCurrentView('main')} />;
       case 'receipt_scan':
         return (
           <ReceiptScanScreen
             initialData={resultData}
             categories={categories}
-            onSuccess={() => {
-              setResultData(null);
-              setCurrentView('main');
-            }}
-            onCancel={() => {
-              setResultData(null);
-              setCurrentView('main');
-            }}
+            onSuccess={() => handleScanClose({ refreshTray: true })}
+            onCancel={() => handleScanClose()}
           />
         );
       case 'prompt_editor':
@@ -428,7 +441,19 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <DisplayModeProvider>
-        {userToken ? <ReceiptTrayProvider>{appBody}</ReceiptTrayProvider> : appBody}
+        {userToken && currentMemberId ? (
+          <ReceiptTrayProvider
+            enabled
+            onOpenScan={handleOpenScanFromTray}
+            onRegisterRefresh={(refresh) => {
+              refreshTrayRef.current = () => refresh();
+            }}
+          >
+            {appBody}
+          </ReceiptTrayProvider>
+        ) : (
+          appBody
+        )}
       </DisplayModeProvider>
     </SafeAreaProvider>
   );

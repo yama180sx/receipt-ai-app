@@ -5,6 +5,7 @@ export type MockReceiptJob = {
   failedReason: string | null;
   timestamp: number;
   getState: () => Promise<string>;
+  remove: () => Promise<void>;
 };
 
 export const mockReceiptJobs = new Map<string, MockReceiptJob>();
@@ -27,6 +28,9 @@ export function registerMockReceiptJob(
     failedReason: options?.failedReason ?? null,
     timestamp: options?.timestamp ?? Date.now(),
     getState: async () => state,
+    remove: async () => {
+      mockReceiptJobs.delete(id);
+    },
   });
 }
 
