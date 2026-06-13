@@ -206,7 +206,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
-/** TOTP セットアップ開始（pending setup またはログイン済み USER） */
+/** TOTP セットアップ開始（pending setup またはログイン済みメンバー） */
 export const startTotpSetup = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as Request & { user: AuthUser }).user;
@@ -312,7 +312,7 @@ export const verifyTotp = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-/** USER 任意: 二要素認証を無効化 */
+/** 二要素認証を無効化（必須ロールでは拒否） */
 export const disableTotp = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as Request & { user: AuthUser }).user;
@@ -326,7 +326,7 @@ export const disableTotp = async (req: Request, res: Response, next: NextFunctio
       throw new AppError('二要素認証が有効ではありません。', 400);
     }
     if (isTotpRequiredForRole(member.role)) {
-      throw new AppError('管理者は二要素認証を無効にできません。', 403);
+      throw new AppError('二要素認証は必須のため無効にできません。', 403);
     }
 
     const passwordOk = await bcrypt.compare(password, member.password_hash);

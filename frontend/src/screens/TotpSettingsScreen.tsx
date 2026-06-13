@@ -20,7 +20,6 @@ type Props = {
 export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
   const [secret, setSecret] = useState<string | null>(null);
   const [code, setCode] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleStartEnable = async () => {
@@ -55,25 +54,6 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
     }
   };
 
-  const handleDisable = async () => {
-    if (!password || !code.trim()) {
-      Alert.alert('入力エラー', 'パスワードと6桁コードを入力してください。');
-      return;
-    }
-    setLoading(true);
-    try {
-      await loginService.disableTotp(password, code);
-      setPassword('');
-      setCode('');
-      onChanged(false);
-      Alert.alert('完了', '二要素認証を無効にしました。');
-    } catch (e: unknown) {
-      Alert.alert('エラー', e instanceof Error ? e.message : '無効化に失敗しました。');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -84,32 +64,9 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       {totpEnabled ? (
         <>
           <Text style={styles.subtitle}>現在: 有効</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="パスワード"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="6桁コード"
-            keyboardType="number-pad"
-            maxLength={6}
-            value={code}
-            onChangeText={setCode}
-          />
-          <TouchableOpacity
-            style={styles.dangerButton}
-            onPress={handleDisable}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.dangerButtonText}>二要素認証を無効にする</Text>
-            )}
-          </TouchableOpacity>
+          <Text style={styles.subtitle}>
+            二要素認証は全メンバー必須のため、無効にできません。
+          </Text>
         </>
       ) : secret ? (
         <>
@@ -187,11 +144,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: 'white', fontWeight: 'bold' },
-  dangerButton: {
-    backgroundColor: '#c0392b',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  dangerButtonText: { color: 'white', fontWeight: 'bold' },
 });

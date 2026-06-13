@@ -364,14 +364,6 @@ export default function App() {
               <View style={styles.topActions}>
                 <DisplayModeSettings />
                 <View style={styles.topActionButtons}>
-                  {currentUserRole === 'USER' ? (
-                    <TouchableOpacity
-                      style={styles.topActionButton}
-                      onPress={() => setCurrentView('totp_settings')}
-                    >
-                      <Text style={styles.topActionText}>2FA設定</Text>
-                    </TouchableOpacity>
-                  ) : null}
                   {biometricEnabled && Platform.OS !== 'web' ? (
                     <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
                       <Text style={styles.topActionText}>生体認証オフ</Text>

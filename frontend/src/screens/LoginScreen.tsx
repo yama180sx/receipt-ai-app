@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +22,7 @@ type Props = {
 };
 
 export function LoginScreen({ onLoginSuccess }: Props) {
+  const scrollRef = useRef<ScrollView>(null);
   const [step, setStep] = useState<LoginStep>('invite');
   const [inviteCode, setInviteCode] = useState('');
   const [family, setFamily] = useState<ResolvedFamily | null>(null);
@@ -167,12 +170,22 @@ export function LoginScreen({ onLoginSuccess }: Props) {
     }
   };
 
+  const scrollToFormBottom = () => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  };
+
+  useEffect(() => {
+    if (step !== 'totp_setup' && step !== 'totp_verify') return;
+    const timer = setTimeout(scrollToFormBottom, 150);
+    return () => clearTimeout(timer);
+  }, [step, totpSecret]);
+
   const renderTotpStep = (isSetup: boolean) => (
     <>
       <Text style={styles.familyLabel}>{family?.name}</Text>
       <Text style={styles.subtitle}>
         {isSetup
-          ? '二要素認証の設定（管理者必須）'
+          ? '二要素認証の設定（初回ログイン）'
           : '二要素認証コードを入力'}
       </Text>
       {isSetup && totpSecret ? (
@@ -190,6 +203,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
           placeholderTextColor="rgba(255,255,255,0.6)"
           value={totpCode}
           onChangeText={setTotpCode}
+          onFocus={scrollToFormBottom}
           keyboardType="number-pad"
           maxLength={6}
           editable={!loading}
@@ -306,25 +320,51 @@ export function LoginScreen({ onLoginSuccess }: Props) {
     </>
   );
 
+  const isTotpStep = step === 'totp_setup' || step === 'totp_verify';
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>RecAIpt</Text>
-      <Text style={styles.tagline}>レシートで家計を管理</Text>
-      {step === 'invite' && renderInviteStep()}
-      {step === 'member' && renderMemberStep()}
-      {step === 'password' && renderPasswordStep()}
-      {step === 'totp_setup' && renderTotpStep(true)}
-      {step === 'totp_verify' && renderTotpStep(false)}
-    </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isTotpStep ? styles.scrollContentTotp : styles.scrollContentCentered,
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>RecAIpt</Text>
+        <Text style={styles.tagline}>レシートで家計を管理</Text>
+        {step === 'invite' && renderInviteStep()}
+        {step === 'member' && renderMemberStep()}
+        {step === 'password' && renderPasswordStep()}
+        {step === 'totp_setup' && renderTotpStep(true)}
+        {step === 'totp_verify' && renderTotpStep(false)}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     backgroundColor: theme.colors.primary,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 40,
+    paddingBottom: 48,
+  },
+  scrollContentCentered: {
+    justifyContent: 'center',
+  },
+  scrollContentTotp: {
+    justifyContent: 'flex-start',
+    paddingTop: 24,
+    paddingBottom: 160,
   },
   title: {
     fontSize: 32,
