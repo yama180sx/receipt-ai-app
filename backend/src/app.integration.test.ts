@@ -382,6 +382,89 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     expect(res.body.data.state).toBe('completed');
   });
 
+  it('GET /receipts/jobs returns only logged-in member jobs', async () => {
+    clearMockReceiptJobs();
+    registerMockReceiptJob('member1-job', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: 'uploads/member1.webp',
+    }, { timestamp: 2000 });
+    registerMockReceiptJob('member2-job', {
+      memberId: 2,
+      familyGroupId: 1,
+      imagePath: 'uploads/member2.webp',
+    }, { timestamp: 1000 });
+
+    const tokenMember1 = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .get('/api/receipts/jobs')
+      .set('Authorization', `Bearer ${tokenMember1}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].id).toBe('member1-job');
+  });
+
+  it('GET /receipts/jobs flags duplicateSuspected on completed jobs', async () => {
+    clearMockReceiptJobs();
+    registerMockReceiptJob('dup-job', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: 'uploads/new-dup.webp',
+    }, {
+      returnvalue: {
+        parsedData: {
+          storeName: '山本家テスト店',
+          purchaseDate: '2026-01-10',
+          totalAmount: 100,
+          items: [{ name: 'テスト商品', price: 100, quantity: 1 }],
+        },
+        imagePath: 'uploads/new-dup.webp',
+        validation: { isSuspicious: false, warnings: [] },
+      },
+    });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .get('/api/receipts/jobs')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const job = res.body.data.find((j: { id: string }) => j.id === 'dup-job');
+    expect(job).toBeDefined();
+    expect(job.duplicateSuspected).toBe(true);
+    expect(job.existingReceiptId).toBeGreaterThan(0);
+    expect(job.parsedData.storeName).toBe('山本家テスト店');
+  });
+
+  it('getJobStatus enriches completed jobs with duplicate flags', async () => {
+    registerMockReceiptJob('dup-status-job', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: 'uploads/dup-status.webp',
+    }, {
+      returnvalue: {
+        parsedData: {
+          storeName: '山本家テスト店',
+          purchaseDate: '2026-01-10',
+          totalAmount: 100,
+          items: [],
+        },
+        imagePath: 'uploads/dup-status.webp',
+      },
+    });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .get('/api/receipts/status/dup-status-job')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.duplicateSuspected).toBe(true);
+    expect(res.body.data.existingReceiptId).toBeGreaterThan(0);
+  });
+
   it('rejects unauthenticated upload image access', async () => {
     const res = await request(app).get('/api/uploads/tenant-isolation-fixture.webp');
     expect(res.status).toBe(401);

@@ -20,6 +20,7 @@ import {
   updateItemCategory,
   getMonthlyStats,
   getJobStatus,
+  getReceiptJobs,
   getAdvancedStats,
   commitReceipt,
   getFamilyMembers,
@@ -95,6 +96,7 @@ router.get('/family-groups/members', getFamilyMembers);
 router.get('/uploads/:filename', serveReceiptImage);
 
 router.get('/receipts', getReceipts);
+router.get('/receipts/jobs', getReceiptJobs);
 router.get('/receipts/latest', getLatestReceipt);
 router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
