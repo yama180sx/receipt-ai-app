@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,7 @@ import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
-import { useReceiptTrayLocalFailures } from '../contexts/ReceiptTrayContext';
-import { useReceiptJobs } from '../hooks/useReceiptJobs';
+import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
@@ -27,7 +26,6 @@ import {
   clearPendingCropUri,
 } from '../utils/webImageFileRegistry';
 import { showAlert } from '../utils/alertMessage';
-import { countReceiptTrayItems, sortReceiptTrayItems } from '../utils/receiptJobDisplay';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
@@ -68,15 +66,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
   const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
 
-  const { jobs, activeCount, refresh: refreshJobs } = useReceiptJobs(currentMemberId > 0);
-  const { localFailedJobs, addLocalFailedJob } = useReceiptTrayLocalFailures();
-
-  const trayItems = useMemo(
-    () => sortReceiptTrayItems([...jobs, ...localFailedJobs]),
-    [jobs, localFailedJobs]
-  );
-
-  const trayItemCount = countReceiptTrayItems(trayItems);
+  const {
+    activeCount,
+    refresh: refreshJobs,
+    trayItems,
+    trayItemCount,
+    addLocalFailedJob,
+    openTrayItem,
+    discardTrayItem,
+    canOpenTrayItem,
+    canDiscardTrayItem,
+  } = useReceiptTray();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -305,6 +305,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               maxItems={HOME_TRAY_PREVIEW_LIMIT}
               showSectionHeaders={trayItemCount > 0}
               onOpenFullTray={onGoToReceiptTray}
+              onItemPress={(item) => void openTrayItem(item)}
+              onItemDiscard={(item) => void discardTrayItem(item)}
+              canOpenItem={canOpenTrayItem}
+              canDiscardItem={canDiscardTrayItem}
               emptyTitle="確認待ちのレシートはありません"
               emptyDescription="撮影したレシートの解析状況がここに表示されます。"
             />

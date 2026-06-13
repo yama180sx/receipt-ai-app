@@ -21,6 +21,7 @@ import {
   getMonthlyStats,
   getJobStatus,
   getReceiptJobs,
+  discardReceiptJob,
   getAdvancedStats,
   commitReceipt,
   getFamilyMembers,
@@ -97,6 +98,7 @@ router.get('/uploads/:filename', serveReceiptImage);
 
 router.get('/receipts', getReceipts);
 router.get('/receipts/jobs', getReceiptJobs);
+router.delete('/receipts/jobs/:jobId', discardReceiptJob);
 router.get('/receipts/latest', getLatestReceipt);
 router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
