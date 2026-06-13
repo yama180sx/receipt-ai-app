@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Image,
   Modal,
   PanResponder,
+  Platform,
   type LayoutChangeEvent,
   type GestureResponderEvent,
   type PanResponderGestureState,
@@ -13,6 +14,13 @@ import {
 import * as ImageManipulator from 'expo-image-manipulator';
 import { AppButton } from './ui';
 import { theme } from '../theme';
+import { registerWebImageFile, uriToWebImageFile } from '../utils/webImageFileRegistry';
+import {
+  computeContainedLayout,
+  cropImageUriWeb,
+  loadImageDimensions,
+  mapSelectionToCrop,
+} from '../utils/cropImageWeb';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -46,6 +54,13 @@ export function ReceiptImageCropModal({
   const [selection, setSelection] = useState<Rect | null>(null);
   const [processing, setProcessing] = useState(false);
   const dragStart = useRef<Point | null>(null);
+
+  useEffect(() => {
+    setSelection(null);
+    dragStart.current = null;
+    setDisplaySize({ width: 0, height: 0 });
+    setNaturalSize({ width: 0, height: 0 });
+  }, [imageUri, visible]);
 
   const resetState = useCallback(() => {
     setSelection(null);
@@ -89,40 +104,68 @@ export function ReceiptImageCropModal({
     })
   ).current;
 
-  const handleConfirm = async () => {
-    if (!selection || selection.width < 8 || selection.height < 8) {
-      onConfirm(imageUri);
-      return;
+  const getNaturalSize = async (): Promise<{ width: number; height: number }> => {
+    if (naturalSize.width > 0 && naturalSize.height > 0) {
+      return naturalSize;
     }
-    if (!displaySize.width || !naturalSize.width) {
-      onConfirm(imageUri);
-      return;
+    if (Platform.OS === 'web') {
+      return loadImageDimensions(imageUri);
+    }
+    return new Promise((resolve, reject) => {
+      Image.getSize(
+        imageUri,
+        (width, height) => resolve({ width, height }),
+        reject
+      );
+    });
+  };
+
+  const cropSelectedRegion = async (): Promise<string | null> => {
+    if (!selection || selection.width < 8 || selection.height < 8) return null;
+    if (!displaySize.width || !displaySize.height) return null;
+
+    const natural = await getNaturalSize();
+    const layout = computeContainedLayout(
+      displaySize.width,
+      displaySize.height,
+      natural.width,
+      natural.height
+    );
+    const crop = mapSelectionToCrop(selection, layout, natural.width, natural.height);
+    if (!crop) return null;
+
+    if (Platform.OS === 'web') {
+      return cropImageUriWeb(imageUri, crop);
     }
 
+    const result = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [{ crop }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  };
+
+  const finishConfirm = async (uri: string) => {
+    if (Platform.OS === 'web') {
+      try {
+        const file = await uriToWebImageFile(uri, 'receipt_cropped.jpg');
+        registerWebImageFile(uri, file);
+      } catch (e) {
+        console.error('[Crop] web file register failed', e);
+      }
+    }
+    onConfirm(uri);
+  };
+
+  const handleConfirm = async () => {
     setProcessing(true);
     try {
-      const scaleX = naturalSize.width / displaySize.width;
-      const scaleY = naturalSize.height / displaySize.height;
-      const originX = Math.max(0, Math.round(selection.x * scaleX));
-      const originY = Math.max(0, Math.round(selection.y * scaleY));
-      const cropWidth = Math.min(
-        naturalSize.width - originX,
-        Math.round(selection.width * scaleX)
-      );
-      const cropHeight = Math.min(
-        naturalSize.height - originY,
-        Math.round(selection.height * scaleY)
-      );
-
-      const result = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [{ crop: { originX, originY, width: cropWidth, height: cropHeight } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      onConfirm(result.uri);
+      const croppedUri = await cropSelectedRegion();
+      await finishConfirm(croppedUri ?? imageUri);
     } catch (e) {
       console.error('[Crop] failed', e);
-      onConfirm(imageUri);
+      await finishConfirm(imageUri);
     } finally {
       setProcessing(false);
     }
@@ -130,7 +173,7 @@ export function ReceiptImageCropModal({
 
   const handleSkipCrop = () => {
     resetState();
-    onConfirm(imageUri);
+    void finishConfirm(imageUri);
   };
 
   const handleCancel = () => {
@@ -138,50 +181,68 @@ export function ReceiptImageCropModal({
     onCancel();
   };
 
+  if (!visible) return null;
+
+  const content = (
+    <View style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
+      <Text style={styles.title}>レシートの範囲を選択</Text>
+      <Text style={styles.hint}>ドラッグして切り取る範囲を指定してください</Text>
+
+      <View style={styles.imageArea} onLayout={handleLayout} {...panResponder.panHandlers}>
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image}
+          resizeMode="contain"
+          onLoad={handleImageLoad}
+        />
+        {selection && selection.width > 0 && selection.height > 0 ? (
+          <View
+            style={[
+              styles.selection,
+              {
+                left: selection.x,
+                top: selection.y,
+                width: selection.width,
+                height: selection.height,
+              },
+            ]}
+            pointerEvents="none"
+          />
+        ) : null}
+      </View>
+
+      <View style={styles.actions}>
+        <AppButton title="キャンセル" variant="outline" onPress={handleCancel} />
+        <AppButton title="切り取らずに使う" variant="secondary" onPress={handleSkipCrop} />
+        <AppButton
+          title={processing ? '処理中...' : '切り取って解析'}
+          onPress={() => void handleConfirm()}
+          disabled={processing}
+        />
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'web') {
+    return content;
+  }
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleCancel}>
-      <View style={styles.container}>
-        <Text style={styles.title}>レシートの範囲を選択</Text>
-        <Text style={styles.hint}>ドラッグして切り取る範囲を指定してください</Text>
-
-        <View style={styles.imageArea} onLayout={handleLayout} {...panResponder.panHandlers}>
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.image}
-            resizeMode="contain"
-            onLoad={handleImageLoad}
-          />
-          {selection && selection.width > 0 && selection.height > 0 ? (
-            <View
-              style={[
-                styles.selection,
-                {
-                  left: selection.x,
-                  top: selection.y,
-                  width: selection.width,
-                  height: selection.height,
-                },
-              ]}
-              pointerEvents="none"
-            />
-          ) : null}
-        </View>
-
-        <View style={styles.actions}>
-          <AppButton title="キャンセル" variant="outline" onPress={handleCancel} />
-          <AppButton title="切り取らずに使う" variant="secondary" onPress={handleSkipCrop} />
-          <AppButton
-            title={processing ? '処理中...' : '切り取って解析'}
-            onPress={() => void handleConfirm()}
-            disabled={processing}
-          />
-        </View>
-      </View>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  webContainer: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+  } as object,
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

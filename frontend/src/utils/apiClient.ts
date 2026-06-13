@@ -57,7 +57,26 @@ apiClient.interceptors.request.use(async (config) => {
   if (memberId) {
     config.headers['x-member-id'] = memberId;
   }
-  
+
+  const isFormData =
+    typeof FormData !== 'undefined' &&
+    (config.data instanceof FormData ||
+      (typeof config.data === 'object' &&
+        config.data !== null &&
+        typeof (config.data as FormData).append === 'function'));
+
+  if (isFormData) {
+    // Web: boundary 付き multipart をブラウザに任せる（明示すると multer が壊れる）
+    // Native: Expo/RN では multipart/form-data の明示が必要
+    if (config.headers) {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+      if (Platform.OS !== 'web') {
+        config.headers['Content-Type'] = 'multipart/form-data';
+      }
+    }
+  }
+
   return config;
 }, (error) => Promise.reject(error));
 

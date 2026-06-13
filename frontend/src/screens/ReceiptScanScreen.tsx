@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -18,6 +17,7 @@ import { modalStyles } from '../theme';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
+import { showAlert } from '../utils/alertMessage';
 
 const c = theme.colors;
 const s = theme.colors.semantic.scan;
@@ -129,23 +129,24 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
       
       const res = await apiClient.post('/receipts/commit', payload);
       if (res.data?.success) {
-        Alert.alert('成功', 'レシートを保存しました。');
-        onSuccess();
+        showAlert('成功', 'レシートを保存しました。', { onOk: onSuccess });
+        return;
       }
     } catch (err: any) {
       const apiError = err.response?.data;
-      console.error('Commit error:', apiError || err.message);
+      const message = apiError?.message || err.message;
 
-      if (apiError?.message === 'DUPLICATE') {
-        Alert.alert(
+      if (message === 'DUPLICATE') {
+        showAlert(
           '既に登録済みです',
           '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。',
-          [{ text: 'OK' }],
+          { onOk: onCancel }
         );
         return;
       }
 
-      Alert.alert('エラー', apiError?.message || '保存に失敗しました。');
+      console.error('Commit error:', apiError || err.message);
+      showAlert('エラー', message || '保存に失敗しました。');
     } finally {
       setLoading(false);
     }
