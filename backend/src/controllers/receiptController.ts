@@ -4,7 +4,8 @@ import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
 import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
+import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService';
+import { enrichCompletedJobPayload, listReceiptJobsForMember } from '../services/receiptJobService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
 import { calcItemLineTotal } from '../utils/itemLineTotal';
@@ -26,15 +27,34 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
     }
 
     const state = await job.getState();
+    let data: Record<string, unknown> = {
+      id: job.id,
+      state,
+      result: job.returnvalue,
+      error: job.failedReason,
+    };
+    data = await enrichCompletedJobPayload(job, familyGroupId, data);
+
     res.status(200).json({
       success: true,
-      data: {
-        id: job.id,
-        state,
-        result: job.returnvalue,
-        error: job.failedReason
-      }
+      data,
     });
+  } catch (error) { next(error); }
+};
+
+/**
+ * [Issue #95-1] ログインメンバー本人の解析ジョブ一覧（確認トレイ用）
+ */
+export const getReceiptJobs = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const familyGroupId = getFamilyGroupId();
+    const memberId = getMemberId();
+    if (!memberId) {
+      throw new AppError('メンバーIDが指定されていません。', 400);
+    }
+
+    const jobs = await listReceiptJobsForMember(familyGroupId, Number(memberId));
+    res.status(200).json({ success: true, data: jobs });
   } catch (error) { next(error); }
 };
 

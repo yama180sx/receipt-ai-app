@@ -1,40 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
 import { estimateCategoryId } from './categoryService';
-import { validateReceiptItems } from './validationService'; 
+import { validateReceiptItems } from './validationService';
+import { checkDuplicateReceipt, parseReceiptDate } from './duplicateReceiptService';
 import logger from '../utils/logger';
 import { normalizeStoreName, getCleanText } from '../utils/normalizer';
 
 const prisma = new PrismaClient();
-
-/**
- * [Issue #71] 文字列からDateオブジェクトを生成する (HH:mm 対応版)
- * Geminiから返却される "YYYY-MM-DD HH:mm" を正確にパースします。
- */
-const parseSafeDate = (dateStr: string | null | undefined): Date => {
-  if (!dateStr) return new Date();
-  
-  // YYYY-MM-DD HH:mm または YYYY-MM-DD の形式を抽出
-  const match = dateStr.match(/(\d{4})[-\/\.](\d{2})[-\/\.](\d{2})(?:\s+(\d{2}):(\d{2}))?/);
-  
-  if (match) {
-    const y = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10);
-    const d = parseInt(match[3], 10);
-    const hh = match[4] ? parseInt(match[4], 10) : 0;
-    const mm = match[5] ? parseInt(match[5], 10) : 0;
-    
-    // タイムゾーンによるズレを防ぐため、OSローカル（JST前提）で生成
-    const date = new Date(y, m - 1, d, hh, mm, 0, 0);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-  
-  // パース失敗時のフォールバック
-  const fallback = new Date(dateStr);
-  return isNaN(fallback.getTime()) ? new Date() : fallback;
-};
 
 /**
  * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
@@ -103,7 +75,7 @@ export const saveParsedReceipt = async (
   try {
     const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
     const cleanStore = getCleanText(officialStoreName);
-    const jstDate = parseSafeDate(parsedData.purchaseDate || parsedData.date);
+    const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
     
     // Receipt.totalAmount は Int、taxAmount は Float
     const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
@@ -132,32 +104,15 @@ export const saveParsedReceipt = async (
     /**
      * 重複チェック（別画像で店名・日付・金額が同一の場合）
      */
-    let duplicateWhere: any = { 
-      familyGroupId, 
-      totalAmount,
-    };
-
-    if (jstDate.getHours() === 0 && jstDate.getMinutes() === 0) {
-      const startOfDay = new Date(jstDate); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(jstDate); endOfDay.setHours(23, 59, 59, 999);
-      duplicateWhere.date = { gte: startOfDay, lte: endOfDay };
-    } else {
-      const margin = 1 * 60 * 1000; // 前後1分
-      duplicateWhere.date = { 
-        gte: new Date(jstDate.getTime() - margin), 
-        lte: new Date(jstDate.getTime() + margin) 
-      };
-    }
-
-    const existing = await prisma.receipt.findFirst({
-      where: duplicateWhere,
-      select: { id: true, storeName: true }
-    });
-
-    if (existing && getCleanText(existing.storeName) === cleanStore) {
+    const duplicate = await checkDuplicateReceipt(
+      familyGroupId,
+      parsedData,
+      imagePath
+    );
+    if (duplicate.duplicateSuspected) {
       const error = new Error('DUPLICATE_RECEIPT_DETECTED');
       (error as any).statusCode = 409;
-      (error as any).existingId = existing.id;
+      (error as any).existingId = duplicate.existingReceiptId;
       throw error;
     }
 
