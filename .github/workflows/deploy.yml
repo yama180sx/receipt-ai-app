@@ -73,6 +73,7 @@ jobs:
           EOF
 
           # 4. frontend/.env 固有設定
+          echo "EXPO_PUBLIC_APP_ENV=stable" >> ./frontend/.env
           echo "EXPO_PUBLIC_API_URL=http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_BACKEND_PORT }}/api" >> ./frontend/.env
           echo "EXPO_PUBLIC_API_TOKEN=${{ secrets.EXPO_PUBLIC_API_TOKEN }}" >> ./frontend/.env
 

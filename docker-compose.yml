@@ -34,6 +34,7 @@ services:
       dockerfile: Dockerfile.web
       args:
         - EXPO_PUBLIC_API_URL=http://${HOST_IP}:${BACKEND_PORT}/api
+        - EXPO_PUBLIC_APP_ENV=${ENV_NAME}
     container_name: receipt-${ENV_NAME}-frontend
     ports:
       - "${WEB_PORT}:80"
