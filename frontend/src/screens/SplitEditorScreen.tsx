@@ -9,12 +9,12 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   Platform,
-  useWindowDimensions
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme, tableStyles, BREAKPOINTS } from '../theme';
+import { theme, tableStyles } from '../theme';
+import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { api } from '../utils/apiClient';
 import { showAlert } from '../utils/alertMessage';
 import {
@@ -34,8 +34,7 @@ interface SplitEditorScreenProps {
 }
 
 export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, onBack }) => {
-  const { width } = useWindowDimensions();
-  const isWide = width >= BREAKPOINTS.TABLET;
+  const isWide = useIsWideLayout();
 
   const [allMembers, setAllMembers] = useState<FamilyMemberSummary[]>([]);
   const [activeMembers, setActiveMembers] = useState<FamilyMemberSummary[]>([]); 

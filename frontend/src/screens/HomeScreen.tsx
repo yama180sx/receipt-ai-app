@@ -5,18 +5,26 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView, 
-  Dimensions, 
   ActivityIndicator, 
-  Alert 
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { AppButton, AppListItem } from '../components/ui';
+import { AppButton, AppListItem, AppModal } from '../components/ui';
+import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
+import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
+import {
+  consumePendingCropUri,
+  persistPendingCropUri,
+  registerWebImageFile,
+  clearPendingCropUri,
+} from '../utils/webImageFileRegistry';
+import { showAlert } from '../utils/alertMessage';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
-
-const { width: windowWidth } = Dimensions.get('window');
+import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
 interface HomeScreenProps {
   onAnalysisReady: (data: any) => void; 
@@ -45,6 +53,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [jobStatus, setJobStatus] = useState('');
+  const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
+  const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -74,6 +84,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     fetchData();
   }, [fetchData]);
 
+  // Android Web: カメラ撮影後にページが再描画されても切り取り画面を復元
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const restored = consumePendingCropUri();
+    if (restored) {
+      setPendingCropUri(restored);
+    }
+  }, []);
+
   const pollJobStatus = async (jobId: string) => {
     const interval = setInterval(async () => {
       try {
@@ -101,51 +120,77 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, 2000);
   };
 
-  const handleScan = async () => {
+  const uploadReceiptImage = async (imageUri: string) => {
+    const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
+
+    setIsAnalyzing(true);
+    setJobStatus('uploading');
+
+    const uploadRes = await apiClient.post('/receipts/upload', formData, {
+      headers: {
+        'x-member-id': currentMemberId.toString(),
+      },
+    });
+
+    if (uploadRes.data?.success) {
+      const jobId = uploadRes.data.data.jobId;
+      setJobStatus('queued');
+      pollJobStatus(jobId);
+    }
+  };
+
+  const openWebCrop = (imageUri: string) => {
+    if (Platform.OS === 'web') {
+      persistPendingCropUri(imageUri);
+    }
+    setPendingCropUri(imageUri);
+  };
+
+  const pickImageForWeb = async (source: 'camera' | 'library') => {
+    try {
+      const picker =
+        source === 'camera'
+          ? ImagePicker.launchCameraAsync({ mediaTypes: 'images' as const, quality: 0.8 })
+          : ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as const, quality: 0.8 });
+      const result = await picker;
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (Platform.OS === 'web' && asset.file) {
+        registerWebImageFile(asset.uri, asset.file);
+      }
+      openWebCrop(asset.uri);
+    } catch (err) {
+      console.error('pickImageForWeb', err);
+      showAlert('エラー', '画像の取得に失敗しました。ギャラリーから選択をお試しください。');
+    }
+  };
+
+  const pickImageNative = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('権限エラー', 'カメラの使用を許可してください。');
       return;
     }
 
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: 'images' as const,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    await uploadReceiptImage(result.assets[0].uri);
+  };
+
+  const handleScan = async () => {
+    if (Platform.OS === 'web') {
+      // Web では Alert.alert の複数ボタンが効かないためモーダルを使う
+      setShowImageSourcePicker(true);
+      return;
+    }
+
     try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: 'images' as any, 
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (result.canceled || !result.assets) return;
-
-      const imageUri = result.assets[0].uri;
-      const formData = new FormData();
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      // @ts-ignore
-      formData.append('image', {
-        uri: imageUri,
-        name: `receipt_upload.${fileType}`,
-        type: `image/${fileType}`,
-      });
-
-      formData.append('memberId', currentMemberId.toString());
-
-      setIsAnalyzing(true);
-      setJobStatus('uploading');
-
-      const uploadRes = await apiClient.post('/receipts/upload', formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'x-member-id': currentMemberId.toString()
-        },
-      });
-
-      if (uploadRes.data && uploadRes.data.success) {
-        const jobId = uploadRes.data.data.jobId;
-        setJobStatus('queued');
-        pollJobStatus(jobId);
-      }
+      await pickImageNative();
     } catch (err) {
       setIsAnalyzing(false);
       console.error('handleScan Error:', err);
@@ -153,14 +198,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
-  const isWide = windowWidth > 600;
+  const handleCropConfirm = async (croppedUri: string) => {
+    clearPendingCropUri();
+    setPendingCropUri(null);
+    try {
+      await uploadReceiptImage(croppedUri);
+    } catch (err) {
+      setIsAnalyzing(false);
+      console.error('upload after crop', err);
+      const message = err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
+      if (Platform.OS === 'web') {
+        showAlert('エラー', message);
+      } else {
+        Alert.alert('エラー', message);
+      }
+    }
+  };
+
+  const handleCropCancel = () => {
+    clearPendingCropUri();
+    setPendingCropUri(null);
+  };
+
+  const isWide = useIsWideHomeMenu();
   const isAdmin = userRole === 'ADMIN';
  
   return (
-    <SafeAreaView style={styles.container}>
+    <>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>AI Receipt Manager</Text>
+          <Text style={styles.headerSubtitle}>RecAIpt</Text>
           <Text style={styles.headerTitle}>
             {currentMemberId === 1 ? '山本さんのダッシュボード' : '共有メニュー'}
           </Text>
@@ -274,7 +342,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
       </ScrollView>
+
+      <AppModal
+        visible={showImageSourcePicker}
+        onRequestClose={() => setShowImageSourcePicker(false)}
+        title="レシート画像"
+        description="取得方法を選んでください"
+        footer={
+          <View style={styles.sourcePickerActions}>
+            <AppButton
+              title="カメラ"
+              onPress={() => {
+                setShowImageSourcePicker(false);
+                void pickImageForWeb('camera');
+              }}
+            />
+            <AppButton
+              title="ギャラリー"
+              variant="secondary"
+              onPress={() => {
+                setShowImageSourcePicker(false);
+                void pickImageForWeb('library');
+              }}
+            />
+            <AppButton
+              title="キャンセル"
+              variant="outline"
+              onPress={() => setShowImageSourcePicker(false)}
+            />
+          </View>
+        }
+      />
+
     </SafeAreaView>
+
+      {pendingCropUri ? (
+        <ReceiptImageCropModal
+          visible
+          imageUri={pendingCropUri}
+          onConfirm={(uri) => void handleCropConfirm(uri)}
+          onCancel={handleCropCancel}
+        />
+      ) : null}
+    </>
   );
 };
 
@@ -282,7 +392,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { padding: theme.spacing.lg, paddingBottom: 40 },
   header: { marginBottom: theme.spacing.lg, marginTop: theme.spacing.md },
-  headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: 1.5 },
+  headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, letterSpacing: 0.5 },
   headerTitle: { ...theme.typography.h1, color: theme.colors.text.main, marginTop: theme.spacing.xs },
   summaryCard: { backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, padding: theme.spacing.xl, marginBottom: theme.spacing.lg, elevation: 4 },
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
@@ -301,6 +411,7 @@ const styles = StyleSheet.create({
   captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },
   iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
   captureButtonText: { ...theme.typography.h2, color: theme.colors.primary },
+  sourcePickerActions: { gap: 10, width: '100%' },
   jobStatusText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
   
   // ★ メニュー部分を Grid (flexWrap) 対応に変更

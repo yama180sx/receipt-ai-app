@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -33,6 +33,8 @@ import { TotpSettingsScreen } from './src/screens/TotpSettingsScreen';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
+import { DisplayModeProvider } from './src/contexts/DisplayModeContext';
+import { DisplayModeSettings } from './src/components/DisplayModeSettings';
 import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -357,25 +359,30 @@ export default function App() {
         );
       default:
         return (
-          <View style={{ flex: 1 }}>
-            <View style={styles.topActions}>
-              {currentUserRole === 'USER' ? (
-                <TouchableOpacity
-                  style={styles.topActionButton}
-                  onPress={() => setCurrentView('totp_settings')}
-                >
-                  <Text style={styles.topActionText}>2FA設定</Text>
-                </TouchableOpacity>
-              ) : null}
-              {biometricEnabled && Platform.OS !== 'web' ? (
-                <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
-                  <Text style={styles.topActionText}>生体認証オフ</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
-                <Text style={styles.topActionText}>ログアウト</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.mainWithToolbar}>
+            <SafeAreaView edges={['top']} style={styles.mainToolbar}>
+              <View style={styles.topActions}>
+                <DisplayModeSettings />
+                <View style={styles.topActionButtons}>
+                  {currentUserRole === 'USER' ? (
+                    <TouchableOpacity
+                      style={styles.topActionButton}
+                      onPress={() => setCurrentView('totp_settings')}
+                    >
+                      <Text style={styles.topActionText}>2FA設定</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {biometricEnabled && Platform.OS !== 'web' ? (
+                    <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
+                      <Text style={styles.topActionText}>生体認証オフ</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
+                    <Text style={styles.topActionText}>ログアウト</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </SafeAreaView>
 
             <HomeScreen
               onAnalysisReady={handleAnalysisReady}
@@ -393,23 +400,39 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ResponsiveContainer fullWidth={isFullWidth}>
-        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-          {renderMainContent()}
-        </View>
-      </ResponsiveContainer>
+      <DisplayModeProvider>
+        <ResponsiveContainer fullWidth={isFullWidth}>
+          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            {renderMainContent()}
+          </View>
+        </ResponsiveContainer>
+      </DisplayModeProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+  mainWithToolbar: { flex: 1 },
+  mainToolbar: {
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
   topActions: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  topActionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
   },
   topActionButton: {
