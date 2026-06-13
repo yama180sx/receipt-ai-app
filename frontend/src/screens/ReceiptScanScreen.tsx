@@ -18,6 +18,7 @@ import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import { showAlert } from '../utils/alertMessage';
+import type { ReceiptScanInitialData } from '../types/receiptScan';
 
 const c = theme.colors;
 const s = theme.colors.semantic.scan;
@@ -30,22 +31,7 @@ interface ReceiptItem {
 }
 
 interface ReceiptScanScreenProps {
-  initialData: {
-    parsedData: {
-      storeName: string;
-      purchaseDate: string;
-      totalAmount: number;
-      taxAmount?: number | string; 
-      items: ReceiptItem[];
-      usageLogId?: number; // ★ Issue #63: ログIDの型定義を追加して引き回しを保証
-    };
-    imagePath: string;
-    validation: {
-      isSuspicious: boolean;
-      warnings: string[];
-    };
-    jobId?: string;
-  };
+  initialData: ReceiptScanInitialData;
   categories: Array<{ id: number; name: string }>;
   onSuccess: () => void;
   onCancel: () => void;
@@ -137,11 +123,10 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
       const message = apiError?.message || err.message;
 
       if (message === 'DUPLICATE') {
-        showAlert(
-          '既に登録済みです',
-          '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。',
-          { onOk: onCancel }
-        );
+        const duplicateMessage = initialData.warnedDuplicateFromTray
+          ? '確認トレイで重複の疑いが表示されていました。同じ内容のレシートは保存できません。トレイから破棄するか、履歴で既存レシートを確認してください。'
+          : '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。';
+        showAlert('既に登録済みです', duplicateMessage, { onOk: onCancel });
         return;
       }
 
@@ -168,6 +153,19 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {initialData.duplicateSuspected ? (
+            <View style={styles.duplicateBanner}>
+              <Text style={styles.duplicateBannerTitle}>重複の疑い</Text>
+              <Text style={styles.duplicateBannerText}>
+                同じ店名・日付・金額のレシートが登録済みの可能性があります。
+                {initialData.existingReceiptId
+                  ? `（既存レシート ID: ${initialData.existingReceiptId}）`
+                  : ''}
+                {' '}内容を確認のうえ、問題なければ保存できます。
+              </Text>
+            </View>
+          ) : null}
+
           {imageSource && (
             <View style={styles.imageContainer}>
               <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
@@ -289,6 +287,27 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 17, fontWeight: 'bold', color: s.textTitle },
   headerBack: { minWidth: 50 },
+  duplicateBanner: {
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.semantic.warning.bg,
+    borderWidth: 1,
+    borderColor: theme.colors.semantic.warning.border,
+  },
+  duplicateBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.semantic.warning.text,
+    marginBottom: 4,
+  },
+  duplicateBannerText: {
+    fontSize: 13,
+    color: theme.colors.semantic.warning.text,
+    lineHeight: 20,
+  },
   scrollView: { flex: 1 },
   imageContainer: { width: '100%', height: 260, backgroundColor: s.imageBg, marginBottom: theme.spacing.md, position: 'relative' },
   receiptImage: { width: '100%', height: '100%' },

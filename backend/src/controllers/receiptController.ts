@@ -4,7 +4,8 @@ import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
 import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService'; 
+import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService';
+import { enrichCompletedJobPayload, listReceiptJobsForMember, discardReceiptJobForMember, removeReceiptJobAfterCommit } from '../services/receiptJobService'; 
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
 import { calcItemLineTotal } from '../utils/itemLineTotal';
@@ -26,15 +27,55 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
     }
 
     const state = await job.getState();
+    let data: Record<string, unknown> = {
+      id: job.id,
+      state,
+      result: job.returnvalue,
+      error: job.failedReason,
+    };
+    data = await enrichCompletedJobPayload(job, familyGroupId, data);
+
     res.status(200).json({
       success: true,
-      data: {
-        id: job.id,
-        state,
-        result: job.returnvalue,
-        error: job.failedReason
-      }
+      data,
     });
+  } catch (error) { next(error); }
+};
+
+/**
+ * [Issue #95-1] ログインメンバー本人の解析ジョブ一覧（確認トレイ用）
+ */
+export const getReceiptJobs = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const familyGroupId = getFamilyGroupId();
+    const memberId = getMemberId();
+    if (!memberId) {
+      throw new AppError('メンバーIDが指定されていません。', 400);
+    }
+
+    const jobs = await listReceiptJobsForMember(familyGroupId, Number(memberId));
+    res.status(200).json({ success: true, data: jobs });
+  } catch (error) { next(error); }
+};
+
+/**
+ * [Issue #95-4] 未取り込み解析ジョブの破棄
+ */
+export const discardReceiptJob = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const familyGroupId = getFamilyGroupId();
+    const memberId = getMemberId();
+    if (!memberId) {
+      throw new AppError('メンバーIDが指定されていません。', 400);
+    }
+
+    await discardReceiptJobForMember(
+      getRouteParam(req, 'jobId'),
+      familyGroupId,
+      Number(memberId)
+    );
+
+    res.status(200).json({ success: true, message: 'Discarded' });
   } catch (error) { next(error); }
 };
 
@@ -78,7 +119,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
   try {
     const memberId = getMemberId();
     const familyGroupId = getFamilyGroupId();
-    const { parsedData, imagePath, validation } = req.body;
+    const { parsedData, imagePath, validation, jobId } = req.body;
 
     if (!parsedData || !imagePath) {
       throw new AppError('必要なデータが不足しています。', 400);
@@ -97,6 +138,12 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
       validation?.isSuspicious || false,
       validation?.warnings || []
     );
+
+    if (jobId) {
+      await removeReceiptJobAfterCommit(String(jobId), familyGroupId, Number(memberId)).catch(() => {
+        // 既に破棄済み等は無視（保存は成功している）
+      });
+    }
 
     res.status(201).json({ success: true, data: result });
   } catch (error: any) { 
