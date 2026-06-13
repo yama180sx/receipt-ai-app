@@ -13,7 +13,7 @@ RUN npm install -g expo-cli
 
 WORKDIR /app
 
-# コンテナ起動時に保持するポート（Expo用）
-EXPOSE 8081 19000 19001 19002
+# コンテナ起動時に保持するポート（Expo用。DEV_PORT は 8081 dev / 8082 stable）
+EXPOSE 8081 8082 19000 19001 19002
 
 CMD ["bash"]
