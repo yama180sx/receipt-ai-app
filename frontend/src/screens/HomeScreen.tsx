@@ -13,10 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
+import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
+import { useReceiptTrayLocalFailures } from '../contexts/ReceiptTrayContext';
 import { useReceiptJobs } from '../hooks/useReceiptJobs';
 import { theme } from '../theme';
-import type { LocalFailedReceiptJob, ReceiptTrayItem } from '../types/receiptJob';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
 import {
@@ -26,11 +27,7 @@ import {
   clearPendingCropUri,
 } from '../utils/webImageFileRegistry';
 import { showAlert } from '../utils/alertMessage';
-import {
-  getReceiptJobDisplay,
-  getReceiptTrayItemTitle,
-  sortReceiptTrayItems,
-} from '../utils/receiptJobDisplay';
+import { countReceiptTrayItems, sortReceiptTrayItems } from '../utils/receiptJobDisplay';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
@@ -38,6 +35,7 @@ interface HomeScreenProps {
   onAnalysisReady: (data: any) => void;
   onGoToHistory: () => void;
   onGoToStats: () => void;
+  onGoToReceiptTray: () => void;
   onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
   currentMemberId: number;
@@ -46,28 +44,7 @@ interface HomeScreenProps {
 }
 
 const ACCEPTANCE_MESSAGE_MS = 3000;
-
-function formatTrayTime(createdAt: number): string {
-  return new Date(createdAt).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function trayBadgeStyle(kind: ReturnType<typeof getReceiptJobDisplay>['kind']) {
-  switch (kind) {
-    case 'failed':
-      return styles.trayBadgeFailed;
-    case 'duplicate_suspected':
-      return styles.trayBadgeDuplicate;
-    case 'ready':
-      return styles.trayBadgeReady;
-    case 'processing':
-      return styles.trayBadgeProcessing;
-    default:
-      return styles.trayBadgeQueued;
-  }
-}
+const HOME_TRAY_PREVIEW_LIMIT = 2;
 
 /**
  * ホーム画面（ダッシュボード）
@@ -76,6 +53,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAnalysisReady: _onAnalysisReady,
   onGoToHistory,
   onGoToStats,
+  onGoToReceiptTray,
   onGoToSettlement,
   onGoToAdminMenu,
   currentMemberId,
@@ -86,19 +64,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [uploadingCount, setUploadingCount] = useState(0);
-  const [localFailedJobs, setLocalFailedJobs] = useState<LocalFailedReceiptJob[]>([]);
   const [acceptanceMessage, setAcceptanceMessage] = useState<string | null>(null);
   const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
   const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
 
   const { jobs, activeCount, refresh: refreshJobs } = useReceiptJobs(currentMemberId > 0);
+  const { localFailedJobs, addLocalFailedJob } = useReceiptTrayLocalFailures();
 
   const trayItems = useMemo(
     () => sortReceiptTrayItems([...jobs, ...localFailedJobs]),
     [jobs, localFailedJobs]
   );
 
-  const pendingBadgeCount = activeCount + uploadingCount;
+  const trayItemCount = countReceiptTrayItems(trayItems);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -146,18 +124,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setAcceptanceMessage(message);
   }, []);
 
-  const registerLocalUploadFailure = useCallback((reason: string) => {
-    setLocalFailedJobs((prev) => [
-      {
-        id: `local-failed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        state: 'failed',
-        createdAt: Date.now(),
-        failedReason: reason,
-        localOnly: true,
-      },
-      ...prev,
-    ]);
-  }, []);
+  const registerLocalUploadFailure = useCallback(
+    (reason: string) => {
+      addLocalFailedJob(reason);
+    },
+    [addLocalFailedJob]
+  );
 
   const uploadReceiptImage = async (imageUri: string) => {
     setUploadingCount((count) => count + 1);
@@ -260,41 +232,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setPendingCropUri(null);
   };
 
-  const renderTrayItem = (item: ReceiptTrayItem) => {
-    const display =
-      'localOnly' in item && item.localOnly
-        ? { kind: 'failed' as const, label: '失敗', isActive: false }
-        : getReceiptJobDisplay(item);
-    const subtitle =
-      'localOnly' in item && item.localOnly
-        ? item.failedReason
-        : item.state === 'failed'
-          ? item.failedReason || '解析に失敗しました'
-          : item.parsedData
-            ? `¥${Math.round(item.parsedData.totalAmount || 0).toLocaleString()}`
-            : display.label;
-
-    return (
-      <View key={item.id} style={styles.trayRow}>
-        <View style={styles.trayRowMain}>
-          <Text style={styles.trayRowTitle} numberOfLines={1}>
-            {getReceiptTrayItemTitle(item)}
-          </Text>
-          <Text style={styles.trayRowMeta} numberOfLines={1}>
-            {formatTrayTime(item.createdAt)} · {subtitle}
-          </Text>
-        </View>
-        <View style={[styles.trayBadge, trayBadgeStyle(display.kind)]}>
-          {display.isActive ? (
-            <ActivityIndicator size="small" color={theme.colors.text.inverse} />
-          ) : (
-            <Text style={styles.trayBadgeText}>{display.label}</Text>
-          )}
-        </View>
-      </View>
-    );
-  };
-
+  const pendingBadgeCount = activeCount + uploadingCount;
   const isWide = useIsWideHomeMenu();
   const isAdmin = userRole === 'ADMIN';
 
@@ -346,21 +284,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               ) : null}
             </View>
-            {trayItems.length > 0 ? (
+            {trayItemCount > 0 ? (
               <View style={styles.captureCountBadge}>
-                <Text style={styles.captureCountBadgeText}>{trayItems.length}</Text>
+                <Text style={styles.captureCountBadgeText}>{trayItemCount}</Text>
               </View>
             ) : null}
           </TouchableOpacity>
 
-          {trayItems.length > 0 ? (
-            <View style={styles.traySection}>
-              <Text style={styles.sectionTitle}>受付一覧</Text>
-              {trayItems.map(renderTrayItem)}
+          <View style={styles.traySection}>
+            <View style={styles.traySectionHeader}>
+              <Text style={styles.sectionTitle}>確認トレイ</Text>
+              {trayItemCount > 0 ? (
+                <TouchableOpacity onPress={onGoToReceiptTray}>
+                  <Text style={styles.trayOpenLink}>すべて見る</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-          ) : null}
+            <ReceiptTrayPanel
+              items={trayItems}
+              maxItems={HOME_TRAY_PREVIEW_LIMIT}
+              showSectionHeaders={trayItemCount > 0}
+              onOpenFullTray={onGoToReceiptTray}
+              emptyTitle="確認待ちのレシートはありません"
+              emptyDescription="撮影したレシートの解析状況がここに表示されます。"
+            />
+          </View>
 
           <View style={styles.gridContainer}>
+            <AppListItem
+              variant="nav"
+              onPress={onGoToReceiptTray}
+              title="確認トレイ"
+              subtitle={trayItemCount > 0 ? `${trayItemCount} 件の受付` : '解析状況を確認'}
+              left={<Text style={styles.gridEmoji}>📥</Text>}
+              right={
+                trayItemCount > 0 ? (
+                  <View style={styles.gridCountBadge}>
+                    <Text style={styles.gridCountBadgeText}>{trayItemCount}</Text>
+                  </View>
+                ) : (
+                  <View />
+                )
+              }
+              style={styles.gridCard}
+            />
             <AppListItem
               variant="nav"
               onPress={onGoToHistory}
@@ -567,31 +534,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  trayRow: {
+  traySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
   },
-  trayRowMain: { flex: 1 },
-  trayRowTitle: { ...theme.typography.body, color: theme.colors.text.main, fontWeight: '600' },
-  trayRowMeta: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
-  trayBadge: {
-    minWidth: 72,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.sm,
+  trayOpenLink: {
+    color: theme.colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  gridCountBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  trayBadgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: '700' },
-  trayBadgeQueued: { backgroundColor: theme.colors.text.muted },
-  trayBadgeProcessing: { backgroundColor: theme.colors.primary },
-  trayBadgeReady: { backgroundColor: '#059669' },
-  trayBadgeDuplicate: { backgroundColor: '#d97706' },
-  trayBadgeFailed: { backgroundColor: theme.colors.semantic.deficit.text },
+  gridCountBadgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: '700' },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',

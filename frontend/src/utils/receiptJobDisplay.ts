@@ -51,3 +51,76 @@ export function countActiveReceiptJobs(jobs: ReceiptJobListItem[]): number {
 export function sortReceiptTrayItems(items: ReceiptTrayItem[]): ReceiptTrayItem[] {
   return [...items].sort((a, b) => b.createdAt - a.createdAt);
 }
+
+export function formatReceiptTrayDateTime(createdAt: number): string {
+  return new Date(createdAt).toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function getReceiptTrayItemSubtitle(item: ReceiptTrayItem): string {
+  if ('localOnly' in item && item.localOnly) {
+    return item.failedReason;
+  }
+
+  if (item.state === 'failed') {
+    return item.failedReason || '解析に失敗しました';
+  }
+
+  const parts: string[] = [formatReceiptTrayDateTime(item.createdAt)];
+
+  if (item.parsedData?.totalAmount != null) {
+    parts.push(`¥${Math.round(item.parsedData.totalAmount).toLocaleString()}`);
+  }
+
+  if ('existingReceiptId' in item && item.existingReceiptId) {
+    parts.push(`既存 #${item.existingReceiptId}`);
+  }
+
+  return parts.join(' · ');
+}
+
+export function resolveReceiptTrayItemDisplay(item: ReceiptTrayItem): ReceiptJobDisplay {
+  if ('localOnly' in item && item.localOnly) {
+    return { kind: 'failed', label: '失敗', isActive: false };
+  }
+  return getReceiptJobDisplay(item);
+}
+
+export type ReceiptTraySection = {
+  title: string;
+  kind: ReceiptJobDisplayKind;
+  items: ReceiptTrayItem[];
+};
+
+const TRAY_SECTIONS: { kind: ReceiptJobDisplayKind; title: string }[] = [
+  { kind: 'processing', title: '解析中' },
+  { kind: 'queued', title: '待機中' },
+  { kind: 'ready', title: '確認待ち' },
+  { kind: 'duplicate_suspected', title: '重複の疑い' },
+  { kind: 'failed', title: '失敗' },
+];
+
+/** 状態別セクション（表示順固定） */
+export function groupReceiptTrayItems(items: ReceiptTrayItem[]): ReceiptTraySection[] {
+  const buckets = new Map<ReceiptJobDisplayKind, ReceiptTrayItem[]>(
+    TRAY_SECTIONS.map((section) => [section.kind, []])
+  );
+
+  for (const item of sortReceiptTrayItems(items)) {
+    const display = resolveReceiptTrayItemDisplay(item);
+    buckets.get(display.kind)?.push(item);
+  }
+
+  return TRAY_SECTIONS.map((section) => ({
+    ...section,
+    items: buckets.get(section.kind) ?? [],
+  })).filter((section) => section.items.length > 0);
+}
+
+export function countReceiptTrayItems(items: ReceiptTrayItem[]): number {
+  return items.length;
+}

@@ -29,7 +29,8 @@ import { SplitEditorScreen } from './src/screens/SplitEditorScreen';
 import { SettlementSummaryScreen } from './src/screens/SettlementSummaryScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
-import { TotpSettingsScreen } from './src/screens/TotpSettingsScreen';
+import { ReceiptTrayScreen } from './src/screens/ReceiptTrayScreen';
+import { ReceiptTrayProvider } from './src/contexts/ReceiptTrayContext';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
@@ -41,7 +42,7 @@ import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary' | 'totp_settings';
+type ViewType = 'main' | 'history' | 'stats' | 'category_mgr' | 'product_master' | 'receipt_scan' | 'receipt_tray' | 'prompt_editor' | 'admin_stats' | 'admin_menu' | 'split_editor' | 'settlement_summary' | 'totp_settings';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -267,7 +268,7 @@ export default function App() {
     );
   }
 
-  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary', 'totp_settings'].includes(currentView);
+  const isFullWidth = ['history', 'stats', 'category_mgr', 'product_master', 'receipt_scan', 'receipt_tray', 'prompt_editor', 'admin_stats', 'admin_menu', 'split_editor', 'settlement_summary', 'totp_settings'].includes(currentView);
 
   if (biometricLockActive && pendingSession) {
     return (
@@ -330,6 +331,13 @@ export default function App() {
         return <CategoryManagementScreen onBack={() => { fetchCategories(); setCurrentView('admin_menu'); }} currentMemberId={memberId} />;
       case 'product_master':
         return <ProductMasterScreen onBack={() => setCurrentView('admin_menu')} currentMemberId={memberId} />;
+      case 'receipt_tray':
+        return (
+          <ReceiptTrayScreen
+            enabled={memberId > 0}
+            onBack={() => setCurrentView('main')}
+          />
+        );
       case 'receipt_scan':
         return (
           <ReceiptScanScreen
@@ -396,6 +404,7 @@ export default function App() {
               onAnalysisReady={handleAnalysisReady}
               onGoToHistory={() => setCurrentView('history')}
               onGoToStats={() => setCurrentView('stats')}
+              onGoToReceiptTray={() => setCurrentView('receipt_tray')}
               onGoToSettlement={() => setCurrentView('settlement_summary')}
               onGoToAdminMenu={() => setCurrentView('admin_menu')}
               currentMemberId={memberId}
@@ -407,15 +416,19 @@ export default function App() {
     }
   };
 
+  const appBody = (
+    <ResponsiveContainer fullWidth={isFullWidth}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {userToken && currentView !== 'main' ? <DevEnvironmentBanner /> : null}
+        {renderMainContent()}
+      </View>
+    </ResponsiveContainer>
+  );
+
   return (
     <SafeAreaProvider>
       <DisplayModeProvider>
-        <ResponsiveContainer fullWidth={isFullWidth}>
-          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            {userToken && currentView !== 'main' ? <DevEnvironmentBanner /> : null}
-            {renderMainContent()}
-          </View>
-        </ResponsiveContainer>
+        {userToken ? <ReceiptTrayProvider>{appBody}</ReceiptTrayProvider> : appBody}
       </DisplayModeProvider>
     </SafeAreaProvider>
   );

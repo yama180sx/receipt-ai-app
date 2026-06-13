@@ -5,26 +5,34 @@ import type { ReceiptJobListItem } from '../types/receiptJob';
 
 const POLL_INTERVAL_MS = 2000;
 
+type RefreshOptions = {
+  userInitiated?: boolean;
+};
+
 export function useReceiptJobs(enabled: boolean) {
   const [jobs, setJobs] = useState<ReceiptJobListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
 
-  const refresh = useCallback(async () => {
-    if (!enabled) return;
-    setRefreshing(true);
-    try {
-      const res = await apiClient.get('/receipts/jobs');
-      if (res.data?.success && Array.isArray(res.data.data)) {
-        setJobs(res.data.data as ReceiptJobListItem[]);
+  const refresh = useCallback(
+    async (options?: RefreshOptions) => {
+      if (!enabled) return;
+      const userInitiated = options?.userInitiated ?? false;
+      if (userInitiated) setRefreshing(true);
+      try {
+        const res = await apiClient.get('/receipts/jobs');
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setJobs(res.data.data as ReceiptJobListItem[]);
+        }
+      } catch (error) {
+        console.error('[ReceiptJobs] refresh failed:', error);
+      } finally {
+        if (userInitiated) setRefreshing(false);
       }
-    } catch (error) {
-      console.error('[ReceiptJobs] refresh failed:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [enabled]);
+    },
+    [enabled]
+  );
 
   useEffect(() => {
     if (!enabled) {
