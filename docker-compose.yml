@@ -51,12 +51,12 @@ services:
     container_name: receipt-${ENV_NAME}-frontend-dev
     restart: unless-stopped
     user: "${UID}:${GID}"
-    command: npx expo start --web --port 8081 --host lan
+    command: sh /app/scripts/expo-dev-server.sh
     volumes:
       - ./frontend:/app
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "${DEV_PORT}:8081"
+      - "${DEV_PORT}:${DEV_PORT}"
       - "${EXPO_PORT_1:-19000}:19000"
       - "${EXPO_PORT_2:-19001}:19001"
     stdin_open: true
@@ -65,9 +65,11 @@ services:
       - ./frontend/.env
     environment:
       - TZ=Asia/Tokyo
+      - ENV_NAME=${ENV_NAME}
+      - HOST_IP=${HOST_IP}
+      - DEV_PORT=${DEV_PORT}
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
       - REACT_NATIVE_PACKAGER_HOSTNAME=${HOST_IP}
-      # ホスト側 DEV_PORT（stable:8082 / dev:8081）を QR・exp:// に反映（コンテナ内 8081 固定）
       - EXPO_PACKAGER_PROXY_URL=http://${HOST_IP}:${DEV_PORT}
     depends_on:
       - backend
