@@ -7,7 +7,7 @@ export function DevEnvironmentBanner() {
 
   return (
     <View style={styles.banner} accessibilityRole="text">
-      <Text style={styles.text}>DEV — 開発環境（stable 本番ではありません）</Text>
+      <Text style={styles.text}>DEV — 開発環境</Text>
     </View>
   );
 }
