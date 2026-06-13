@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  ActivityIndicator, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
   Alert,
   Platform,
 } from 'react-native';
@@ -14,7 +14,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
+import { useReceiptJobs } from '../hooks/useReceiptJobs';
 import { theme } from '../theme';
+import type { LocalFailedReceiptJob, ReceiptTrayItem } from '../types/receiptJob';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
 import {
@@ -24,40 +26,79 @@ import {
   clearPendingCropUri,
 } from '../utils/webImageFileRegistry';
 import { showAlert } from '../utils/alertMessage';
+import {
+  getReceiptJobDisplay,
+  getReceiptTrayItemTitle,
+  sortReceiptTrayItems,
+} from '../utils/receiptJobDisplay';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 
 interface HomeScreenProps {
-  onAnalysisReady: (data: any) => void; 
+  onAnalysisReady: (data: any) => void;
   onGoToHistory: () => void;
   onGoToStats: () => void;
-  onGoToSettlement?: () => void; // ★ [Issue #80] 精算サマリー画面への遷移ハンドラを追加
+  onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
   currentMemberId: number;
   memberName?: string | null;
   userRole?: string | null;
 }
 
+const ACCEPTANCE_MESSAGE_MS = 3000;
+
+function formatTrayTime(createdAt: number): string {
+  return new Date(createdAt).toLocaleTimeString('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function trayBadgeStyle(kind: ReturnType<typeof getReceiptJobDisplay>['kind']) {
+  switch (kind) {
+    case 'failed':
+      return styles.trayBadgeFailed;
+    case 'duplicate_suspected':
+      return styles.trayBadgeDuplicate;
+    case 'ready':
+      return styles.trayBadgeReady;
+    case 'processing':
+      return styles.trayBadgeProcessing;
+    default:
+      return styles.trayBadgeQueued;
+  }
+}
+
 /**
  * ホーム画面（ダッシュボード）
  */
-export const HomeScreen: React.FC<HomeScreenProps> = ({ 
-  onAnalysisReady, 
-  onGoToHistory, 
-  onGoToStats, 
-  onGoToSettlement, // ★ 追加
+export const HomeScreen: React.FC<HomeScreenProps> = ({
+  onAnalysisReady: _onAnalysisReady,
+  onGoToHistory,
+  onGoToStats,
+  onGoToSettlement,
   onGoToAdminMenu,
   currentMemberId,
   memberName,
-  userRole 
+  userRole,
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [jobStatus, setJobStatus] = useState('');
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [localFailedJobs, setLocalFailedJobs] = useState<LocalFailedReceiptJob[]>([]);
+  const [acceptanceMessage, setAcceptanceMessage] = useState<string | null>(null);
   const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
   const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
+
+  const { jobs, activeCount, refresh: refreshJobs } = useReceiptJobs(currentMemberId > 0);
+
+  const trayItems = useMemo(
+    () => sortReceiptTrayItems([...jobs, ...localFailedJobs]),
+    [jobs, localFailedJobs]
+  );
+
+  const pendingBadgeCount = activeCount + uploadingCount;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -65,13 +106,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const currentMonth = getCurrentYearMonth();
       const [latestRes, statsRes] = await Promise.all([
         apiClient.get('/receipts/latest', { params: { memberId: currentMemberId } }),
-        apiClient.get('/stats/monthly', { params: { month: currentMonth } })
+        apiClient.get('/stats/monthly', { params: { month: currentMonth } }),
       ]);
 
       if (latestRes.data && latestRes.data.success) {
         setLatestReceipt(latestRes.data.data);
       }
-      
+
       if (statsRes.data && statsRes.data.success) {
         const total = statsRes.data.data.totalAmount || 0;
         setMonthlyTotal(Math.round(total));
@@ -87,7 +128,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     fetchData();
   }, [fetchData]);
 
-  // Android Web: カメラ撮影後にページが再描画されても切り取り画面を復元
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const restored = consumePendingCropUri();
@@ -96,49 +136,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, []);
 
-  const pollJobStatus = async (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiClient.get(`/receipts/status/${jobId}`);
-        const { state, result, error } = res.data.data;
-        
-        setJobStatus(state);
+  useEffect(() => {
+    if (!acceptanceMessage) return;
+    const timer = setTimeout(() => setAcceptanceMessage(null), ACCEPTANCE_MESSAGE_MS);
+    return () => clearTimeout(timer);
+  }, [acceptanceMessage]);
 
-        if (state === 'completed') {
-          clearInterval(interval);
-          setIsAnalyzing(false);
-          setJobStatus('');
-          if (result) onAnalysisReady(result);
-        } else if (state === 'failed') {
-          clearInterval(interval);
-          setIsAnalyzing(false);
-          setJobStatus('');
-          Alert.alert('解析失敗', error || 'AIによる解析中にエラーが発生しました。');
-        }
-      } catch (err) {
-        clearInterval(interval);
-        setIsAnalyzing(false);
-        console.error('Polling error:', err);
-      }
-    }, 2000);
-  };
+  const showAcceptanceFeedback = useCallback((message: string) => {
+    setAcceptanceMessage(message);
+  }, []);
+
+  const registerLocalUploadFailure = useCallback((reason: string) => {
+    setLocalFailedJobs((prev) => [
+      {
+        id: `local-failed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        state: 'failed',
+        createdAt: Date.now(),
+        failedReason: reason,
+        localOnly: true,
+      },
+      ...prev,
+    ]);
+  }, []);
 
   const uploadReceiptImage = async (imageUri: string) => {
-    const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
+    setUploadingCount((count) => count + 1);
+    try {
+      const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
+      const uploadRes = await apiClient.post('/receipts/upload', formData, {
+        headers: {
+          'x-member-id': currentMemberId.toString(),
+        },
+      });
 
-    setIsAnalyzing(true);
-    setJobStatus('uploading');
+      if (uploadRes.data?.success) {
+        showAcceptanceFeedback('受付しました。解析結果は下の一覧に表示されます。');
+        await refreshJobs();
+        return;
+      }
 
-    const uploadRes = await apiClient.post('/receipts/upload', formData, {
-      headers: {
-        'x-member-id': currentMemberId.toString(),
-      },
-    });
-
-    if (uploadRes.data?.success) {
-      const jobId = uploadRes.data.data.jobId;
-      setJobStatus('queued');
-      pollJobStatus(jobId);
+      registerLocalUploadFailure('サーバーが受付を拒否しました。');
+      showAlert('エラー', 'レシートの受付に失敗しました。');
+    } catch (err) {
+      console.error('uploadReceiptImage', err);
+      const message =
+        err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
+      registerLocalUploadFailure(message);
+      if (Platform.OS === 'web') {
+        showAlert('エラー', message);
+      } else {
+        Alert.alert('エラー', message);
+      }
+    } finally {
+      setUploadingCount((count) => Math.max(0, count - 1));
     }
   };
 
@@ -187,7 +237,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleScan = async () => {
     if (Platform.OS === 'web') {
-      // Web では Alert.alert の複数ボタンが効かないためモーダルを使う
       setShowImageSourcePicker(true);
       return;
     }
@@ -195,7 +244,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     try {
       await pickImageNative();
     } catch (err) {
-      setIsAnalyzing(false);
       console.error('handleScan Error:', err);
       Alert.alert('エラー', '画像のアップロードに失敗しました。');
     }
@@ -204,18 +252,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleCropConfirm = async (croppedUri: string) => {
     clearPendingCropUri();
     setPendingCropUri(null);
-    try {
-      await uploadReceiptImage(croppedUri);
-    } catch (err) {
-      setIsAnalyzing(false);
-      console.error('upload after crop', err);
-      const message = err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
-      if (Platform.OS === 'web') {
-        showAlert('エラー', message);
-      } else {
-        Alert.alert('エラー', message);
-      }
-    }
+    await uploadReceiptImage(croppedUri);
   };
 
   const handleCropCancel = () => {
@@ -223,159 +260,217 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setPendingCropUri(null);
   };
 
-  const isWide = useIsWideHomeMenu();
-  const isAdmin = userRole === 'ADMIN';
- 
-  return (
-    <>
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, isDevAppEnv() && styles.headerDev]}>
-          <Text style={styles.headerSubtitle}>{getAppDisplayName()}</Text>
-          <Text style={styles.headerTitle}>{getMemberMenuTitle(memberName)}</Text>
+  const renderTrayItem = (item: ReceiptTrayItem) => {
+    const display =
+      'localOnly' in item && item.localOnly
+        ? { kind: 'failed' as const, label: '失敗', isActive: false }
+        : getReceiptJobDisplay(item);
+    const subtitle =
+      'localOnly' in item && item.localOnly
+        ? item.failedReason
+        : item.state === 'failed'
+          ? item.failedReason || '解析に失敗しました'
+          : item.parsedData
+            ? `¥${Math.round(item.parsedData.totalAmount || 0).toLocaleString()}`
+            : display.label;
+
+    return (
+      <View key={item.id} style={styles.trayRow}>
+        <View style={styles.trayRowMain}>
+          <Text style={styles.trayRowTitle} numberOfLines={1}>
+            {getReceiptTrayItemTitle(item)}
+          </Text>
+          <Text style={styles.trayRowMeta} numberOfLines={1}>
+            {formatTrayTime(item.createdAt)} · {subtitle}
+          </Text>
         </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>今月の利用合計</Text>
-          <View style={styles.summaryAmountRow}>
-            <Text style={styles.summarySymbol}>¥</Text>
-            <Text style={styles.summaryAmount}>{monthlyTotal.toLocaleString()}</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <AppButton
-            title="統計の詳細を見る ›"
-            onPress={onGoToStats}
-            variant="outline"
-            size="sm"
-            style={styles.summaryLinkButton}
-            textStyle={styles.summaryLinkText}
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.captureButton, isAnalyzing && styles.captureButtonDisabled]} 
-          activeOpacity={0.8}
-          onPress={handleScan}
-          disabled={isAnalyzing}
-        >
-          <View style={styles.iconCircle}>
-            {isAnalyzing ? <ActivityIndicator color="white" /> : <Text style={{ fontSize: 20 }}>📷</Text>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.captureButtonText}>
-              {isAnalyzing ? 'AI解析中...' : 'レシートを撮影・解析'}
-            </Text>
-            {isAnalyzing && <Text style={styles.jobStatusText}>解析結果を待っています...</Text>}
-          </View>
-        </TouchableOpacity>
-
-        {/* メニューカード群：グリッド表示 */}
-        <View style={styles.gridContainer}>
-          <AppListItem
-            variant="nav"
-            onPress={onGoToHistory}
-            title="履歴一覧"
-            left={<Text style={styles.gridEmoji}>📋</Text>}
-            right={<View />}
-            style={styles.gridCard}
-          />
-          <AppListItem
-            variant="nav"
-            onPress={onGoToStats}
-            title="支出統計"
-            left={<Text style={styles.gridEmoji}>📊</Text>}
-            right={<View />}
-            style={styles.gridCard}
-          />
-          {onGoToSettlement && isWide && (
-            <AppListItem
-              variant="nav"
-              onPress={onGoToSettlement}
-              title="精算サマリー"
-              left={<Text style={styles.gridEmoji}>🤝</Text>}
-              right={<View />}
-              style={styles.gridCard}
-            />
+        <View style={[styles.trayBadge, trayBadgeStyle(display.kind)]}>
+          {display.isActive ? (
+            <ActivityIndicator size="small" color={theme.colors.text.inverse} />
+          ) : (
+            <Text style={styles.trayBadgeText}>{display.label}</Text>
           )}
         </View>
+      </View>
+    );
+  };
 
-        {/* 管理者限定メニューへのハブ導線 */}
-        {isAdmin && (
-          <View style={styles.section}>
-            <AppListItem
-              variant="nav"
-              onPress={onGoToAdminMenu}
-              title="管理者メニュー"
-              subtitle="マスタ管理・システム設定"
-              style={{ backgroundColor: theme.colors.semantic.icon.adminSettings }}
-              left={
-                <View style={[styles.settingsIconWrapper, { backgroundColor: theme.colors.semantic.icon.adminCard }]}>
-                  <Text>🛡️</Text>
-                </View>
-              }
+  const isWide = useIsWideHomeMenu();
+  const isAdmin = userRole === 'ADMIN';
+
+  return (
+    <>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={[styles.header, isDevAppEnv() && styles.headerDev]}>
+            <Text style={styles.headerSubtitle}>{getAppDisplayName()}</Text>
+            <Text style={styles.headerTitle}>{getMemberMenuTitle(memberName)}</Text>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>今月の利用合計</Text>
+            <View style={styles.summaryAmountRow}>
+              <Text style={styles.summarySymbol}>¥</Text>
+              <Text style={styles.summaryAmount}>{monthlyTotal.toLocaleString()}</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <AppButton
+              title="統計の詳細を見る ›"
+              onPress={onGoToStats}
+              variant="outline"
+              size="sm"
+              style={styles.summaryLinkButton}
+              textStyle={styles.summaryLinkText}
             />
           </View>
-        )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>最近の登録</Text>
-          {loading ? (
-            <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 10 }} />
-          ) : latestReceipt ? (
+          {acceptanceMessage ? (
+            <View style={styles.acceptanceBanner}>
+              <Text style={styles.acceptanceBannerText}>{acceptanceMessage}</Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity style={styles.captureButton} activeOpacity={0.8} onPress={handleScan}>
+            <View style={styles.iconCircle}>
+              {uploadingCount > 0 ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={{ fontSize: 20 }}>📷</Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.captureButtonText}>レシートを撮影・解析</Text>
+              {pendingBadgeCount > 0 ? (
+                <Text style={styles.captureSubText}>
+                  解析中 {pendingBadgeCount} 件 — 続けて撮影できます
+                </Text>
+              ) : null}
+            </View>
+            {trayItems.length > 0 ? (
+              <View style={styles.captureCountBadge}>
+                <Text style={styles.captureCountBadgeText}>{trayItems.length}</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+
+          {trayItems.length > 0 ? (
+            <View style={styles.traySection}>
+              <Text style={styles.sectionTitle}>受付一覧</Text>
+              {trayItems.map(renderTrayItem)}
+            </View>
+          ) : null}
+
+          <View style={styles.gridContainer}>
             <AppListItem
               variant="nav"
               onPress={onGoToHistory}
-              title={latestReceipt.storeName || '店名不明'}
-              subtitle={
-                latestReceipt.date
-                  ? new Date(latestReceipt.date).toLocaleDateString('ja-JP')
-                  : '日付不明'
-              }
-              right={
-                <Text style={styles.amountText}>
-                  ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
-                </Text>
-              }
-              style={styles.latestCard}
+              title="履歴一覧"
+              left={<Text style={styles.gridEmoji}>📋</Text>}
+              right={<View />}
+              style={styles.gridCard}
             />
-          ) : (
-            <View style={[styles.latestCard, { justifyContent: 'center' }]}><Text style={styles.dateText}>表示できるデータがありません</Text></View>
-          )}
-        </View>
-      </ScrollView>
-
-      <AppModal
-        visible={showImageSourcePicker}
-        onRequestClose={() => setShowImageSourcePicker(false)}
-        title="レシート画像"
-        description="取得方法を選んでください"
-        footer={
-          <View style={styles.sourcePickerActions}>
-            <AppButton
-              title="カメラ"
-              onPress={() => {
-                setShowImageSourcePicker(false);
-                void pickImageForWeb('camera');
-              }}
+            <AppListItem
+              variant="nav"
+              onPress={onGoToStats}
+              title="支出統計"
+              left={<Text style={styles.gridEmoji}>📊</Text>}
+              right={<View />}
+              style={styles.gridCard}
             />
-            <AppButton
-              title="ギャラリー"
-              variant="secondary"
-              onPress={() => {
-                setShowImageSourcePicker(false);
-                void pickImageForWeb('library');
-              }}
-            />
-            <AppButton
-              title="キャンセル"
-              variant="outline"
-              onPress={() => setShowImageSourcePicker(false)}
-            />
+            {onGoToSettlement && isWide && (
+              <AppListItem
+                variant="nav"
+                onPress={onGoToSettlement}
+                title="精算サマリー"
+                left={<Text style={styles.gridEmoji}>🤝</Text>}
+                right={<View />}
+                style={styles.gridCard}
+              />
+            )}
           </View>
-        }
-      />
 
-    </SafeAreaView>
+          {isAdmin && (
+            <View style={styles.section}>
+              <AppListItem
+                variant="nav"
+                onPress={onGoToAdminMenu}
+                title="管理者メニュー"
+                subtitle="マスタ管理・システム設定"
+                style={{ backgroundColor: theme.colors.semantic.icon.adminSettings }}
+                left={
+                  <View
+                    style={[
+                      styles.settingsIconWrapper,
+                      { backgroundColor: theme.colors.semantic.icon.adminCard },
+                    ]}
+                  >
+                    <Text>🛡️</Text>
+                  </View>
+                }
+              />
+            </View>
+          )}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>最近の登録</Text>
+            {loading ? (
+              <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 10 }} />
+            ) : latestReceipt ? (
+              <AppListItem
+                variant="nav"
+                onPress={onGoToHistory}
+                title={latestReceipt.storeName || '店名不明'}
+                subtitle={
+                  latestReceipt.date
+                    ? new Date(latestReceipt.date).toLocaleDateString('ja-JP')
+                    : '日付不明'
+                }
+                right={
+                  <Text style={styles.amountText}>
+                    ¥{Math.round(latestReceipt.totalAmount || 0).toLocaleString()}
+                  </Text>
+                }
+                style={styles.latestCard}
+              />
+            ) : (
+              <View style={[styles.latestCard, { justifyContent: 'center' }]}>
+                <Text style={styles.dateText}>表示できるデータがありません</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        <AppModal
+          visible={showImageSourcePicker}
+          onRequestClose={() => setShowImageSourcePicker(false)}
+          title="レシート画像"
+          description="取得方法を選んでください"
+          footer={
+            <View style={styles.sourcePickerActions}>
+              <AppButton
+                title="カメラ"
+                onPress={() => {
+                  setShowImageSourcePicker(false);
+                  void pickImageForWeb('camera');
+                }}
+              />
+              <AppButton
+                title="ギャラリー"
+                variant="secondary"
+                onPress={() => {
+                  setShowImageSourcePicker(false);
+                  void pickImageForWeb('library');
+                }}
+              />
+              <AppButton
+                title="キャンセル"
+                variant="outline"
+                onPress={() => setShowImageSourcePicker(false)}
+              />
+            </View>
+          }
+        />
+      </SafeAreaView>
 
       {pendingCropUri ? (
         <ReceiptImageCropModal
@@ -400,7 +495,13 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, letterSpacing: 0.5 },
   headerTitle: { ...theme.typography.h1, color: theme.colors.text.main, marginTop: theme.spacing.xs },
-  summaryCard: { backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, padding: theme.spacing.xl, marginBottom: theme.spacing.lg, elevation: 4 },
+  summaryCard: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
+    elevation: 4,
+  },
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
   summaryAmountRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 5 },
   summarySymbol: { color: theme.colors.text.inverse, fontSize: 20, marginRight: 4, fontWeight: 'bold' },
@@ -413,21 +514,105 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.7)',
   },
   summaryLinkText: { color: theme.colors.text.inverse, fontSize: 14, fontWeight: '600' },
-  captureButton: { backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg, borderWidth: 2, borderColor: theme.colors.primary, borderStyle: 'dashed' },
-  captureButtonDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.semantic.disabled.bg },
-  iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  acceptanceBanner: {
+    backgroundColor: theme.colors.semantic.surplus.bg,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.semantic.surplus.border,
+  },
+  acceptanceBannerText: {
+    color: theme.colors.semantic.surplus.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  captureButton: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    borderStyle: 'dashed',
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.md,
+  },
   captureButtonText: { ...theme.typography.h2, color: theme.colors.primary },
-  sourcePickerActions: { gap: 10, width: '100%' },
-  jobStatusText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 2 },
-  
-  // ★ メニュー部分を Grid (flexWrap) 対応に変更
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md, marginBottom: theme.spacing.md },
+  captureSubText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 4 },
+  captureCountBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  captureCountBadgeText: { color: theme.colors.text.inverse, fontSize: 12, fontWeight: '700' },
+  traySection: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  trayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  trayRowMain: { flex: 1 },
+  trayRowTitle: { ...theme.typography.body, color: theme.colors.text.main, fontWeight: '600' },
+  trayRowMeta: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
+  trayBadge: {
+    minWidth: 72,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trayBadgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: '700' },
+  trayBadgeQueued: { backgroundColor: theme.colors.text.muted },
+  trayBadgeProcessing: { backgroundColor: theme.colors.primary },
+  trayBadgeReady: { backgroundColor: '#059669' },
+  trayBadgeDuplicate: { backgroundColor: '#d97706' },
+  trayBadgeFailed: { backgroundColor: theme.colors.semantic.deficit.text },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
   gridCard: { flexGrow: 1, minWidth: 100, flexBasis: '30%' },
   gridEmoji: { fontSize: 28 },
   section: { marginTop: theme.spacing.lg },
   sectionTitle: { ...theme.typography.h2, color: theme.colors.text.main, marginBottom: theme.spacing.sm },
-  settingsIconWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
+  settingsIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.md,
+  },
   latestCard: { marginBottom: 0 },
   amountText: { ...theme.typography.h2, color: theme.colors.primary, fontWeight: 'bold' },
   dateText: { ...theme.typography.caption, color: theme.colors.text.muted },
+  sourcePickerActions: { gap: 10, width: '100%' },
 });
