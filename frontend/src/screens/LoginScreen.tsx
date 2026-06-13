@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { loginService } from '../services/loginService';
 import type { AuthFamilyMember, LoginResult, ResolvedFamily } from '../types/auth';
+import { getAppDisplayName, devUiColors, isDevAppEnv } from '../config/appEnv';
+import { DevEnvironmentBanner } from '../components/DevEnvironmentBanner';
 import { theme } from '../theme';
 import { showAlert } from '../utils/alertMessage';
 
@@ -33,6 +35,8 @@ export function LoginScreen({ onLoginSuccess }: Props) {
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const accentColor = isDevAppEnv() ? devUiColors.loginPrimary : theme.colors.primary;
 
   const finishLogin = (result: LoginResult) => {
     if (!family) return;
@@ -215,9 +219,11 @@ export function LoginScreen({ onLoginSuccess }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={accentColor} />
         ) : (
-          <Text style={styles.primaryButtonText}>{isSetup ? '設定を完了' : '確認'}</Text>
+          <Text style={[styles.primaryButtonText, { color: accentColor }]}>
+            {isSetup ? '設定を完了' : '確認'}
+          </Text>
         )}
       </TouchableOpacity>
     </>
@@ -244,9 +250,9 @@ export function LoginScreen({ onLoginSuccess }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={accentColor} />
         ) : (
-          <Text style={styles.primaryButtonText}>次へ</Text>
+          <Text style={[styles.primaryButtonText, { color: accentColor }]}>次へ</Text>
         )}
       </TouchableOpacity>
     </>
@@ -264,7 +270,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
             onPress={() => handleSelectMember(member)}
             disabled={loading}
           >
-            <Text style={styles.memberButtonText}>{member.name}</Text>
+            <Text style={[styles.memberButtonText, { color: accentColor }]}>{member.name}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -298,9 +304,9 @@ export function LoginScreen({ onLoginSuccess }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={accentColor} />
         ) : (
-          <Text style={styles.primaryButtonText}>ログイン</Text>
+          <Text style={[styles.primaryButtonText, { color: accentColor }]}>ログイン</Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -324,7 +330,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: accentColor }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -336,7 +342,8 @@ export function LoginScreen({ onLoginSuccess }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>RecAIpt</Text>
+        <DevEnvironmentBanner />
+        <Text style={styles.title}>{getAppDisplayName()}</Text>
         <Text style={styles.tagline}>レシートで家計を管理</Text>
         {step === 'invite' && renderInviteStep()}
         {step === 'member' && renderMemberStep()}
@@ -351,7 +358,6 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
   },
   scrollContent: {
     flexGrow: 1,
@@ -431,7 +437,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: theme.colors.primary,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -473,7 +478,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   memberButtonText: {
-    color: theme.colors.primary,
     fontWeight: 'bold',
     fontSize: 16,
   },

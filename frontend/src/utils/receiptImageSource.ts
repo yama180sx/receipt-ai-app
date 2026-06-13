@@ -60,15 +60,20 @@ export async function buildReceiptImageSource(
       return { uri: URL.createObjectURL(res.data) };
     }
 
+    const headers = await buildAuthHeaders();
+    const url = getReceiptImageApiUrl(imagePath);
+
+    // iOS: Image の headers 付きリモート URI（File.downloadFileAsync は iOS 6s 等で失敗する）
+    if (Platform.OS === 'ios') {
+      return { uri: url, headers };
+    }
+
+    // Android: キャッシュへダウンロード
     const destination = new File(Paths.cache, `receipt-${getCacheFilename(imagePath)}`);
-    const downloaded = await File.downloadFileAsync(
-      getReceiptImageApiUrl(imagePath),
-      destination,
-      {
-        headers: await buildAuthHeaders(),
-        idempotent: true,
-      }
-    );
+    const downloaded = await File.downloadFileAsync(url, destination, {
+      headers,
+      idempotent: true,
+    });
     return { uri: downloaded.uri };
   } catch (error) {
     console.warn('[ReceiptImage] Failed to load image:', error);
@@ -76,7 +81,7 @@ export async function buildReceiptImageSource(
   }
 }
 
-/** 認証付き API から取得したローカル URI（Web: blob / Native: cache file） */
+/** 認証付き API から Image source を構築（Web: blob / iOS: リモート+headers / Android: cache） */
 export function useReceiptImageSource(imagePath: string | null | undefined) {
   const [source, setSource] = useState<ReceiptImageSource | null>(null);
 
