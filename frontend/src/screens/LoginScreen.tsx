@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
 import { loginService } from '../services/loginService';
 import type { AuthFamilyMember, LoginResult, ResolvedFamily } from '../types/auth';
 import { theme } from '../theme';
+import { showAlert } from '../utils/alertMessage';
 
 type LoginStep = 'invite' | 'member' | 'password' | 'totp_setup' | 'totp_verify';
 
@@ -49,7 +49,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   const handleResolveFamily = async () => {
     if (!inviteCode.trim()) {
-      Alert.alert('入力エラー', '招待コードを入力してください。');
+      showAlert('入力エラー', '招待コードを入力してください。');
       return;
     }
 
@@ -66,7 +66,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : '招待コードの確認に失敗しました。';
-      Alert.alert('エラー', message);
+      showAlert('エラー', message);
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
   const handleLogin = async () => {
     if (!family || !selectedMember) return;
     if (!password) {
-      Alert.alert('入力エラー', 'パスワードを入力してください。');
+      showAlert('入力エラー', 'パスワードを入力してください。');
       return;
     }
 
@@ -122,7 +122,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : 'ログインに失敗しました。';
-      Alert.alert('認証エラー', message);
+      showAlert('認証エラー', message);
       setPassword('');
     } finally {
       setLoading(false);
@@ -131,7 +131,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   const handleConfirmTotpSetup = async () => {
     if (!pendingToken || !totpCode.trim()) {
-      Alert.alert('入力エラー', '認証アプリの6桁コードを入力してください。');
+      showAlert('入力エラー', '認証アプリの6桁コードを入力してください。');
       return;
     }
 
@@ -141,7 +141,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
       finishLogin(result);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : '認証コードの確認に失敗しました。';
-      Alert.alert('エラー', message);
+      showAlert('エラー', message);
       setTotpCode('');
     } finally {
       setLoading(false);
@@ -150,7 +150,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
 
   const handleVerifyTotp = async () => {
     if (!pendingToken || !totpCode.trim()) {
-      Alert.alert('入力エラー', '認証アプリの6桁コードを入力してください。');
+      showAlert('入力エラー', '認証アプリの6桁コードを入力してください。');
       return;
     }
 
@@ -160,7 +160,7 @@ export function LoginScreen({ onLoginSuccess }: Props) {
       finishLogin(result);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : '認証コードが正しくありません。';
-      Alert.alert('認証エラー', message);
+      showAlert('認証エラー', message);
       setTotpCode('');
     } finally {
       setLoading(false);
