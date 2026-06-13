@@ -40,7 +40,7 @@ if [ "$ENV" == "dev" ]; then
     DB_PORT=5433
     REDIS_PORT=6380
     BACKEND_COMMAND="npm run dev"
-    CORS_ORIGIN="http://localhost:$DEV_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT,http://$HOST_IP:$WEB_PORT"
+    CORS_ORIGIN="http://localhost:$DEV_PORT,http://127.0.0.1:$DEV_PORT,http://localhost:$WEB_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT,http://$HOST_IP:$WEB_PORT"
     GEMINI_MODEL="gemini-flash-latest"
     CRON_SCHEDULE="0 3 * * *" # dev環境は毎日午前3時に実行
 else
@@ -57,7 +57,7 @@ else
     BACKEND_COMMAND="npm run start"
     # ブラウザ Origin は :80 省略のことがあるため両方許可（Issue #89 ログイン CORS）
     # Expo dev（:8082）と Expo Go（exp://）も許可
-    CORS_ORIGIN="http://$HOST_IP,http://$HOST_IP:$WEB_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT"
+    CORS_ORIGIN="http://$HOST_IP,http://$HOST_IP:$WEB_PORT,http://$HOST_IP:$DEV_PORT,exp://$HOST_IP:$DEV_PORT,http://localhost:$DEV_PORT,http://127.0.0.1:$DEV_PORT"
     GEMINI_MODEL="gemini-flash-latest"
     CRON_SCHEDULE="0 4 * * *" # stable環境は毎日午前4時に実行
 fi
