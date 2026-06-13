@@ -4,7 +4,6 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { prisma } from '../utils/prismaClient';
 import { encryptSecretForStorage } from '../services/totpService';
-import { Role } from '@prisma/client';
 
 export const TEST_MEMBER_PASSWORD = 'integration-test-password';
 /** 結合テスト用固定 TOTP シークレット（base32） */
@@ -33,13 +32,12 @@ export async function ensureTestMemberPassword(memberId = 1): Promise<void> {
   });
 }
 
-/** Admin 結合テスト用: 既知シークレットで TOTP を有効化 */
-export async function ensureTestAdminTotp(memberId: number): Promise<void> {
+/** 結合テスト用: 既知シークレットで TOTP を有効化 */
+export async function ensureTestMemberTotp(memberId: number): Promise<void> {
   const member = await prisma.familyMember.findUnique({ where: { id: memberId } });
   if (!member) {
     throw new Error(`Test member id=${memberId} not found.`);
   }
-  if (member.role !== Role.ADMIN) return;
   if (member.totpEnabled) return;
 
   await prisma.familyMember.update({
@@ -102,9 +100,7 @@ export async function loginAsTestMember(app: Express, memberId = 1): Promise<str
     throw new Error(`Test member id=${memberId} not found. Run prisma seed first.`);
   }
 
-  if (member.role === Role.ADMIN) {
-    await ensureTestAdminTotp(memberId);
-  }
+  await ensureTestMemberTotp(memberId);
 
   return completeTotpLogin(app, {
     familyGroupId: member.familyGroupId,

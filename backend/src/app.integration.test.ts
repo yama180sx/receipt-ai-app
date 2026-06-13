@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
 import {
-  ensureTestAdminTotp,
+  ensureTestMemberTotp,
   ensureTestMemberPassword,
   getTestTotpCode,
   getTenantBItemId,
@@ -50,8 +50,9 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
     await ensureTestMemberPassword(1);
     await ensureTestMemberPassword(2);
     await ensureTestMemberPassword(TENANT_B_ADMIN_MEMBER_ID);
-    await ensureTestAdminTotp(1);
-    await ensureTestAdminTotp(TENANT_B_ADMIN_MEMBER_ID);
+    await ensureTestMemberTotp(1);
+    await ensureTestMemberTotp(2);
+    await ensureTestMemberTotp(TENANT_B_ADMIN_MEMBER_ID);
 
     const fixturePath = path.join(process.cwd(), 'uploads', 'tenant-isolation-fixture.webp');
     fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
@@ -179,7 +180,12 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
       expect(res.status).toBe(401);
     });
 
-    it('POST /api/auth/login issues token directly for USER without TOTP', async () => {
+    it('POST /api/auth/login returns requiresTotpSetup for USER without TOTP', async () => {
+      await prisma.familyMember.update({
+        where: { id: 2 },
+        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+      });
+
       const res = await request(app)
         .post('/api/auth/login')
         .send({
@@ -189,9 +195,12 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.token).toBeDefined();
-      expect(res.body.data.requiresTotpSetup).toBe(false);
+      expect(res.body.data.token).toBeNull();
+      expect(res.body.data.requiresTotpSetup).toBe(true);
+      expect(res.body.data.pendingToken).toBeDefined();
       expect(res.body.data.requiresTotpVerification).toBe(false);
+
+      await ensureTestMemberTotp(2);
     });
   });
 
@@ -215,7 +224,7 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
       expect(res.body.data.pendingToken).toBeDefined();
       expect(res.body.data.token).toBeNull();
 
-      await ensureTestAdminTotp(1);
+      await ensureTestMemberTotp(1);
     });
 
     it('admin setup flow issues access token', async () => {
@@ -248,7 +257,7 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
       expect(confirmRes.status).toBe(200);
       expect(confirmRes.body.data.token).toBeDefined();
 
-      await ensureTestAdminTotp(1);
+      await ensureTestMemberTotp(1);
     });
 
     it('blocks admin API when TOTP not enabled', async () => {
@@ -288,7 +297,7 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
       expect(adminRes.status).toBe(403);
       expect(adminRes.body.code).toBe('TOTP_REQUIRED');
 
-      await ensureTestAdminTotp(1);
+      await ensureTestMemberTotp(1);
     });
   });
 

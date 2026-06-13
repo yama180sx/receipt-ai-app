@@ -26,7 +26,7 @@ export function decryptSecretFromStorage(encrypted: string): string {
   return decryptTotpSecret(encrypted);
 }
 
-/** Admin は 2FA 必須、USER は任意 */
-export function isTotpRequiredForRole(role: Role): boolean {
-  return role === Role.ADMIN;
+/** 全メンバーで初回ログイン時に 2FA セットアップ必須 */
+export function isTotpRequiredForRole(_role: Role): boolean {
+  return true;
 }
