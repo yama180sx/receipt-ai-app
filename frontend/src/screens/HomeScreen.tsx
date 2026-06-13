@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
-import { DevEnvironmentBanner } from '../components/DevEnvironmentBanner';
+import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
 import {
