@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
+import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
 import { theme } from '../theme';
 import apiClient from '../utils/apiClient';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
@@ -33,6 +34,7 @@ interface HomeScreenProps {
   onGoToSettlement?: () => void; // ★ [Issue #80] 精算サマリー画面への遷移ハンドラを追加
   onGoToAdminMenu?: () => void;
   currentMemberId: number;
+  memberName?: string | null;
   userRole?: string | null;
 }
 
@@ -46,6 +48,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToSettlement, // ★ 追加
   onGoToAdminMenu,
   currentMemberId,
+  memberName,
   userRole 
 }) => {
   const [latestReceipt, setLatestReceipt] = useState<any>(null);
@@ -227,11 +230,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <>
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>RecAIpt</Text>
-          <Text style={styles.headerTitle}>
-            {currentMemberId === 1 ? '山本さんのダッシュボード' : '共有メニュー'}
-          </Text>
+        <View style={[styles.header, isDevAppEnv() && styles.headerDev]}>
+          <Text style={styles.headerSubtitle}>{getAppDisplayName()}</Text>
+          <Text style={styles.headerTitle}>{getMemberMenuTitle(memberName)}</Text>
         </View>
 
         <View style={styles.summaryCard}>
@@ -392,6 +393,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { padding: theme.spacing.lg, paddingBottom: 40 },
   header: { marginBottom: theme.spacing.lg, marginTop: theme.spacing.md },
+  headerDev: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#b45309',
+    paddingLeft: theme.spacing.sm,
+  },
   headerSubtitle: { ...theme.typography.caption, color: theme.colors.text.muted, letterSpacing: 0.5 },
   headerTitle: { ...theme.typography.h1, color: theme.colors.text.main, marginTop: theme.spacing.xs },
   summaryCard: { backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, padding: theme.spacing.xl, marginBottom: theme.spacing.lg, elevation: 4 },

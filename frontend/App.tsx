@@ -35,6 +35,8 @@ import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
 import { DisplayModeProvider } from './src/contexts/DisplayModeContext';
 import { DisplayModeSettings } from './src/components/DisplayModeSettings';
+import { DevEnvironmentBanner } from './src/components/DevEnvironmentBanner';
+import { devUiColors, isDevAppEnv } from './src/config/appEnv';
 import type { LoginResult, StoredSession } from './src/types/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -50,6 +52,7 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [userToken, setUserToken] = useState<string | null>(null);
   const [currentMemberId, setCurrentMemberId] = useState<number | null>(null);
+  const [currentMemberName, setCurrentMemberName] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [pendingSession, setPendingSession] = useState<StoredSession | null>(null);
   const [biometricLockActive, setBiometricLockActive] = useState(false);
@@ -65,6 +68,7 @@ export default function App() {
   const applySession = useCallback((session: StoredSession) => {
     setUserToken(session.token);
     setCurrentMemberId(session.memberId);
+    setCurrentMemberName(session.memberName);
     setCurrentUserRole(session.role);
   }, []);
 
@@ -184,6 +188,7 @@ export default function App() {
     setTotpEnabled(false);
     setUserToken(null);
     setCurrentMemberId(null);
+    setCurrentMemberName(null);
     setCurrentUserRole(null);
     setCurrentView('main');
     setResultData(null);
@@ -202,6 +207,7 @@ export default function App() {
 
     setUserToken(null);
     setCurrentMemberId(null);
+    setCurrentMemberName(null);
     setCurrentUserRole(null);
     setPendingSession(null);
     setBiometricLockActive(false);
@@ -283,6 +289,10 @@ export default function App() {
     );
   }
 
+  const devToolbarStyle = isDevAppEnv()
+    ? { backgroundColor: devUiColors.toolbarBg, borderBottomColor: devUiColors.toolbarBorder }
+    : null;
+
   const renderMainContent = () => {
     const memberId = currentMemberId!;
 
@@ -360,10 +370,16 @@ export default function App() {
       default:
         return (
           <View style={styles.mainWithToolbar}>
-            <SafeAreaView edges={['top']} style={styles.mainToolbar}>
+            <DevEnvironmentBanner />
+            <SafeAreaView edges={['top']} style={[styles.mainToolbar, devToolbarStyle]}>
               <View style={styles.topActions}>
                 <DisplayModeSettings />
                 <View style={styles.topActionButtons}>
+                  {currentMemberName ? (
+                    <Text style={styles.memberNameText} numberOfLines={1}>
+                      {currentMemberName}
+                    </Text>
+                  ) : null}
                   {biometricEnabled && Platform.OS !== 'web' ? (
                     <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
                       <Text style={styles.topActionText}>生体認証オフ</Text>
@@ -383,6 +399,7 @@ export default function App() {
               onGoToSettlement={() => setCurrentView('settlement_summary')}
               onGoToAdminMenu={() => setCurrentView('admin_menu')}
               currentMemberId={memberId}
+              memberName={currentMemberName}
               userRole={currentUserRole}
             />
           </View>
@@ -395,6 +412,7 @@ export default function App() {
       <DisplayModeProvider>
         <ResponsiveContainer fullWidth={isFullWidth}>
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            {userToken && currentView !== 'main' ? <DevEnvironmentBanner /> : null}
             {renderMainContent()}
           </View>
         </ResponsiveContainer>
@@ -433,4 +451,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   topActionText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
+  memberNameText: {
+    color: theme.colors.text.main,
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: 120,
+  },
 });

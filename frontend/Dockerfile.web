@@ -13,7 +13,9 @@ COPY . .
 # [重要] Expo Webのビルド時にAPI URLを静的に埋め込む
 # 実行時ではなくビルド時に確定させる必要があります
 ARG EXPO_PUBLIC_API_URL
+ARG EXPO_PUBLIC_APP_ENV=stable
 ENV EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL}
+ENV EXPO_PUBLIC_APP_ENV=${EXPO_PUBLIC_APP_ENV}
 
 # 静的書き出し (distフォルダが生成される)
 RUN npx expo export --platform web
