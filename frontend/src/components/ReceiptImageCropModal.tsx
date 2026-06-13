@@ -15,6 +15,12 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { AppButton } from './ui';
 import { theme } from '../theme';
 import { registerWebImageFile, uriToWebImageFile } from '../utils/webImageFileRegistry';
+import {
+  computeContainedLayout,
+  cropImageUriWeb,
+  loadImageDimensions,
+  mapSelectionToCrop,
+} from '../utils/cropImageWeb';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -98,6 +104,48 @@ export function ReceiptImageCropModal({
     })
   ).current;
 
+  const getNaturalSize = async (): Promise<{ width: number; height: number }> => {
+    if (naturalSize.width > 0 && naturalSize.height > 0) {
+      return naturalSize;
+    }
+    if (Platform.OS === 'web') {
+      return loadImageDimensions(imageUri);
+    }
+    return new Promise((resolve, reject) => {
+      Image.getSize(
+        imageUri,
+        (width, height) => resolve({ width, height }),
+        reject
+      );
+    });
+  };
+
+  const cropSelectedRegion = async (): Promise<string | null> => {
+    if (!selection || selection.width < 8 || selection.height < 8) return null;
+    if (!displaySize.width || !displaySize.height) return null;
+
+    const natural = await getNaturalSize();
+    const layout = computeContainedLayout(
+      displaySize.width,
+      displaySize.height,
+      natural.width,
+      natural.height
+    );
+    const crop = mapSelectionToCrop(selection, layout, natural.width, natural.height);
+    if (!crop) return null;
+
+    if (Platform.OS === 'web') {
+      return cropImageUriWeb(imageUri, crop);
+    }
+
+    const result = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [{ crop }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  };
+
   const finishConfirm = async (uri: string) => {
     if (Platform.OS === 'web') {
       try {
@@ -111,36 +159,10 @@ export function ReceiptImageCropModal({
   };
 
   const handleConfirm = async () => {
-    if (!selection || selection.width < 8 || selection.height < 8) {
-      await finishConfirm(imageUri);
-      return;
-    }
-    if (!displaySize.width || !naturalSize.width) {
-      await finishConfirm(imageUri);
-      return;
-    }
-
     setProcessing(true);
     try {
-      const scaleX = naturalSize.width / displaySize.width;
-      const scaleY = naturalSize.height / displaySize.height;
-      const originX = Math.max(0, Math.round(selection.x * scaleX));
-      const originY = Math.max(0, Math.round(selection.y * scaleY));
-      const cropWidth = Math.min(
-        naturalSize.width - originX,
-        Math.round(selection.width * scaleX)
-      );
-      const cropHeight = Math.min(
-        naturalSize.height - originY,
-        Math.round(selection.height * scaleY)
-      );
-
-      const result = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [{ crop: { originX, originY, width: cropWidth, height: cropHeight } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      await finishConfirm(result.uri);
+      const croppedUri = await cropSelectedRegion();
+      await finishConfirm(croppedUri ?? imageUri);
     } catch (e) {
       console.error('[Crop] failed', e);
       await finishConfirm(imageUri);

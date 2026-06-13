@@ -225,7 +225,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
  
   return (
     <>
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.headerSubtitle}>RecAIpt</Text>

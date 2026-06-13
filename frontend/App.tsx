@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -359,26 +359,30 @@ export default function App() {
         );
       default:
         return (
-          <View style={{ flex: 1 }}>
-            <View style={styles.topActions}>
-              {Platform.OS === 'web' ? <DisplayModeSettings /> : null}
-              {currentUserRole === 'USER' ? (
-                <TouchableOpacity
-                  style={styles.topActionButton}
-                  onPress={() => setCurrentView('totp_settings')}
-                >
-                  <Text style={styles.topActionText}>2FA設定</Text>
-                </TouchableOpacity>
-              ) : null}
-              {biometricEnabled && Platform.OS !== 'web' ? (
-                <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
-                  <Text style={styles.topActionText}>生体認証オフ</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
-                <Text style={styles.topActionText}>ログアウト</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.mainWithToolbar}>
+            <SafeAreaView edges={['top']} style={styles.mainToolbar}>
+              <View style={styles.topActions}>
+                <DisplayModeSettings />
+                <View style={styles.topActionButtons}>
+                  {currentUserRole === 'USER' ? (
+                    <TouchableOpacity
+                      style={styles.topActionButton}
+                      onPress={() => setCurrentView('totp_settings')}
+                    >
+                      <Text style={styles.topActionText}>2FA設定</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {biometricEnabled && Platform.OS !== 'web' ? (
+                    <TouchableOpacity style={styles.topActionButton} onPress={handleDisableBiometric}>
+                      <Text style={styles.topActionText}>生体認証オフ</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity style={styles.topActionButton} onPress={handleLogout}>
+                    <Text style={styles.topActionText}>ログアウト</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </SafeAreaView>
 
             <HomeScreen
               onAnalysisReady={handleAnalysisReady}
@@ -409,12 +413,26 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+  mainWithToolbar: { flex: 1 },
+  mainToolbar: {
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
   topActions: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  topActionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
   },
   topActionButton: {
