@@ -76,8 +76,6 @@ flowchart TB
 | コンテナ | Docker Compose |
 | CI | GitHub Actions（`test.yml` / `deploy.yml`） |
 
-> ルート `README.md` の技術スタック記載（Supabase 等）は歴史的なものであり、**現行実装は上表が正**である（#90-7 で README 現行化予定）。
-
 ---
 
 ## 3. リポジトリ構成

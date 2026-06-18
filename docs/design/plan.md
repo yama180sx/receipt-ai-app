@@ -36,7 +36,7 @@ docs/
 
 | ファイル | 扱い |
 |----------|------|
-| `README.md` | #90-7 で現行化（技術スタック・セットアップ） |
+| `README.md` | 現行化済み（技術スタック・セットアップ） — [README.md](../../README.md) |
 | `docs/MILESTONE_PHASE1.md` | 3層正規化の起源として参照。#90-4 で再整理 |
 | `docs/db-operations.md` | #90-6 に統合または相互リンク |
 | `docs/restore-manual.md` | #90-6 に統合または相互リンク |

@@ -230,4 +230,4 @@ flowchart LR
 
 - [architecture.md](./architecture.md) — 環境・デプロイ・外部連携
 - [plan.md](./plan.md) — 設計資料 Epic 計画
-- [README.md](../../README.md) — バックアップ・監視の概要（#90-7 で現行化予定）
+- [README.md](../../README.md) — バックアップ・監視の概要
