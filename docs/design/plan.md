@@ -19,7 +19,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 docs/
 ├── design/                    # 本 Epic の成果物（新規）
 │   ├── plan.md                # 本ファイル
-│   ├── architecture.md        # #90-1
+│   ├── architecture.md        # #90-1 → [architecture.md](./architecture.md)
 │   ├── domain-model.md        # #90-2
 │   ├── api-spec.md            # #90-3
 │   ├── ai-pipeline.md         # #90-4
@@ -47,7 +47,7 @@ docs/
 
 | 優先 | 資料 | 子 Issue | 主な読者 |
 |------|------|----------|----------|
-| Must | アーキテクチャ概要 | #90-1 | 全体把握 |
+| Must | [アーキテクチャ概要](./architecture.md) | #90-1 | 全体把握 |
 | Must | ドメインモデル & 業務ルール | #90-2 | DB・精算・按分 |
 | Must | API 仕様 | #90-3 | FE/BE 連携 |
 | Must | 3層正規化 & AI パイプライン | #90-4 | OCR・マスタ |
