@@ -342,7 +342,7 @@ BullMQ のジョブキュー専用。`redisdata/` ボリュームで永続化。
 4. `prisma migrate deploy`
 5. `docker compose up -d --build`
 
-運用詳細（バックアップ・Discord 通知・リストア）は [operations.md](./operations.md)（#90-6）で統合予定。現状は `docs/db-operations.md`, `docs/restore-manual.md` を参照。
+運用詳細（バックアップ・Discord 通知・リストア・DB マスタ運用）は [operations.md](./operations.md)（#90-6）を参照。コマンド全文は [db-operations.md](../db-operations.md), [restore-manual.md](../restore-manual.md) にも維持。
 
 ---
 
