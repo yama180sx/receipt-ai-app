@@ -13,7 +13,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | #90-4 | [#295](https://github.com/yama180sx/receipt-ai-app/issues/295) | [ai-pipeline.md](./ai-pipeline.md) | 完了 |
 | #90-5 | [#296](https://github.com/yama180sx/receipt-ai-app/issues/296) | [frontend-screens.md](./frontend-screens.md) | 完了 |
 | #90-6 | [#297](https://github.com/yama180sx/receipt-ai-app/issues/297) | [operations.md](./operations.md) | 完了 |
-| #90-7 | [#298](https://github.com/yama180sx/receipt-ai-app/issues/298) | ルート `README.md` | 未着手 |
+| #90-7 | [#298](https://github.com/yama180sx/receipt-ai-app/issues/298) | ルート `README.md` | 完了 |
 
 ## 関連
 
