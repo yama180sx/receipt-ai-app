@@ -153,7 +153,7 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
  */
 export const addSettlementTransfer = async (req: Request, res: Response, next: NextFunction) => {
   const familyGroupId = getFamilyGroupId();
-  
+
   const { month, fromMemberId, toMemberId, amount } = req.body;
   const normalizedMonth = normalizeYearMonth(month);
   const fromId = Number(fromMemberId);
@@ -161,24 +161,23 @@ export const addSettlementTransfer = async (req: Request, res: Response, next: N
   const transferAmount = Math.round(Number(amount));
 
   if (!normalizedMonth || !fromMemberId || !toMemberId || !Number.isFinite(transferAmount) || transferAmount <= 0) {
-    return res.status(400).json({ success: false, message: '必要なパラメータが不足しているか、金額が不正です。' });
+    return next(new AppError('必要なパラメータが不足しているか、金額が不正です。', 400));
   }
 
   if (fromId === toId) {
-    return res.status(400).json({ success: false, message: '自分自身への送金は登録できません。' });
+    return next(new AppError('自分自身への送金は登録できません。', 400));
   }
 
   try {
-    // 送信者・受信者が同一世帯に属しているか（テナント検証）
     const validMembers = await prisma.familyMember.findMany({
       where: {
         id: { in: [fromId, toId] },
-        familyGroupId
-      }
+        familyGroupId,
+      },
     });
 
     if (validMembers.length !== 2) {
-      return res.status(403).json({ success: false, message: '無効なユーザー指定、または権限がありません。' });
+      throw new AppError('無効なユーザー指定、または権限がありません。', 403);
     }
 
     // 送金記録の作成
@@ -216,7 +215,7 @@ export const deleteSettlementTransfer = async (
   const transferId = Number(getRouteParam(req, 'id'));
 
   if (!Number.isFinite(transferId) || transferId <= 0) {
-    return res.status(400).json({ success: false, message: '送金記録IDが不正です。' });
+    return next(new AppError('送金記録IDが不正です。', 400));
   }
 
   try {

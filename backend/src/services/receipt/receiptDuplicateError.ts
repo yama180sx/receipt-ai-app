@@ -1,30 +1,21 @@
-/** commit / 手動登録時の重複レシート検出 */
-export class DuplicateReceiptError extends Error {
-  readonly statusCode = 409;
+import { AppError } from '../../utils/appError';
+
+/** commit / 手動登録時の重複レシート検出（api-spec §2.3 特殊ケース 409） */
+export class DuplicateReceiptError extends AppError {
   readonly existingId: number | null;
 
   constructor(existingId?: number | null) {
-    super('DUPLICATE_RECEIPT_DETECTED');
+    super('DUPLICATE', 409);
     this.name = 'DuplicateReceiptError';
     this.existingId = existingId ?? null;
   }
 }
 
 export function isDuplicateReceiptError(error: unknown): error is DuplicateReceiptError {
-  return (
-    error instanceof DuplicateReceiptError ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'statusCode' in error &&
-      (error as { statusCode: number }).statusCode === 409)
-  );
+  return error instanceof DuplicateReceiptError;
 }
 
 export function getDuplicateExistingId(error: unknown): number | null {
   if (error instanceof DuplicateReceiptError) return error.existingId;
-  if (typeof error === 'object' && error !== null && 'existingId' in error) {
-    const id = (error as { existingId?: number | null }).existingId;
-    return id ?? null;
-  }
   return null;
 }
