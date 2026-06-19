@@ -15,7 +15,7 @@ import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { api } from '../utils/apiClient';
+import { receiptApi } from '../api/receiptApi';
 import { showAlert } from '../utils/alertMessage';
 import {
   buildItemSplitSavePayload,
@@ -51,7 +51,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
   useEffect(() => {
     const init = async () => {
       try {
-        const res = await api.getFamilyMembers();
+        const res = await receiptApi.getFamilyMembers();
         if (res.success) {
           setAllMembers(res.data);
           
@@ -296,7 +296,7 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
           amounts,
           remainderMemberId
         );
-        return api.saveItemSplits(item.id, payloadSplits);
+        return receiptApi.saveItemSplits(item.id, payloadSplits);
       });
 
       await Promise.all(savePromises);

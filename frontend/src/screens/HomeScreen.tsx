@@ -17,7 +17,7 @@ import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
 import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { theme } from '../theme';
-import apiClient from '../utils/apiClient';
+import { receiptApi, statsApi } from '../api';
 import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
 import {
   consumePendingCropUri,
@@ -84,16 +84,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     try {
       const currentMonth = getCurrentYearMonth();
       const [latestRes, statsRes] = await Promise.all([
-        apiClient.get('/receipts/latest', { params: { memberId: currentMemberId } }),
-        apiClient.get('/stats/monthly', { params: { month: currentMonth } }),
+        receiptApi.getLatestReceipt(currentMemberId),
+        statsApi.getMonthlyStats(currentMonth),
       ]);
 
-      if (latestRes.data && latestRes.data.success) {
-        setLatestReceipt(latestRes.data.data);
+      if (latestRes.success) {
+        setLatestReceipt(latestRes.data);
       }
 
-      if (statsRes.data && statsRes.data.success) {
-        const total = statsRes.data.data.totalAmount || 0;
+      if (statsRes.success) {
+        const total = statsRes.data.totalAmount || 0;
         setMonthlyTotal(Math.round(total));
       }
     } catch (error) {
@@ -136,13 +136,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setUploadingCount((count) => count + 1);
     try {
       const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
-      const uploadRes = await apiClient.post('/receipts/upload', formData, {
-        headers: {
-          'x-member-id': currentMemberId.toString(),
-        },
-      });
+      const uploadRes = await receiptApi.uploadReceipt(formData, currentMemberId);
 
-      if (uploadRes.data?.success) {
+      if (uploadRes.success) {
         showAcceptanceFeedback('受付しました。解析結果は下の一覧に表示されます。');
         await refreshJobs();
         return;

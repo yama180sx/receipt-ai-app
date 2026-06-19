@@ -9,7 +9,7 @@ import {
   Platform, 
   Alert,
 } from 'react-native';
-import apiClient from '../utils/apiClient';
+import { categoryApi, receiptApi } from '../api';
 import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
@@ -59,9 +59,9 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   // カテゴリマスタの取得
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await apiClient.get('/categories');
-      if (res.data?.success) {
-        setCategories(res.data.data);
+      const res = await categoryApi.listCategories();
+      if (res.success) {
+        setCategories(res.data);
       }
     } catch (err) {
       console.error('カテゴリー取得失敗', err);
@@ -71,9 +71,9 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   // ★ Issue #64: 所属世帯のメンバー一覧を取得
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await apiClient.get('/family-groups/members');
-      if (res.data?.success) {
-        setMembers(res.data.data);
+      const res = await receiptApi.getFamilyMembers();
+      if (res.success) {
+        setMembers(res.data);
       }
     } catch (err) {
       console.error('世帯メンバー取得失敗', err);
@@ -84,15 +84,12 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/receipts', {
-        params: {
-          ...(selectedMonth ? { month: selectedMonth } : {}),
-          // 世帯全体: memberId を空で送る（省略すると API がログインユーザーに絞る旧挙動になる）
-          memberId: selectedMember,
-        },
+      const res = await receiptApi.listReceipts({
+        ...(selectedMonth ? { month: selectedMonth } : {}),
+        memberId: selectedMember,
       });
-      if (res.data?.success) {
-        const data = res.data.data;
+      if (res.success) {
+        const data = res.data;
         setReceipts(data);
         
         // 編集・保存後に選択中データの参照を最新に更新
@@ -127,12 +124,10 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await apiClient.patch(`/receipts/items/${itemId}`, 
-        { categoryId: Number(categoryId) }
-      );
-      
-      if (response.data?.success) {
-        const updatedItem = response.data.data;
+      const response = await receiptApi.updateItemCategory(itemId, Number(categoryId));
+
+      if (response.success) {
+        const updatedItem = response.data;
         const mapper = (r: ReceiptDetail): ReceiptDetail => ({
           ...r,
           items: r.items.map((item) =>

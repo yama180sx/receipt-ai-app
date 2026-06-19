@@ -12,7 +12,7 @@ import { AppButton, AppSelect, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import apiClient from '../utils/apiClient';
+import { receiptApi } from '../api/receiptApi';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import type { CategorySummary, ReceiptDetail, ReceiptItemDetail } from '../types/receipt';
 import type { ReceiptForSplitEditor } from '../types/settlement';
@@ -117,8 +117,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         }))
       };
 
-      const res = await apiClient.patch(`/receipts/${receipt.id}`, payload);
-      if (res.data?.success) {
+      const res = await receiptApi.updateReceipt(receipt.id, payload);
+      if (res.success) {
         Alert.alert('成功', '変更を保存しました。');
         setIsEditing(false);
         if (onSaveSuccess) onSaveSuccess();

@@ -18,7 +18,7 @@ import {
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme, tableStyles } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { api } from '../utils/apiClient';
+import { statsApi } from '../api/statsApi';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { showAlert } from '../utils/alertMessage';
 import { showConfirmDialog } from '../utils/confirmDialog';
@@ -132,7 +132,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
       if (!options?.silent) {
         setLoading(true);
       }
-      const res = await api.getSettlementStatus(selectedMonth);
+      const res = await statsApi.getSettlementStatus(selectedMonth);
       if (res.success) {
         setSummaryData(res.data?.members ?? []);
         setTransferList(res.data?.transfers ?? []);
@@ -161,7 +161,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
     setIsSubmitting(true);
     try {
-      const res = await api.addSettlementTransfer({
+      const res = await statsApi.addSettlementTransfer({
         month: selectedMonth,
         fromMemberId: transferFrom!,
         toMemberId: transferTo!,
@@ -192,7 +192,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
     setCancellingTransferId(transfer.id);
     try {
-      const res = await api.deleteSettlementTransfer(transfer.id);
+      const res = await statsApi.deleteSettlementTransfer(transfer.id);
       if (res.success) {
         showAlert('完了', '送金記録を取り消しました。');
         await loadSettlementData({ silent: true });
