@@ -1,13 +1,16 @@
 import { prisma } from '../../utils/prismaClient';
 import logger from '../../utils/logger';
 import { normalizeStoreName, getCleanText } from '../../utils/normalizer';
+import { runReceiptCommitTransaction } from '../../utils/prismaTransaction';
 import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptService';
-import type { ParsedItem, ReceiptCommitPayload } from '../../types/receipt';
+import type { ReceiptCommitPayload } from '../../types/receipt';
 import { DuplicateReceiptError } from './receiptDuplicateError';
+import { persistReceiptCommitInTx } from './receiptCommitPersistence';
 
 /**
  * パース済みデータを DB に永続化（重複チェック ＋ 世帯別学習）
  * [Issue #63 / #72] ApiUsageLog 紐付けをトランザクション内で実行
+ * [Issue #98-4] commit 系 tx は runReceiptCommitTransaction のみで開始
  */
 export async function saveParsedReceipt(
   memberId: number,
@@ -47,58 +50,21 @@ export async function saveParsedReceipt(
     throw new DuplicateReceiptError(duplicate.existingReceiptId);
   }
 
-  const savedId = await prisma.$transaction(
-    async (tx) => {
-      const itemsToCreate = await Promise.all(
-        parsedData.items.map(async (item: ParsedItem) => {
-          const cleanName = getCleanText(item.name);
-          const finalCategoryId = item.categoryId ? Number(item.categoryId) : null;
-
-          if (finalCategoryId) {
-            await tx.productMaster.upsert({
-              where: {
-                name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId },
-              },
-              update: { categoryId: finalCategoryId },
-              create: { name: cleanName, storeName: cleanStore, categoryId: finalCategoryId, familyGroupId },
-            });
-          }
-
-          return {
-            name: item.name,
-            price: parseFloat(String(item.price || 0)),
-            quantity: parseFloat(String(item.quantity || 1)),
-            categoryId: finalCategoryId,
-          };
-        })
-      );
-
-      const created = await tx.receipt.create({
-        data: {
-          memberId,
-          familyGroupId,
-          storeName: officialStoreName,
-          date: jstDate,
-          totalAmount,
-          taxAmount,
-          imagePath,
-          items: { create: itemsToCreate },
-          rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
-        },
-        select: { id: true },
-      });
-
-      if (usageLogId && !isNaN(usageLogId)) {
-        await tx.apiUsageLog.update({
-          where: { id: usageLogId },
-          data: { receiptId: created.id },
-        });
-        logger.info(`[Link_Log] ApiUsageLog(ID: ${usageLogId}) を Receipt(ID: ${created.id}) に紐付けました。`);
-      }
-
-      return created.id;
-    },
-    { timeout: 15000 }
+  const savedId = await runReceiptCommitTransaction((tx) =>
+    persistReceiptCommitInTx(tx, {
+      memberId,
+      familyGroupId,
+      parsedData,
+      officialStoreName,
+      cleanStore,
+      jstDate,
+      totalAmount,
+      taxAmount,
+      imagePath,
+      isSuspicious,
+      warnings,
+      usageLogId,
+    })
   );
 
   const final = await prisma.receipt.findUnique({
