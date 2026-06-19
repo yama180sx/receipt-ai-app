@@ -19,6 +19,7 @@ import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
+import type { ReceiptDetail } from '../types/receipt';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 // --- interface 定義 ---
@@ -288,7 +289,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         title="解析レシート詳細"
       >
         <ReceiptDetailComponent
-          receipt={data?.latestReceipt}
+          receipt={data?.latestReceipt as ReceiptDetail | null | undefined}
           categories={allCategories}
           onCategoryChange={handleCategoryChange}
           baseUrl={BASE_URL}

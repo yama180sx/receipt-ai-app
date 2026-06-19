@@ -16,11 +16,13 @@ import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
+import type { CategorySummary, ReceiptDetail } from '../types/receipt';
+import type { FamilyMemberSummary, ReceiptForSplitEditor } from '../types/settlement';
 
 interface HistoryScreenProps {
   onBack: () => void;
   currentMemberId: number; 
-  onGoToSplitEditor?: (receipt: any) => void; // ★ [Issue #79] App.tsxからの遷移ハンドラを受け取る
+  onGoToSplitEditor?: (receipt: ReceiptForSplitEditor) => void;
 }
 
 /**
@@ -30,10 +32,10 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   const isWide = useIsWideLayout();
 
   const [loading, setLoading] = useState(true);
-  const [receipts, setReceipts] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]); // ★ Issue #64: 動的世帯メンバー用ステート
-  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptDetail[]>([]);
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
+  const [members, setMembers] = useState<FamilyMemberSummary[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
   
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
@@ -95,7 +97,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
         
         // 編集・保存後に選択中データの参照を最新に更新
         if (selectedReceipt) {
-          const updated = data.find((r: any) => r.id === selectedReceipt.id);
+          const updated = data.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
           if (updated) setSelectedReceipt(updated);
         } else if (isWide && data.length > 0) {
           // 初回ロード時は1件目を選択
@@ -131,15 +133,15 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
       
       if (response.data?.success) {
         const updatedItem = response.data.data;
-        const mapper = (r: any) => ({
+        const mapper = (r: ReceiptDetail): ReceiptDetail => ({
           ...r,
-          items: r.items.map((item: any) =>
+          items: r.items.map((item) =>
             item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
           ),
         });
 
         setReceipts(prev => prev.map(mapper));
-        if (selectedReceipt) setSelectedReceipt((prev: any) => mapper(prev));
+        if (selectedReceipt) setSelectedReceipt((prev) => (prev ? mapper(prev) : null));
       }
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
@@ -149,7 +151,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item }: { item: ReceiptDetail }) => {
     const isSelected = selectedReceipt?.id === item.id;
     const displayAmount = Math.round(item.totalAmount || 0);
 

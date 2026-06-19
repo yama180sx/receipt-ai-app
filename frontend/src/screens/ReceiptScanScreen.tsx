@@ -19,16 +19,10 @@ import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import { showAlert } from '../utils/alertMessage';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
+import type { ParsedReceiptItemInput } from '../types/receipt';
 
 const c = theme.colors;
 const s = theme.colors.semantic.scan;
-
-interface ReceiptItem {
-  name: string;
-  price: number | string; // 入力中は文字列を許容
-  quantity: number | string; // 入力中は文字列を許容
-  categoryId: number | null;
-}
 
 interface ReceiptScanScreenProps {
   initialData: ReceiptScanInitialData;
@@ -76,7 +70,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     return Math.round(itemsTotal + tax);
   }, [receiptData.items, receiptData.taxAmount]);
 
-  const updateItem = (index: number, key: keyof ReceiptItem, value: any) => {
+  const updateItem = (index: number, key: keyof ParsedReceiptItemInput, value: ParsedReceiptItemInput[keyof ParsedReceiptItemInput]) => {
     const newItems = [...receiptData.items];
     newItems[index] = { ...newItems[index], [key]: value };
     setReceiptData({ ...receiptData, items: newItems });

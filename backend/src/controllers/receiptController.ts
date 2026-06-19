@@ -11,6 +11,7 @@ import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
 import { calcItemLineTotal } from '../utils/itemLineTotal';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
 import { getRouteParam } from '../utils/routeParams';
+import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
 
 /**
  * [Issue #43] ジョブステータス取得
@@ -133,7 +134,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
     const result = await saveConfirmedReceipt(
       memberId,
       familyGroupId,
-      parsedData,
+      parsedData as ReceiptCommitPayload,
       imagePath,
       validation?.isSuspicious || false,
       validation?.warnings || []
@@ -169,7 +170,8 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
     const { date, storeName, items, imagePath } = req.body;
 
     // 単価×数量の合計を算出し、四捨五入して整数にする
-    const calculatedTotal = items.reduce((sum: number, i: any) => {
+    const typedItems = items as ReceiptCreateItemInput[];
+    const calculatedTotal = typedItems.reduce((sum: number, i) => {
       return sum + (Number(i.price || 0) * Number(i.quantity || 0));
     }, 0);
 
@@ -180,10 +182,10 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
         storeName,
         purchaseDate: date,
         totalAmount: Math.round(calculatedTotal), // 合計は整数
-        items: items.map((i: any) => ({
+        items: typedItems.map((i) => ({
           name: i.name,
-          price: parseFloat(i.price), 
-          quantity: parseFloat(i.quantity || 1),
+          price: parseFloat(String(i.price)), 
+          quantity: parseFloat(String(i.quantity || 1)),
           categoryId: i.categoryId ? Number(i.categoryId) : null
         }))
       },

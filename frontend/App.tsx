@@ -32,6 +32,7 @@ import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
 import { ReceiptTrayScreen } from './src/screens/ReceiptTrayScreen';
 import { ReceiptTrayProvider } from './src/contexts/ReceiptTrayContext';
 import type { ReceiptScanInitialData } from './src/types/receiptScan';
+import type { ReceiptForSplitEditor } from './src/types/settlement';
 
 import { theme } from './src/theme';
 import { ResponsiveContainer } from './src/components/ResponsiveContainer';
@@ -61,12 +62,12 @@ export default function App() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [totpEnabled, setTotpEnabled] = useState(false);
 
-  const [resultData, setResultData] = useState<any>(null);
+  const [resultData, setResultData] = useState<ReceiptScanInitialData | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [scanReturnView, setScanReturnView] = useState<ViewType>('main');
 
-  const [targetReceipt, setTargetReceipt] = useState<any>(null);
+  const [targetReceipt, setTargetReceipt] = useState<ReceiptForSplitEditor | null>(null);
   const refreshTrayRef = useRef<(() => Promise<void>) | null>(null);
 
   const applySession = useCallback((session: StoredSession) => {
@@ -258,7 +259,7 @@ export default function App() {
     saveState();
   }, [currentView, resultData, isReady, userToken]);
 
-  const handleAnalysisReady = (data: any) => {
+  const handleAnalysisReady = (data: ReceiptScanInitialData) => {
     setScanReturnView('main');
     setResultData(data);
     setCurrentView('receipt_scan');
@@ -334,7 +335,7 @@ export default function App() {
           />
         );
       case 'split_editor':
-        return (
+        return targetReceipt ? (
           <SplitEditorScreen
             receipt={targetReceipt}
             onBack={() => {
@@ -342,7 +343,7 @@ export default function App() {
               setCurrentView('history');
             }}
           />
-        );
+        ) : null;
       case 'settlement_summary':
         return (
           <SettlementSummaryScreen
@@ -358,14 +359,14 @@ export default function App() {
       case 'receipt_tray':
         return <ReceiptTrayScreen onBack={() => setCurrentView('main')} />;
       case 'receipt_scan':
-        return (
+        return resultData ? (
           <ReceiptScanScreen
             initialData={resultData}
             categories={categories}
             onSuccess={() => handleScanClose({ refreshTray: true })}
             onCancel={() => handleScanClose()}
           />
-        );
+        ) : null;
       case 'prompt_editor':
         return <PromptEditorScreen onBack={() => setCurrentView('admin_menu')} />;
       case 'admin_stats':
