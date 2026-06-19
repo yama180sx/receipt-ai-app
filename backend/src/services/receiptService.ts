@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
+import { analyzeReceiptImage } from './geminiService';
+import type { ParsedItem, ReceiptCommitPayload } from '../types/receipt';
 import { estimateCategoryId } from './categoryService';
 import { validateReceiptItems } from './validationService';
 import { checkDuplicateReceipt, parseReceiptDate } from './duplicateReceiptService';
@@ -67,7 +68,7 @@ export const analyzeOnly = async (memberId: number, imagePath: string) => {
 export const saveParsedReceipt = async (
   memberId: number, 
   familyGroupId: number,
-  parsedData: any,
+  parsedData: ReceiptCommitPayload,
   imagePath: string,
   isSuspicious: boolean, 
   warnings: string[] 
@@ -117,7 +118,7 @@ export const saveParsedReceipt = async (
     }
 
     const savedId = await prisma.$transaction(async (tx) => {
-      const itemsToCreate = await Promise.all(parsedData.items.map(async (item: any) => {
+      const itemsToCreate = await Promise.all(parsedData.items.map(async (item: ParsedItem) => {
         const cleanName = getCleanText(item.name);
         const finalCategoryId = item.categoryId ? Number(item.categoryId) : null;
 
@@ -185,7 +186,7 @@ export const saveParsedReceipt = async (
 export const saveConfirmedReceipt = async (
   memberId: number,
   familyGroupId: number,
-  parsedData: any,
+  parsedData: ReceiptCommitPayload,
   imagePath: string,
   isSuspicious: boolean,
   warnings: string[]

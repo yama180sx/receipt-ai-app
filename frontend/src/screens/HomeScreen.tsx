@@ -28,9 +28,10 @@ import {
 import { showAlert } from '../utils/alertMessage';
 import { getCurrentYearMonth } from '../utils/monthSelectOptions';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
+import type { ReceiptScanInitialData } from '../types/receiptScan';
 
 interface HomeScreenProps {
-  onAnalysisReady: (data: any) => void;
+  onAnalysisReady: (data: ReceiptScanInitialData) => void;
   onGoToHistory: () => void;
   onGoToStats: () => void;
   onGoToReceiptTray: () => void;

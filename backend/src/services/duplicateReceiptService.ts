@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prismaClient';
 import { getCleanText, normalizeStoreName } from '../utils/normalizer';
+import type { ReceiptDuplicateCheckInput } from '../types/receipt';
 
 export type DuplicateCheckResult = {
   duplicateSuspected: boolean;
@@ -25,20 +26,13 @@ export function parseReceiptDate(dateStr: string | null | undefined): Date {
   return isNaN(fallback.getTime()) ? new Date() : fallback;
 }
 
-type ParsedLike = {
-  storeName?: string | null;
-  purchaseDate?: string | null;
-  date?: string | null;
-  totalAmount?: number | null;
-};
-
 /**
  * commit 前の read-only 重複候補判定（店名・日付・金額）。
  * saveParsedReceipt と同一ロジック。
  */
 export async function checkDuplicateReceipt(
   familyGroupId: number,
-  parsedData: ParsedLike,
+  parsedData: ReceiptDuplicateCheckInput,
   imagePath?: string | null
 ): Promise<DuplicateCheckResult> {
   const normalizedImage = imagePath?.replace(/\\/g, '/');
