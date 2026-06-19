@@ -4,8 +4,12 @@
 
 | 資料 | 内容 |
 |------|------|
-| [chatgpt/](./chatgpt/) | ChatGPT による ZIP 解析出力（Phase1–5、**原文保管・変更しない**） |
+| [chatgpt/](./chatgpt/) | ChatGPT 解析出力（Phase1–5 仕様書、リファクタ案。**原文保管・変更しない**） |
 | [comparison-chatgpt-vs-design.md](./comparison-chatgpt-vs-design.md) | ChatGPT 仕様と `docs/design/` の差分表・統合記録 |
+
+## 関連
+
+- リファクタ計画: [docs/refactor/plan.md](../refactor/plan.md)（Issue #98）
 
 ## 正本への導線
 
