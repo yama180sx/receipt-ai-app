@@ -19,7 +19,9 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 docs/
 ├── design/                    # 本 Epic の成果物（新規）
 │   ├── plan.md                # 本ファイル
-│   ├── architecture.md        # #90-1
+│   ├── README.md              # 完成版仕様書索引
+│   ├── architecture.md        # #90-1 → [architecture.md](./architecture.md)
+│   ├── database-schema.md     # DB 列定義（ChatGPT Phase1 突合）
 │   ├── domain-model.md        # #90-2
 │   ├── api-spec.md            # #90-3
 │   ├── ai-pipeline.md         # #90-4
@@ -36,18 +38,20 @@ docs/
 
 | ファイル | 扱い |
 |----------|------|
-| `README.md` | #90-7 で現行化（技術スタック・セットアップ） |
+| `README.md` | 現行化済み（技術スタック・セットアップ） — [README.md](../../README.md) |
 | `docs/MILESTONE_PHASE1.md` | 3層正規化の起源として参照。#90-4 で再整理 |
 | `docs/db-operations.md` | #90-6 に統合または相互リンク |
 | `docs/restore-manual.md` | #90-6 に統合または相互リンク |
 | `docs/reviews/issue-87/` | 精算・按分の深掘り資料として維持 |
 | `docs/testing/plan.md` | テスト観点の仕様補助として参照 |
+| `docs/specs/chatgpt/` | ChatGPT ZIP 解析の監査ログ（正本は design） |
+| `docs/specs/comparison-chatgpt-vs-design.md` | ChatGPT 仕様との突合記録 |
 
 ## 4. 作成対象と優先度
 
 | 優先 | 資料 | 子 Issue | 主な読者 |
 |------|------|----------|----------|
-| Must | アーキテクチャ概要 | #90-1 | 全体把握 |
+| Must | [アーキテクチャ概要](./architecture.md) | #90-1 | 全体把握 |
 | Must | ドメインモデル & 業務ルール | #90-2 | DB・精算・按分 |
 | Must | API 仕様 | #90-3 | FE/BE 連携 |
 | Must | 3層正規化 & AI パイプライン | #90-4 | OCR・マスタ |
