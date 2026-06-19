@@ -1,0 +1,577 @@
+共通ルール
+	• ZIPを必ず展開して解析する 
+	• 前回の回答内容を根拠にしない 
+	• 今回添付したZIPのみを正とする 
+	• 推測禁止 
+	• 一般論禁止 
+	• 未確認事項は「【未確認】」 
+	• 不足ファイルがある場合は「【解析不可】」 
+	• 最後に「確認が必要な項目一覧」を出力 
+	• それぞれの対象を記載していますが、不足している場合はZIP内の他のファイルも参照してください。
+
+RecAIpt 仕様書作成（Phase5 アーキテクチャ仕様書）
+添付する ZIP ファイルを展開して解析してください。
+最重要ルール
+推測禁止。
+ZIPから確認できた内容のみ使用すること。
+
+未確認事項
+確認できない場合は
+【未確認】
+と記載すること。
+
+解析対象
+backend/package.json
+frontend/package.json
+backend/src/
+frontend/src/
+README.md
+Dockerfile
+
+作成成果物
+01-project-survey.md
+	• ディレクトリ構成
+	• ファイル一覧
+	• Screen一覧
+	• Component一覧
+	• Hook一覧
+	• Route一覧
+	• Controller一覧
+	• Service一覧
+
+02-architecture.md
+	• システム構成
+	• Frontend構成
+	• Backend構成
+	• DB構成
+	• 認証構成
+	• AI連携構成
+	• データフロー
+
+glossary.md
+実装に登場する用語のみ
+
+出力順
+	1. ZIP展開成功/失敗
+	2. 発見ファイル一覧
+	3. 01-project-survey.md
+	4. 02-architecture.md
+	5. glossary.md
+	6. 確認が必要な項目一覧
+確認が必要な項目一覧には
+	• 構成が追跡できない箇所
+	• 外部サービス設定が不足している箇所
+を列挙すること。
+この5本をそのまま使えば、毎回「ZIP再解析」「推測禁止」「未確認一覧の明示」が強制されるので、今回のような問題はかなり防ぎやすくなります。
+思考を停止しました
+1. ZIP展開成功/失敗
+
+✅ ZIP展開成功
+
+解析対象ZIP：
+receipt-ai-app-main(13).zip
+
+2. 発見ファイル一覧
+解析対象確認
+Root
+README.md
+Backend
+backend/package.json
+backend/Dockerfile
+backend/prisma/schema.prisma
+backend/src/**
+Frontend
+frontend/package.json
+frontend/App.tsx
+frontend/src/**
+3. 01-project-survey.md
+01-project-survey.md
+ディレクトリ構成
+receipt-ai-app-main
+├─ README.md
+├─ backend
+│  ├─ Dockerfile
+│  ├─ package.json
+│  ├─ prisma
+│  │  └─ schema.prisma
+│  └─ src
+│      ├─ api
+│      ├─ config
+│      ├─ controllers
+│      ├─ middleware
+│      ├─ queues
+│      ├─ routes
+│      ├─ schemas
+│      ├─ services
+│      ├─ utils
+│      └─ workers
+└─ frontend
+    ├─ App.tsx
+    ├─ package.json
+    └─ src
+        ├─ components
+        ├─ config
+        ├─ constants
+        ├─ contexts
+        ├─ hooks
+        ├─ screens
+        ├─ services
+        ├─ theme
+        ├─ types
+        └─ utils
+ファイル一覧
+Frontend Screen
+HomeScreen
+HistoryScreen
+StatisticsScreen
+CategoryManagementScreen
+ProductMasterScreen
+ReceiptScanScreen
+PromptEditorScreen
+AdminStatsScreen
+AdminMenuScreen
+SplitEditorScreen
+SettlementSummaryScreen
+LoginScreen
+BiometricLockScreen
+ReceiptTrayScreen
+TotpSettingsScreen
+Frontend Component
+components
+DevEnvironmentBanner
+DisplayModeSettings
+ReceiptDetailComponent
+ReceiptImageCropModal
+ReceiptJobThumbnail
+ReceiptJobTrayRow
+ReceiptTrayPanel
+ResponsiveContainer
+components/ui
+AppBackButton
+AppButton
+AppFormField
+AppListItem
+AppModal
+AppModalCloseButton
+AppSelect
+AppTextInput
+Hook一覧
+useIsWideLayout
+useReceiptJobs
+useResponsive
+Route一覧
+authRoutes
+
+Base:
+/api/auth
+
+POST /resolve-family
+GET /families//members
+POST /login
+POST /verify-totp
+POST /totp/disable
+
+【未確認】
+authRoutes内の一部POSTルートは抜粋のみ確認できたため完全な一覧は確認不可
+
+receiptRoutes
+
+Base:
+/api
+
+GET /family-groups/members
+GET /uploads/
+GET /receipts
+GET /receipts/jobs
+DELETE /receipts/jobs/
+GET /receipts/latest
+GET /receipts/status/
+GET /stats/monthly
+GET /stats/advanced
+POST /receipts
+DELETE /receipts/
+PATCH /receipts/
+PATCH /receipts/items/
+POST /receipts/items//splits
+POST /receipts/commit
+categoryRoutes
+
+Base:
+/api/categories
+
+GET /
+POST /
+DELETE /
+POST /optimize
+productMasterRoutes
+
+Base:
+/api/product-master
+
+GET /
+PATCH /
+DELETE /
+POST /merge-stores
+adminRoutes
+
+Base:
+/api/admin
+
+GET /stats
+GET /prompts
+POST /prompts
+PATCH /prompts/
+PATCH /prompts//activate
+DELETE /prompts/
+statsRoutes
+
+Base:
+/api/stats
+
+GET /settlement
+POST /settlement/transfers
+DELETE /settlement/transfers/
+Controller一覧
+adminController
+authController
+categoryController
+productMasterController
+receiptController
+statsController
+uploadController
+Service一覧
+Backend
+authService
+categoryService
+duplicateReceiptService
+geminiService
+imageAccessService
+receiptJobService
+receiptService
+totpService
+validationService
+Frontend
+authService
+biometricService
+displayModeService
+loginService
+Screen一覧
+
+App.tsxで確認できたViewType
+
+main
+history
+stats
+category_mgr
+product_master
+receipt_scan
+receipt_tray
+prompt_editor
+admin_stats
+admin_menu
+split_editor
+settlement_summary
+totp_settings
+4. 02-architecture.md
+02-architecture.md
+システム構成
+
+Frontend
+↓ HTTP API
+
+Backend (Express)
+
+↓ Prisma
+
+PostgreSQL
+
+↓
+
+Google Gemini API
+
+↓
+
+BullMQ Queue / Worker
+
+↓
+
+Redis
+
+Frontend構成
+
+確認ライブラリ
+
+React 19
+React Native 0.81
+Expo 54
+TypeScript
+
+主要機能
+
+ログイン
+TOTP認証
+生体認証
+レシート撮影
+レシート画像トリミング
+レシート投入トレイ
+カテゴリ管理
+商品マスタ管理
+統計表示
+精算管理
+管理メニュー
+プロンプト編集
+
+Context
+
+DisplayModeContext
+ReceiptTrayContext
+
+Hook
+
+useResponsive
+useIsWideLayout
+useReceiptJobs
+Backend構成
+
+フレームワーク
+
+Express 5
+
+主要ミドルウェア
+
+authMiddleware
+tenantMiddleware
+pendingAuthMiddleware
+errorHandler
+validate
+
+主要レイヤ
+
+Controller
+↓
+Service
+↓
+Prisma
+↓
+PostgreSQL
+
+Queue構成
+
+確認ファイル
+
+queues/receiptQueue.ts
+workers/receiptWorker.ts
+
+使用ライブラリ
+
+BullMQ
+ioredis
+
+Redis利用あり
+
+DB構成
+
+Prisma Provider
+
+PostgreSQL
+
+主要テーブル
+
+FamilyGroup
+
+世帯管理
+
+FamilyMember
+
+家族メンバー管理
+
+Category
+
+カテゴリマスタ
+
+Store
+
+店舗マスタ
+
+Receipt
+
+レシート
+
+Item
+
+レシート明細
+
+ItemSplit
+
+負担割合
+
+SettlementTransfer
+
+精算履歴
+
+ProductMaster
+
+商品学習マスタ
+
+ApiUsageLog
+
+Gemini利用量ログ
+
+PromptTemplate
+
+AIプロンプト管理
+
+認証構成
+
+確認内容
+
+JWT認証
+bcrypt
+TOTP認証
+生体認証(Frontend)
+
+関連ライブラリ
+
+Backend
+
+jsonwebtoken
+bcrypt
+otplib
+
+Frontend
+
+expo-local-authentication
+expo-secure-store
+
+認証フロー
+
+LoginScreen
+↓
+/api/auth/login
+↓
+JWT取得
+↓
+認証API利用
+
+TOTP有効時
+
+Login
+↓
+verify-totp
+↓
+認証完了
+
+AI連携構成
+
+確認ライブラリ
+
+@google/generative-ai
+
+確認サービス
+
+services/geminiService.ts
+
+README記載
+
+Gemini API
+Gemini 1.5 Pro / Flash
+
+実装モデル名
+
+【未確認】
+
+データフロー
+
+レシート画像アップロード
+
+Frontend
+↓
+Backend API
+↓
+BullMQ Queue
+↓
+Worker
+↓
+Gemini解析
+↓
+Receipt / Item保存
+↓
+PostgreSQL
+
+統計表示
+
+Frontend
+↓
+stats API
+↓
+Prisma
+↓
+PostgreSQL
+↓
+Frontend表示
+
+カテゴリ管理
+
+Frontend
+↓
+category API
+↓
+Categoryテーブル
+↓
+PostgreSQL
+
+商品学習マスタ
+
+Frontend
+↓
+product-master API
+↓
+ProductMasterテーブル
+↓
+PostgreSQL
+
+5. glossary.md
+glossary.md
+用語	内容
+FamilyGroup	世帯管理単位
+FamilyMember	世帯所属ユーザー
+Category	費目カテゴリ
+Store	店舗マスタ
+Receipt	レシート
+Item	レシート明細
+ItemSplit	明細ごとの負担内訳
+SettlementTransfer	精算送金履歴
+ProductMaster	商品学習マスタ
+PromptTemplate	AIプロンプト管理
+ApiUsageLog	Gemini利用量ログ
+JWT	認証トークン
+TOTP	ワンタイムパスワード認証
+BullMQ	ジョブキュー
+Redis	キュー管理ストア
+Prisma	ORM
+Gemini	Google生成AI
+ReceiptTray	レシート投入トレイ
+DisplayMode	表示モード設定
+Biometric Authentication	生体認証
+6. 確認が必要な項目一覧
+構成が追跡できない箇所
+authRoutes.ts の全ルート定義を今回の抜粋確認のみでは完全追跡できない
+GeminiモデルID（実際に使用している model 名）は未確認
+BullMQキュー名未確認
+Redis接続先設定値未確認
+Receipt Queue → Worker の詳細処理フロー未確認
+uploadController の利用経路未確認
+frontend内の画面遷移全条件は未確認
+App.tsx全体解析未実施のため全View遷移ロジックは未確認
+外部サービス設定が不足している箇所
+Gemini APIキー設定値【未確認】
+DATABASE_URL設定値【未確認】
+Redis接続設定値【未確認】
+JWT Secret設定値【未確認】
+CORS_ORIGIN設定値【未確認】
+TOTP暗号化設定値【未確認】
+ファイル保存先ディレクトリ設定値【未確認】
+
+以上は今回添付ZIPから確認できなかったため、推測せず【未確認】とした。
+
+

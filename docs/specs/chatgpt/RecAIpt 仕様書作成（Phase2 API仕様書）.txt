@@ -1,0 +1,506 @@
+共通ルール
+	• ZIPを必ず展開して解析する 
+	• 前回の回答内容を根拠にしない 
+	• 今回添付したZIPのみを正とする 
+	• 推測禁止 
+	• 一般論禁止 
+	• 未確認事項は「【未確認】」 
+	• 不足ファイルがある場合は「【解析不可】」 
+	• 最後に「確認が必要な項目一覧」を出力 
+それぞれの対象を記載していますが、不足している場合はZIP内の他のファイルも参照してください。
+
+RecAIpt 仕様書作成（Phase2 API仕様書）
+添付する ZIP ファイルを展開して解析してください。
+最重要ルール
+ZIPを展開して得た情報のみ使用すること。
+以下は禁止。
+	• 推測
+	• 一般論
+	• 前回回答の引用
+	• Route名からの想像
+確認できた内容のみ記載すること。
+
+未確認事項
+確認できない場合は
+【未確認】
+と記載すること。
+
+解析対象
+backend/src/routes/
+backend/src/controllers/
+backend/src/middleware/
+
+作成成果物
+05-api-spec.md
+必須項目
+	• Endpoint
+	• HTTP Method
+	• Request
+	• Response
+	• Error
+	• Middleware
+	• Controller
+
+06-auth-spec.md
+必須項目
+	• JWT
+	• 認証方式
+	• 認可方式
+	• Role
+	• 権限制御
+	• TOTP
+	• ログインフロー
+	• 認証フロー図
+
+出力順
+	1. ZIP展開成功/失敗
+	2. Route一覧
+	3. Controller一覧
+	4. Middleware一覧
+	5. 05-api-spec.md
+	6. 06-auth-spec.md
+	7. 確認が必要な項目一覧
+確認が必要な項目一覧には
+	• 実装が見つからないAPI
+	• Request/Responseが特定できないAPI
+	• Middlewareが特定できないAPI
+を列挙すること。
+思考を停止しました
+ZIP展開成功
+
+解析対象ZIP:
+receipt-ai-app-main(10).zip
+
+解析対象確認:
+
+backend/src/routes/
+backend/src/controllers/
+backend/src/middleware/
+2. Route一覧
+Route File	Endpoint
+authRoutes.ts	POST /resolve-family
+authRoutes.ts	GET /families/:familyGroupId/members
+authRoutes.ts	POST /login
+authRoutes.ts	POST /totp/setup
+authRoutes.ts	POST /totp/confirm
+authRoutes.ts	POST /verify-totp
+authRoutes.ts	POST /totp/disable
+adminRoutes.ts	GET /stats
+adminRoutes.ts	GET /prompts
+adminRoutes.ts	POST /prompts
+adminRoutes.ts	PATCH /prompts/:id
+adminRoutes.ts	PATCH /prompts/:id/activate
+adminRoutes.ts	DELETE /prompts/:id
+categoryRoutes.ts	GET /
+categoryRoutes.ts	POST /
+categoryRoutes.ts	DELETE /:id
+categoryRoutes.ts	POST /optimize
+productMasterRoutes.ts	GET /
+productMasterRoutes.ts	PATCH /:id
+productMasterRoutes.ts	DELETE /:id
+productMasterRoutes.ts	POST /merge-stores
+receiptRoutes.ts	POST /receipts/upload
+receiptRoutes.ts	GET /family-groups/members
+receiptRoutes.ts	GET /uploads/:filename
+receiptRoutes.ts	GET /receipts
+receiptRoutes.ts	GET /receipts/jobs
+receiptRoutes.ts	DELETE /receipts/jobs/:jobId
+receiptRoutes.ts	GET /receipts/latest
+receiptRoutes.ts	GET /receipts/status/:jobId
+receiptRoutes.ts	GET /stats/monthly
+receiptRoutes.ts	GET /stats/advanced
+receiptRoutes.ts	POST /receipts
+receiptRoutes.ts	DELETE /receipts/:id
+receiptRoutes.ts	PATCH /receipts/:id
+receiptRoutes.ts	PATCH /receipts/items/:id
+receiptRoutes.ts	POST /receipts/items/:itemId/splits
+receiptRoutes.ts	POST /receipts/commit
+statsRoutes.ts	GET /settlement
+statsRoutes.ts	POST /settlement/transfers
+statsRoutes.ts	DELETE /settlement/transfers/:id
+3. Controller一覧
+Controller File	Export
+authController.ts	resolveFamily, getFamilyMembers, login, startTotpSetup, confirmTotpSetup, verifyTotp, disableTotp
+adminController.ts	getPrompts, createPrompt, updatePrompt, activatePrompt, deletePrompt, getCostStats
+categoryController.ts	getCategories, createCategory, deleteCategory, optimizeKeywords
+productMasterController.ts	getProductMasters, updateProductMaster, mergeStoreNames, deleteProductMaster
+receiptController.ts	getJobStatus, getReceiptJobs, discardReceiptJob, commitReceipt, createReceipt, updateReceipt, updateItemCategory, getReceipts, getLatestReceipt, deleteReceipt, getMonthlyStats, getAdvancedStats, getFamilyMembers, updateItemSplits
+statsController.ts	getSettlementStatus, addSettlementTransfer, deleteSettlementTransfer
+uploadController.ts	serveReceiptImage
+4. Middleware一覧
+Middleware	内容
+authMiddleware	JWT Access Token検証
+isAdmin	ADMINロール確認＋TOTP有効確認
+pendingAuthMiddleware	totp_setup / totp_pending トークン検証
+tenantMiddleware	familyGroupId特定・AsyncLocalStorage設定
+validate	Zodバリデーション
+errorHandler	グローバルエラーハンドラ
+5. 05-api-spec.md
+05-api-spec.md
+認証API
+POST /resolve-family
+Controller: resolveFamily
+Middleware: なし
+Request:
+inviteCode
+Response:
+familyGroupId
+name
+Error:
+400 招待コード未指定
+404 招待コード不正
+GET /families//members
+Controller: getFamilyMembers
+Middleware: なし
+Request:
+Path: familyGroupId
+Query: inviteCode
+Response:
+id
+name
+Error:
+400
+404
+POST /login
+Controller: login
+Middleware: なし
+Request:
+familyGroupId
+memberId
+password
+Response:
+token
+pendingToken
+member
+requiresTotpVerification
+requiresTotpSetup
+Error:
+400
+401
+403
+404
+POST /totp/setup
+Controller: startTotpSetup
+Middleware:
+pendingAuthMiddleware(totp_setup, access)
+Response:
+secret
+otpauthUrl
+POST /totp/confirm
+Controller: confirmTotpSetup
+Middleware:
+pendingAuthMiddleware(totp_setup, access)
+Request:
+code
+Response:
+Access Token発行またはTOTP有効化結果
+POST /verify-totp
+Controller: verifyTotp
+Middleware:
+pendingAuthMiddleware(totp_pending)
+Request:
+code
+Response:
+token
+member
+POST /totp/disable
+Controller: disableTotp
+Middleware:
+authMiddleware
+Request:
+password
+code
+レシートAPI
+POST /receipts/upload
+Controller: Route内匿名処理
+Middleware:
+multer
+authMiddleware
+tenantMiddleware
+validate(uploadReceiptSchema)
+Request:
+image
+Response:
+jobId
+status=queued
+Error:
+400
+401
+GET /family-groups/members
+Controller: receiptController.getFamilyMembers
+Middleware:
+authMiddleware
+tenantMiddleware
+GET /uploads/
+Controller: serveReceiptImage
+Middleware:
+authMiddleware
+tenantMiddleware
+GET /receipts
+Controller: getReceipts
+Middleware:
+authMiddleware
+tenantMiddleware
+Query:
+month
+memberId
+GET /receipts/jobs
+Controller: getReceiptJobs
+DELETE /receipts/jobs/
+Controller: discardReceiptJob
+GET /receipts/status/
+Controller: getJobStatus
+GET /receipts/latest
+Controller: getLatestReceipt
+POST /receipts
+Controller: createReceipt
+Request:
+date
+storeName
+items
+imagePath
+PATCH /receipts/
+Controller: updateReceipt
+DELETE /receipts/
+Controller: deleteReceipt
+PATCH /receipts/items/
+Controller: updateItemCategory
+Request:
+categoryId
+POST /receipts/items//splits
+Controller: updateItemSplits
+Request:
+splits[]
+POST /receipts/commit
+Controller: commitReceipt
+Request:
+parsedData
+imagePath
+validation
+jobId
+GET /stats/monthly
+Controller: getMonthlyStats
+GET /stats/advanced
+Controller: getAdvancedStats
+精算API
+GET /settlement
+Controller: getSettlementStatus
+Middleware:
+authMiddleware
+tenantMiddleware
+POST /settlement/transfers
+Controller: addSettlementTransfer
+Request:
+month
+fromMemberId
+toMemberId
+amount
+DELETE /settlement/transfers/
+Controller: deleteSettlementTransfer
+管理者API
+
+全API共通Middleware:
+
+isAdmin
+GET /stats
+Controller: getCostStats
+GET /prompts
+Controller: getPrompts
+POST /prompts
+Controller: createPrompt
+PATCH /prompts/
+Controller: updatePrompt
+PATCH /prompts//activate
+Controller: activatePrompt
+DELETE /prompts/
+Controller: deletePrompt
+カテゴリAPI
+GET /
+Controller: getCategories
+POST /
+Controller: createCategory
+DELETE /
+Controller: deleteCategory
+POST /optimize
+Controller: optimizeKeywords
+商品マスタAPI
+GET /
+Controller: getProductMasters
+PATCH /
+Controller: updateProductMaster
+DELETE /
+Controller: deleteProductMaster
+POST /merge-stores
+Controller: mergeStoreNames
+6. 06-auth-spec.md
+06-auth-spec.md
+JWT
+
+確認内容:
+
+authMiddlewareでBearer Tokenを検証
+verifyToken(token, ['access']) を使用
+成功時は req.user に格納
+
+JWT Payload確認項目:
+
+id
+name
+familyGroupId
+role
+認証方式
+
+方式:
+
+ID/パスワード認証
+JWT認証
+
+ログイン入力:
+
+familyGroupId
+memberId
+password
+
+パスワード検証:
+
+bcrypt.compare()
+認可方式
+
+実装確認:
+
+authMiddleware
+tenantMiddleware
+isAdmin
+Role
+
+確認できたRole:
+
+ADMIN
+
+その他Role:
+
+【未確認】
+権限制御
+一般API
+authMiddleware
+tenantMiddleware
+管理者API
+authMiddleware
+isAdmin
+管理者追加条件
+totpEnabled=true
+
+未設定時:
+
+code=TOTP_REQUIRED
+HTTP 403
+TOTP
+
+確認内容:
+
+generateTotpSecret
+buildOtpauthUrl
+verifyTotpCode
+encryptSecretForStorage
+decryptSecretFromStorage
+
+保存項目:
+
+totpSecret
+totpEnabled
+totpVerifiedAt
+ログインフロー
+POST /login
+familyGroupId/memberId/password検証
+判定
+TOTP有効
+pendingToken(totp_pending)発行
+requiresTotpVerification=true
+
+↓
+
+POST /verify-totp
+
+↓
+
+Access Token発行
+
+TOTP必須Roleかつ未設定
+pendingToken(totp_setup)発行
+requiresTotpSetup=true
+
+↓
+
+POST /totp/setup
+
+↓
+
+POST /totp/confirm
+
+↓
+
+Access Token発行
+
+TOTP不要
+Access Token発行
+認証フロー図
+
+Login
+↓
+Password Verify
+↓
+├─ totpEnabled=true
+│ ↓
+│ pendingToken(totp_pending)
+│ ↓
+│ verify-totp
+│ ↓
+│ Access Token
+│
+├─ TOTP必須Role
+│ ↓
+│ pendingToken(totp_setup)
+│ ↓
+│ totp/setup
+│ ↓
+│ totp/confirm
+│ ↓
+│ Access Token
+│
+└─ その他
+↓
+Access Token
+
+7. 確認が必要な項目一覧
+実装が見つからないAPI
+なし（routes配下で参照されているControllerは確認できた）
+Request/Responseが特定できないAPI
+GET /prompts
+POST /prompts
+PATCH /prompts/:id
+PATCH /prompts/:id/activate
+DELETE /prompts/:id
+GET /
+POST /
+DELETE /:id
+POST /optimize
+GET / (productMaster)
+PATCH /:id (productMaster)
+DELETE /:id (productMaster)
+POST /merge-stores
+
+※ Controller実装は存在するが、今回の解析範囲だけでは全Request/Response構造を完全特定できない箇所あり。
+
+Middlewareが特定できないAPI
+なし（Route定義から確認可能）
+その他未確認
+JWT署名アルゴリズム
+JWT有効期限
+TokenPurpose定義詳細
+Role列挙値全件
+TOTP必須Role判定ロジック詳細
+uploadReceiptSchema詳細
+Category/ProductMaster系APIの完全Request/Response仕様
+getPrompts系APIの完全Request/Response仕様
+
+

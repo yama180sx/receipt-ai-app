@@ -160,7 +160,8 @@ npm run test:integration
 |------|------|
 | [docs/design/plan.md](docs/design/plan.md) | 設計資料全体の計画 |
 | [docs/design/architecture.md](docs/design/architecture.md) | アーキテクチャ概要 |
-| [docs/design/domain-model.md](docs/design/domain-model.md) | ドメインモル・業務ルール |
+| [docs/design/database-schema.md](docs/design/database-schema.md) | DB 列定義・制約 |
+| [docs/design/domain-model.md](docs/design/domain-model.md) | ドメインモデル・業務ルール |
 | [docs/design/api-spec.md](docs/design/api-spec.md) | API 仕様 |
 | [docs/design/ai-pipeline.md](docs/design/ai-pipeline.md) | 3層正規化・AI パイプライン |
 | [docs/design/frontend-screens.md](docs/design/frontend-screens.md) | 画面遷移・フロント |
@@ -176,6 +177,7 @@ npm run test:integration
 | [docs/db-operations.md](docs/db-operations.md) | DB マスタ運用の詳細手順 |
 | [docs/restore-manual.md](docs/restore-manual.md) | バックアップ・リストア手順 |
 | [docs/reviews/issue-87/README.md](docs/reviews/issue-87/README.md) | 精算ドメイン詳細レビュー |
+| [docs/specs/comparison-chatgpt-vs-design.md](docs/specs/comparison-chatgpt-vs-design.md) | ChatGPT 仕様との突合記録 |
 
 ---
 

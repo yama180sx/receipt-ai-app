@@ -8,6 +8,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 | 資料 | 内容 |
 |------|------|
+| [database-schema.md](./database-schema.md) | DB 列定義・制約（Prisma 準拠） |
 | [architecture.md](./architecture.md) | システム構成・レイヤー（#90-1） |
 | [api-spec.md](./api-spec.md) | 精算 API エンドポイント（#90-3） |
 | [docs/reviews/issue-87/](../reviews/issue-87/README.md) | 精算ドメイン LLM レビュー資材 |
@@ -100,6 +101,7 @@ erDiagram
     }
 ```
 
+> 列定義・制約の詳細: [database-schema.md](./database-schema.md)  
 > スキーマ正本: `backend/prisma/schema.prisma`  
 > AI 関連（`PromptTemplate`, `ApiUsageLog`）は [ai-pipeline.md](./ai-pipeline.md)（#90-4）で扱う。
 
@@ -374,6 +376,8 @@ A が B へ 100 円送金を記録（`SettlementTransfer`）すると:
 
 ## 9. 関連資料
 
+- [domain-model.md](./domain-model.md) — 業務ルール・精算
+- [database-schema.md](./database-schema.md) — DB 列定義
 - [architecture.md](./architecture.md) — システム構成（#90-1）
 - [plan.md](./plan.md) — Epic #90 全体計画
 - [docs/reviews/issue-87/README.md](../reviews/issue-87/README.md) — 精算ドメイン LLM レビュー
