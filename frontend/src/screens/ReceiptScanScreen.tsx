@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '../utils/apiClient';
+import { receiptApi } from '../api/receiptApi';
 import { AppBackButton, AppButton, AppFormField, AppSelect, AppTextInput } from '../components/ui';
 import { modalStyles } from '../theme';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
@@ -107,8 +107,8 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         validation: initialData.validation
       };
       
-      const res = await apiClient.post('/receipts/commit', payload);
-      if (res.data?.success) {
+      const res = await receiptApi.commitReceipt(payload);
+      if (res.success) {
         showAlert('成功', 'レシートを保存しました。', { onOk: onSuccess });
         return;
       }

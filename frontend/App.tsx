@@ -12,7 +12,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
-import apiClient, { setOnUnauthorized } from './src/utils/apiClient';
+import { categoryApi } from './src/api/categoryApi';
+import { setOnUnauthorized } from './src/utils/apiClient';
 import { authService } from './src/services/authService';
 import { canUseBiometric } from './src/services/biometricService';
 
@@ -79,9 +80,9 @@ export default function App() {
 
   const fetchCategoriesForSession = useCallback(async () => {
     try {
-      const catRes = await apiClient.get('/categories');
-      if (catRes.data?.success) {
-        setCategories(catRes.data.data);
+      const catRes = await categoryApi.listCategories();
+      if (catRes.success) {
+        setCategories(catRes.data);
       }
     } catch (catErr) {
       console.error('起動時のカテゴリマスタ先行取得失敗:', catErr);
@@ -227,9 +228,9 @@ export default function App() {
   const fetchCategories = useCallback(async () => {
     if (!userToken) return;
     try {
-      const res = await apiClient.get('/categories');
-      if (res.data && res.data.success) {
-        setCategories(res.data.data);
+      const res = await categoryApi.listCategories();
+      if (res.success) {
+        setCategories(res.data);
       }
     } catch (err) {
       console.error('マスタ取得失敗:', err);
