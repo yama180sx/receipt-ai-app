@@ -19,7 +19,9 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 docs/
 ├── design/                    # 本 Epic の成果物（新規）
 │   ├── plan.md                # 本ファイル
+│   ├── README.md              # 完成版仕様書索引
 │   ├── architecture.md        # #90-1 → [architecture.md](./architecture.md)
+│   ├── database-schema.md     # DB 列定義（ChatGPT Phase1 突合）
 │   ├── domain-model.md        # #90-2
 │   ├── api-spec.md            # #90-3
 │   ├── ai-pipeline.md         # #90-4
@@ -42,6 +44,8 @@ docs/
 | `docs/restore-manual.md` | #90-6 に統合または相互リンク |
 | `docs/reviews/issue-87/` | 精算・按分の深掘り資料として維持 |
 | `docs/testing/plan.md` | テスト観点の仕様補助として参照 |
+| `docs/specs/chatgpt/` | ChatGPT ZIP 解析の監査ログ（正本は design） |
+| `docs/specs/comparison-chatgpt-vs-design.md` | ChatGPT 仕様との突合記録 |
 
 ## 4. 作成対象と優先度
 

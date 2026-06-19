@@ -8,6 +8,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 | 資料 | 内容 |
 |------|------|
+| [database-schema.md](./database-schema.md) | DB 列定義・制約 |
 | [domain-model.md](./domain-model.md) | ドメインモデル・業務ルール（#90-2） |
 | [api-spec.md](./api-spec.md) | API 仕様（#90-3） |
 | [ai-pipeline.md](./ai-pipeline.md) | 3層正規化・AI パイプライン（#90-4） |

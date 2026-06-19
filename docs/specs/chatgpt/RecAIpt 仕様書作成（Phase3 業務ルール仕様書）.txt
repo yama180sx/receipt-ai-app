@@ -1,0 +1,724 @@
+共通ルール
+	• ZIPを必ず展開して解析する 
+	• 前回の回答内容を根拠にしない 
+	• 今回添付したZIPのみを正とする 
+	• 推測禁止 
+	• 一般論禁止 
+	• 未確認事項は「【未確認】」 
+	• 不足ファイルがある場合は「【解析不可】」 
+	• 最後に「確認が必要な項目一覧」を出力 
+	• それぞれの対象を記載していますが、不足している場合はZIP内の他のファイルも参照してください。
+
+RecAIpt 仕様書作成（Phase3 業務ルール仕様書）
+添付する ZIP ファイルを展開して解析してください。
+最重要ルール
+Service層を正本として解析すること。
+推測禁止。
+確認できた実装のみ記載すること。
+
+未確認事項
+確認できない場合は
+【未確認】
+と記載すること。
+
+解析対象
+backend/src/services/
+backend/src/utils/
+backend/src/queues/
+存在しないディレクトリは
+【解析対象なし】
+と記載すること。
+
+作成成果物
+07-business-rules.md
+	• レシート登録ルール
+	• カテゴリ判定ルール
+	• 商品マスタ学習ルール
+	• 重複判定ルール
+
+08-settlement-rules.md
+	• 精算ロジック
+	• 集計ロジック
+	• 入出金ルール
+
+09-ai-analysis-rules.md
+	• AI解析処理
+	• 使用モデル
+	• Prompt生成
+	• Validation
+	• Retry
+	• TOTP
+
+出力順
+	1. ZIP展開成功/失敗
+	2. Service一覧
+	3. Utils一覧
+	4. Queue一覧
+	5. 各仕様書
+	6. 確認が必要な項目一覧
+確認が必要な項目一覧には
+	• 実装はあるがロジックが追跡できない箇所
+	• 他レイヤ参照が必要な箇所
+を列挙すること。
+思考を停止しました
+1. ZIP展開結果
+
+ZIP展開成功
+
+対象ZIP:
+
+receipt-ai-app-main(11).zip
+2. Service一覧
+
+backend/src/services/
+
+ファイル
+authService.ts
+categoryService.ts
+duplicateReceiptService.ts
+geminiService.ts
+imageAccessService.ts
+receiptJobService.ts
+receiptService.ts
+totpService.ts
+validationService.ts
+3. Utils一覧
+
+backend/src/utils/
+
+ファイル
+appError.ts
+auth.ts
+categoryColor.ts
+context.ts
+itemLineTotal.ts
+itemSplitAllocation.ts
+logger.ts
+normalizer.ts
+prismaClient.ts
+retry.ts
+routeParams.ts
+totpCrypto.ts
+yearMonth.ts
+
+※テストコード除外
+
+4. Queue一覧
+
+backend/src/queues/
+
+ファイル
+receiptQueue.ts
+5. 各仕様書
+07-business-rules.md
+レシート登録ルール
+解析処理
+
+実装元:
+
+receiptService.analyzeOnly()
+
+処理順
+
+Gemini解析実行
+analyzeReceiptImage()
+店舗名正規化用テキスト生成
+getCleanText(storeName)
+各明細へカテゴリ付与
+
+判定順
+
+① 商品マスタ一致
+ProductMaster
+(name, storeName, familyGroupId)
+
+完全一致検索
+
+一致時
+
+categoryId = ProductMaster.categoryId
+② カテゴリ推定
+
+一致しない場合
+
+estimateCategoryId()
+
+実行
+
+保存処理
+
+実装元
+
+saveParsedReceipt()
+
+処理順
+
+① 店舗名正規化
+normalizeStoreName()
+
+実行
+
+② 日付変換
+parseReceiptDate()
+
+実行
+
+③ 金額変換
+totalAmount = Math.round(parsedData.totalAmount)
+taxAmount = parseFloat(parsedData.taxAmount)
+④ 同一画像判定
+
+検索条件
+
+familyGroupId
+imagePath
+
+一致した場合
+
+既存レシート返却
+新規作成しない
+⑤ 重複チェック
+checkDuplicateReceipt()
+
+実行
+
+重複検出時
+
+Error: DUPLICATE_RECEIPT_DETECTED
+statusCode=409
+
+発生
+
+⑥ レシート作成
+
+Receipt作成項目
+
+memberId
+familyGroupId
+storeName
+date
+totalAmount
+taxAmount
+imagePath
+items
+rawText
+カテゴリ判定ルール
+
+実装元
+
+categoryService.ts
+
+判定順
+
+① 商品名＋店舗名一致
+
+検索条件
+
+ProductMaster
+name
+storeName
+familyGroupId
+
+一致時
+
+categoryId返却
+② 商品名一致
+
+検索条件
+
+ProductMaster
+name
+familyGroupId
+
+一致時
+
+categoryId返却
+③ Category.keywords一致
+
+実行SQL
+
+SELECT c.id
+FROM Category c,
+jsonb_array_elements_text(c.keywords) AS kw
+WHERE c.familyGroupId = ?
+AND itemName LIKE '%' || kw || '%'
+LIMIT 1
+
+一致時
+
+Category.id返却
+④ フォールバック
+
+検索条件
+
+Category.name='その他'
+
+存在時
+
+id返却
+
+存在しない場合
+
+0返却
+商品マスタ学習ルール
+
+実装元
+
+saveParsedReceipt()
+
+条件
+
+item.categoryId が存在する
+
+場合のみ実行
+
+登録方法
+
+ProductMaster.upsert()
+
+キー
+
+name
+storeName
+familyGroupId
+
+更新内容
+
+categoryId
+
+新規作成内容
+
+name
+storeName
+categoryId
+familyGroupId
+重複判定ルール
+
+実装元
+
+duplicateReceiptService.ts
+
+判定順
+
+① imagePath一致
+
+検索条件
+
+familyGroupId
+imagePath
+
+一致時
+
+duplicateSuspected = false
+existingReceiptId返却
+② 店舗・日付・金額判定
+
+比較対象
+
+storeName
+date
+totalAmount
+時刻なし
+
+条件
+
+00:00
+
+の場合
+
+同日 00:00〜23:59:59
+
+検索
+
+時刻あり
+
+条件
+
+±1分
+
+検索
+
+店舗名比較
+
+比較値
+
+getCleanText(existing.storeName)
+
+と
+
+getCleanText(parsedData.storeName)
+
+一致
+
+かつ
+
+totalAmount一致
+
+の場合
+
+duplicateSuspected=true
+08-settlement-rules.md
+精算ロジック
+
+解析対象
+
+services
+utils
+queues
+
+内で確認できた実装
+
+明細按分
+
+実装元
+
+itemSplitAllocation.ts
+
+入力
+
+totalAmount
+splits[]
+
+ルール
+
+最後のメンバー
+残額を自動割当
+amount指定
+Math.round(amount)
+
+使用
+
+ratio指定
+Math.round(totalAmount * ratio)
+
+使用
+
+検証
+
+以下はエラー
+
+totalAmount < 0
+familyMemberId <= 0
+familyMemberId重複
+最終メンバー以外でamount/ratio未指定
+amount負数
+合計金額不一致
+集計ロジック
+
+確認できた実装
+
+明細小計
+
+実装元
+
+itemLineTotal.ts
+
+計算式
+
+Math.round(price * quantity)
+入出金ルール
+
+【未確認】
+
+解析対象内で精算テーブル更新処理は確認できず。
+
+09-ai-analysis-rules.md
+AI解析処理
+
+実装元
+
+geminiService.ts
+
+処理順
+
+① Prompt取得
+
+DB検索
+
+PromptTemplate
+key='RECEIPT_ANALYSIS'
+isActive=true
+
+最新更新順
+
+updatedAt DESC
+② ドメインヒント追加
+
+template.domainHints存在時
+
+### 業態別特別指示
+
+としてPromptへ追加
+
+③ 画像送信
+
+送信内容
+
+Prompt
+Base64画像
+④ JSON解析
+
+レスポンス
+
+responseMimeType=application/json
+
+指定
+
+⑤ 算術整合性検証
+
+計算式
+
+(price × quantity 合計)
++
+taxAmount
+=
+totalAmount
+
+許容差
+
+1円以内
+⑥ 自己修復リトライ
+
+算術不整合時
+
+追加Prompt
+
+前回結果の矛盾内容
+
+を付与して再解析
+
+使用モデル
+
+実装元
+
+geminiService.ts
+
+使用SDK
+
+@google/generative-ai
+
+モデル
+
+process.env.GEMINI_MODEL
+
+未設定時
+
+gemini-2.0-flash
+Prompt生成
+
+実装元
+
+buildPrompt()
+
+取得元
+
+PromptTemplate.systemPrompt
+
+追加要素
+
+PromptTemplate.domainHints
+
+自己修復時
+
+追加文
+
+算術矛盾の説明
+Validation
+
+実装元
+
+validationService.ts
+単価チェック
+price > maxUnitPrice
+
+警告
+
+数量チェック
+quantity > maxQuantity
+
+警告
+
+行合計チェック
+
+条件
+
+item.price
+item.quantity
+item.amount
+
+存在
+
+かつ
+
+abs((price*quantity)-amount) > 10
+
+警告
+
+結果
+
+warnings.length > 0
+
+なら
+
+isSuspicious=true
+Retry
+
+実装元
+
+geminiService.ts
+
+対象
+
+429
+
+または
+
+500以上
+
+回数
+
+process.env.GEMINI_RETRY_COUNT
+
+未設定時
+
+3回
+
+初期待機
+
+process.env.GEMINI_RETRY_DELAY
+
+未設定時
+
+2000ms
+
+待機方式
+
+指数バックオフ
+delay × 2
+TOTP
+
+実装元
+
+totpService.ts
+totpCrypto.ts
+
+ライブラリ
+
+otplib
+
+認証許容
+
+window = 1
+
+シークレット生成
+
+authenticator.generateSecret()
+
+OTP URL生成
+
+authenticator.keyuri()
+
+検証
+
+authenticator.verify()
+
+保存前暗号化
+
+方式
+
+AES-256-GCM
+
+暗号鍵
+
+優先順
+
+TOTP_ENCRYPTION_KEY
+
+↓
+
+JWT_SECRET
+
+ロール判定
+
+isTotpRequiredForRole()
+
+戻り値
+
+true
+
+全ロール必須
+
+6. 確認が必要な項目一覧
+1. VALIDATION_THRESHOLDS実体
+
+参照
+
+validationService.ts
+../config/validationThresholds
+
+ロジック使用あり
+
+設定値未解析
+
+→ 【未確認】
+
+2. PromptTemplateテーブル定義
+
+参照
+
+geminiService.ts
+
+使用あり
+
+DB構造未解析
+
+→ 【未確認】
+
+3. ApiUsageLogテーブル定義
+
+参照
+
+geminiService.ts
+receiptService.ts
+
+使用あり
+
+DB構造未解析
+
+→ 【未確認】
+
+4. Receipt・ReceiptItemスキーマ詳細
+
+参照
+
+saveParsedReceipt()
+
+使用あり
+
+Prismaスキーマ未解析
+
+→ 【未確認】
+
+5. Settlement関連ロジック
+
+解析対象内に精算計算本体なし
+
+→ 【解析不可】
+
+6. Queue Worker実装
+
+receiptQueue定義のみ確認
+
+ジョブ投入側・Worker側処理未解析
+
+→ 【他レイヤ参照が必要】
+
+7. PromptTemplate.domainHints生成元
+
+参照あり
+
+生成処理未確認
+
+→ 【他レイヤ参照が必要】
+
+

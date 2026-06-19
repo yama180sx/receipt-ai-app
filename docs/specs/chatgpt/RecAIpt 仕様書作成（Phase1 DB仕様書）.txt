@@ -1,0 +1,333 @@
+共通ルール
+	• ZIPを必ず展開して解析する 
+	• 前回の回答内容を根拠にしない 
+	• 今回添付したZIPのみを正とする 
+	• 推測禁止 
+	• 一般論禁止 
+	• 未確認事項は「【未確認】」 
+	• 不足ファイルがある場合は「【解析不可】」 
+	• 最後に「確認が必要な項目一覧」を出力 
+	•それぞれの対象を記載していますが、不足している場合はZIP内の他のファイルも参照してください。
+
+RecAIpt 仕様書作成（Phase1 DB仕様書）
+添付する ZIP ファイルを展開して解析してください。
+最重要ルール
+ZIPを必ず展開して解析する
+仕様書は今回添付した ZIP の内容のみを根拠に作成すること。
+以下は禁止。
+	• 前回の回答を根拠にする
+	• 過去の会話内容を根拠にする
+	• 一般論による補完
+	• 推測による補完
+実際にZIPを展開して確認できた内容のみ記載すること。
+
+未確認事項
+確認できない内容は必ず
+【未確認】
+と記載すること。
+推測して埋めてはいけない。
+
+解析対象
+ZIP内容
+backend/prisma/
+含まれる想定
+	• backend/prisma/schema.prisma
+	• backend/prisma/migrations/
+
+作成成果物
+03-database-spec.md
+必須項目
+	• 全テーブル
+	• 全カラム
+	• データ型
+	• Nullable
+	• Default値
+	• PK
+	• FK
+	• Unique制約
+	• Index
+	• Enum
+
+04-er-diagram.md
+必須項目
+	• 全リレーション
+	• Mermaid形式ER図
+
+出力順
+	1. ZIP展開成功/失敗
+	2. 発見ファイル一覧
+	3. 調査結果
+	4. 03-database-spec.md
+	5. 04-er-diagram.md
+	6. 確認が必要な項目一覧
+確認が必要な項目一覧には
+	• schemaから判断できない事項
+	• migration不足で確認できない事項
+を列挙すること。
+思考を停止しました
+1. ZIP展開成功/失敗
+
+ZIP展開成功
+
+解析対象:
+
+receipt-ai-app-main/backend/prisma/schema.prisma
+receipt-ai-app-main/backend/prisma/migrations/*
+2. 発見ファイル一覧
+backend/prisma/schema.prisma
+
+backend/prisma/migrations/
+├─ 20260216110046_add_master_tables/migration.sql
+├─ 20260216111430_unify_master_schema/migration.sql
+├─ 20260223121954_add_product_master_and_image_path/migration.sql
+├─ 20260224161136_add_color_to_category/migration.sql
+├─ 20260324121218_add_cascade_delete_to_items/migration.sql
+├─ 20260406080504_add_content_hash_to_receipt/migration.sql
+├─ 20260406094352_drop_content_hash_and_move_to_logic_check/migration.sql
+├─ 20260406232953_add_family_group/migration.sql
+├─ 20260407121136_update_product_master_unique/migration.sql
+├─ 20260410002945_add_password_hash_to_member/migration.sql
+├─ 20260419050856_add_api_usage_log/migration.sql
+├─ 20260429013008_change_item_types_to_float/migration.sql
+├─ 20260513134544_add_tax_amount_to_receipt/migration.sql
+├─ 20260514215713_add_prompt_template/migration.sql
+├─ 20260519225122_add_role_to_family_member/migration.sql
+├─ 20260522150214_update_prompt_template_schema/migration.sql
+├─ 20260523114921_add_item_split/migration.sql
+├─ 20260525122437_add_settlement_transfer/migration.sql
+├─ 20260608060000_add_family_group_to_masters/migration.sql
+└─ 20260608140000_add_totp_to_family_member/migration.sql
+3. 調査結果
+
+確認できたDB定義は schema.prisma に存在。
+
+確認できたEnum:
+
+enum Role {
+  ADMIN
+  USER
+}
+
+確認できたテーブル:
+
+FamilyGroup
+FamilyMember
+Category
+Store
+Receipt
+Item
+ItemSplit
+SettlementTransfer
+ProductMaster
+ApiUsageLog
+PromptTemplate
+4. 03-database-spec.md
+Enum一覧
+Role
+値
+ADMIN
+USER
+FamilyGroup
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+name	String	No	-	-	-	-	-
+inviteCode	String	No	cuid()	-	-	Yes	-
+createdAt	DateTime	No	now()	-	-	-	-
+Unique制約
+inviteCode
+FamilyMember
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+name	String	No	-	-	-	複合Unique	-
+password_hash	String	Yes	-	-	-	-	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	複合Unique	-
+role	Role	No	USER	-	-	-	-
+totpSecret	String	Yes	-	-	-	-	-
+totpEnabled	Boolean	No	false	-	-	-	-
+totpVerifiedAt	DateTime	Yes	-	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+Unique制約
+(name, familyGroupId)
+Category
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+name	String	No	-	-	-	複合Unique	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	複合Unique	Yes
+color	String	Yes	-	-	-	-	-
+keywords	Json	No	[]	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+Unique制約
+(name, familyGroupId)
+Index
+familyGroupId
+Store
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+officialName	String	No	-	-	-	複合Unique	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	複合Unique	Yes
+aliases	Json	No	[]	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+Unique制約
+(officialName, familyGroupId)
+Index
+familyGroupId
+Receipt
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	-	複合Index
+memberId	Int	No	-	-	FamilyMember.id	-	-
+storeName	String	No	-	-	-	-	-
+date	DateTime	No	-	-	-	-	複合Index
+totalAmount	Int	No	-	-	-	-	-
+taxAmount	Float	No	0.0	-	-	-	-
+rawText	Json	Yes	-	-	-	-	-
+imagePath	String	Yes	-	-	-	-	-
+createdAt	DateTime	No	now()	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+memberId → FamilyMember.id
+Index
+(familyGroupId, date)
+Item
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+receiptId	Int	No	-	-	Receipt.id	-	-
+categoryId	Int	Yes	-	-	Category.id	-	-
+name	String	No	-	-	-	-	-
+price	Float	No	-	-	-	-	-
+quantity	Float	No	1.0	-	-	-	-
+FK
+receiptId → Receipt.id
+categoryId → Category.id
+削除ルール
+receiptId → onDelete: Cascade
+ItemSplit
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+itemId	Int	No	-	-	Item.id	-	Yes
+familyMemberId	Int	No	-	-	FamilyMember.id	-	Yes
+amount	Int	No	-	-	-	-	-
+createdAt	DateTime	No	now()	-	-	-	-
+FK
+itemId → Item.id
+familyMemberId → FamilyMember.id
+Index
+itemId
+familyMemberId
+削除ルール
+itemId → onDelete: Cascade
+SettlementTransfer
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	-	Yes
+month	String	No	-	-	-	-	Yes
+fromMemberId	Int	No	-	-	FamilyMember.id	-	Yes
+toMemberId	Int	No	-	-	FamilyMember.id	-	Yes
+amount	Int	No	-	-	-	-	-
+settledAt	DateTime	No	now()	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+fromMemberId → FamilyMember.id
+toMemberId → FamilyMember.id
+Index
+month
+fromMemberId
+toMemberId
+familyGroupId
+ProductMaster
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+name	String	No	-	-	-	複合Unique	-
+storeName	String	No	-	-	-	複合Unique	-
+categoryId	Int	No	-	-	Category.id	-	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	複合Unique	-
+FK
+categoryId → Category.id
+familyGroupId → FamilyGroup.id
+Unique制約
+(name, storeName, familyGroupId)
+ApiUsageLog
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+familyMemberId	Int	Yes	-	-	FamilyMember.id	-	Yes
+receiptId	Int	Yes	-	-	Receipt.id	-	-
+modelId	String	No	-	-	-	-	-
+promptTokens	Int	No	-	-	-	-	-
+candidatesTokens	Int	No	-	-	-	-	-
+totalTokens	Int	No	-	-	-	-	-
+createdAt	DateTime	No	now()	-	-	-	Yes
+FK
+familyMemberId → FamilyMember.id
+receiptId → Receipt.id
+Index
+familyMemberId
+createdAt
+PromptTemplate
+カラム	型	Nullable	Default	PK	FK	Unique	Index
+id	Int	No	autoincrement()	Yes	-	-	-
+familyGroupId	Int	No	-	-	FamilyGroup.id	-	複合Index
+key	String	No	-	-	-	-	複合Index
+name	String	No	"デフォルトプロンプト"	-	-	-	-
+description	String	Yes	-	-	-	-	-
+systemPrompt	String(Text)	No	-	-	-	-	-
+domainHints	Json	Yes	-	-	-	-	-
+isActive	Boolean	No	false	-	-	-	複合Index
+version	Int	No	1	-	-	-	-
+createdAt	DateTime	No	now()	-	-	-	-
+updatedAt	DateTime	No	@updatedAt	-	-	-	-
+FK
+familyGroupId → FamilyGroup.id
+Index
+(familyGroupId, key, isActive)
+5. 04-er-diagram.md
+```mermaid
+erDiagram
+
+    FamilyGroup ||--o{ FamilyMember : has
+    FamilyGroup ||--o{ Receipt : has
+    FamilyGroup ||--o{ Category : has
+    FamilyGroup ||--o{ Store : has
+    FamilyGroup ||--o{ ProductMaster : has
+    FamilyGroup ||--o{ PromptTemplate : has
+    FamilyGroup ||--o{ SettlementTransfer : has
+
+    FamilyMember ||--o{ Receipt : creates
+    FamilyMember ||--o{ ApiUsageLog : executes
+    FamilyMember ||--o{ ItemSplit : owns
+
+    Receipt ||--o{ Item : contains
+    Receipt ||--o{ ApiUsageLog : related
+
+    Category ||--o{ Item : classifies
+    Category ||--o{ ProductMaster : classifies
+
+    Item ||--o{ ItemSplit : split
+
+    FamilyMember ||--o{ SettlementTransfer : sender
+    FamilyMember ||--o{ SettlementTransfer : receiver
+}
+```
+6. 確認が必要な項目一覧
+【未確認】
+PostgreSQL上で生成される実テーブル名（Prismaマッピング指定なしのためDDL未確認）
+各カラムの物理カラム名
+FK制約名
+PK制約名
+UNIQUE制約名（ProductMasterの named unique 以外）
+INDEX名
+シーケンス名
+migration適用後の実DDLとの差異有無
+DBコメント定義有無
+テーブルコメント定義有無
+カラムコメント定義有無
+migration関連
+migrationファイルを全件確認しない限り、途中で追加→削除された履歴項目の完全な変遷は判断不可
+migration適用順により生成されるDB固有オブジェクト名は schema.prisma からは判断不可
+【解析不可】
+
+なし（指定された backend/prisma/schema.prisma および backend/prisma/migrations はZIP内に存在していたため解析可能）
+
+
