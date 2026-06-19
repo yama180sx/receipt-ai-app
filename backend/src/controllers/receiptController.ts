@@ -10,7 +10,6 @@ import {
 import { getFamilyGroupId, getMemberId } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
-import { isDuplicateReceiptError, getDuplicateExistingId } from '../services/receipt/receiptDuplicateError';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
 import { createManualReceipt } from '../services/receipt/receiptUpdateService';
 import {
@@ -26,18 +25,6 @@ import {
   getAdvancedStats as fetchAdvancedStats,
 } from '../services/receipt/receiptStatsService';
 import { SplitInput } from '../utils/itemSplitAllocation';
-
-function handleDuplicateOrNext(error: unknown, res: Response, next: NextFunction): void {
-  if (isDuplicateReceiptError(error)) {
-    res.status(409).json({
-      success: false,
-      message: 'DUPLICATE',
-      existingId: getDuplicateExistingId(error),
-    });
-    return;
-  }
-  next(error);
-}
 
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
@@ -142,7 +129,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
 
     res.status(201).json({ success: true, data: result });
   } catch (error) {
-    handleDuplicateOrNext(error, res, next);
+    next(error);
   }
 };
 
@@ -161,7 +148,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
 
     res.status(201).json({ success: true, data: newReceipt });
   } catch (error) {
-    handleDuplicateOrNext(error, res, next);
+    next(error);
   }
 };
 
