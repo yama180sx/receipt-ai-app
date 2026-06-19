@@ -1,8 +1,8 @@
-import { prisma } from '../../utils/prismaClient';
 import { AppError } from '../../utils/appError';
-import { getCleanText } from '../../utils/normalizer';
+import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import type { ReceiptCreateItemInput } from '../../types/receipt';
 import { saveParsedReceipt } from './receiptPersistenceService';
+import { upsertProductMasterCategory } from './receiptProductMasterLearning';
 
 export type ManualReceiptInput = {
   date: string;
@@ -37,14 +37,7 @@ export async function createManualReceipt(
   input: ManualReceiptInput
 ) {
   const payload = buildCommitPayload(input);
-  return saveParsedReceipt(
-    memberId,
-    familyGroupId,
-    payload,
-    input.imagePath || '',
-    false,
-    []
-  );
+  return saveParsedReceipt(memberId, familyGroupId, payload, input.imagePath || '', false, []);
 }
 
 export type UpdateReceiptInput = {
@@ -53,77 +46,115 @@ export type UpdateReceiptInput = {
   items?: ReceiptCreateItemInput[];
 };
 
-/** 保存済みレシートの完全編集 */
-export async function updateReceiptById(
+async function updateReceiptInTx(
+  tx: PrismaTx,
   receiptId: number,
   familyGroupId: number,
   input: UpdateReceiptInput
 ) {
   const { date, storeName, items } = input;
 
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.receipt.findUnique({
-      where: { id: receiptId },
+  const existing = await tx.receipt.findUnique({
+    where: { id: receiptId },
+  });
+  if (!existing || existing.familyGroupId !== familyGroupId) {
+    throw new AppError('ReceiptNotFound', 404);
+  }
+
+  const itemList = items ?? [];
+  const calculatedTotal = itemList.reduce((sum, i) => {
+    return sum + Number(i.price || 0) * Number(i.quantity || 0);
+  }, 0);
+  const finalTotal = Math.round(calculatedTotal);
+
+  await tx.receipt.update({
+    where: { id: receiptId },
+    data: {
+      date: date ? new Date(date) : undefined,
+      storeName: storeName || undefined,
+      totalAmount: finalTotal,
+    },
+  });
+
+  await tx.item.deleteMany({ where: { receiptId } });
+
+  if (itemList.length > 0) {
+    await tx.item.createMany({
+      data: itemList.map((i) => ({
+        receiptId,
+        name: i.name,
+        price: parseFloat(String(i.price)) || 0,
+        quantity: parseFloat(String(i.quantity)) || 0,
+        categoryId: i.categoryId ? Number(i.categoryId) : null,
+      })),
     });
-    if (!existing || existing.familyGroupId !== familyGroupId) {
-      throw new AppError('ReceiptNotFound', 404);
-    }
 
-    const itemList = items ?? [];
-    const calculatedTotal = itemList.reduce((sum, i) => {
-      return sum + Number(i.price || 0) * Number(i.quantity || 0);
-    }, 0);
-    const finalTotal = Math.round(calculatedTotal);
-
-    await tx.receipt.update({
-      where: { id: receiptId },
-      data: {
-        date: date ? new Date(date) : undefined,
-        storeName: storeName || undefined,
-        totalAmount: finalTotal,
-      },
-    });
-
-    await tx.item.deleteMany({ where: { receiptId } });
-
-    if (itemList.length > 0) {
-      await tx.item.createMany({
-        data: itemList.map((i) => ({
-          receiptId,
-          name: i.name,
-          price: parseFloat(String(i.price)) || 0,
-          quantity: parseFloat(String(i.quantity)) || 0,
-          categoryId: i.categoryId ? Number(i.categoryId) : null,
-        })),
-      });
-
-      for (const item of itemList) {
-        if (item.categoryId) {
-          await tx.productMaster.upsert({
-            where: {
-              name_storeName_familyGroupId: {
-                name: getCleanText(item.name),
-                storeName: getCleanText(storeName || existing.storeName),
-                familyGroupId,
-              },
-            },
-            update: { categoryId: Number(item.categoryId) },
-            create: {
-              name: getCleanText(item.name),
-              storeName: getCleanText(storeName || existing.storeName),
-              categoryId: Number(item.categoryId),
-              familyGroupId,
-            },
-          });
-        }
+    const resolvedStoreName = storeName || existing.storeName;
+    for (const item of itemList) {
+      if (item.categoryId) {
+        await upsertProductMasterCategory(tx, {
+          itemName: item.name,
+          storeName: resolvedStoreName,
+          familyGroupId,
+          categoryId: Number(item.categoryId),
+        });
       }
     }
+  }
 
-    return tx.receipt.findUnique({
-      where: { id: receiptId },
-      include: { items: { include: { category: true } } },
-    });
+  return tx.receipt.findUnique({
+    where: { id: receiptId },
+    include: { items: { include: { category: true } } },
   });
+}
+
+/** 保存済みレシートの完全編集 */
+export async function updateReceiptById(
+  receiptId: number,
+  familyGroupId: number,
+  input: UpdateReceiptInput
+) {
+  return runInTransaction((tx) => updateReceiptInTx(tx, receiptId, familyGroupId, input));
+}
+
+async function updateItemCategoryInTx(
+  tx: PrismaTx,
+  itemId: number,
+  familyGroupId: number,
+  categoryId: number | null | undefined
+) {
+  const currentItem = await tx.item.findUnique({
+    where: { id: itemId },
+    include: { receipt: true },
+  });
+
+  if (!currentItem || currentItem.receipt.familyGroupId !== familyGroupId) {
+    throw new AppError('ItemNotFound', 404);
+  }
+
+  if (categoryId) {
+    const category = await tx.category.findFirst({
+      where: { id: Number(categoryId), familyGroupId },
+    });
+    if (!category) throw new AppError('CategoryNotFound', 404);
+  }
+
+  const updatedItem = await tx.item.update({
+    where: { id: itemId },
+    data: { categoryId: categoryId ? Number(categoryId) : null },
+    include: { category: true },
+  });
+
+  if (categoryId) {
+    await upsertProductMasterCategory(tx, {
+      itemName: currentItem.name,
+      storeName: currentItem.receipt.storeName,
+      familyGroupId,
+      categoryId: Number(categoryId),
+    });
+  }
+
+  return updatedItem;
 }
 
 /** 明細カテゴリ更新 ＋ 学習マスタ反映 */
@@ -132,48 +163,5 @@ export async function updateItemCategoryById(
   familyGroupId: number,
   categoryId: number | null | undefined
 ) {
-  return prisma.$transaction(async (tx) => {
-    const currentItem = await tx.item.findUnique({
-      where: { id: itemId },
-      include: { receipt: true },
-    });
-
-    if (!currentItem || currentItem.receipt.familyGroupId !== familyGroupId) {
-      throw new AppError('ItemNotFound', 404);
-    }
-
-    if (categoryId) {
-      const category = await tx.category.findFirst({
-        where: { id: Number(categoryId), familyGroupId },
-      });
-      if (!category) throw new AppError('CategoryNotFound', 404);
-    }
-
-    const updatedItem = await tx.item.update({
-      where: { id: itemId },
-      data: { categoryId: categoryId ? Number(categoryId) : null },
-      include: { category: true },
-    });
-
-    if (categoryId) {
-      await tx.productMaster.upsert({
-        where: {
-          name_storeName_familyGroupId: {
-            name: getCleanText(currentItem.name),
-            storeName: getCleanText(currentItem.receipt.storeName),
-            familyGroupId,
-          },
-        },
-        update: { categoryId: Number(categoryId) },
-        create: {
-          name: getCleanText(currentItem.name),
-          storeName: getCleanText(currentItem.receipt.storeName),
-          categoryId: Number(categoryId),
-          familyGroupId,
-        },
-      });
-    }
-
-    return updatedItem;
-  });
+  return runInTransaction((tx) => updateItemCategoryInTx(tx, itemId, familyGroupId, categoryId));
 }
