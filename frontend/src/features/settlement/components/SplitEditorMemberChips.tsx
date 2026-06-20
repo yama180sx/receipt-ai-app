@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { theme } from '../../theme';
-import type { FamilyMemberSummary } from '../../types/settlement';
+import { theme } from '../../../theme';
+import type { FamilyMemberSummary } from '../../../types/settlement';
 
 interface SplitEditorMemberChipsProps {
   activeMembers: FamilyMemberSummary[];

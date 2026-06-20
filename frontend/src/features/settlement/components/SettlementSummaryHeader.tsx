@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AppBackButton, AppButton, AppSelect } from '../ui';
-import { BUTTON_LABELS } from '../../constants/buttonLabels';
-import { theme } from '../../theme';
-import { useMonthSelectOptions } from '../../utils/monthSelectOptions';
+import { AppBackButton, AppButton, AppSelect } from '../../../components/ui';
+import { BUTTON_LABELS } from '../../../constants/buttonLabels';
+import { theme } from '../../../theme';
+import { useMonthSelectOptions } from '../../../utils/monthSelectOptions';
 
 interface SettlementSummaryHeaderProps {
   isWide: boolean;

@@ -7,15 +7,15 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { AppButton } from '../ui';
-import { BUTTON_LABELS } from '../../constants/buttonLabels';
-import { theme, tableStyles } from '../../theme';
-import { calcItemTotal } from '../../utils/splitEditorSplits';
+import { AppButton } from '../../../components/ui';
+import { BUTTON_LABELS } from '../../../constants/buttonLabels';
+import { theme, tableStyles } from '../../../theme';
+import { calcItemTotal } from '../../../utils/splitEditorSplits';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,
   ReceiptItemForSplit,
-} from '../../types/settlement';
+} from '../../../types/settlement';
 
 interface SplitEditorItemTableProps {
   receipt: ReceiptForSplitEditor;

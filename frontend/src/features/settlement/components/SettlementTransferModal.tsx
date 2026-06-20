@@ -7,10 +7,10 @@ import {
   AppSelect,
   AppTextInput,
   modalStyles,
-} from '../ui';
-import { BUTTON_LABELS } from '../../constants/buttonLabels';
-import { hasNegativeAmountSign } from '../../utils/parsePositiveYenAmount';
-import type { TransferFormErrors } from '../../utils/settlementTransferForm';
+} from '../../../components/ui';
+import { BUTTON_LABELS } from '../../../constants/buttonLabels';
+import { hasNegativeAmountSign } from '../../../utils/parsePositiveYenAmount';
+import type { TransferFormErrors } from '../utils/settlementTransferForm';
 
 interface MemberOption {
   label: string;

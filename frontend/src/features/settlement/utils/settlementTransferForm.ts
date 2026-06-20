@@ -1,7 +1,7 @@
 import {
   hasNegativeAmountSign,
   parsePositiveYenAmount,
-} from './parsePositiveYenAmount';
+} from '../../../utils/parsePositiveYenAmount';
 
 export interface TransferFormErrors {
   from?: string;

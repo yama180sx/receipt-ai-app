@@ -7,12 +7,14 @@ import {
 } from 'react-native';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { useSettlementSummary } from '../hooks/useSettlementSummary';
-import { SettlementSummaryHeader } from '../components/settlement/SettlementSummaryHeader';
-import { SettlementMemberCards } from '../components/settlement/SettlementMemberCards';
-import { SettlementDetailTable } from '../components/settlement/SettlementDetailTable';
-import { SettlementTransferHistory } from '../components/settlement/SettlementTransferHistory';
-import { SettlementTransferModal } from '../components/settlement/SettlementTransferModal';
+import {
+  useSettlementSummary,
+  SettlementSummaryHeader,
+  SettlementMemberCards,
+  SettlementDetailTable,
+  SettlementTransferHistory,
+  SettlementTransferModal,
+} from '../features/settlement';
 import { hasNegativeAmountSign } from '../utils/parsePositiveYenAmount';
 
 interface SettlementSummaryScreenProps {
