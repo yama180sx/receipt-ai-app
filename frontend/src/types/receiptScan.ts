@@ -1,7 +1,17 @@
-import type { ParsedReceiptData } from './receipt';
-
 export type ReceiptScanInitialData = {
-  parsedData: ParsedReceiptData;
+  parsedData: {
+    storeName: string;
+    purchaseDate: string;
+    totalAmount: number;
+    taxAmount?: number | string;
+    items: Array<{
+      name: string;
+      price: number | string;
+      quantity: number | string;
+      categoryId: number | null;
+    }>;
+    usageLogId?: number;
+  };
   imagePath: string;
   validation: {
     isSuspicious: boolean;
@@ -16,7 +26,7 @@ export type ReceiptScanInitialData = {
 type JobStatusResponse = {
   state: string;
   result?: {
-    parsedData?: ParsedReceiptData;
+    parsedData?: ReceiptScanInitialData['parsedData'];
     imagePath?: string;
     validation?: ReceiptScanInitialData['validation'];
   };

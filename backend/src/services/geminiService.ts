@@ -3,9 +3,22 @@ import * as fs from "fs";
 import * as path from "path";
 import prisma from "../utils/prismaClient"; 
 import logger from "../utils/logger";
-import type { ParsedReceipt } from "../types/receipt";
 
-export type { ParsedItem, ParsedReceipt } from "../types/receipt";
+export interface ParsedItem {
+  name: string;
+  price: number;
+  quantity: number;
+  inferredCategory?: string; 
+}
+
+export interface ParsedReceipt {
+  storeName: string;
+  purchaseDate: string; 
+  totalAmount: number;
+  taxAmount?: number;
+  items: ParsedItem[];
+  usageLogId?: number; // [Issue #63] ログ紐付け用
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 

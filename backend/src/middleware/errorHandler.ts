@@ -1,60 +1,52 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/appError';
 import logger from '../utils/logger';
-import { DuplicateReceiptError } from '../services/receipt/receiptDuplicateError';
 
 /**
- * 📂 グローバルエラーハンドリング・ミドルウェア [Issue #47 / #98-5]
+ * 📂 グローバルエラーハンドリング・ミドルウェア [Issue #47]
  */
 export const errorHandler = (
-  err: unknown,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   const isDev = process.env.NODE_ENV === 'development';
-  const error = err as Error & { statusCode?: number; details?: unknown; stack?: string };
-
-  const statusCode = err instanceof AppError ? err.statusCode : (error.statusCode || 500);
-  const message = error.message || 'Internal Server Error';
+  
+  // ステータスコードとメッセージの決定
+  const statusCode = err instanceof AppError ? err.statusCode : (err.statusCode || 500);
+  const message = err.message || 'Internal Server Error';
   const details = err instanceof AppError ? err.details : undefined;
 
+  // 1. T320 のログファイル (error-DATE.log) へ常にフルスタックを出力
   logger.error(`[${req.method}] ${req.path} - ${message}`, {
     statusCode,
     method: req.method,
     path: req.originalUrl,
     details,
-    stack: error.stack,
-    internal: err,
+    stack: err.stack,
+    internal: err // Prisma等の生エラーオブジェクト
   });
 
-  // api-spec §2.3: 重複レシート（409）は existingId をトップレベルに含める
-  if (err instanceof DuplicateReceiptError) {
-    return res.status(409).json({
-      success: false,
-      message: 'DUPLICATE',
-      existingId: err.existingId,
-    });
-  }
-
+  // 2. クライアント（Expo）へのレスポンス
+  // キーを 'message' に統一することで Expo 側のコードと同期させます
   if (isDev) {
     return res.status(statusCode).json({
       success: false,
-      message,
-      stack: error.stack,
-      details,
-      internal: err,
+      message: message, // 'error' から 'message' に変更
+      stack: err.stack,
+      details: details,
+      internal: err
     });
-  }
-
-  const safeMessage =
-    statusCode >= 500
-      ? 'サーバー内部でエラーが発生しました。時間をおいて再度お試しください。'
+  } else {
+    const safeMessage = statusCode >= 500 
+      ? 'サーバー内部でエラーが発生しました。時間をおいて再度お試しください。' 
       : message;
 
-  return res.status(statusCode).json({
-    success: false,
-    message: safeMessage,
-    ...(details && { details }),
-  });
+    return res.status(statusCode).json({
+      success: false,
+      message: safeMessage, // 'error' から 'message' に変更
+      ...(details && { details })
+    });
+  }
 };
