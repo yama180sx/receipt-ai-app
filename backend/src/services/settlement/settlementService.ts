@@ -5,7 +5,78 @@ import {
   getLocalMonthDateRange,
   normalizeYearMonth,
 } from '../../utils/yearMonth';
-import { computeSettlementMemberSummaries } from './settlementAggregation';
+import {
+  computeSettlementMemberSummaries,
+  type SettlementReceiptInput,
+} from './settlementAggregation';
+
+export type SettlementItemRow = {
+  receiptId: number;
+  memberId: number;
+  price: number;
+  quantity: number;
+  splits: { familyMemberId: number; amount: number }[];
+};
+
+/** Item 行を receipt 単位にグループ化（集計入力用） */
+export function buildSettlementReceiptInputsFromItems(
+  rows: SettlementItemRow[]
+): SettlementReceiptInput[] {
+  const receiptsById = new Map<number, SettlementReceiptInput>();
+
+  for (const row of rows) {
+    let receipt = receiptsById.get(row.receiptId);
+    if (!receipt) {
+      receipt = { memberId: row.memberId, items: [] };
+      receiptsById.set(row.receiptId, receipt);
+    }
+
+    receipt.items.push({
+      price: row.price,
+      quantity: row.quantity,
+      splits: row.splits,
+    });
+  }
+
+  return Array.from(receiptsById.values());
+}
+
+async function fetchSettlementReceiptInputs(
+  familyGroupId: number,
+  startDate: Date,
+  endDate: Date
+): Promise<SettlementReceiptInput[]> {
+  const items = await prisma.item.findMany({
+    where: {
+      receipt: {
+        familyGroupId,
+        date: { gte: startDate, lt: endDate },
+      },
+    },
+    select: {
+      receiptId: true,
+      price: true,
+      quantity: true,
+      receipt: { select: { memberId: true } },
+      splits: {
+        select: {
+          familyMemberId: true,
+          amount: true,
+        },
+      },
+    },
+  });
+
+  return buildSettlementReceiptInputsFromItems(
+    items.map((item) => ({
+      receiptId: item.receiptId,
+      memberId: item.receipt.memberId,
+      price: item.price,
+      quantity: item.quantity,
+      splits: item.splits,
+    }))
+  );
+}
 
 export type SettlementTransferRecord = {
   id: number;
@@ -29,50 +100,30 @@ export async function getSettlementStatusData(
   const targetMonth = normalizeYearMonth(month) ?? getCurrentYearMonthLocal();
   const { start: startDate, end: endDate } = getLocalMonthDateRange(targetMonth);
 
-  const members = await prisma.familyMember.findMany({
-    where: { familyGroupId },
-    select: { id: true, name: true },
-  });
-
-  const receipts = await prisma.receipt.findMany({
-    where: {
-      familyGroupId,
-      date: { gte: startDate, lt: endDate },
-    },
-    include: {
-      items: {
-        include: { splits: true },
+  const [members, receiptInputs, transfers] = await Promise.all([
+    prisma.familyMember.findMany({
+      where: { familyGroupId },
+      select: { id: true, name: true },
+    }),
+    fetchSettlementReceiptInputs(familyGroupId, startDate, endDate),
+    prisma.settlementTransfer.findMany({
+      where: {
+        month: targetMonth,
+        familyGroupId,
       },
-    },
-  });
-
-  const transfers = await prisma.settlementTransfer.findMany({
-    where: {
-      month: targetMonth,
-      familyGroupId,
-    },
-    select: {
-      id: true,
-      fromMemberId: true,
-      toMemberId: true,
-      amount: true,
-      settledAt: true,
-    },
-  });
+      select: {
+        id: true,
+        fromMemberId: true,
+        toMemberId: true,
+        amount: true,
+        settledAt: true,
+      },
+    }),
+  ]);
 
   const memberSummaries = computeSettlementMemberSummaries(
     members,
-    receipts.map((r) => ({
-      memberId: r.memberId,
-      items: r.items.map((item) => ({
-        price: item.price,
-        quantity: item.quantity,
-        splits: item.splits.map((s) => ({
-          familyMemberId: s.familyMemberId,
-          amount: s.amount,
-        })),
-      })),
-    })),
+    receiptInputs,
     transfers.map((t) => ({
       fromMemberId: t.fromMemberId,
       toMemberId: t.toMemberId,
