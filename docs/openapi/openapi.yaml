@@ -2,18 +2,26 @@ openapi: 3.0.3
 info:
   title: Receipt AI App API
   description: |
-    Phase 1 OpenAPI 正本（auth / receipt / stats）。
+    OpenAPI 正本（全公開 API）。
+    Phase 1: auth / receipt / stats — Phase 2 (#98-8-10): category / productMaster / admin / upload / health。
     詳細な as-built 仕様は docs/design/api-spec.md を参照。
-  version: 1.0.0
+  version: 1.1.0
 
 servers:
   - url: /api
     description: Express app（baseURL = EXPO_PUBLIC_API_URL、通常 `/api` 付き）
+  - url: /
+    description: ルート（/health のみ。/api プレフィックスなし）
 
 tags:
   - name: auth
   - name: receipt
   - name: stats
+  - name: category
+  - name: productMaster
+  - name: admin
+  - name: upload
+  - name: health
 
 paths:
   /auth/resolve-family:
@@ -647,6 +655,364 @@ paths:
                           id:
                             type: integer
 
+  /categories:
+    get:
+      tags: [category]
+      summary: カテゴリ一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Category'
+    post:
+      tags: [category]
+      summary: カテゴリ新規作成
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Category'
+
+  /categories/{id}:
+    delete:
+      tags: [category]
+      summary: カテゴリ削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /categories/optimize:
+    post:
+      tags: [category]
+      summary: ProductMaster からキーワード最適化
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OptimizeCategoryResponse'
+
+  /product-master:
+    get:
+      tags: [productMaster]
+      summary: 学習マスタ一覧
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: store
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductMaster'
+
+  /product-master/{id}:
+    patch:
+      tags: [productMaster]
+      summary: マスタ個別更新
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductMasterRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductMaster'
+    delete:
+      tags: [productMaster]
+      summary: マスタ削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /product-master/merge-stores:
+    post:
+      tags: [productMaster]
+      summary: 店舗名統合
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeStoreNamesRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MergeStoreNamesResponse'
+
+  /uploads/{filename}:
+    get:
+      tags: [upload]
+      summary: レシート画像配信（認証付き）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 画像バイナリ
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not Found
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: AI コスト統計
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdminCostStatRow'
+
+  /admin/prompts:
+    get:
+      tags: [admin]
+      summary: プロンプトテンプレート一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PromptTemplate'
+    post:
+      tags: [admin]
+      summary: プロンプト新規作成
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromptTemplateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PromptTemplate'
+
+  /admin/prompts/{id}:
+    patch:
+      tags: [admin]
+      summary: プロンプト更新
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromptTemplateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PromptTemplate'
+    delete:
+      tags: [admin]
+      summary: プロンプト削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /admin/prompts/{id}/activate:
+    patch:
+      tags: [admin]
+      summary: デフォルトプロンプト切替
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /health:
+    get:
+      tags: [health]
+      summary: 死活監視
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1195,3 +1561,171 @@ components:
           type: integer
         amount:
           type: number
+
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        familyGroupId:
+          type: integer
+        keywords:
+          type: array
+          items:
+            type: string
+
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+
+    OptimizeCategoryResponse:
+      type: object
+      required: [addedCount, message]
+      properties:
+        addedCount:
+          type: integer
+        message:
+          type: string
+
+    ProductMaster:
+      type: object
+      required: [id, name, storeName, categoryId]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        storeName:
+          type: string
+        categoryId:
+          type: integer
+        category:
+          $ref: '#/components/schemas/CategorySummary'
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateProductMasterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        storeName:
+          type: string
+        categoryId:
+          type: integer
+
+    MergeStoreNamesRequest:
+      type: object
+      required: [sourceStoreName, targetStoreName]
+      properties:
+        sourceStoreName:
+          type: string
+        targetStoreName:
+          type: string
+
+    MergeStoreNamesResponse:
+      type: object
+      required: [message, count]
+      properties:
+        message:
+          type: string
+        count:
+          type: integer
+
+    PromptTemplate:
+      type: object
+      required: [id, key, systemPrompt, isActive, version]
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        systemPrompt:
+          type: string
+        domainHints:
+          type: object
+          additionalProperties: true
+          nullable: true
+        isActive:
+          type: boolean
+        version:
+          type: integer
+        familyGroupId:
+          type: integer
+
+    CreatePromptTemplateRequest:
+      type: object
+      required: [key, systemPrompt]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        systemPrompt:
+          type: string
+        domainHints:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+
+    UpdatePromptTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        systemPrompt:
+          type: string
+        domainHints:
+          type: object
+          additionalProperties: true
+
+    AdminCostStatRow:
+      type: object
+      required: [month, modelId, totalPromptTokens, totalCandidatesTokens, estimatedCostJpy]
+      properties:
+        month:
+          type: string
+        modelId:
+          type: string
+        totalPromptTokens:
+          type: integer
+        totalCandidatesTokens:
+          type: integer
+        estimatedCostJpy:
+          type: number
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        env:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

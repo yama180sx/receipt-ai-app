@@ -6,7 +6,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 本ドキュメントは **実装準拠（as-built）** で記述する。Express ルート・ミドルウェア・コントローラの挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）を参照する。
 
-> **OpenAPI 正本（Phase 2 #98-8-9）**: 主要 API（auth / receipt / stats）の FE 型生成用 YAML は [../openapi/openapi.yaml](../openapi/openapi.yaml)。詳細説明は本書、機械可読スキーマは OpenAPI を正とする。
+> **OpenAPI 正本（Phase 2 #98-8-9 / #98-8-10）**: 公開 API 全体の FE 型生成用 YAML は [../openapi/openapi.yaml](../openapi/openapi.yaml)。詳細説明は本書、機械可読スキーマは OpenAPI を正とする。
 
 | 資料 | 内容 |
 |------|------|

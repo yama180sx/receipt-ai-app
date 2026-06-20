@@ -8,16 +8,8 @@ import {
 } from 'react-native';
 import { AppBackButton } from '../components/ui';
 import { theme, tableStyles } from '../theme';
-import apiClient from '../utils/apiClient';
+import { adminApi, type AdminCostStatRow } from '../api';
 import { getApiErrorMessage } from '../utils/apiError';
-
-interface StatData {
-  month: string;
-  modelId: string;
-  totalPromptTokens: number;
-  totalCandidatesTokens: number;
-  estimatedCostJpy: number;
-}
 
 interface AdminStatsScreenProps {
   onBack: () => void;
@@ -25,7 +17,7 @@ interface AdminStatsScreenProps {
 
 export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<StatData[]>([]);
+  const [stats, setStats] = useState<AdminCostStatRow[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null); // ★ 追加: エラー状態管理
 
@@ -35,12 +27,11 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
 
   const fetchStats = async () => {
     try {
-      const res = await apiClient.get('/admin/stats');
-      if (res.data && res.data.success) {
-        setStats(res.data.data);
-        const total = res.data.data.reduce((sum: number, item: StatData) => sum + item.estimatedCostJpy, 0);
-        setTotalCost(total);
-      }
+      const res = await adminApi.getCostStats();
+      const rows = res.data ?? [];
+      setStats(rows);
+      const total = rows.reduce((sum, item) => sum + item.estimatedCostJpy, 0);
+      setTotalCost(total);
     } catch (error: unknown) {
       console.error('Stats Fetch Error:', error);
       setErrorMsg(getApiErrorMessage(error, 'コスト統計の取得に失敗しました。'));
