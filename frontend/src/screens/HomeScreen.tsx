@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,27 +6,16 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { AppButton, AppListItem, AppModal } from '../components/ui';
 import { ReceiptImageCropModal } from '../components/ReceiptImageCropModal';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
 import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { theme } from '../theme';
-import { receiptApi, statsApi } from '../api';
-import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
-import {
-  consumePendingCropUri,
-  persistPendingCropUri,
-  registerWebImageFile,
-  clearPendingCropUri,
-} from '../utils/webImageFileRegistry';
-import { showAlert } from '../utils/alertMessage';
-import { getCurrentYearMonth } from '../utils/monthSelectOptions';
+import { useHomeDashboard } from '../hooks/useHomeDashboard';
+import { useReceiptUpload } from '../hooks/useReceiptUpload';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
 
@@ -42,7 +31,6 @@ interface HomeScreenProps {
   userRole?: string | null;
 }
 
-const ACCEPTANCE_MESSAGE_MS = 3000;
 const HOME_TRAY_PREVIEW_LIMIT = 2;
 
 /**
@@ -59,14 +47,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   memberName,
   userRole,
 }) => {
-  const [latestReceipt, setLatestReceipt] = useState<any>(null);
-  const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const [acceptanceMessage, setAcceptanceMessage] = useState<string | null>(null);
-  const [pendingCropUri, setPendingCropUri] = useState<string | null>(null);
-  const [showImageSourcePicker, setShowImageSourcePicker] = useState(false);
-
   const {
     activeCount,
     refresh: refreshJobs,
@@ -79,157 +59,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     canDiscardTrayItem,
   } = useReceiptTray();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const currentMonth = getCurrentYearMonth();
-      const [latestRes, statsRes] = await Promise.all([
-        receiptApi.getLatestReceipt(currentMemberId),
-        statsApi.getMonthlyStats(currentMonth),
-      ]);
+  const { latestReceipt, monthlyTotal, loading } = useHomeDashboard(currentMemberId);
 
-      if (latestRes.success) {
-        setLatestReceipt(latestRes.data);
-      }
+  const upload = useReceiptUpload({
+    currentMemberId,
+    onUploadAccepted: refreshJobs,
+    registerLocalUploadFailure: addLocalFailedJob,
+  });
 
-      if (statsRes.success) {
-        const total = statsRes.data.totalAmount || 0;
-        setMonthlyTotal(Math.round(total));
-      }
-    } catch (error) {
-      console.error('Data fetch error:', error);
-    } finally {
-      loading && setLoading(false);
-    }
-  }, [currentMemberId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const restored = consumePendingCropUri();
-    if (restored) {
-      setPendingCropUri(restored);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!acceptanceMessage) return;
-    const timer = setTimeout(() => setAcceptanceMessage(null), ACCEPTANCE_MESSAGE_MS);
-    return () => clearTimeout(timer);
-  }, [acceptanceMessage]);
-
-  const showAcceptanceFeedback = useCallback((message: string) => {
-    setAcceptanceMessage(message);
-  }, []);
-
-  const registerLocalUploadFailure = useCallback(
-    (reason: string) => {
-      addLocalFailedJob(reason);
-    },
-    [addLocalFailedJob]
-  );
-
-  const uploadReceiptImage = async (imageUri: string) => {
-    setUploadingCount((count) => count + 1);
-    try {
-      const formData = await buildReceiptUploadFormData(imageUri, currentMemberId);
-      const uploadRes = await receiptApi.uploadReceipt(formData, currentMemberId);
-
-      if (uploadRes.success) {
-        showAcceptanceFeedback('受付しました。解析結果は下の一覧に表示されます。');
-        await refreshJobs();
-        return;
-      }
-
-      registerLocalUploadFailure('サーバーが受付を拒否しました。');
-      showAlert('エラー', 'レシートの受付に失敗しました。');
-    } catch (err) {
-      console.error('uploadReceiptImage', err);
-      const message =
-        err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
-      registerLocalUploadFailure(message);
-      if (Platform.OS === 'web') {
-        showAlert('エラー', message);
-      } else {
-        Alert.alert('エラー', message);
-      }
-    } finally {
-      setUploadingCount((count) => Math.max(0, count - 1));
-    }
-  };
-
-  const openWebCrop = (imageUri: string) => {
-    if (Platform.OS === 'web') {
-      persistPendingCropUri(imageUri);
-    }
-    setPendingCropUri(imageUri);
-  };
-
-  const pickImageForWeb = async (source: 'camera' | 'library') => {
-    try {
-      const picker =
-        source === 'camera'
-          ? ImagePicker.launchCameraAsync({ mediaTypes: 'images' as const, quality: 0.8 })
-          : ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as const, quality: 0.8 });
-      const result = await picker;
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if (Platform.OS === 'web' && asset.file) {
-        registerWebImageFile(asset.uri, asset.file);
-      }
-      openWebCrop(asset.uri);
-    } catch (err) {
-      console.error('pickImageForWeb', err);
-      showAlert('エラー', '画像の取得に失敗しました。ギャラリーから選択をお試しください。');
-    }
-  };
-
-  const pickImageNative = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('権限エラー', 'カメラの使用を許可してください。');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: 'images' as const,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (result.canceled || !result.assets?.[0]) return;
-    await uploadReceiptImage(result.assets[0].uri);
-  };
-
-  const handleScan = async () => {
-    if (Platform.OS === 'web') {
-      setShowImageSourcePicker(true);
-      return;
-    }
-
-    try {
-      await pickImageNative();
-    } catch (err) {
-      console.error('handleScan Error:', err);
-      Alert.alert('エラー', '画像のアップロードに失敗しました。');
-    }
-  };
-
-  const handleCropConfirm = async (croppedUri: string) => {
-    clearPendingCropUri();
-    setPendingCropUri(null);
-    await uploadReceiptImage(croppedUri);
-  };
-
-  const handleCropCancel = () => {
-    clearPendingCropUri();
-    setPendingCropUri(null);
-  };
-
-  const pendingBadgeCount = activeCount + uploadingCount;
+  const pendingBadgeCount = activeCount + upload.uploadingCount;
   const isWide = useIsWideHomeMenu();
   const isAdmin = userRole === 'ADMIN';
 
@@ -259,15 +97,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             />
           </View>
 
-          {acceptanceMessage ? (
+          {upload.acceptanceMessage ? (
             <View style={styles.acceptanceBanner}>
-              <Text style={styles.acceptanceBannerText}>{acceptanceMessage}</Text>
+              <Text style={styles.acceptanceBannerText}>{upload.acceptanceMessage}</Text>
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.captureButton} activeOpacity={0.8} onPress={handleScan}>
+          <TouchableOpacity
+            style={styles.captureButton}
+            activeOpacity={0.8}
+            onPress={() => void upload.handleScan()}
+          >
             <View style={styles.iconCircle}>
-              {uploadingCount > 0 ? (
+              {upload.uploadingCount > 0 ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={{ fontSize: 20 }}>📷</Text>
@@ -409,8 +251,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </ScrollView>
 
         <AppModal
-          visible={showImageSourcePicker}
-          onRequestClose={() => setShowImageSourcePicker(false)}
+          visible={upload.showImageSourcePicker}
+          onRequestClose={() => upload.setShowImageSourcePicker(false)}
           title="レシート画像"
           description="取得方法を選んでください"
           footer={
@@ -418,34 +260,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <AppButton
                 title="カメラ"
                 onPress={() => {
-                  setShowImageSourcePicker(false);
-                  void pickImageForWeb('camera');
+                  upload.setShowImageSourcePicker(false);
+                  void upload.pickImageForWeb('camera');
                 }}
               />
               <AppButton
                 title="ギャラリー"
                 variant="secondary"
                 onPress={() => {
-                  setShowImageSourcePicker(false);
-                  void pickImageForWeb('library');
+                  upload.setShowImageSourcePicker(false);
+                  void upload.pickImageForWeb('library');
                 }}
               />
               <AppButton
                 title="キャンセル"
                 variant="outline"
-                onPress={() => setShowImageSourcePicker(false)}
+                onPress={() => upload.setShowImageSourcePicker(false)}
               />
             </View>
           }
         />
       </SafeAreaView>
 
-      {pendingCropUri ? (
+      {upload.pendingCropUri ? (
         <ReceiptImageCropModal
           visible
-          imageUri={pendingCropUri}
-          onConfirm={(uri) => void handleCropConfirm(uri)}
-          onCancel={handleCropCancel}
+          imageUri={upload.pendingCropUri}
+          onConfirm={(uri) => void upload.handleCropConfirm(uri)}
+          onCancel={upload.handleCropCancel}
         />
       ) : null}
     </>
