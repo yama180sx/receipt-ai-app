@@ -1,4 +1,5 @@
 import { prisma } from '../../utils/prismaClient';
+import { AppError } from '../../utils/appError';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../../utils/yearMonth';
 
 export type ListReceiptsParams = {
@@ -42,7 +43,12 @@ export async function getLatestReceipt(familyGroupId: number) {
   });
 }
 
-export async function deleteReceiptById(receiptId: number) {
+export async function deleteReceiptById(receiptId: number, familyGroupId: number) {
+  const existing = await prisma.receipt.findUnique({ where: { id: receiptId } });
+  if (!existing || existing.familyGroupId !== familyGroupId) {
+    throw new AppError('ReceiptNotFound', 404);
+  }
+
   await prisma.receipt.delete({ where: { id: receiptId } });
 }
 

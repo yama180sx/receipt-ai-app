@@ -47,7 +47,7 @@ export async function checkDuplicateReceipt(
     }
   }
 
-  const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
+  const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
   const cleanStore = getCleanText(officialStoreName);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
   const totalAmount = Math.round(Number(parsedData.totalAmount || 0));

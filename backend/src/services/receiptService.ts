@@ -18,7 +18,10 @@ export const processAndSaveReceipt = async (memberId: number, imagePath: string)
   });
   if (!member) throw new Error('MEMBER_NOT_FOUND');
 
-  const { parsedData, validation } = await analyzeOnly(memberId, imagePath);
+  const { parsedData, validation } = await analyzeOnly(
+    { familyGroupId: member.familyGroupId, memberId },
+    imagePath
+  );
   return saveConfirmedReceipt(
     memberId,
     member.familyGroupId,
