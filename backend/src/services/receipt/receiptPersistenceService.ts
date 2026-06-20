@@ -1,9 +1,12 @@
-import { prisma } from '../../utils/prismaClient';
 import logger from '../../utils/logger';
 import { normalizeStoreName, getCleanText } from '../../utils/normalizer';
 import { runReceiptCommitTransaction } from '../../utils/prismaTransaction';
 import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptService';
 import type { ReceiptCommitPayload } from '../../types/receipt';
+import {
+  findReceiptById,
+  findReceiptByImagePath,
+} from '../../repositories/receiptRepository';
 import { DuplicateReceiptError } from './receiptDuplicateError';
 import { persistReceiptCommitInTx } from './receiptCommitPersistence';
 
@@ -31,10 +34,7 @@ export async function saveParsedReceipt(
   const usageLogId = usageLogIdStr ? parseInt(usageLogIdStr, 10) : null;
 
   if (imagePath) {
-    const existingByImage = await prisma.receipt.findFirst({
-      where: { familyGroupId, imagePath },
-      include: { items: { include: { category: true } } },
-    });
+    const existingByImage = await findReceiptByImagePath(familyGroupId, imagePath);
     if (existingByImage) {
       logger.info(`[Idempotent] imagePath 一致のため既存レシートを返却: ID ${existingByImage.id}`);
       return {
@@ -67,10 +67,7 @@ export async function saveParsedReceipt(
     })
   );
 
-  const final = await prisma.receipt.findUnique({
-    where: { id: savedId },
-    include: { items: { include: { category: true } } },
-  });
+  const final = await findReceiptById(savedId);
 
   return { ...JSON.parse(JSON.stringify(final)), isSuspicious, warnings };
 }

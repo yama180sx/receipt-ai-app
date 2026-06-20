@@ -2,6 +2,10 @@ import logger from '../../utils/logger';
 import { getCleanText } from '../../utils/normalizer';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import type { ParsedItem, ReceiptCommitPayload } from '../../types/receipt';
+import {
+  createReceiptInTx,
+  linkApiUsageLogToReceiptInTx,
+} from '../../repositories/receiptRepository';
 import { upsertProductMasterCategory } from './receiptProductMasterLearning';
 
 /** commit トランザクション内で永続化するための準備済み入力 */
@@ -66,26 +70,20 @@ export async function persistReceiptCommitInTx(
     })
   );
 
-  const created = await tx.receipt.create({
-    data: {
-      memberId,
-      familyGroupId,
-      storeName: officialStoreName,
-      date: jstDate,
-      totalAmount,
-      taxAmount,
-      imagePath,
-      items: { create: itemsToCreate },
-      rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
-    },
-    select: { id: true },
+  const created = await createReceiptInTx(tx, {
+    memberId,
+    familyGroupId,
+    storeName: officialStoreName,
+    date: jstDate,
+    totalAmount,
+    taxAmount,
+    imagePath,
+    rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
+    items: itemsToCreate,
   });
 
   if (usageLogId && !isNaN(usageLogId)) {
-    await tx.apiUsageLog.update({
-      where: { id: usageLogId },
-      data: { receiptId: created.id },
-    });
+    await linkApiUsageLogToReceiptInTx(tx, usageLogId, created.id);
     logger.info(`[Link_Log] ApiUsageLog(ID: ${usageLogId}) を Receipt(ID: ${created.id}) に紐付けました。`);
   }
 

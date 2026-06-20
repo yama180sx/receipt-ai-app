@@ -2,6 +2,13 @@ import { AppError } from '../../utils/appError';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import { allocateItemSplits, SplitInput } from '../../utils/itemSplitAllocation';
 import { calcItemLineTotal } from '../../utils/itemLineTotal';
+import {
+  createItemSplitsInTx,
+  deleteItemSplitsInTx,
+  findFamilyMembersByIdsInTx,
+  findItemSplitsInTx,
+  findItemWithReceiptInTx,
+} from '../../repositories/receiptRepository';
 
 async function updateItemSplitsInTx(
   tx: PrismaTx,
@@ -9,17 +16,14 @@ async function updateItemSplitsInTx(
   familyGroupId: number,
   splits: SplitInput[] | undefined | null
 ) {
-  const item = await tx.item.findUnique({
-    where: { id: itemId },
-    include: { receipt: true },
-  });
+  const item = await findItemWithReceiptInTx(tx, itemId);
 
   if (!item || item.receipt.familyGroupId !== familyGroupId) {
     throw new AppError('ItemNotFound', 404);
   }
 
   if (!splits || !Array.isArray(splits) || splits.length === 0) {
-    await tx.itemSplit.deleteMany({ where: { itemId } });
+    await deleteItemSplitsInTx(tx, itemId);
     return { message: 'Splits cleared (Fallback to default payer)' };
   }
 
@@ -31,26 +35,24 @@ async function updateItemSplitsInTx(
   }));
 
   const memberIds = [...new Set(splitInputs.map((s) => s.familyMemberId))];
-  const validMembers = await tx.familyMember.findMany({
-    where: { id: { in: memberIds }, familyGroupId },
-    select: { id: true },
-  });
+  const validMembers = await findFamilyMembersByIdsInTx(tx, memberIds, familyGroupId);
   if (validMembers.length !== memberIds.length) {
     throw new AppError('Invalid familyMemberId in splits', 403);
   }
 
   const finalSplits = allocateItemSplits(totalAmount, splitInputs);
 
-  await tx.itemSplit.deleteMany({ where: { itemId } });
-  await tx.itemSplit.createMany({
-    data: finalSplits.map((fs) => ({
+  await deleteItemSplitsInTx(tx, itemId);
+  await createItemSplitsInTx(
+    tx,
+    finalSplits.map((fs) => ({
       itemId,
       familyMemberId: fs.familyMemberId,
       amount: fs.amount,
-    })),
-  });
+    }))
+  );
 
-  return tx.itemSplit.findMany({ where: { itemId } });
+  return findItemSplitsInTx(tx, itemId);
 }
 
 /** 明細（Item）の負担内訳（ItemSplit）を更新・保存 */
