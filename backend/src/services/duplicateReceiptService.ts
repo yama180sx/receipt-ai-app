@@ -1,6 +1,6 @@
-import { prisma } from '../utils/prismaClient';
 import { getCleanText, normalizeStoreName } from '../utils/normalizer';
 import type { ReceiptDuplicateCheckInput } from '../types/receipt';
+import { findReceiptForDuplicate } from '../repositories/receiptRepository';
 
 export type DuplicateCheckResult = {
   duplicateSuspected: boolean;
@@ -38,10 +38,10 @@ export async function checkDuplicateReceipt(
   const normalizedImage = imagePath?.replace(/\\/g, '/');
 
   if (normalizedImage) {
-    const existingByImage = await prisma.receipt.findFirst({
-      where: { familyGroupId, imagePath: normalizedImage },
-      select: { id: true },
-    });
+    const existingByImage = await findReceiptForDuplicate(
+      { familyGroupId, imagePath: normalizedImage },
+      { id: true }
+    );
     if (existingByImage) {
       return { duplicateSuspected: false, existingReceiptId: existingByImage.id };
     }
@@ -76,10 +76,7 @@ export async function checkDuplicateReceipt(
     };
   }
 
-  const existing = await prisma.receipt.findFirst({
-    where: duplicateWhere,
-    select: { id: true, storeName: true },
-  });
+  const existing = await findReceiptForDuplicate(duplicateWhere, { id: true, storeName: true });
 
   if (existing && getCleanText(existing.storeName) === cleanStore) {
     return { duplicateSuspected: true, existingReceiptId: existing.id };
