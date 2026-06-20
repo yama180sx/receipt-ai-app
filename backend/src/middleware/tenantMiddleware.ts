@@ -52,7 +52,7 @@ export const tenantMiddleware = async (req: Request, res: Response, next: NextFu
 
     // --- ここが ALC の生命線 ---
     // runWithTenant のコールバック内で next() を呼ぶことで、
-    // この後に続く controller や service 内で getFamilyGroupId() が使えるようになります。
+    // この後に続く controller が requireTenantContext() で ctx を取得できる。
     runWithTenant(
       { familyGroupId: member.familyGroupId, memberId: member.id },
       () => {
