@@ -1,12 +1,11 @@
 import { VALIDATION_THRESHOLDS } from '../config/validationThresholds';
-import type { ParsedItem } from '../types/receipt';
 
 export interface ValidationResult {
   isSuspicious: boolean;
   warnings: string[];
 }
 
-export const validateReceiptItems = (items: ParsedItem[]): ValidationResult => {
+export const validateReceiptItems = (items: any[]): ValidationResult => {
   const warnings: string[] = [];
 
   items.forEach((item, index) => {

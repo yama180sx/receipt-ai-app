@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { receiptApi } from '../api/receiptApi';
+import apiClient from '../utils/apiClient';
 import { countActiveReceiptJobs } from '../utils/receiptJobDisplay';
 import type { ReceiptJobListItem } from '../types/receiptJob';
 
@@ -21,9 +21,9 @@ export function useReceiptJobs(enabled: boolean) {
       const userInitiated = options?.userInitiated ?? false;
       if (userInitiated) setRefreshing(true);
       try {
-        const res = await receiptApi.listJobs();
-        if (res.success && Array.isArray(res.data)) {
-          setJobs(res.data as ReceiptJobListItem[]);
+        const res = await apiClient.get('/receipts/jobs');
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setJobs(res.data.data as ReceiptJobListItem[]);
         }
       } catch (error) {
         console.error('[ReceiptJobs] refresh failed:', error);

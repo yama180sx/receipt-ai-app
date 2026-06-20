@@ -66,6 +66,8 @@ apiClient.interceptors.request.use(async (config) => {
         typeof (config.data as FormData).append === 'function'));
 
   if (isFormData) {
+    // Web: boundary 付き multipart をブラウザに任せる（明示すると multer が壊れる）
+    // Native: Expo/RN では multipart/form-data の明示が必要
     if (config.headers) {
       delete config.headers['Content-Type'];
       delete config.headers['content-type'];
@@ -87,7 +89,7 @@ apiClient.interceptors.response.use(
     if (error.response && error.response.data) {
       const serverMessage = error.response.data.message || error.message;
       const errorCode = error.response.data.code;
-
+      
       error.message = serverMessage;
 
       if (error.response.status === 401) {
@@ -103,5 +105,53 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+import type {
+  ApiSuccessResponse,
+  FamilyMemberSummary,
+  ItemSplitSavePayload,
+  SettlementStatusData,
+  SettlementTransfer,
+} from '../types/settlement';
+
+export type ItemSplitSaveRequest = ItemSplitSavePayload & {
+  ratio?: number;
+};
+
+// ★ [Issue #78/#79/#80/#81] 各種APIコール用ラッパー
+export const api = {
+  getFamilyMembers: async (): Promise<ApiSuccessResponse<FamilyMemberSummary[]>> => {
+    const res = await apiClient.get('/family-groups/members');
+    return res.data;
+  },
+  saveItemSplits: async (
+    itemId: number,
+    splits: ItemSplitSaveRequest[]
+  ): Promise<ApiSuccessResponse<unknown>> => {
+    const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
+    return res.data;
+  },
+  getSettlementStatus: async (
+    month: string
+  ): Promise<ApiSuccessResponse<SettlementStatusData>> => {
+    const res = await apiClient.get('/stats/settlement', { params: { month } });
+    return res.data;
+  },
+  addSettlementTransfer: async (payload: {
+    month: string;
+    fromMemberId: number;
+    toMemberId: number;
+    amount: number;
+  }): Promise<ApiSuccessResponse<SettlementTransfer>> => {
+    const res = await apiClient.post('/stats/settlement/transfers', payload);
+    return res.data;
+  },
+  deleteSettlementTransfer: async (
+    id: number
+  ): Promise<ApiSuccessResponse<{ id: number }>> => {
+    const res = await apiClient.delete(`/stats/settlement/transfers/${id}`);
+    return res.data;
+  },
+};
 
 export default apiClient;

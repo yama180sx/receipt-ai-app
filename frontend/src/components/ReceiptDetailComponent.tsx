@@ -12,19 +12,17 @@ import { AppButton, AppSelect, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { receiptApi } from '../api/receiptApi';
+import apiClient from '../utils/apiClient';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
-import type { CategorySummary, ReceiptDetail, ReceiptItemDetail } from '../types/receipt';
-import type { ReceiptForSplitEditor } from '../types/settlement';
 
 interface ReceiptDetailComponentProps {
-  receipt: ReceiptDetail | null | undefined;
-  categories: CategorySummary[];
+  receipt: any;
+  categories: any[];
   onCategoryChange: (itemId: number, categoryId: number | null) => void;
   baseUrl: string;
   fullWidth?: boolean; 
   onSaveSuccess?: () => void;
-  onGoToSplitEditor?: (receipt: ReceiptForSplitEditor) => void;
+  onGoToSplitEditor?: (receipt: any) => void; // ★ [Issue #79] 按分エディタへの遷移
 }
 
 /**
@@ -45,7 +43,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [editData, setEditData] = useState<ReceiptDetail | null>(null);
+  const [editData, setEditData] = useState<any>(null);
 
   const cacheKey = useMemo(() => Date.now(), []);
   const imageSource = useReceiptImageSource(receipt?.imagePath);
@@ -70,18 +68,18 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
   }, [receipt]);
 
   const displayTotal = useMemo(() => {
-    if (!editData || !receipt) return 0;
+    if (!editData) return 0;
     const items = isEditing ? editData.items : receipt.items;
     const tax = isEditing ? parseFloat(String(editData.taxAmount)) || 0 : receipt.taxAmount || 0;
 
-    const itemsSum = items.reduce((s: number, i: ReceiptItemDetail) => {
+    const itemsSum = items.reduce((s: number, i: any) => {
       const p = parseFloat(String(i.price)) || 0;
       const q = parseFloat(String(i.quantity)) || 0;
       return s + (p * q);
     }, 0);
 
     return Math.round(itemsSum + tax); 
-  }, [isEditing, editData, receipt]);
+  }, [isEditing, editData?.items, editData?.taxAmount, receipt.items, receipt.taxAmount]);
 
   if (!receipt || !editData) {
     return (
@@ -91,13 +89,13 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
     );
   }
 
-  const updateEditField = (key: keyof ReceiptDetail, value: ReceiptDetail[keyof ReceiptDetail] | string) => {
-    setEditData({ ...editData, [key]: value } as ReceiptDetail);
+  const updateEditField = (key: string, value: any) => {
+    setEditData({ ...editData, [key]: value });
   };
 
-  const updateEditItem = (index: number, key: keyof ReceiptItemDetail, value: ReceiptItemDetail[keyof ReceiptItemDetail] | string) => {
+  const updateEditItem = (index: number, key: string, value: any) => {
     const newItems = [...editData.items];
-    newItems[index] = { ...newItems[index], [key]: value } as ReceiptItemDetail;
+    newItems[index] = { ...newItems[index], [key]: value };
     setEditData({ ...editData, items: newItems });
   };
 
@@ -109,7 +107,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         date: editData.date,
         taxAmount: parseFloat(String(editData.taxAmount)) || 0,
         totalAmount: displayTotal, 
-        items: editData.items.map((item) => ({
+        items: editData.items.map((item: any) => ({
           ...item,
           price: parseFloat(String(item.price)) || 0,
           quantity: parseFloat(String(item.quantity)) || 0,
@@ -117,8 +115,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         }))
       };
 
-      const res = await receiptApi.updateReceipt(receipt.id, payload);
-      if (res.success) {
+      const res = await apiClient.patch(`/receipts/${receipt.id}`, payload);
+      if (res.data?.success) {
         Alert.alert('成功', '変更を保存しました。');
         setIsEditing(false);
         if (onSaveSuccess) onSaveSuccess();
@@ -173,19 +171,10 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
           ) : (
             <>
               {/* ★ [Issue #81] スマホ非表示化 ＆ 文言変更 */}
-              {onGoToSplitEditor && isWide && receipt.memberId != null && (
+              {onGoToSplitEditor && isWide && (
                 <AppButton
                   title="➗ 割り勘"
-                  onPress={() => {
-                    const memberId = receipt.memberId!;
-                    onGoToSplitEditor({
-                      id: receipt.id,
-                      memberId,
-                      imagePath: receipt.imagePath,
-                      storeName: receipt.storeName,
-                      items: receipt.items,
-                    });
-                  }}
+                  onPress={() => onGoToSplitEditor(receipt)}
                   variant="outline"
                   size="sm"
                   style={styles.splitButtonOverride}
@@ -239,7 +228,7 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
 
         <View style={styles.itemsSection}>
           <Text style={styles.itemsSectionTitle}>明細・カテゴリ設定</Text>
-          {(isEditing ? editData.items : receipt.items)?.map((item: ReceiptItemDetail, idx: number) => (
+          {(isEditing ? editData.items : receipt.items)?.map((item: any, idx: number) => (
             <View key={item.id || idx} style={styles.detailItemRow}>
               <View style={styles.detailItemTop}>
                 {isEditing ? (

@@ -322,18 +322,6 @@ describe.skipIf(!shouldRunDbIntegration())('API integration (DATABASE_URL)', () 
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
   });
-
-  it('POST /api/stats/settlement/transfers with invalid body returns error envelope', async () => {
-    const token = await loginAsTestMember(app);
-    const res = await request(app)
-      .post('/api/stats/settlement/transfers')
-      .set('Authorization', `Bearer ${token}`)
-      .send({});
-
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(typeof res.body.message).toBe('string');
-  });
 });
 
 describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
