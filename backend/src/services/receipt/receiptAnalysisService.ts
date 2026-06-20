@@ -1,7 +1,7 @@
 import { prisma } from '../../utils/prismaClient';
 import logger from '../../utils/logger';
 import { getCleanText } from '../../utils/normalizer';
-import { analyzeReceiptImage } from '../geminiService';
+import { getReceiptAnalysisProvider } from '../../ai';
 import { estimateCategoryId } from '../categoryService';
 import { validateReceiptItems } from '../validationService';
 
@@ -18,7 +18,7 @@ export async function analyzeOnly(memberId: number, imagePath: string) {
   });
   const familyGroupId = member?.familyGroupId;
 
-  const parsedData = await analyzeReceiptImage(imagePath, memberId);
+  const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(imagePath, memberId);
   const cleanStore = getCleanText(parsedData.storeName || '');
 
   const itemsWithCategories = await Promise.all(
