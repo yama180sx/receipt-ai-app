@@ -1,0 +1,1197 @@
+openapi: 3.0.3
+info:
+  title: Receipt AI App API
+  description: |
+    Phase 1 OpenAPI 正本（auth / receipt / stats）。
+    詳細な as-built 仕様は docs/design/api-spec.md を参照。
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Express app（baseURL = EXPO_PUBLIC_API_URL、通常 `/api` 付き）
+
+tags:
+  - name: auth
+  - name: receipt
+  - name: stats
+
+paths:
+  /auth/resolve-family:
+    post:
+      tags: [auth]
+      summary: 招待コードから世帯を解決
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveFamilyRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedFamily'
+
+  /auth/families/{familyGroupId}/members:
+    get:
+      tags: [auth]
+      summary: ログイン前メンバー一覧
+      parameters:
+        - name: familyGroupId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: inviteCode
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuthFamilyMember'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: パスワード認証
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+
+  /auth/totp/setup:
+    post:
+      tags: [auth]
+      summary: TOTP シークレット発行
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TotpSetupInfo'
+
+  /auth/totp/confirm:
+    post:
+      tags: [auth]
+      summary: TOTP 有効化
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpCodeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+
+  /auth/verify-totp:
+    post:
+      tags: [auth]
+      summary: ログイン時 TOTP 検証
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpCodeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+
+  /auth/totp/disable:
+    post:
+      tags: [auth]
+      summary: TOTP 無効化
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpDisableRequest'
+      responses:
+        '200':
+          description: OK
+
+  /receipts:
+    get:
+      tags: [receipt]
+      summary: レシート一覧
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+        - name: memberId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReceiptDetail'
+    post:
+      tags: [receipt]
+      summary: 手動レシート登録
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualReceiptRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptDetail'
+
+  /receipts/latest:
+    get:
+      tags: [receipt]
+      summary: 最新レシート 1 件
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memberId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/ReceiptDetail'
+                          - type: 'null'
+
+  /receipts/{id}:
+    patch:
+      tags: [receipt]
+      summary: レシート全体編集
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReceiptRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptDetail'
+    delete:
+      tags: [receipt]
+      summary: レシート削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /receipts/commit:
+    post:
+      tags: [receipt]
+      summary: AI 解析結果の確定保存
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitReceiptRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptDetail'
+        '409':
+          description: 重複レシート
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DuplicateReceiptError'
+
+  /receipts/upload:
+    post:
+      tags: [receipt]
+      summary: 画像アップロード → 解析ジョブ投入
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, memberId]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                memberId:
+                  type: integer
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadJobResponse'
+
+  /receipts/jobs:
+    get:
+      tags: [receipt]
+      summary: 解析ジョブ一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReceiptJobListItem'
+
+  /receipts/jobs/{jobId}:
+    delete:
+      tags: [receipt]
+      summary: 未取り込みジョブ破棄
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessageEnvelope'
+
+  /receipts/status/{jobId}:
+    get:
+      tags: [receipt]
+      summary: 解析ジョブ状態
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptJobStatus'
+
+  /receipts/items/{itemId}:
+    patch:
+      tags: [receipt]
+      summary: 明細カテゴリ更新
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemCategoryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptItemDetail'
+
+  /receipts/items/{itemId}/splits:
+    post:
+      tags: [receipt]
+      summary: 明細按分保存
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveItemSplitsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - type: array
+                            items:
+                              $ref: '#/components/schemas/ItemSplitSummary'
+                          - type: object
+                            properties:
+                              message:
+                                type: string
+
+  /family-groups/members:
+    get:
+      tags: [receipt]
+      summary: 認証済み世帯メンバー一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FamilyMemberSummary'
+
+  /stats/monthly:
+    get:
+      tags: [stats]
+      summary: 月別家計統計
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MonthlyStatsData'
+
+  /stats/advanced:
+    get:
+      tags: [stats]
+      summary: トレンド・パレート分析
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdvancedStatsData'
+
+  /stats/settlement:
+    get:
+      tags: [stats]
+      summary: 月間精算ステータス
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementStatusData'
+
+  /stats/settlement/transfers:
+    post:
+      tags: [stats]
+      summary: 送金履歴追加
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSettlementTransferRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementTransfer'
+
+  /stats/settlement/transfers/{id}:
+    delete:
+      tags: [stats]
+      summary: 送金履歴削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiSuccessEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data: {}
+
+    ApiMessageEnvelope:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+
+    ResolveFamilyRequest:
+      type: object
+      required: [inviteCode]
+      properties:
+        inviteCode:
+          type: string
+
+    ResolvedFamily:
+      type: object
+      required: [familyGroupId, name]
+      properties:
+        familyGroupId:
+          type: integer
+        name:
+          type: string
+
+    AuthFamilyMember:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [familyGroupId, memberId, password]
+      properties:
+        familyGroupId:
+          type: integer
+        memberId:
+          type: integer
+        password:
+          type: string
+
+    LoginMember:
+      type: object
+      required: [id, name, familyGroupId, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        familyGroupId:
+          type: integer
+        role:
+          type: string
+        totpEnabled:
+          type: boolean
+
+    LoginResponse:
+      type: object
+      required: [token, pendingToken, member, requiresTotpVerification, requiresTotpSetup]
+      properties:
+        token:
+          type: string
+          nullable: true
+        pendingToken:
+          type: string
+          nullable: true
+        member:
+          $ref: '#/components/schemas/LoginMember'
+        requiresTotpVerification:
+          type: boolean
+        requiresTotpSetup:
+          type: boolean
+
+    TotpSetupInfo:
+      type: object
+      required: [secret, otpauthUrl]
+      properties:
+        secret:
+          type: string
+        otpauthUrl:
+          type: string
+
+    TotpCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    TotpDisableRequest:
+      type: object
+      required: [password, code]
+      properties:
+        password:
+          type: string
+        code:
+          type: string
+
+    CategorySummary:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+
+    ItemSplitSummary:
+      type: object
+      required: [id, itemId, familyMemberId, amount]
+      properties:
+        id:
+          type: integer
+        itemId:
+          type: integer
+        familyMemberId:
+          type: integer
+        amount:
+          type: number
+
+    ReceiptItemDetail:
+      type: object
+      required: [id, name, price, quantity, categoryId]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: number
+        categoryId:
+          type: integer
+          nullable: true
+        category:
+          oneOf:
+            - $ref: '#/components/schemas/CategorySummary'
+            - type: 'null'
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemSplitSummary'
+
+    ReceiptDetail:
+      type: object
+      required: [id, storeName, totalAmount, items]
+      properties:
+        id:
+          type: integer
+        storeName:
+          type: string
+        date:
+          type: string
+          format: date-time
+        totalAmount:
+          type: number
+        taxAmount:
+          type: number
+        imagePath:
+          type: string
+          nullable: true
+        memberId:
+          type: integer
+        familyGroupId:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptItemDetail'
+
+    ManualReceiptRequest:
+      type: object
+      required: [date, storeName, items]
+      properties:
+        date:
+          type: string
+        storeName:
+          type: string
+        imagePath:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptItemInput'
+
+    UpdateReceiptRequest:
+      type: object
+      properties:
+        date:
+          type: string
+        storeName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptItemInput'
+
+    ReceiptItemInput:
+      type: object
+      required: [name, price, quantity]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: number
+        categoryId:
+          type: integer
+          nullable: true
+
+    CommitReceiptRequest:
+      type: object
+      required: [parsedData, imagePath, validation]
+      properties:
+        jobId:
+          type: string
+        parsedData:
+          $ref: '#/components/schemas/ParsedReceiptCommitData'
+        imagePath:
+          type: string
+        validation:
+          $ref: '#/components/schemas/ReceiptValidation'
+
+    ParsedReceiptCommitData:
+      type: object
+      required: [storeName, totalAmount, items]
+      properties:
+        storeName:
+          type: string
+        purchaseDate:
+          type: string
+        date:
+          type: string
+        totalAmount:
+          type: number
+        taxAmount:
+          type: number
+        usageLogId:
+          oneOf:
+            - type: integer
+            - type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParsedReceiptItem'
+
+    ParsedReceiptItem:
+      type: object
+      required: [name, price, quantity]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: number
+        categoryId:
+          type: integer
+          nullable: true
+
+    ReceiptValidation:
+      type: object
+      required: [isSuspicious, warnings]
+      properties:
+        isSuspicious:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+
+    DuplicateReceiptError:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+          enum: [DUPLICATE]
+        existingId:
+          type: integer
+
+    UploadJobResponse:
+      type: object
+      required: [jobId]
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+
+    ReceiptJobListItem:
+      type: object
+      required: [id, state, imagePath, createdAt]
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+        imagePath:
+          type: string
+          nullable: true
+        createdAt:
+          type: number
+        failedReason:
+          type: string
+          nullable: true
+        parsedData:
+          type: object
+          properties:
+            storeName:
+              type: string
+            purchaseDate:
+              type: string
+            totalAmount:
+              type: number
+            taxAmount:
+              type: number
+            itemCount:
+              type: integer
+        validation:
+          $ref: '#/components/schemas/ReceiptValidation'
+        duplicateSuspected:
+          type: boolean
+        existingReceiptId:
+          type: integer
+
+    ReceiptJobStatus:
+      type: object
+      required: [id, state]
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+        duplicateSuspected:
+          type: boolean
+        existingReceiptId:
+          type: integer
+          nullable: true
+
+    UpdateItemCategoryRequest:
+      type: object
+      required: [categoryId]
+      properties:
+        categoryId:
+          type: integer
+
+    SaveItemSplitsRequest:
+      type: object
+      required: [splits]
+      properties:
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemSplitInput'
+
+    ItemSplitInput:
+      type: object
+      required: [familyMemberId]
+      properties:
+        familyMemberId:
+          type: integer
+        ratio:
+          type: number
+        amount:
+          type: number
+
+    FamilyMemberSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    MonthlyStatsData:
+      type: object
+      required: [month, totalAmount, stats, latestReceipt]
+      properties:
+        month:
+          type: string
+        totalAmount:
+          type: number
+        stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryStatRow'
+        latestReceipt:
+          oneOf:
+            - $ref: '#/components/schemas/ReceiptDetail'
+            - type: 'null'
+
+    CategoryStatRow:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+          nullable: true
+        categoryName:
+          type: string
+        totalAmount:
+          oneOf:
+            - type: number
+            - type: string
+        color:
+          type: string
+          nullable: true
+
+    AdvancedStatsData:
+      type: object
+      required: [trend, pareto]
+      properties:
+        trend:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendRow'
+        pareto:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParetoRow'
+
+    TrendRow:
+      type: object
+      required: [period, total]
+      properties:
+        period:
+          type: string
+        total:
+          type: number
+        prev_total:
+          type: number
+          nullable: true
+
+    ParetoRow:
+      type: object
+      required: [name, amount, ratio, cumulative_ratio]
+      properties:
+        name:
+          type: string
+        amount:
+          type: number
+        ratio:
+          type: number
+        cumulative_ratio:
+          type: number
+
+    SettlementStatusData:
+      type: object
+      required: [month, members, transfers]
+      properties:
+        month:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementMemberSummary'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementTransfer'
+
+    SettlementMemberSummary:
+      type: object
+      required: [memberId, name, totalPaid, totalOwed, baseBalance, transferredOut, transferredIn, balance]
+      properties:
+        memberId:
+          type: integer
+        name:
+          type: string
+        totalPaid:
+          type: number
+        totalOwed:
+          type: number
+        baseBalance:
+          type: number
+        transferredOut:
+          type: number
+        transferredIn:
+          type: number
+        balance:
+          type: number
+
+    SettlementTransfer:
+      type: object
+      required: [id, fromMemberId, toMemberId, amount, settledAt]
+      properties:
+        id:
+          type: integer
+        fromMemberId:
+          type: integer
+        toMemberId:
+          type: integer
+        amount:
+          type: number
+        month:
+          type: string
+        settledAt:
+          type: string
+          format: date-time
+
+    CreateSettlementTransferRequest:
+      type: object
+      required: [month, fromMemberId, toMemberId, amount]
+      properties:
+        month:
+          type: string
+        fromMemberId:
+          type: integer
+        toMemberId:
+          type: integer
+        amount:
+          type: number

@@ -1,37 +1,15 @@
-export type ResolvedFamily = {
-  familyGroupId: number;
-  name: string;
-};
-
-export type AuthFamilyMember = {
-  id: number;
-  name: string;
-};
-
-export type LoginMember = {
-  id: number;
-  name: string;
-  familyGroupId: number;
-  role: string;
-  totpEnabled?: boolean;
-};
-
-export type LoginResponse = {
-  token: string | null;
-  pendingToken: string | null;
-  member: LoginMember;
-  requiresTotpVerification: boolean;
-  requiresTotpSetup: boolean;
-};
+export type {
+  ResolvedFamily,
+  AuthFamilyMember,
+  LoginMember,
+  LoginResponse,
+  TotpSetupInfo,
+} from '../api/generated';
+import type { LoginMember } from '../api/generated';
 
 export type LoginResult = {
   token: string;
   member: LoginMember;
-};
-
-export type TotpSetupInfo = {
-  secret: string;
-  otpauthUrl: string;
 };
 
 export type StoredSession = {

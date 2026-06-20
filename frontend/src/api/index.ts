@@ -1,4 +1,4 @@
-export type { ApiSuccessResponse, ApiMessageResponse } from './types';
+export type { ApiSuccessResponse, ApiMessageResponse } from './generated';
 export { authApi } from './authApi';
 export { receiptApi } from './receiptApi';
 export type { CommitReceiptPayload, ItemSplitSaveRequest, ListReceiptsParams } from './receiptApi';

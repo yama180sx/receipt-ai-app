@@ -1,13 +1,13 @@
 import axios from 'axios';
 import apiClient from '../utils/apiClient';
 import type {
+  ApiSuccessResponse,
   AuthFamilyMember,
   LoginResponse,
-  LoginResult,
   ResolvedFamily,
   TotpSetupInfo,
-} from '../types/auth';
-import type { ApiSuccessResponse } from './types';
+} from './generated';
+import type { LoginResult } from '../types/auth';
 
 function pendingClient(pendingToken: string) {
   return axios.create({

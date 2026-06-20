@@ -30,43 +30,13 @@ export interface ReceiptInput {
   }[];
 }
 
-/** GET /categories レスポンス要素 */
-export interface CategorySummary {
-  id: number;
-  name: string;
-  color?: string | null;
-}
-
-/** 按分レコード（履歴 API に含まれる） */
-export interface ItemSplitSummary {
-  id: number;
-  itemId: number;
-  familyMemberId: number;
-  amount: number;
-}
-
-/** GET /receipts 明細 */
-export interface ReceiptItemDetail {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  categoryId: number | null;
-  category?: CategorySummary | null;
-  splits?: ItemSplitSummary[];
-}
-
-/** GET /receipts レスポンス要素（統計 API の latestReceipt 等も包含） */
-export interface ReceiptDetail {
-  id: number;
-  storeName: string;
-  date?: string;
-  totalAmount: number;
-  taxAmount?: number;
-  imagePath?: string | null;
-  memberId?: number;
-  items: ReceiptItemDetail[];
-}
+/** OpenAPI 生成 DTO（docs/openapi/openapi.yaml） */
+export type {
+  CategorySummary,
+  ItemSplitSummary,
+  ReceiptItemDetail,
+  ReceiptDetail,
+} from '../api/generated';
 
 /** commit 前の編集用明細（UI 入力中は string 許容） */
 export interface ParsedReceiptItemInput {

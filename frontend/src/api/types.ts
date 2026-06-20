@@ -1,10 +1,2 @@
-/** Backend 標準 success envelope */
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiMessageResponse = {
-  success: true;
-  message: string;
-};
+/** @deprecated import from `./generated` — OpenAPI 正本から生成 */
+export type { ApiSuccessResponse, ApiMessageResponse } from './generated';
