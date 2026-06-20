@@ -42,4 +42,24 @@ export type SettlementMemberSummary = Schemas['SettlementMemberSummary'];
 export type SettlementTransfer = Schemas['SettlementTransfer'];
 export type CreateSettlementTransferRequest = Schemas['CreateSettlementTransferRequest'];
 
+// --- category ---
+export type Category = Schemas['Category'];
+export type CreateCategoryRequest = Schemas['CreateCategoryRequest'];
+export type OptimizeCategoryResponse = Schemas['OptimizeCategoryResponse'];
+
+// --- productMaster ---
+export type ProductMaster = Schemas['ProductMaster'];
+export type UpdateProductMasterRequest = Schemas['UpdateProductMasterRequest'];
+export type MergeStoreNamesRequest = Schemas['MergeStoreNamesRequest'];
+export type MergeStoreNamesResponse = Schemas['MergeStoreNamesResponse'];
+
+// --- admin ---
+export type PromptTemplate = Schemas['PromptTemplate'];
+export type CreatePromptTemplateRequest = Schemas['CreatePromptTemplateRequest'];
+export type UpdatePromptTemplateRequest = Schemas['UpdatePromptTemplateRequest'];
+export type AdminCostStatRow = Schemas['AdminCostStatRow'];
+
+// --- health ---
+export type HealthResponse = Schemas['HealthResponse'];
+
 export type { components, paths } from './schema';

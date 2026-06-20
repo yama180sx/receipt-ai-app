@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
-import apiClient from '../utils/apiClient';
+import { categoryApi, type Category } from '../api';
 import { getApiErrorStatus } from '../utils/apiError';
 import { AppBackButton, AppButton, AppListColorDot, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { pickNextCategoryColor } from '../utils/categoryColor';
 import { showConfirmDialog } from '../utils/confirmDialog';
-
-interface Category {
-  id: number;
-  name: string;
-  color: string;
-}
 
 export const CategoryManagementScreen = ({ 
   onBack, 
@@ -26,26 +20,16 @@ export const CategoryManagementScreen = ({
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
 
-  /**
-   * [Issue #51 & #52] 
-   * バックエンドが JWT 認証（Bearer Token）を優先するように修正されたため、
-   * 手動の x-member-id 付与は「移行期間用」として最小限に留めます。
-   * ※Issue #52 完了後は、このヘルパー自体を削除し apiClient に任せます。
-   */
-  const getHeaders = () => (currentMemberId ? { 'x-member-id': currentMemberId.toString() } : {});
-
-  useEffect(() => { 
-    if (currentMemberId) fetchCategories(); 
+  useEffect(() => {
+    if (currentMemberId) fetchCategories();
   }, [currentMemberId]);
 
   const fetchCategories = async () => {
     if (!currentMemberId) return;
     setLoading(true);
     try {
-      const res = await apiClient.get('/categories', { headers: getHeaders() });
-      if (res.data && res.data.success) {
-        setCategories(res.data.data || []);
-      }
+      const res = await categoryApi.listCategories();
+      setCategories(res.data ?? []);
     } catch (e: unknown) {
       if (getApiErrorStatus(e) === 401) {
         Alert.alert("セッション切れ", "再度ログインしてください。");
@@ -60,12 +44,10 @@ export const CategoryManagementScreen = ({
   const addCategory = async () => {
     if (!newName.trim() || !currentMemberId) return;
     try {
-      const color = pickNextCategoryColor(categories.map((c) => c.color));
-      await apiClient.post(
-        '/categories',
-        { name: newName, color },
-        { headers: getHeaders() }
+      const color = pickNextCategoryColor(
+        categories.map((c) => c.color).filter((c): c is string => !!c)
       );
+      await categoryApi.createCategory({ name: newName, color });
       setNewName('');
       fetchCategories();
     } catch (e) {
@@ -81,7 +63,7 @@ export const CategoryManagementScreen = ({
         style: 'destructive',
         onPress: async () => {
           try {
-            await apiClient.delete(`/categories/${id}`, { headers: getHeaders() });
+            await categoryApi.deleteCategory(id);
             fetchCategories();
           } catch (e: unknown) {
             const status = getApiErrorStatus(e);
@@ -107,11 +89,9 @@ export const CategoryManagementScreen = ({
           onPress: async () => {
             setOptimizing(true);
             try {
-              const res = await apiClient.post('/categories/optimize', {}, { headers: getHeaders() });
-              if (res.data.success) {
-                Alert.alert('完了', res.data.data.message);
-                fetchCategories();
-              }
+              const res = await categoryApi.optimizeCategories();
+              Alert.alert('完了', res.data?.message ?? '最適化が完了しました。');
+              fetchCategories();
             } catch (e) {
               Alert.alert('エラー', '最適化処理に失敗しました。');
             } finally {
@@ -162,7 +142,7 @@ export const CategoryManagementScreen = ({
           renderItem={({ item }) => (
             <AppListItem
               title={item.name}
-              left={<AppListColorDot color={item.color} />}
+              left={<AppListColorDot color={item.color ?? theme.colors.semantic.placeholder.badge} />}
               right={
                 <AppButton
                   title={BUTTON_LABELS.delete}
