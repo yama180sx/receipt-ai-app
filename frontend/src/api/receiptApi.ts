@@ -1,12 +1,16 @@
 import apiClient from '../utils/apiClient';
-import type { CategorySummary, ReceiptDetail, ReceiptItemDetail } from '../types/receipt';
 import type { ParsedReceiptData } from '../types/receipt';
+import type { ItemSplitSavePayload } from '../types/settlement';
 import type {
+  ApiMessageResponse,
+  ApiSuccessResponse,
   FamilyMemberSummary,
-  ItemSplitSavePayload,
-} from '../types/settlement';
-import type { ReceiptJobListItem } from '../types/receiptJob';
-import type { ApiMessageResponse, ApiSuccessResponse } from './types';
+  ItemSplitSummary,
+  ReceiptDetail,
+  ReceiptItemDetail,
+  ReceiptJobListItem,
+  ReceiptJobStatus,
+} from './generated';
 
 export type ListReceiptsParams = {
   month?: string;
@@ -24,14 +28,7 @@ export type ItemSplitSaveRequest = ItemSplitSavePayload & {
   ratio?: number;
 };
 
-export type ReceiptJobStatusResponse = ApiSuccessResponse<{
-  id: string;
-  state: string;
-  result?: unknown;
-  error?: string;
-  duplicateSuspected?: boolean;
-  existingReceiptId?: number | null;
-}>;
+export type ReceiptJobStatusResponse = ApiSuccessResponse<ReceiptJobStatus>;
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
 export const receiptApi = {
@@ -99,7 +96,7 @@ export const receiptApi = {
   async saveItemSplits(
     itemId: number,
     splits: ItemSplitSaveRequest[]
-  ): Promise<ApiSuccessResponse<unknown>> {
+  ): Promise<ApiSuccessResponse<ItemSplitSummary[] | { message: string }>> {
     const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
     return res.data;
   },

@@ -1,3 +1,5 @@
+export type { ReceiptJobListItem } from '../api/generated';
+
 export type ReceiptJobState =
   | 'waiting'
   | 'active'
@@ -5,27 +7,6 @@ export type ReceiptJobState =
   | 'failed'
   | 'delayed'
   | 'paused';
-
-export type ReceiptJobListItem = {
-  id: string;
-  state: ReceiptJobState;
-  imagePath: string | null;
-  createdAt: number;
-  failedReason?: string | null;
-  parsedData?: {
-    storeName: string;
-    purchaseDate: string;
-    totalAmount: number;
-    taxAmount?: number;
-    itemCount: number;
-  };
-  validation?: {
-    isSuspicious: boolean;
-    warnings: string[];
-  };
-  duplicateSuspected?: boolean;
-  existingReceiptId?: number;
-};
 
 /** アップロード失敗など、サーバーにジョブが無いローカル行 */
 export type LocalFailedReceiptJob = {
@@ -36,4 +17,4 @@ export type LocalFailedReceiptJob = {
   localOnly: true;
 };
 
-export type ReceiptTrayItem = ReceiptJobListItem | LocalFailedReceiptJob;
+export type ReceiptTrayItem = import('../api/generated').ReceiptJobListItem | LocalFailedReceiptJob;

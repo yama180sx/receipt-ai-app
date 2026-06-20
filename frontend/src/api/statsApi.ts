@@ -1,23 +1,12 @@
 import apiClient from '../utils/apiClient';
-import type { SettlementStatusData, SettlementTransfer } from '../types/settlement';
-import type { ApiSuccessResponse } from './types';
-
-export type MonthlyStatsData = {
-  month: string;
-  totalAmount: number;
-  stats: Array<{
-    categoryId: number | null;
-    categoryName: string;
-    totalAmount: number | string;
-    color: string;
-  }>;
-  latestReceipt: unknown;
-};
-
-export type AdvancedStatsData = {
-  trend: Array<{ period: string; total: number; prev_total?: number | null }>;
-  pareto: Array<{ name: string; amount: number; ratio: number; cumulative_ratio: number }>;
-};
+import type {
+  AdvancedStatsData,
+  ApiSuccessResponse,
+  CreateSettlementTransferRequest,
+  MonthlyStatsData,
+  SettlementStatusData,
+  SettlementTransfer,
+} from './generated';
 
 /** 統計・精算 API（/api/stats/*） */
 export const statsApi = {
@@ -36,12 +25,9 @@ export const statsApi = {
     return res.data;
   },
 
-  async addSettlementTransfer(payload: {
-    month: string;
-    fromMemberId: number;
-    toMemberId: number;
-    amount: number;
-  }): Promise<ApiSuccessResponse<SettlementTransfer>> {
+  async addSettlementTransfer(
+    payload: CreateSettlementTransferRequest
+  ): Promise<ApiSuccessResponse<SettlementTransfer>> {
     const res = await apiClient.post('/stats/settlement/transfers', payload);
     return res.data;
   },
@@ -51,3 +37,5 @@ export const statsApi = {
     return res.data;
   },
 };
+
+export type { AdvancedStatsData, MonthlyStatsData } from './generated';
