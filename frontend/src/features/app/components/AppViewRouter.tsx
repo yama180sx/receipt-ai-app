@@ -1,6 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, View } from 'react-native';
 import { HomeScreen } from '../../../screens/HomeScreen';
 import HistoryScreen from '../../../screens/HistoryScreen';
 import { StatisticsScreen } from '../../../screens/StatisticsScreen';
@@ -14,10 +13,8 @@ import { SplitEditorScreen } from '../../../screens/SplitEditorScreen';
 import { SettlementSummaryScreen } from '../../../screens/SettlementSummaryScreen';
 import { ReceiptTrayScreen } from '../../../screens/ReceiptTrayScreen';
 import { TotpSettingsScreen } from '../../../screens/TotpSettingsScreen';
-import { DisplayModeSettings } from '../../../components/DisplayModeSettings';
 import { DevEnvironmentBanner } from '../../../components/DevEnvironmentBanner';
-import { theme } from '../../../theme';
-import { devUiColors, isDevAppEnv } from '../../../config/appEnv';
+import { MainToolbar } from './MainToolbar';
 import type { AppViewType } from '../hooks/useAppSession';
 import type { ReceiptScanInitialData } from '../../../types/receiptScan';
 import type { ReceiptForSplitEditor } from '../../../types/settlement';
@@ -62,10 +59,6 @@ export const AppViewRouter: React.FC<AppViewRouterProps> = ({
   onDisableBiometric,
   fetchCategories,
 }) => {
-  const devToolbarStyle = isDevAppEnv()
-    ? { backgroundColor: devUiColors.toolbarBg, borderBottomColor: devUiColors.toolbarBorder }
-    : null;
-
   switch (currentView) {
     case 'history':
       return (
@@ -151,26 +144,12 @@ export const AppViewRouter: React.FC<AppViewRouterProps> = ({
       return (
         <View style={styles.mainWithToolbar}>
           <DevEnvironmentBanner />
-          <SafeAreaView edges={['top']} style={[styles.mainToolbar, devToolbarStyle]}>
-            <View style={styles.topActions}>
-              <DisplayModeSettings />
-              <View style={styles.topActionButtons}>
-                {currentMemberName ? (
-                  <Text style={styles.memberNameText} numberOfLines={1}>
-                    {currentMemberName}
-                  </Text>
-                ) : null}
-                {biometricEnabled && Platform.OS !== 'web' ? (
-                  <TouchableOpacity style={styles.topActionButton} onPress={onDisableBiometric}>
-                    <Text style={styles.topActionText}>生体認証オフ</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity style={styles.topActionButton} onPress={onLogout}>
-                  <Text style={styles.topActionText}>ログアウト</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </SafeAreaView>
+          <MainToolbar
+            memberName={currentMemberName}
+            biometricEnabled={biometricEnabled}
+            onDisableBiometric={onDisableBiometric}
+            onLogout={onLogout}
+          />
 
           <HomeScreen
             onAnalysisReady={onAnalysisReady}
@@ -190,37 +169,4 @@ export const AppViewRouter: React.FC<AppViewRouterProps> = ({
 
 const styles = StyleSheet.create({
   mainWithToolbar: { flex: 1 },
-  mainToolbar: {
-    backgroundColor: theme.colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  topActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  topActionButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  topActionButton: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    padding: 8,
-    borderRadius: 10,
-  },
-  topActionText: { color: theme.colors.text.muted, fontSize: 12, fontWeight: 'bold' },
-  memberNameText: {
-    color: theme.colors.text.main,
-    fontSize: 13,
-    fontWeight: '600',
-    maxWidth: 120,
-  },
 });

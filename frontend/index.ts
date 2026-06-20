@@ -1,8 +1,13 @@
 import { registerRootComponent } from 'expo';
 
-import App from './App';
+const useRouterPoc = process.env.EXPO_PUBLIC_EXPO_ROUTER_POC === 'true';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(App);
+if (useRouterPoc) {
+  // PoC 時のみ Expo Router エントリ（本番移行 #404 まで既存 App.tsx をデフォルト維持）
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('expo-router/entry');
+} else {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const App = require('./App').default;
+  registerRootComponent(App);
+}
