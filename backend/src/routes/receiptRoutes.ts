@@ -6,7 +6,7 @@ import { receiptQueue } from '../queues/receiptQueue';
 import logger from '../utils/logger';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { tenantMiddleware } from '../middleware/tenantMiddleware';
-import { getFamilyGroupId, getMemberId } from '../utils/context';
+import { requireTenantContext } from '../utils/context';
 import { validate } from '../middleware/validate';
 import { uploadReceiptSchema } from '../schemas/receiptSchema';
 import { AppError } from '../utils/appError';
@@ -51,12 +51,8 @@ router.post(
       const file = req.file as Express.Multer.File;
       if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
-      const familyGroupId = getFamilyGroupId();
-      const memberId = getMemberId();
-
-      if (!familyGroupId || !memberId) {
-        throw new AppError('テナントコンテキストが設定されていません。', 401);
-      }
+      const ctx = requireTenantContext();
+      const { familyGroupId, memberId } = ctx;
 
       const timestamp = Date.now();
       const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;

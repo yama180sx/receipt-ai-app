@@ -1,5 +1,4 @@
 import { prisma } from './prismaClient';
-import { getFamilyGroupId } from './context';
 import logger from './logger';
 
 const sanitize = (text: string | null | undefined): string => {
@@ -15,15 +14,15 @@ const sanitize = (text: string | null | undefined): string => {
 /**
  * 店舗名の正規化（世帯スコープ — Issue #93-4）
  */
-export const normalizeStoreName = async (rawName: string): Promise<string> => {
+export const normalizeStoreName = async (
+  rawName: string,
+  familyGroupId: number
+): Promise<string> => {
   try {
     const cleanRawName = sanitize(rawName);
     if (!cleanRawName) return '';
 
-    const familyGroupId = getFamilyGroupId();
-    const stores = await prisma.store.findMany(
-      familyGroupId ? { where: { familyGroupId } } : undefined
-    );
+    const stores = await prisma.store.findMany({ where: { familyGroupId } });
 
     for (const store of stores) {
       const officialName = sanitize(store.officialName);

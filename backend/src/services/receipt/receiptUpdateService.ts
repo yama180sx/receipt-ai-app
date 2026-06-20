@@ -1,6 +1,7 @@
 import { AppError } from '../../utils/appError';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import type { ReceiptCreateItemInput } from '../../types/receipt';
+import type { TenantContext } from '../../utils/context';
 import { saveParsedReceipt } from './receiptPersistenceService';
 import { upsertProductMasterCategory } from './receiptProductMasterLearning';
 
@@ -31,13 +32,9 @@ function buildCommitPayload(input: ManualReceiptInput) {
 }
 
 /** 手動登録（解析 usageLogId 紐付けなし） */
-export async function createManualReceipt(
-  memberId: number,
-  familyGroupId: number,
-  input: ManualReceiptInput
-) {
+export async function createManualReceipt(ctx: TenantContext, input: ManualReceiptInput) {
   const payload = buildCommitPayload(input);
-  return saveParsedReceipt(memberId, familyGroupId, payload, input.imagePath || '', false, []);
+  return saveParsedReceipt(ctx.memberId, ctx.familyGroupId, payload, input.imagePath || '', false, []);
 }
 
 export type UpdateReceiptInput = {
