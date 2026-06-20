@@ -13,12 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PieChart } from 'react-native-chart-kit';
-import apiClient from '../utils/apiClient';
+import { categoryApi, receiptApi, statsApi } from '../api';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
+import type { ReceiptDetail } from '../types/receipt';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 // --- interface 定義 ---
@@ -85,15 +86,14 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
     if (!currentMemberId) return;
     try {
       setLoading(true);
-      const headers = { 'x-member-id': currentMemberId.toString() };
       const [statsRes, advRes, catRes] = await Promise.all([
-        apiClient.get(`/stats/monthly`, { params: { month: selectedMonth }, headers }),
-        apiClient.get(`/stats/advanced`, { headers }),
-        apiClient.get('/categories', { headers })
+        statsApi.getMonthlyStats(selectedMonth),
+        statsApi.getAdvancedStats(),
+        categoryApi.listCategories(),
       ]);
 
-      if (statsRes.data?.success) {
-        const raw = statsRes.data.data;
+      if (statsRes.success) {
+        const raw = statsRes.data;
         if (Array.isArray(raw)) {
           const target = raw.find(item => item.month === selectedMonth) || raw[0];
           setData({
@@ -107,8 +107,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           setData(raw);
         }
       }
-      if (advRes.data?.success) setAdvancedData(advRes.data.data);
-      if (catRes.data?.success) setAllCategories(catRes.data.data);
+      if (advRes.success) setAdvancedData(advRes.data);
+      if (catRes.success) setAllCategories(catRes.data);
     } catch (error: any) {
       console.error('[DEBUG-STATS] Fetch Error:', error);
       Alert.alert("エラー", "データの取得に失敗しました");
@@ -122,10 +122,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      await apiClient.patch(`/receipts/items/${itemId}`, 
-        { categoryId: Number(categoryId) }, 
-        { headers: { 'x-member-id': currentMemberId.toString() } }
-      );
+      await receiptApi.updateItemCategory(itemId, Number(categoryId));
       await fetchData(); 
     } catch (error) {
       Alert.alert("エラー", "カテゴリーの更新に失敗しました");
@@ -288,7 +285,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         title="解析レシート詳細"
       >
         <ReceiptDetailComponent
-          receipt={data?.latestReceipt}
+          receipt={data?.latestReceipt as ReceiptDetail | null | undefined}
           categories={allCategories}
           onCategoryChange={handleCategoryChange}
           baseUrl={BASE_URL}
