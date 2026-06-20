@@ -7,6 +7,7 @@ import { setOnUnauthorized } from '../../../utils/apiClient';
 import { authService } from '../../../services/authService';
 import { canUseBiometric } from '../../../services/biometricService';
 import type { LoginResult, StoredSession } from '../../../types/auth';
+import type { CategorySummary } from '../../../types/receipt';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',
@@ -38,7 +39,7 @@ export function useAppSession() {
   const [biometricLockActive, setBiometricLockActive] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [totpEnabled, setTotpEnabled] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [currentView, setCurrentView] = useState<AppViewType>('main');
 
   const applySession = useCallback((session: StoredSession) => {

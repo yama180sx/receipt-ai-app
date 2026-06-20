@@ -21,6 +21,7 @@ import { devUiColors, isDevAppEnv } from '../../../config/appEnv';
 import type { AppViewType } from '../hooks/useAppSession';
 import type { ReceiptScanInitialData } from '../../../types/receiptScan';
 import type { ReceiptForSplitEditor } from '../../../types/settlement';
+import type { CategorySummary } from '../../../types/receipt';
 
 export interface AppViewRouterProps {
   currentView: AppViewType;
@@ -31,7 +32,7 @@ export interface AppViewRouterProps {
   biometricEnabled: boolean;
   totpEnabled: boolean;
   setTotpEnabled: (enabled: boolean) => void;
-  categories: any[];
+  categories: CategorySummary[];
   resultData: ReceiptScanInitialData | null;
   targetReceipt: ReceiptForSplitEditor | null;
   setTargetReceipt: (receipt: ReceiptForSplitEditor | null) => void;

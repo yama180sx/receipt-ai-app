@@ -13,6 +13,7 @@ import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { receiptApi } from '../api/receiptApi';
+import { getApiErrorMessage } from '../utils/apiError';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import type { CategorySummary, ReceiptDetail, ReceiptItemDetail } from '../types/receipt';
 import type { ReceiptForSplitEditor } from '../types/settlement';
@@ -123,8 +124,8 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         setIsEditing(false);
         if (onSaveSuccess) onSaveSuccess();
       }
-    } catch (err: any) {
-      console.error('Update failed', err.response?.data || err.message);
+    } catch (err: unknown) {
+      console.error('Update failed', getApiErrorMessage(err));
       Alert.alert('エラー', '保存に失敗しました。');
     } finally {
       setLoading(false);
