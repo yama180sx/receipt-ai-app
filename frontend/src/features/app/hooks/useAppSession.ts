@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
-import { categoryApi } from '../api/categoryApi';
-import { setOnUnauthorized } from '../utils/apiClient';
-import { authService } from '../services/authService';
-import { canUseBiometric } from '../services/biometricService';
-import type { LoginResult, StoredSession } from '../types/auth';
+import { categoryApi } from '../../../api/categoryApi';
+import { setOnUnauthorized } from '../../../utils/apiClient';
+import { authService } from '../../../services/authService';
+import { canUseBiometric } from '../../../services/biometricService';
+import type { LoginResult, StoredSession } from '../../../types/auth';
 
 const STORAGE_KEYS = {
   VIEW: '@app_view',

@@ -1,10 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AppButton } from '../ui';
-import { BUTTON_LABELS } from '../../constants/buttonLabels';
-import { theme } from '../../theme';
-import { formatTransferDate } from '../../utils/settlementFormat';
-import type { SettlementTransfer } from '../../types/settlement';
+import { AppButton } from '../../../components/ui';
+import { BUTTON_LABELS } from '../../../constants/buttonLabels';
+import { theme } from '../../../theme';
+import { formatTransferDate } from '../../../utils/settlementFormat';
+import type { SettlementTransfer } from '../../../types/settlement';
 
 interface SettlementTransferHistoryProps {
   selectedMonth: string;

@@ -14,8 +14,7 @@ import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { getAppDisplayName, getMemberMenuTitle, isDevAppEnv } from '../config/appEnv';
 import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { theme } from '../theme';
-import { useHomeDashboard } from '../hooks/useHomeDashboard';
-import { useReceiptUpload } from '../hooks/useReceiptUpload';
+import { useHomeDashboard, useReceiptUpload } from '../features/home';
 import { useIsWideHomeMenu } from '../hooks/useIsWideLayout';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
 

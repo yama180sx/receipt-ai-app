@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { receiptApi } from '../api';
-import { buildReceiptUploadFormData } from '../utils/receiptUploadFormData';
+import { receiptApi } from '../../../api';
+import { buildReceiptUploadFormData } from '../../../utils/receiptUploadFormData';
 import {
   consumePendingCropUri,
   persistPendingCropUri,
   registerWebImageFile,
   clearPendingCropUri,
-} from '../utils/webImageFileRegistry';
-import { showAlert } from '../utils/alertMessage';
+} from '../../../utils/webImageFileRegistry';
+import { showAlert } from '../../../utils/alertMessage';
 
 const ACCEPTANCE_MESSAGE_MS = 3000;
 

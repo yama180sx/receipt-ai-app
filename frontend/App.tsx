@@ -15,8 +15,7 @@ import { DevEnvironmentBanner } from './src/components/DevEnvironmentBanner';
 import { ReceiptTrayProvider } from './src/contexts/ReceiptTrayContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
-import { AppViewRouter } from './src/components/AppViewRouter';
-import { useAppSession, type AppViewType } from './src/hooks/useAppSession';
+import { AppViewRouter, useAppSession, type AppViewType } from './src/features/app';
 import type { ReceiptScanInitialData } from './src/types/receiptScan';
 import type { ReceiptForSplitEditor } from './src/types/settlement';
 

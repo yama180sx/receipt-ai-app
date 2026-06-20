@@ -10,9 +10,11 @@ import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { useSplitEditor } from '../hooks/useSplitEditor';
-import { SplitEditorMemberChips } from '../components/splitEditor/SplitEditorMemberChips';
-import { SplitEditorItemTable } from '../components/splitEditor/SplitEditorItemTable';
+import {
+  useSplitEditor,
+  SplitEditorMemberChips,
+  SplitEditorItemTable,
+} from '../features/settlement';
 import type { ReceiptForSplitEditor } from '../types/settlement';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 

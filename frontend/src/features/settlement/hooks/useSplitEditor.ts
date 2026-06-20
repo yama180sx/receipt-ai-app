@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { receiptApi } from '../api/receiptApi';
-import { showAlert } from '../utils/alertMessage';
+import { receiptApi } from '../../../api/receiptApi';
+import { showAlert } from '../../../utils/alertMessage';
 import {
   buildItemSplitSavePayload,
   calcItemTotal,
-} from '../utils/splitEditorSplits';
+} from '../../../utils/splitEditorSplits';
 import { deriveInitialActiveMembers } from '../utils/splitEditorInit';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,
-} from '../types/settlement';
+} from '../../../types/settlement';
 
 function buildInitialSplits(
   receipt: ReceiptForSplitEditor,

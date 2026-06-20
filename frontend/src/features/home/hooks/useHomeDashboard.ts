@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { receiptApi, statsApi } from '../api';
-import { getCurrentYearMonth } from '../utils/monthSelectOptions';
+import { receiptApi, statsApi } from '../../../api';
+import { getCurrentYearMonth } from '../../../utils/monthSelectOptions';
 
 export function useHomeDashboard(currentMemberId: number) {
   const [latestReceipt, setLatestReceipt] = useState<{
