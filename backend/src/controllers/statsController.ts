@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getFamilyGroupId } from '../utils/context';
+import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
 import {
   createSettlementTransfer,
@@ -9,10 +9,8 @@ import {
 
 export const getSettlementStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await getSettlementStatusData(
-      getFamilyGroupId(),
-      req.query.month as string | undefined
-    );
+    const ctx = requireTenantContext();
+    const data = await getSettlementStatusData(ctx, req.query.month as string | undefined);
     res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
@@ -21,8 +19,9 @@ export const getSettlementStatus = async (req: Request, res: Response, next: Nex
 
 export const addSettlementTransfer = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const ctx = requireTenantContext();
     const { month, fromMemberId, toMemberId, amount } = req.body;
-    const newTransfer = await createSettlementTransfer(getFamilyGroupId(), {
+    const newTransfer = await createSettlementTransfer(ctx, {
       month,
       fromMemberId,
       toMemberId,
@@ -40,10 +39,8 @@ export const deleteSettlementTransfer = async (
   next: NextFunction
 ) => {
   try {
-    const data = await removeSettlementTransfer(
-      getFamilyGroupId(),
-      Number(getRouteParam(req, 'id'))
-    );
+    const ctx = requireTenantContext();
+    const data = await removeSettlementTransfer(ctx, Number(getRouteParam(req, 'id')));
     res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);

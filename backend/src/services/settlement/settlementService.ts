@@ -9,6 +9,7 @@ import {
   computeSettlementMemberSummaries,
   type SettlementReceiptInput,
 } from './settlementAggregation';
+import type { TenantContext } from '../../utils/context';
 
 export type SettlementItemRow = {
   receiptId: number;
@@ -94,9 +95,10 @@ export type SettlementStatusData = {
 
 /** 月間精算ステータス（暗黙デフォルト ＋ 送金実績反映） */
 export async function getSettlementStatusData(
-  familyGroupId: number,
+  ctx: TenantContext,
   month?: string
 ): Promise<SettlementStatusData> {
+  const { familyGroupId } = ctx;
   const targetMonth = normalizeYearMonth(month) ?? getCurrentYearMonthLocal();
   const { start: startDate, end: endDate } = getLocalMonthDateRange(targetMonth);
 
@@ -147,9 +149,10 @@ export type CreateSettlementTransferInput = {
 
 /** 送金記録の登録 */
 export async function createSettlementTransfer(
-  familyGroupId: number,
+  ctx: TenantContext,
   input: CreateSettlementTransferInput
 ) {
+  const { familyGroupId } = ctx;
   const normalizedMonth = normalizeYearMonth(input.month);
   const fromId = Number(input.fromMemberId);
   const toId = Number(input.toMemberId);
@@ -186,7 +189,8 @@ export async function createSettlementTransfer(
 }
 
 /** 送金記録の取消（物理削除） */
-export async function deleteSettlementTransfer(familyGroupId: number, transferId: number) {
+export async function deleteSettlementTransfer(ctx: TenantContext, transferId: number) {
+  const { familyGroupId } = ctx;
   if (!Number.isFinite(transferId) || transferId <= 0) {
     throw new AppError('送金記録IDが不正です。', 400);
   }
