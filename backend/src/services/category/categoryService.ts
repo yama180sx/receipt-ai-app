@@ -1,14 +1,19 @@
-import { prisma } from '../../utils/prismaClient';
 import { AppError } from '../../utils/appError';
 import logger from '../../utils/logger';
 import { pickNextCategoryColor } from '../../utils/categoryColor';
 import type { TenantContext } from '../../utils/context';
+import {
+  createCategoryRecord,
+  deleteCategoryById,
+  findCategoriesByFamilyGroup,
+  findCategoryByIdAndFamilyGroup,
+  findCategoryColorsByFamilyGroup,
+  groupProductMasterStatsByCategory,
+  updateCategoryKeywords,
+} from '../../repositories/categoryRepository';
 
 export async function listCategories(ctx: TenantContext) {
-  return prisma.category.findMany({
-    where: { familyGroupId: ctx.familyGroupId },
-    orderBy: { id: 'asc' },
-  });
+  return findCategoriesByFamilyGroup(ctx.familyGroupId);
 }
 
 export async function createCategory(
@@ -20,10 +25,7 @@ export async function createCategory(
     throw new AppError('Name is required', 400);
   }
 
-  const existing = await prisma.category.findMany({
-    where: { familyGroupId: ctx.familyGroupId },
-    select: { color: true },
-  });
+  const existing = await findCategoryColorsByFamilyGroup(ctx.familyGroupId);
   const existingColors = existing.map((c) => c.color);
   const requested = typeof color === 'string' && color.trim() ? color.trim() : '';
   const isDuplicate =
@@ -34,12 +36,10 @@ export async function createCategory(
   const resolvedColor =
     requested && !isDuplicate ? requested : pickNextCategoryColor(existingColors);
 
-  const category = await prisma.category.create({
-    data: {
-      name,
-      color: resolvedColor,
-      familyGroupId: ctx.familyGroupId,
-    },
+  const category = await createCategoryRecord({
+    name,
+    color: resolvedColor,
+    familyGroupId: ctx.familyGroupId,
   });
 
   logger.info(`[CATEGORY] Created: ${name}`);
@@ -47,15 +47,13 @@ export async function createCategory(
 }
 
 export async function deleteCategory(ctx: TenantContext, categoryId: number) {
-  const existing = await prisma.category.findFirst({
-    where: { id: categoryId, familyGroupId: ctx.familyGroupId },
-  });
+  const existing = await findCategoryByIdAndFamilyGroup(categoryId, ctx.familyGroupId);
   if (!existing) {
     throw new AppError('Category not found', 404);
   }
 
   try {
-    await prisma.category.delete({ where: { id: existing.id } });
+    await deleteCategoryById(existing.id);
     logger.info(`[CATEGORY] Deleted: ID ${categoryId}`);
   } catch (error: unknown) {
     if (
@@ -72,16 +70,8 @@ export async function deleteCategory(ctx: TenantContext, categoryId: number) {
 
 /** ProductMaster 統計から Category キーワードを補強（当該世帯の Category のみ更新） */
 export async function optimizeCategoryKeywords(ctx: TenantContext) {
-  const stats = await prisma.productMaster.groupBy({
-    by: ['name', 'categoryId'],
-    where: { familyGroupId: ctx.familyGroupId },
-    _count: { name: true },
-    having: { name: { _count: { gte: 5 } } },
-  });
-
-  const categories = await prisma.category.findMany({
-    where: { familyGroupId: ctx.familyGroupId },
-  });
+  const stats = await groupProductMasterStatsByCategory(ctx.familyGroupId);
+  const categories = await findCategoriesByFamilyGroup(ctx.familyGroupId);
   let totalAdded = 0;
 
   for (const category of categories) {
@@ -98,10 +88,7 @@ export async function optimizeCategoryKeywords(ctx: TenantContext) {
     );
 
     if (newEntries.length > 0) {
-      await prisma.category.update({
-        where: { id: category.id },
-        data: { keywords: [...currentKeywords, ...newEntries] },
-      });
+      await updateCategoryKeywords(category.id, [...currentKeywords, ...newEntries]);
       totalAdded += newEntries.length;
       logger.info(`[OPTIMIZE] Category:${category.name} added ${newEntries.length} keywords.`);
     }

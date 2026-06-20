@@ -190,6 +190,18 @@ export async function updateReceiptInTx(
   });
 }
 
+export async function updateReceiptStoreNamesInTx(
+  tx: PrismaTx,
+  familyGroupId: number,
+  sourceStoreName: string,
+  targetStoreName: string
+) {
+  return tx.receipt.updateMany({
+    where: { storeName: sourceStoreName, familyGroupId },
+    data: { storeName: targetStoreName },
+  });
+}
+
 export type ItemCreateInput = {
   receiptId: number;
   name: string;
