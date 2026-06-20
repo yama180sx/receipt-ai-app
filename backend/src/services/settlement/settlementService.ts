@@ -1,4 +1,3 @@
-import { prisma } from '../../utils/prismaClient';
 import { AppError } from '../../utils/appError';
 import {
   getCurrentYearMonthLocal,
@@ -10,6 +9,15 @@ import {
   type SettlementReceiptInput,
 } from './settlementAggregation';
 import type { TenantContext } from '../../utils/context';
+import {
+  createSettlementTransferRecord,
+  deleteSettlementTransferById,
+  findFamilyMembersByIds,
+  findSettlementItemsInRange,
+  findSettlementTransferById,
+  findSettlementTransfersByMonth,
+  listFamilyMembersForSettlement,
+} from '../../repositories/settlementRepository';
 
 export type SettlementItemRow = {
   receiptId: number;
@@ -47,26 +55,7 @@ async function fetchSettlementReceiptInputs(
   startDate: Date,
   endDate: Date
 ): Promise<SettlementReceiptInput[]> {
-  const items = await prisma.item.findMany({
-    where: {
-      receipt: {
-        familyGroupId,
-        date: { gte: startDate, lt: endDate },
-      },
-    },
-    select: {
-      receiptId: true,
-      price: true,
-      quantity: true,
-      receipt: { select: { memberId: true } },
-      splits: {
-        select: {
-          familyMemberId: true,
-          amount: true,
-        },
-      },
-    },
-  });
+  const items = await findSettlementItemsInRange(familyGroupId, startDate, endDate);
 
   return buildSettlementReceiptInputsFromItems(
     items.map((item) => ({
@@ -103,24 +92,9 @@ export async function getSettlementStatusData(
   const { start: startDate, end: endDate } = getLocalMonthDateRange(targetMonth);
 
   const [members, receiptInputs, transfers] = await Promise.all([
-    prisma.familyMember.findMany({
-      where: { familyGroupId },
-      select: { id: true, name: true },
-    }),
+    listFamilyMembersForSettlement(familyGroupId),
     fetchSettlementReceiptInputs(familyGroupId, startDate, endDate),
-    prisma.settlementTransfer.findMany({
-      where: {
-        month: targetMonth,
-        familyGroupId,
-      },
-      select: {
-        id: true,
-        fromMemberId: true,
-        toMemberId: true,
-        amount: true,
-        settledAt: true,
-      },
-    }),
+    findSettlementTransfersByMonth(familyGroupId, targetMonth),
   ]);
 
   const memberSummaries = computeSettlementMemberSummaries(
@@ -166,25 +140,18 @@ export async function createSettlementTransfer(
     throw new AppError('自分自身への送金は登録できません。', 400);
   }
 
-  const validMembers = await prisma.familyMember.findMany({
-    where: {
-      id: { in: [fromId, toId] },
-      familyGroupId,
-    },
-  });
+  const validMembers = await findFamilyMembersByIds(familyGroupId, [fromId, toId]);
 
   if (validMembers.length !== 2) {
     throw new AppError('無効なユーザー指定、または権限がありません。', 403);
   }
 
-  return prisma.settlementTransfer.create({
-    data: {
-      familyGroupId,
-      month: normalizedMonth,
-      fromMemberId: fromId,
-      toMemberId: toId,
-      amount: transferAmount,
-    },
+  return createSettlementTransferRecord({
+    familyGroupId,
+    month: normalizedMonth,
+    fromMemberId: fromId,
+    toMemberId: toId,
+    amount: transferAmount,
   });
 }
 
@@ -195,9 +162,7 @@ export async function deleteSettlementTransfer(ctx: TenantContext, transferId: n
     throw new AppError('送金記録IDが不正です。', 400);
   }
 
-  const transfer = await prisma.settlementTransfer.findUnique({
-    where: { id: transferId },
-  });
+  const transfer = await findSettlementTransferById(transferId);
 
   if (!transfer) {
     throw new AppError('送金記録が見つかりません。', 404);
@@ -207,7 +172,7 @@ export async function deleteSettlementTransfer(ctx: TenantContext, transferId: n
     throw new AppError('この送金記録を操作する権限がありません。', 403);
   }
 
-  await prisma.settlementTransfer.delete({ where: { id: transferId } });
+  await deleteSettlementTransferById(transferId);
 
   return { id: transferId };
 }
