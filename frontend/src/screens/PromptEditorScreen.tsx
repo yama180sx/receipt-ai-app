@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import apiClient from '../utils/apiClient';
+import { getApiErrorMessage } from '../utils/apiError';
 import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
@@ -20,7 +21,7 @@ interface PromptTemplate {
   name: string;
   description: string | null;
   systemPrompt: string;
-  domainHints: Record<string, any> | null;
+  domainHints: Record<string, unknown> | null;
   isActive: boolean;
   version: number;
 }
@@ -58,8 +59,8 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       } else {
         setError('データの取得に失敗しました。');
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || '通信エラーが発生しました。');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -73,8 +74,8 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
     try {
       await apiClient.patch(`/admin/prompts/${id}/activate`);
       fetchPrompts();
-    } catch (err: any) {
-      Alert.alert('エラー', 'デフォルトの切り替えに失敗しました。');
+    } catch (err: unknown) {
+      Alert.alert('エラー', getApiErrorMessage(err, 'デフォルトの切り替えに失敗しました。'));
     }
   };
 
@@ -83,8 +84,8 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       try {
         await apiClient.delete(`/admin/prompts/${id}`);
         fetchPrompts();
-      } catch (err: any) {
-        Alert.alert('エラー', err?.response?.data?.error || '削除に失敗しました。');
+      } catch (err: unknown) {
+        Alert.alert('エラー', getApiErrorMessage(err, '削除に失敗しました。'));
       }
     };
 
@@ -145,8 +146,8 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       setEditingTemplate(null);
       setIsCreatingNew(false);
       fetchPrompts();
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || '保存に失敗しました。');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, '保存に失敗しました。'));
     } finally {
       setIsSaving(false);
     }

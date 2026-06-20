@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { theme } from '../../../theme';
+import { webPickerOutlineReset } from '../../../utils/webPlatformStyles';
 import type { FamilyMemberSummary } from '../../../types/settlement';
 
 interface SplitEditorMemberChipsProps {
@@ -115,6 +116,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: 14,
     fontWeight: 'bold',
-    ...Platform.select({ web: { outlineStyle: 'none', border: 'none', background: 'transparent' } as any }),
+    ...webPickerOutlineReset,
   },
 });

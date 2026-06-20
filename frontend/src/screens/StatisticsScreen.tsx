@@ -109,7 +109,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       }
       if (advRes.success) setAdvancedData(advRes.data);
       if (catRes.success) setAllCategories(catRes.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[DEBUG-STATS] Fetch Error:', error);
       Alert.alert("エラー", "データの取得に失敗しました");
     } finally {

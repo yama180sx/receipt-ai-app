@@ -18,6 +18,7 @@ import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import { showAlert } from '../utils/alertMessage';
+import { getApiErrorMessage, getApiErrorResponseData } from '../utils/apiError';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
 import type { ParsedReceiptItemInput } from '../types/receipt';
 
@@ -112,9 +113,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         showAlert('成功', 'レシートを保存しました。', { onOk: onSuccess });
         return;
       }
-    } catch (err: any) {
-      const apiError = err.response?.data;
-      const message = apiError?.message || err.message;
+    } catch (err: unknown) {
+      const apiError = getApiErrorResponseData(err);
+      const message = getApiErrorMessage(err, '保存に失敗しました。');
 
       if (message === 'DUPLICATE') {
         const duplicateMessage = initialData.warnedDuplicateFromTray
@@ -124,7 +125,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         return;
       }
 
-      console.error('Commit error:', apiError || err.message);
+      console.error('Commit error:', apiError || message);
       showAlert('エラー', message || '保存に失敗しました。');
     } finally {
       setLoading(false);

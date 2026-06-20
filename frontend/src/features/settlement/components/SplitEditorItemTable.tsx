@@ -5,12 +5,12 @@ import {
   View,
   ScrollView,
   TextInput,
-  Platform,
 } from 'react-native';
 import { AppButton } from '../../../components/ui';
 import { BUTTON_LABELS } from '../../../constants/buttonLabels';
 import { theme, tableStyles } from '../../../theme';
 import { calcItemTotal } from '../../../utils/splitEditorSplits';
+import { webTextInputOutlineNone } from '../../../utils/webPlatformStyles';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text.main,
     paddingRight: 4,
-    ...Platform.select({ web: { outlineStyle: 'none' } as any }),
+    ...webTextInputOutlineNone,
   },
   percentBox: { width: 35 },
   amountBox: { width: 60 },

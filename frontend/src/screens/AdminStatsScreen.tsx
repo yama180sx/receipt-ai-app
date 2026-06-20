@@ -9,6 +9,7 @@ import {
 import { AppBackButton } from '../components/ui';
 import { theme, tableStyles } from '../theme';
 import apiClient from '../utils/apiClient';
+import { getApiErrorMessage } from '../utils/apiError';
 
 interface StatData {
   month: string;
@@ -40,11 +41,9 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
         const total = res.data.data.reduce((sum: number, item: StatData) => sum + item.estimatedCostJpy, 0);
         setTotalCost(total);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Stats Fetch Error:', error);
-      // ★ Alertを廃止し、バックエンドのエラーメッセージを抽出してステートにセット
-      const serverError = error?.response?.data?.error || error?.response?.data?.message || 'コスト統計の取得に失敗しました。';
-      setErrorMsg(serverError);
+      setErrorMsg(getApiErrorMessage(error, 'コスト統計の取得に失敗しました。'));
     } finally {
       setLoading(false);
     }
