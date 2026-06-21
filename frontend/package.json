@@ -1,11 +1,9 @@
 {
   "name": "receipt-manager-frontend",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "npx expo start",
-    "start:router-poc": "EXPO_PUBLIC_EXPO_ROUTER_POC=true npx expo start",
-    "web:router-poc": "EXPO_PUBLIC_EXPO_ROUTER_POC=true npx expo start --web",
     "android": "npx expo start --android",
     "ios": "npx expo start --ios",
     "web": "npx expo start --web",
@@ -40,6 +38,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "babel-preset-expo": "~54.0.10",
     "openapi-typescript": "^7.8.0",
     "typescript": "~5.9.2",
     "vitest": "^3.2.4"
