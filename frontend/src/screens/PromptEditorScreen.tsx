@@ -9,21 +9,11 @@ import {
   Platform,
 } from 'react-native';
 
-import apiClient from '../utils/apiClient';
+import { adminApi, type PromptTemplate } from '../api';
+import { getApiErrorMessage } from '../utils/apiError';
 import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
-
-interface PromptTemplate {
-  id: number;
-  key: string;
-  name: string;
-  description: string | null;
-  systemPrompt: string;
-  domainHints: Record<string, any> | null;
-  isActive: boolean;
-  version: number;
-}
 
 interface PromptEditorScreenProps {
   onBack: () => void;
@@ -52,14 +42,10 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get<{ success: boolean; data: PromptTemplate[] }>('/admin/prompts');
-      if (response.data.success && response.data.data) {
-        setTemplates(response.data.data.filter(p => p.key === PROMPT_KEY));
-      } else {
-        setError('データの取得に失敗しました。');
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || '通信エラーが発生しました。');
+      const response = await adminApi.listPrompts();
+      setTemplates((response.data ?? []).filter((p) => p.key === PROMPT_KEY));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -71,20 +57,20 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
 
   const handleActivate = async (id: number) => {
     try {
-      await apiClient.patch(`/admin/prompts/${id}/activate`);
+      await adminApi.activatePrompt(id);
       fetchPrompts();
-    } catch (err: any) {
-      Alert.alert('エラー', 'デフォルトの切り替えに失敗しました。');
+    } catch (err: unknown) {
+      Alert.alert('エラー', getApiErrorMessage(err, 'デフォルトの切り替えに失敗しました。'));
     }
   };
 
   const handleDelete = async (id: number) => {
     const executeDelete = async () => {
       try {
-        await apiClient.delete(`/admin/prompts/${id}`);
+        await adminApi.deletePrompt(id);
         fetchPrompts();
-      } catch (err: any) {
-        Alert.alert('エラー', err?.response?.data?.error || '削除に失敗しました。');
+      } catch (err: unknown) {
+        Alert.alert('エラー', getApiErrorMessage(err, '削除に失敗しました。'));
       }
     };
 
@@ -121,7 +107,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
 
     try {
       if (isCreatingNew) {
-        await apiClient.post(`/admin/prompts`, {
+        await adminApi.createPrompt({
           key: PROMPT_KEY,
           name: formName,
           description: formDesc,
@@ -131,7 +117,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
         });
         if (Platform.OS !== 'web') Alert.alert('作成完了', '新しいプロンプトを作成しました。');
       } else if (editingTemplate && editingTemplate.id) {
-        await apiClient.patch(`/admin/prompts/${editingTemplate.id}`, {
+        await adminApi.updatePrompt(editingTemplate.id, {
           name: formName,
           description: formDesc,
           systemPrompt: formSystemPrompt,
@@ -145,8 +131,8 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       setEditingTemplate(null);
       setIsCreatingNew(false);
       fetchPrompts();
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err.message || '保存に失敗しました。');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, '保存に失敗しました。'));
     } finally {
       setIsSaving(false);
     }
@@ -157,7 +143,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
   const openEditForm = (template: PromptTemplate) => {
     setEditingTemplate(template);
     setIsCreatingNew(false);
-    setFormName(template.name);
+    setFormName(template.name || '');
     setFormDesc(template.description || '');
     setFormSystemPrompt(template.systemPrompt);
     setFormDomainHints(template.domainHints ? JSON.stringify(template.domainHints, null, 2) : '');

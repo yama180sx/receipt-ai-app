@@ -34,7 +34,9 @@
       "themeColor": "#2563eb",
       "backgroundColor": "#ffffff"
     },
+    "scheme": "recaipt",
     "plugins": [
+      "expo-router",
       "expo-secure-store",
       [
         "expo-local-authentication",

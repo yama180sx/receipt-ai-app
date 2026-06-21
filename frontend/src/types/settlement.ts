@@ -1,13 +1,10 @@
-/** API 成功レスポンス（精算・按分ドメイン） */
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type FamilyMemberSummary = {
-  id: number;
-  name: string;
-};
+/** OpenAPI 生成 DTO（精算 API） */
+export type {
+  FamilyMemberSummary,
+  SettlementMemberSummary,
+  SettlementStatusData,
+  SettlementTransfer,
+} from '../api/generated';
 
 export type ItemSplitRecord = {
   familyMemberId: number;
@@ -35,29 +32,4 @@ export type ReceiptForSplitEditor = {
 export type ItemSplitSavePayload = {
   familyMemberId: number;
   amount: number;
-};
-
-export type SettlementMemberSummary = {
-  memberId: number;
-  name: string;
-  totalPaid: number;
-  totalOwed: number;
-  baseBalance: number;
-  transferredOut: number;
-  transferredIn: number;
-  balance: number;
-};
-
-export type SettlementTransfer = {
-  id: number;
-  fromMemberId: number;
-  toMemberId: number;
-  amount: number;
-  settledAt: string;
-};
-
-export type SettlementStatusData = {
-  month: string;
-  members: SettlementMemberSummary[];
-  transfers: SettlementTransfer[];
 };

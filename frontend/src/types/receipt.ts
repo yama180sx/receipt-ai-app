@@ -29,3 +29,29 @@ export interface ReceiptInput {
     categoryId?: number | null;
   }[];
 }
+
+/** OpenAPI 生成 DTO（docs/openapi/openapi.yaml） */
+export type {
+  CategorySummary,
+  ItemSplitSummary,
+  ReceiptItemDetail,
+  ReceiptDetail,
+} from '../api/generated';
+
+/** commit 前の編集用明細（UI 入力中は string 許容） */
+export interface ParsedReceiptItemInput {
+  name: string;
+  price: number | string;
+  quantity: number | string;
+  categoryId: number | null;
+}
+
+/** commit 前の parsedData（api-spec §5.3） */
+export interface ParsedReceiptData {
+  storeName: string;
+  purchaseDate: string;
+  totalAmount: number;
+  taxAmount?: number | string;
+  items: ParsedReceiptItemInput[];
+  usageLogId?: number;
+}

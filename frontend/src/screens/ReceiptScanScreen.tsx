@@ -11,24 +11,19 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '../utils/apiClient';
+import { receiptApi } from '../api/receiptApi';
 import { AppBackButton, AppButton, AppFormField, AppSelect, AppTextInput } from '../components/ui';
 import { modalStyles } from '../theme';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import { showAlert } from '../utils/alertMessage';
+import { getApiErrorMessage, getApiErrorResponseData } from '../utils/apiError';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
+import type { ParsedReceiptItemInput } from '../types/receipt';
 
 const c = theme.colors;
 const s = theme.colors.semantic.scan;
-
-interface ReceiptItem {
-  name: string;
-  price: number | string; // 入力中は文字列を許容
-  quantity: number | string; // 入力中は文字列を許容
-  categoryId: number | null;
-}
 
 interface ReceiptScanScreenProps {
   initialData: ReceiptScanInitialData;
@@ -76,7 +71,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
     return Math.round(itemsTotal + tax);
   }, [receiptData.items, receiptData.taxAmount]);
 
-  const updateItem = (index: number, key: keyof ReceiptItem, value: any) => {
+  const updateItem = (index: number, key: keyof ParsedReceiptItemInput, value: ParsedReceiptItemInput[keyof ParsedReceiptItemInput]) => {
     const newItems = [...receiptData.items];
     newItems[index] = { ...newItems[index], [key]: value };
     setReceiptData({ ...receiptData, items: newItems });
@@ -113,14 +108,14 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         validation: initialData.validation
       };
       
-      const res = await apiClient.post('/receipts/commit', payload);
-      if (res.data?.success) {
+      const res = await receiptApi.commitReceipt(payload);
+      if (res.success) {
         showAlert('成功', 'レシートを保存しました。', { onOk: onSuccess });
         return;
       }
-    } catch (err: any) {
-      const apiError = err.response?.data;
-      const message = apiError?.message || err.message;
+    } catch (err: unknown) {
+      const apiError = getApiErrorResponseData(err);
+      const message = getApiErrorMessage(err, '保存に失敗しました。');
 
       if (message === 'DUPLICATE') {
         const duplicateMessage = initialData.warnedDuplicateFromTray
@@ -130,7 +125,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
         return;
       }
 
-      console.error('Commit error:', apiError || err.message);
+      console.error('Commit error:', apiError || message);
       showAlert('エラー', message || '保存に失敗しました。');
     } finally {
       setLoading(false);

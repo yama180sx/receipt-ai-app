@@ -1,31 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
-  Image, 
-  TextInput, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  Platform,
+import React from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { AppBackButton, AppButton } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme, tableStyles } from '../theme';
+import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
-import { api } from '../utils/apiClient';
-import { showAlert } from '../utils/alertMessage';
 import {
-  buildItemSplitSavePayload,
-  calcItemTotal,
-} from '../utils/splitEditorSplits';
-import type {
-  FamilyMemberSummary,
-  ReceiptForSplitEditor,
-  ReceiptItemForSplit,
-} from '../types/settlement';
+  useSplitEditor,
+  SplitEditorMemberChips,
+  SplitEditorItemTable,
+} from '../features/settlement';
+import type { ReceiptForSplitEditor } from '../types/settlement';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 
 interface SplitEditorScreenProps {
@@ -33,304 +23,21 @@ interface SplitEditorScreenProps {
   onBack: () => void;
 }
 
-export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, onBack }) => {
+export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({
+  receipt,
+  onBack,
+}) => {
   const isWide = useIsWideLayout();
-
-  const [allMembers, setAllMembers] = useState<FamilyMemberSummary[]>([]);
-  const [activeMembers, setActiveMembers] = useState<FamilyMemberSummary[]>([]); 
-  
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
-  // 明細ごとの入力状態
-  // { itemId: { memberId: 500 } }
-  const [editSplits, setEditSplits] = useState<Record<number, Record<number, number>>>({});
-
+  const editor = useSplitEditor(receipt, onBack);
   const imageSource = useReceiptImageSource(receipt?.imagePath);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const res = await api.getFamilyMembers();
-        if (res.success) {
-          setAllMembers(res.data);
-          
-          let initialActive: FamilyMemberSummary[] = [];
-
-          const hasExistingSplits = receipt.items.some(
-            (item) => item.splits && item.splits.length > 0
-          );
-
-          if (hasExistingSplits) {
-            const splitMemberIds = new Set<number>();
-            receipt.items.forEach((item) => {
-              if (item.splits) {
-                item.splits.forEach((s) => splitMemberIds.add(s.familyMemberId));
-              }
-            });
-
-            const payer = res.data.find((m) => m.id === receipt.memberId);
-            if (payer) initialActive.push(payer);
-
-            res.data.forEach((m) => {
-              if (splitMemberIds.has(m.id) && m.id !== receipt.memberId) {
-                initialActive.push(m);
-              }
-            });
-
-          } else {
-            const payer = res.data.find((m) => m.id === receipt.memberId);
-            if (payer) initialActive.push(payer);
-            const others = res.data.filter((m) => m.id !== receipt.memberId);
-            if (others.length > 0) initialActive.push(others[0]);
-          }
-
-          if (initialActive.length === 0) {
-            initialActive = res.data.slice(0, 2);
-          }
-          
-          setActiveMembers(initialActive);
-          initializeSplits(res.data, initialActive);
-        }
-      } catch (err) {
-        console.error('メンバー取得失敗', err);
-        showAlert('エラー', 'メンバー情報の取得に失敗しました。');
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [receipt]);
-
-  const initializeSplits = (
-    _familyMembers: FamilyMemberSummary[],
-    targetMembers: FamilyMemberSummary[]
-  ) => {
-    if (!receipt || !receipt.items) return;
-
-    const initialData: Record<number, Record<number, number>> = {};
-    receipt.items.forEach((item) => {
-      initialData[item.id] = {};
-      const itemTotal = calcItemTotal(item);
-
-      if (item.splits && item.splits.length > 0) {
-        targetMembers.forEach(m => {
-          const split = item.splits!.find((s) => s.familyMemberId === m.id);
-          initialData[item.id][m.id] = split ? split.amount : 0;
-        });
-      } else {
-        targetMembers.forEach(m => {
-          initialData[item.id][m.id] = m.id === receipt.memberId ? itemTotal : 0;
-        });
-      }
-    });
-    setEditSplits(initialData);
-  };
-
-  const addMember = (memberId: number) => {
-    if (activeMembers.find(m => m.id === memberId)) return;
-    const memberToAdd = allMembers.find(m => m.id === memberId);
-    if (memberToAdd) {
-      const newActive = [...activeMembers, memberToAdd];
-      setActiveMembers(newActive);
-      
-      setEditSplits(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(itemId => {
-          next[Number(itemId)] = { ...next[Number(itemId)], [memberId]: 0 };
-        });
-        return next;
-      });
-    }
-  };
-
-  const removeMember = (memberId: number) => {
-    if (activeMembers.length <= 1) {
-      showAlert('エラー', '対象者は最低1人必要です。');
-      return;
-    }
-    const newActive = activeMembers.filter(m => m.id !== memberId);
-    setActiveMembers(newActive);
-
-    setEditSplits(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(itemId => {
-        const nId = Number(itemId);
-        const newData = { ...next[nId] };
-        delete newData[memberId];
-        next[nId] = newData;
-      });
-      return next;
-    });
-  };
-
-  const handleAmountChange = (itemId: number, memberId: number, value: string, itemTotal: number) => {
-    const numericValue = value.replace(/[^0-9]/g, '');
-    let valToSet = numericValue === '' ? 0 : parseInt(numericValue, 10);
-    if (valToSet > itemTotal) valToSet = itemTotal; 
-
-    const newData = { ...editSplits[itemId] };
-    newData[memberId] = valToSet;
-    
-    const firstMemberId = activeMembers[0].id;
-    if (memberId !== firstMemberId) {
-      let sumOthers = 0;
-      activeMembers.forEach(m => {
-        if (m.id !== firstMemberId) {
-          sumOthers += newData[m.id] || 0;
-        }
-      });
-      newData[firstMemberId] = Math.max(0, itemTotal - sumOthers);
-    }
-    
-    setEditSplits(prev => ({ ...prev, [itemId]: newData }));
-  };
-
-  const handlePercentChange = (itemId: number, memberId: number, value: string, itemTotal: number) => {
-    const numericValue = value.replace(/[^0-9]/g, '');
-    let percent = numericValue === '' ? 0 : parseInt(numericValue, 10);
-    if (percent > 100) percent = 100;
-
-    const calculatedAmount = Math.round(itemTotal * (percent / 100));
-
-    const newData = { ...editSplits[itemId] };
-    newData[memberId] = calculatedAmount;
-
-    const firstMemberId = activeMembers[0].id;
-    if (memberId !== firstMemberId) {
-      let sumOthers = 0;
-      activeMembers.forEach(m => {
-        if (m.id !== firstMemberId) {
-          sumOthers += newData[m.id] || 0;
-        }
-      });
-      newData[firstMemberId] = Math.max(0, itemTotal - sumOthers);
-    }
-
-    setEditSplits(prev => ({ ...prev, [itemId]: newData }));
-  };
-
-  const splitItemEqually = (itemId: number, itemTotal: number) => {
-    const newData = { ...editSplits[itemId] };
-    const memberCount = activeMembers.length;
-    if (memberCount === 0) return;
-
-    const baseAmount = Math.floor(itemTotal / memberCount);
-    activeMembers.forEach((m, idx) => {
-      newData[m.id] = idx === 0 ? itemTotal - (baseAmount * (memberCount - 1)) : baseAmount;
-    });
-    
-    setEditSplits(prev => ({ ...prev, [itemId]: newData }));
-  };
-
-  // ★ 追加: 合計行の変更を全明細にカスケードするロジック
-  const applyCascadePercent = (memberId: number, percent: number) => {
-    if (activeMembers.length <= 1 || percent < 0 || percent > 100) return;
-
-    const firstMemberId = activeMembers[0].id;
-    if (memberId === firstMemberId) return; // 先頭は常に自動計算のためスキップ
-
-    setEditSplits(prev => {
-      const next = { ...prev };
-      receipt.items.forEach((item) => {
-        const itemTotal = calcItemTotal(item);
-        const newData = { ...next[item.id] };
-
-        // 入力された％に基づいて金額を算出
-        const calculatedAmount = Math.round(itemTotal * (percent / 100));
-        newData[memberId] = calculatedAmount;
-
-        // 先頭メンバーの端数調整
-        let sumOthers = 0;
-        activeMembers.forEach(m => {
-          if (m.id !== firstMemberId) {
-            sumOthers += newData[m.id] || 0;
-          }
-        });
-        newData[firstMemberId] = Math.max(0, itemTotal - sumOthers);
-
-        next[item.id] = newData;
-      });
-      return next;
-    });
-  };
-
-  // ★ 追加: 合計行の金額変更ハンドラ
-  const handleTotalAmountChange = (memberId: number, value: string, receiptTotal: number) => {
-    const numericValue = value.replace(/[^0-9]/g, '');
-    let valToSet = numericValue === '' ? 0 : parseInt(numericValue, 10);
-    if (valToSet > receiptTotal) valToSet = receiptTotal;
-
-    // 入力された金額から割合（％）を算出し、全明細に適用
-    const percent = receiptTotal > 0 ? (valToSet / receiptTotal) * 100 : 0;
-    applyCascadePercent(memberId, percent);
-  };
-
-  // ★ 追加: 合計行の％変更ハンドラ
-  const handleTotalPercentChange = (memberId: number, value: string) => {
-    const numericValue = value.replace(/[^0-9]/g, '');
-    let percent = numericValue === '' ? 0 : parseInt(numericValue, 10);
-    applyCascadePercent(memberId, percent);
-  };
-
-  // ★ 追加: レシート全体を均等割り
-  const splitWholeReceiptEqually = () => {
-    receipt.items.forEach((item) => {
-      splitItemEqually(item.id, calcItemTotal(item));
-    });
-  };
-
-  const handleSave = async () => {
-    if (activeMembers.length === 0) {
-      showAlert('エラー', '対象者を1人以上選択してください。');
-      return;
-    }
-
-    const remainderMemberId = activeMembers[0].id;
-    setSaving(true);
-    try {
-      const savePromises = receipt.items.map(async (item) => {
-        const amounts = editSplits[item.id] ?? {};
-        const payloadSplits = buildItemSplitSavePayload(
-          activeMembers,
-          amounts,
-          remainderMemberId
-        );
-        return api.saveItemSplits(item.id, payloadSplits);
-      });
-
-      await Promise.all(savePromises);
-      showAlert('保存完了', '割り勘設定を保存しました。', { onOk: onBack });
-    } catch (err) {
-      console.error('保存エラー', err);
-      showAlert('エラー', '保存に失敗しました。');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading || !receipt) {
+  if (editor.loading) {
     return (
       <View style={styles.centerLoading}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
-
-  // レシート全体の合計額を算出
-  const receiptTotalAmount = receipt.items.reduce(
-    (sum, item) => sum + calcItemTotal(item),
-    0
-  );
-
-  // 合計行表示用: メンバーごとの合計額を計算
-  const getMemberTotalAmount = (memberId: number) => {
-    let sum = 0;
-    receipt.items.forEach((item) => {
-      sum += editSplits[item.id]?.[memberId] || 0;
-    });
-    return sum;
-  };
 
   return (
     <View style={styles.container}>
@@ -340,50 +47,20 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
         <View style={styles.headerRight}>
           <AppButton
             title={BUTTON_LABELS.save}
-            onPress={handleSave}
-            loading={saving}
-            disabled={saving}
+            onPress={() => void editor.handleSave()}
+            loading={editor.saving}
+            disabled={editor.saving}
             size="sm"
           />
         </View>
       </View>
 
-      <View style={styles.targetSection}>
-        <View style={styles.targetHeader}>
-          <Text style={styles.targetTitle}>👤 割り勘の対象者</Text>
-        </View>
-        
-        <View style={styles.memberChips}>
-          {activeMembers.map((m, idx) => (
-            <View key={m.id} style={[styles.chip, idx === 0 && styles.firstChip]}>
-              <Text style={[styles.chipText, idx === 0 && styles.firstChipText]}>
-                {m.name} {idx === 0 && "(端数負担)"}
-              </Text>
-              {activeMembers.length > 1 && idx !== 0 && (
-                <TouchableOpacity onPress={() => removeMember(m.id)} style={styles.chipClose}>
-                  <Text style={styles.chipCloseText}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-          
-          {allMembers.filter(am => !activeMembers.find(m => m.id === am.id)).length > 0 && (
-            <View style={styles.addMemberWrapper}>
-              <Picker
-                selectedValue=""
-                onValueChange={(val) => { if(val) addMember(Number(val)); }}
-                style={styles.addPicker}
-              >
-                <Picker.Item label="+ 人を追加" value="" color={theme.colors.primary} />
-                {allMembers
-                  .filter(am => !activeMembers.find(m => m.id === am.id))
-                  .map(am => <Picker.Item key={am.id} label={am.name} value={am.id} />)
-                }
-              </Picker>
-            </View>
-          )}
-        </View>
-      </View>
+      <SplitEditorMemberChips
+        activeMembers={editor.activeMembers}
+        inactiveMembers={editor.inactiveMembers}
+        onRemoveMember={editor.removeMember}
+        onAddMember={editor.addMember}
+      />
 
       <View style={[styles.mainLayout, isWide ? styles.rowLayout : styles.colLayout]}>
         <View style={[styles.imagePane, isWide && { width: 350 }]}>
@@ -401,188 +78,71 @@ export const SplitEditorScreen: React.FC<SplitEditorScreenProps> = ({ receipt, o
             <Text style={styles.storeName}>{receipt.storeName || '店名不明'}</Text>
           </View>
 
-          <ScrollView style={styles.tableScroll} horizontal={false}>
-            <ScrollView horizontal={true} contentContainerStyle={{ flexDirection: 'column' }}>
-              <View style={tableStyles.wrapper}>
-              <View style={[tableStyles.row, tableStyles.headerRow, styles.tableRowWide]}>
-                <Text style={[tableStyles.cell, styles.cellName, tableStyles.headerText]}>商品名</Text>
-                <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.headerText]}>合計</Text>
-                {activeMembers.map(m => (
-                  <Text key={m.id} style={[tableStyles.cell, styles.cellInputCol, tableStyles.headerText, { textAlign: 'center' }]}>
-                    {m.name}
-                  </Text>
-                ))}
-                <Text style={[tableStyles.cell, styles.cellAction, tableStyles.headerText]}>操作</Text>
-              </View>
-
-              {receipt.items.map((item: ReceiptItemForSplit) => {
-                const itemTotal = calcItemTotal(item);
-
-                return (
-                  <View key={item.id} style={[tableStyles.row, styles.tableRowWide]}>
-                    <Text style={[tableStyles.cell, styles.cellName, tableStyles.bodyText]} numberOfLines={2}>{item.name}</Text>
-                    <Text style={[tableStyles.cell, styles.cellAmount, tableStyles.bodyText, tableStyles.boldText]}>¥{itemTotal.toLocaleString()}</Text>
-                    
-                    {activeMembers.map((m, idx) => {
-                      const amountValue = editSplits[item.id]?.[m.id] || 0;
-                      const percentValue = itemTotal > 0 ? Math.round((amountValue / itemTotal) * 100) : 0;
-                      const isFirst = idx === 0;
-
-                      return (
-                        <View key={m.id} style={[tableStyles.cell, styles.cellInputCol]}>
-                          <View style={styles.dualInputWrapper}>
-                            <View style={styles.inputGroup}>
-                              <TextInput
-                                style={[styles.inputBox, styles.percentBox, isFirst && styles.disabledInputBox]}
-                                value={String(percentValue)}
-                                onChangeText={(val) => handlePercentChange(item.id, m.id, val, itemTotal)}
-                                keyboardType="number-pad"
-                                editable={!isFirst}
-                                selectTextOnFocus
-                              />
-                              <Text style={styles.unitText}>%</Text>
-                            </View>
-                            
-                            <View style={[styles.inputGroup, { marginLeft: 4 }]}>
-                              <TextInput
-                                style={[styles.inputBox, styles.amountBox, isFirst && styles.disabledInputBox]}
-                                value={String(amountValue)}
-                                onChangeText={(val) => handleAmountChange(item.id, m.id, val, itemTotal)}
-                                keyboardType="number-pad"
-                                editable={!isFirst}
-                                selectTextOnFocus
-                              />
-                              <Text style={styles.unitText}>円</Text>
-                            </View>
-                          </View>
-                        </View>
-                      );
-                    })}
-
-                    <View style={[tableStyles.cell, styles.cellAction]}>
-                      <AppButton
-                        title={BUTTON_LABELS.splitEqual}
-                        onPress={() => splitItemEqually(item.id, itemTotal)}
-                        variant="ghost"
-                        size="sm"
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-
-              {/* ★ 追加: 合計行 (Total) */}
-              <View style={[tableStyles.row, styles.tableRowWide, styles.totalRow]}>
-                <Text style={[tableStyles.cell, styles.cellName, styles.totalText]}>一括調整（全体合計）</Text>
-                <Text style={[tableStyles.cell, styles.cellAmount, styles.totalText]}>¥{receiptTotalAmount.toLocaleString()}</Text>
-                
-                {activeMembers.map((m, idx) => {
-                  const memberTotal = getMemberTotalAmount(m.id);
-                  const percentValue = receiptTotalAmount > 0 ? Math.round((memberTotal / receiptTotalAmount) * 100) : 0;
-                  const isFirst = idx === 0;
-
-                  return (
-                    <View key={m.id} style={[tableStyles.cell, styles.cellInputCol]}>
-                      <View style={styles.dualInputWrapper}>
-                        <View style={[styles.inputGroup, styles.totalInputGroup]}>
-                          <TextInput
-                            style={[styles.inputBox, styles.percentBox, isFirst && styles.disabledInputBox, styles.totalInputBox]}
-                            value={String(percentValue)}
-                            onChangeText={(val) => handleTotalPercentChange(m.id, val)}
-                            keyboardType="number-pad"
-                            editable={!isFirst}
-                            selectTextOnFocus
-                          />
-                          <Text style={[styles.unitText, styles.totalUnitText]}>%</Text>
-                        </View>
-                        
-                        <View style={[styles.inputGroup, styles.totalInputGroup, { marginLeft: 4 }]}>
-                          <TextInput
-                            style={[styles.inputBox, styles.amountBox, isFirst && styles.disabledInputBox, styles.totalInputBox]}
-                            value={String(memberTotal)}
-                            onChangeText={(val) => handleTotalAmountChange(m.id, val, receiptTotalAmount)}
-                            keyboardType="number-pad"
-                            editable={!isFirst}
-                            selectTextOnFocus
-                          />
-                          <Text style={[styles.unitText, styles.totalUnitText]}>円</Text>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-
-                <View style={[tableStyles.cell, styles.cellAction]}>
-                  <AppButton
-                    title={BUTTON_LABELS.splitEqual}
-                    onPress={splitWholeReceiptEqually}
-                    variant="ghost"
-                    size="sm"
-                  />
-                </View>
-              </View>
-
-              </View>
-            </ScrollView>
-          </ScrollView>
+          <SplitEditorItemTable
+            receipt={receipt}
+            activeMembers={editor.activeMembers}
+            editSplits={editor.editSplits}
+            receiptTotalAmount={editor.receiptTotalAmount}
+            onAmountChange={editor.handleAmountChange}
+            onPercentChange={editor.handlePercentChange}
+            onSplitItemEqually={editor.splitItemEqually}
+            onTotalAmountChange={editor.handleTotalAmountChange}
+            onTotalPercentChange={editor.handleTotalPercentChange}
+            onSplitWholeReceiptEqually={editor.splitWholeReceiptEqually}
+            getMemberTotalAmount={editor.getMemberTotalAmount}
+          />
         </View>
       </View>
     </View>
   );
 };
 
-const sem = theme.colors.semantic;
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text.main },
   headerRight: { minWidth: 100, alignItems: 'flex-end' },
-  
-  targetSection: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, padding: 15, paddingHorizontal: 20 },
-  targetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  targetTitle: { fontSize: 15, fontWeight: 'bold', color: theme.colors.text.main },
-  
-  memberChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: sem.info.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: sem.info.border },
-  firstChip: { backgroundColor: sem.neutral.bg, borderColor: sem.neutral.border },
-  chipText: { color: sem.info.text, fontWeight: 'bold', fontSize: 14 },
-  firstChipText: { color: theme.colors.text.muted },
-  chipClose: { marginLeft: 8, backgroundColor: 'rgba(3,105,161,0.1)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  chipCloseText: { color: sem.info.text, fontSize: 10, fontWeight: 'bold' },
-  addMemberWrapper: { height: 32, justifyContent: 'center', backgroundColor: theme.colors.background, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  addPicker: { height: 32, width: 120, color: theme.colors.primary, fontSize: 14, fontWeight: 'bold', ...Platform.select({ web: { outlineStyle: 'none', border: 'none', background: 'transparent' } as any }) },
-  
   mainLayout: { flex: 1, padding: 20, gap: 20 },
   rowLayout: { flexDirection: 'row' },
   colLayout: { flexDirection: 'column' },
   imagePane: { height: '100%', minHeight: 300 },
-  imageBox: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  imageBox: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
   receiptImage: { width: '100%', height: '100%' },
   noImageText: { color: theme.colors.text.muted },
-  editorPane: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  editorToolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  editorPane: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  editorToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
   storeName: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  
-  tableScroll: { flex: 1 },
-  tableRowWide: { minWidth: 800 },
-  totalRow: { backgroundColor: sem.warning.bg, borderTopWidth: 2, borderTopColor: sem.warning.border },
-  totalText: { fontWeight: 'bold', color: sem.warning.text },
-  totalInputGroup: { borderColor: sem.warning.border, backgroundColor: sem.warning.inputBg },
-  totalInputBox: { fontWeight: 'bold', color: sem.warning.text },
-  totalUnitText: { color: sem.warning.text, fontWeight: 'bold' },
-  cellName: { width: 160 },
-  cellAmount: { width: 90, textAlign: 'right' },
-  cellInputCol: { width: 180, alignItems: 'center' },
-  
-  dualInputWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
-  inputGroup: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, height: 36, paddingRight: 4 },
-  inputBox: { height: '100%', textAlign: 'right', fontSize: 14, color: theme.colors.text.main, paddingRight: 4, ...Platform.select({ web: { outlineStyle: 'none' } as any }) },
-  percentBox: { width: 35 },
-  amountBox: { width: 60 },
-  disabledInputBox: { backgroundColor: sem.neutral.bg, color: theme.colors.text.muted },
-  unitText: { fontSize: 11, color: theme.colors.text.muted },
-  
-  cellAction: { width: 70, alignItems: 'center' },
 });

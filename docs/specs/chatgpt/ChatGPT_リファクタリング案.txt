@@ -1,0 +1,453 @@
+このプロジェクトは
+
+Frontend：React Native / Expo + TypeScript
+Backend：Express 5 + TypeScript
+ORM：Prisma 6
+DB：PostgreSQL
+非同期：BullMQ + Redis
+AI：Gemini
+認証：JWT + TOTP
+Docker Compose運用
+
+という構成で、個人開発としてはかなり整理されています。
+
+一方で、将来的な保守性という観点では、現在は
+
+Controller → Service → Prisma
+
+のシンプルな構造に寄っており、機能増加時にサービス層の肥大化が起き始めています。
+
+実際に確認したコードでは、
+
+receiptService.ts
+receiptController.ts
+
+あたりが既に大きくなり始めています。
+
+現在のアーキテクチャ評価
+良い点
+
+既に以下はできています。
+
+レイヤ分離
+routes
+ ↓
+controllers
+ ↓
+services
+ ↓
+prisma
+テスト可能な構造
+
+architecture.mdにも記載されていますが
+
+app.ts
+server.ts
+
+分離済みです。
+
+これは非常に良いです。
+
+非同期処理分離
+upload
+ ↓
+BullMQ
+ ↓
+Worker
+ ↓
+Gemini
+
+になっているので、
+
+AI処理がAPIレスポンス時間に影響しない
+
+設計になっています。
+
+これは維持すべきです。
+
+最大の課題
+
+私が見た限りでは
+
+receiptService がドメインサービス化している
+
+例えば
+
+saveParsedReceipt()
+
+の中で
+
+重複チェック
+店舗正規化
+商品マスタ学習
+カテゴリ推定
+Receipt保存
+Item保存
+UsageLog更新
+
+を全部やっています。
+
+つまり
+
+Receipt
+ProductMaster
+Category
+UsageLog
+
+複数の責務を持っています。
+
+今後かなり辛くなる可能性があります。
+
+推奨リファクタリング方針
+
+私は
+
+DDDをやり過ぎない
+
+を推奨します。
+
+この規模なら
+
+Controller
+Application Service
+Domain Service
+Repository
+
+までで十分です。
+
+Issue1
+Prisma直接参照をRepository化
+
+現状
+
+prisma.receipt.create()
+prisma.receipt.findMany()
+
+が各Serviceに散らばっています。
+
+追加
+
+repositories/
+  receiptRepository.ts
+  categoryRepository.ts
+  productMasterRepository.ts
+  memberRepository.ts
+
+例
+
+class ReceiptRepository {
+  create()
+  findById()
+  findByImagePath()
+}
+
+効果
+
+Prisma変更時
+
+Prisma
+↓
+Drizzle
+
+への移行コスト激減
+
+優先度
+
+★★★★★
+
+Issue2
+ReceiptService分割
+
+現在
+
+receiptService.ts
+
+が大きいです。
+
+分割推奨
+
+services/
+
+receipt/
+  receiptPersistenceService.ts
+  receiptDuplicateService.ts
+  receiptCategoryService.ts
+  receiptAnalysisService.ts
+
+例
+
+現在
+
+saveParsedReceipt()
+
+↓
+
+duplicateService.check()
+
+categoryService.assign()
+
+receiptPersistenceService.save()
+
+効果
+
+機能追加時の影響範囲縮小
+
+優先度
+
+★★★★★
+
+Issue3
+Transaction境界統一
+
+現在
+
+prisma.$transaction()
+
+がサービス内部にあります。
+
+今後
+
+Receipt
+Settlement
+ProductMaster
+
+が絡むと事故ります。
+
+推奨
+
+Application Service側で
+
+prisma.$transaction(async tx => {})
+
+管理
+
+Repositoryへtx渡し
+
+repository.save(tx)
+
+形式
+
+優先度
+
+★★★★☆
+
+Issue4
+Domainモデル導入
+
+現在
+
+parsedData
+
+が
+
+any
+
+で流れています。
+
+実際に
+
+saveParsedReceipt(
+  parsedData: any
+)
+
+を確認しました。
+
+推奨
+
+ReceiptDraft
+ReceiptItem
+ReceiptAnalysisResult
+
+など型を作る
+
+例
+
+interface ReceiptDraft {
+  storeName: string
+  purchaseDate: Date
+  totalAmount: number
+}
+
+優先度
+
+★★★★★
+
+Issue5
+Context依存の整理
+
+現在
+
+getFamilyGroupId()
+getMemberId()
+
+を
+
+AsyncLocalStorage
+
+経由で取得しています。
+
+これは便利ですが、
+
+テスト時に追跡が難しくなります。
+
+推奨
+
+Controller
+
+const ctx = {
+  memberId,
+  familyGroupId
+}
+
+↓
+
+Serviceへ明示的に渡す
+
+優先度
+
+★★★☆☆
+
+Issue6
+AI層独立
+
+現在
+
+geminiService.ts
+
+が直接呼ばれています。
+
+将来的に
+
+Gemini
+OpenAI
+Claude
+
+切替したくなる可能性があります。
+
+推奨
+
+ai/
+
+AiProvider.ts
+
+GeminiProvider.ts
+OpenAiProvider.ts
+
+利用側
+
+aiProvider.analyzeReceipt()
+
+のみ
+
+優先度
+
+★★★★☆
+
+Issue7
+Frontend Screen肥大化対策
+
+構成を見ると
+
+screens/
+  ReceiptScanScreen
+  SplitEditorScreen
+  StatisticsScreen
+
+があります。
+
+今後確実に大きくなります。
+
+推奨
+
+features/
+
+receipt/
+  components/
+  hooks/
+  services/
+
+settlement/
+
+構成へ移行
+
+優先度
+
+★★★☆☆
+
+Issue8
+APIクライアント統一
+
+現在
+
+services/
+utils/apiClient.ts
+
+に分散しています。
+
+推奨
+
+frontend/src/api
+
+authApi.ts
+receiptApi.ts
+statsApi.ts
+
+に統一
+
+BackendのRoute単位と揃える
+
+優先度
+
+★★★☆☆
+
+私ならこう切る
+
+工数と効果のバランスを考えると
+
+Sprint1（安全）
+
+Issue1 Repository化
+
+Issue4 型定義強化
+
+Sprint2（効果大）
+
+Issue2 ReceiptService分割
+
+Issue3 Transaction整理
+
+Sprint3（将来投資）
+
+Issue6 AI Provider抽象化
+
+Issue8 Front API整理
+
+Sprint4（大型）
+
+Issue7 Feature単位構成
+
+Context整理
+
+結論
+
+このプロジェクトは「作り直しが必要な状態」では全くありません。
+
+むしろ、
+
+Docker化済み
+CIあり
+Prisma migration管理済み
+Worker分離済み
+テスト導入済み
+
+なので基盤はかなり良好です。
+
+保守性を上げるなら、最優先は
+
+① Repository導入
+→ ② ReceiptService分割
+→ ③ 型(any)排除
+
+です。
+
+この3つだけでも、今後Issueが100件→500件規模になったときの開発効率がかなり変わると思います。

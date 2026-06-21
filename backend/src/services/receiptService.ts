@@ -1,215 +1,30 @@
-import { PrismaClient } from '@prisma/client';
-import { analyzeReceiptImage, ParsedReceipt } from './geminiService';
-import { estimateCategoryId } from './categoryService';
-import { validateReceiptItems } from './validationService';
-import { checkDuplicateReceipt, parseReceiptDate } from './duplicateReceiptService';
-import logger from '../utils/logger';
-import { normalizeStoreName, getCleanText } from '../utils/normalizer';
-
-const prisma = new PrismaClient();
-
 /**
- * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
- * 戻り値に usageLogId を含めるように拡張
+ * 後方互換ファサード（Issue #98-3）
+ * 新規コードは `services/receipt/*` を直接 import してください。
  */
-export const analyzeOnly = async (memberId: number, imagePath: string) => {
-  logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId})`);
-  
-  const member = await prisma.familyMember.findUnique({
-    where: { id: memberId },
-    select: { familyGroupId: true }
-  });
-  const familyGroupId = member?.familyGroupId;
+import { findMemberById } from '../repositories/receiptRepository';
+import { analyzeOnly } from './receipt/receiptAnalysisService';
+import { saveConfirmedReceipt } from './receipt/receiptPersistenceService';
 
-  // Geminiで解析 (taxAmount, HH:mm, usageLogId を含む ParsedReceipt が返る)
-  const parsedData = await analyzeReceiptImage(imagePath, memberId);
-  const cleanStore = getCleanText(parsedData.storeName || '');
+export { analyzeOnly } from './receipt/receiptAnalysisService';
+export { saveParsedReceipt, saveConfirmedReceipt } from './receipt/receiptPersistenceService';
+export { DuplicateReceiptError, isDuplicateReceiptError, getDuplicateExistingId } from './receipt/receiptDuplicateError';
 
-  // 各明細にカテゴリを事前割り当て
-  const itemsWithCategories = await Promise.all(parsedData.items.map(async (item) => {
-    const cleanName = getCleanText(item.name);
-    let initialCategoryId = null;
-
-    if (familyGroupId) {
-      const mastered = await prisma.productMaster.findUnique({
-        where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } }
-      });
-      initialCategoryId = mastered
-        ? mastered.categoryId
-        : await estimateCategoryId(cleanName, cleanStore, familyGroupId, prisma);
-    }
-
-    return {
-      ...item,
-      price: parseFloat(String(item.price || 0)),         // ガソリンスタンド等の小数対応
-      quantity: parseFloat(String(item.quantity || 1)),   // リットル等の小数対応
-      categoryId: initialCategoryId
-    };
-  }));
-
-  parsedData.items = itemsWithCategories;
-  parsedData.taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : undefined;
-
-  // バリデーション (items合計 + taxAmount = totalAmount のチェック等)
-  const validation = validateReceiptItems(parsedData.items);
-  
-  return {
-    parsedData, // usageLogId が含まれる
-    imagePath,
-    validation
-  };
-};
-
-/**
- * パース済みデータをDBに永続化する（重複チェック ＋ 世帯別学習機能）
- * [Issue #63 / #72] 1対1の確実な ApiUsageLog 紐付けをトランザクション内で実行
- */
-export const saveParsedReceipt = async (
-  memberId: number, 
-  familyGroupId: number,
-  parsedData: any,
-  imagePath: string,
-  isSuspicious: boolean, 
-  warnings: string[] 
-) => {
-  try {
-    const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
-    const cleanStore = getCleanText(officialStoreName);
-    const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
-    
-    // Receipt.totalAmount は Int、taxAmount は Float
-    const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
-    const taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : 0;
-    
-    // 安全な数値キャスト（NaNガード付き）
-    const usageLogIdStr = parsedData.usageLogId !== undefined ? String(parsedData.usageLogId) : null;
-    const usageLogId = usageLogIdStr ? parseInt(usageLogIdStr, 10) : null;
-
-    /** 同一画像の再保存（二重タップ・アプリ復帰後の再確定）は成功扱い */
-    if (imagePath) {
-      const existingByImage = await prisma.receipt.findFirst({
-        where: { familyGroupId, imagePath },
-        include: { items: { include: { category: true } } },
-      });
-      if (existingByImage) {
-        logger.info(`[Idempotent] imagePath 一致のため既存レシートを返却: ID ${existingByImage.id}`);
-        return {
-          ...JSON.parse(JSON.stringify(existingByImage)),
-          isSuspicious,
-          warnings,
-        };
-      }
-    }
-
-    /**
-     * 重複チェック（別画像で店名・日付・金額が同一の場合）
-     */
-    const duplicate = await checkDuplicateReceipt(
-      familyGroupId,
-      parsedData,
-      imagePath
-    );
-    if (duplicate.duplicateSuspected) {
-      const error = new Error('DUPLICATE_RECEIPT_DETECTED');
-      (error as any).statusCode = 409;
-      (error as any).existingId = duplicate.existingReceiptId;
-      throw error;
-    }
-
-    const savedId = await prisma.$transaction(async (tx) => {
-      const itemsToCreate = await Promise.all(parsedData.items.map(async (item: any) => {
-        const cleanName = getCleanText(item.name);
-        const finalCategoryId = item.categoryId ? Number(item.categoryId) : null;
-
-        if (finalCategoryId) {
-          await tx.productMaster.upsert({
-            where: { name_storeName_familyGroupId: { name: cleanName, storeName: cleanStore, familyGroupId } },
-            update: { categoryId: finalCategoryId },
-            create: { name: cleanName, storeName: cleanStore, categoryId: finalCategoryId, familyGroupId }
-          });
-        }
-
-        return {
-          name: item.name,
-          price: parseFloat(String(item.price || 0)),
-          quantity: parseFloat(String(item.quantity || 1)),
-          categoryId: finalCategoryId
-        };
-      }));
-
-      // 1. Receiptの作成
-      const created = await tx.receipt.create({
-        data: {
-          memberId, 
-          familyGroupId, 
-          storeName: officialStoreName, 
-          date: jstDate,
-          totalAmount, 
-          taxAmount, 
-          imagePath, 
-          items: { create: itemsToCreate },
-          rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
-        },
-        select: { id: true }
-      });
-
-      // 2. [Issue #63] usageLogId が有効な数値の場合、ピンポイントで紐付けを更新
-      if (usageLogId && !isNaN(usageLogId)) {
-        await tx.apiUsageLog.update({
-          where: { id: usageLogId },
-          data: { receiptId: created.id }
-        });
-        logger.info(`[Link_Log] ApiUsageLog(ID: ${usageLogId}) を Receipt(ID: ${created.id}) に紐付けました。`);
-      }
-
-      return created.id;
-    }, { timeout: 15000 });
-
-    const final = await prisma.receipt.findUnique({
-      where: { id: savedId },
-      include: { items: { include: { category: true } } }
-    });
-
-    return { ...JSON.parse(JSON.stringify(final)), isSuspicious, warnings };
-  } catch (error: any) {
-    if (error.statusCode === 409) throw error;
-    logger.error(`[DB_ERROR] ${error}`);
-    throw error;
-  }
-};
-
-/**
- * ユーザー確認済みデータの永続化
- * [Issue #63] 曖昧なupdateManyを廃止し、saveParsedReceiptの内部トランザクションへ委譲
- */
-export const saveConfirmedReceipt = async (
-  memberId: number,
-  familyGroupId: number,
-  parsedData: any,
-  imagePath: string,
-  isSuspicious: boolean,
-  warnings: string[]
-) => {
-  return await saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings);
-};
-
-/**
- * 解析〜保存の一括処理（Worker用/自動投入用）
- */
+/** 解析〜保存の一括処理（Worker 用レガシー / スクリプト用） */
 export const processAndSaveReceipt = async (memberId: number, imagePath: string) => {
-  const member = await prisma.familyMember.findUnique({ 
-    where: { id: memberId }, 
-    select: { familyGroupId: true } 
-  });
+  const member = await findMemberById(memberId);
   if (!member) throw new Error('MEMBER_NOT_FOUND');
-  
-  const { parsedData, validation } = await analyzeOnly(memberId, imagePath);
-  return await saveConfirmedReceipt(
-    memberId, 
-    member.familyGroupId, 
-    parsedData, 
-    imagePath, 
-    validation.isSuspicious, 
+
+  const { parsedData, validation } = await analyzeOnly(
+    { familyGroupId: member.familyGroupId, memberId },
+    imagePath
+  );
+  return saveConfirmedReceipt(
+    memberId,
+    member.familyGroupId,
+    parsedData,
+    imagePath,
+    validation.isSuspicious,
     validation.warnings
   );
 };
