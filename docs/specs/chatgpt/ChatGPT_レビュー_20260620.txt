@@ -1,0 +1,393 @@
+添付したzipファイルは、現在React Native (Expo), TypeScript, PostgreSQLで構築中のアプリ「RecAIpt」のソースコード一式です。
+
+人間による細部レビューを一切排除した『真の品質ガバナンス』の検証として、以下の4観点から【100点満点からの厳格な減点方式】でシビアに採点してください。
+冗長な褒め言葉や配慮は一切不要です。将来の保守者（非AIネイティブな人間）への引き継ぎに耐えうるかという視点で、具体的な減点理由と改善ポイントをストレートに提示してください。
+
+【評価観点】
+1. コードの共通化とDRY原則（25点）: 微調整の連発によって、似たロジックやインラインコードが重複・コピペされていないか。
+2. コンポーネントの責務分割（25点）: 1つのファイルにロジック、UI、データ処理が詰め込まれすぎ、ファイルが肥大化していないか。
+3. 型定義の堅牢性と一元管理（25点）: Anyの乱用や不適切なアサーションがなく、型が適切に共通化されているか。
+4. 保守性とクリーン度（25点）: 結合度が強すぎて、将来の修正で別画面に予期せぬバグを誘発しやすくないか。
+思考を停止しました
+
+ZIPを実際に展開してソース構成・主要画面・型定義・バックエンド構成を確認した上で採点します。
+
+対象確認範囲：
+
+Frontend: React Native (Expo) / TypeScript
+Backend: Node.js / Express / Prisma
+DB: PostgreSQL
+ファイル数：約339
+主要画面数：約15
+Components：約17
+Hooks：約4
+Types定義：約7ファイル
+総合評価
+項目	配点	得点
+1. DRY原則・共通化	25	18
+2. 責務分割	25	15
+3. 型定義の堅牢性	25	21
+4. 保守性・クリーン度	25	18
+総合	100	72
+1. コードの共通化とDRY原則
+得点
+
+18 / 25
+
+減点 -7
+-3点
+
+画面ごとの肥大化によるロジック重複リスク
+
+確認した時点で以下が500行級。
+
+App.tsx (501行)
+HomeScreen.tsx (583行)
+SplitEditorScreen.tsx (588行)
+SettlementSummaryScreen.tsx (598行)
+
+これだけ大きいと、
+
+API呼び出し
+状態管理
+エラーハンドリング
+フォーマット処理
+
+が画面内に閉じ込められやすく、将来的に同様実装が増殖しやすい。
+
+-2点
+
+カスタムHookが少ない
+
+確認できたHook
+
+useIsWideLayout
+useReceiptJobs
+useResponsive
+
+程度。
+
+HomeScreenやSettlement系画面の状態管理量を考えると
+
+useSettlement()
+useReceiptScan()
+useReceiptSplit()
+
+のような業務単位Hookへの分離余地が大きい。
+
+-2点
+
+画面内関数数が多い
+
+特に
+
+HomeScreen
+SplitEditorScreen
+
+は画面イベントハンドラが多数存在。
+
+共通Util化できる部分が残っている。
+
+2. コンポーネント責務分割
+得点
+
+15 / 25
+
+減点 -10
+
+ここが最大の弱点。
+
+-4点
+
+App.tsxが大きすぎる
+
+501行。
+
+実質的に
+
+画面遷移
+認証
+初期化
+状態管理
+
+を全部持っている。
+
+React Navigation未導入なら仕方ない部分もあるが、
+
+現在の規模では限界。
+
+-3点
+
+ScreenがContainer化している
+
+例えば
+
+HomeScreen
+
+には
+
+UI
+API呼び出し
+権限処理
+画像選択
+状態管理
+
+が混在。
+
+理想は
+
+HomeScreen
+ ├ HomeView
+ ├ useHomeScreen
+ ├ useReceiptUpload
+ └ useImagePicker
+
+レベル。
+
+-2点
+
+Settlement系機能の凝集度が高い
+
+SplitEditorScreen
+
+SettlementSummaryScreen
+
+がそれぞれ約600行。
+
+業務ルール変更時に修正箇所が大きくなる。
+
+-1点
+
+Component数がやや少ない
+
+画面15に対してコンポーネント17。
+
+比率的に画面への集中が見える。
+
+3. 型定義の堅牢性と一元管理
+得点
+
+21 / 25
+
+減点 -4
+
+ここは比較的良い。
+
+良い点
+
+型定義フォルダが存在
+
+types/
+  auth.ts
+  receipt.ts
+  receiptScan.ts
+  settlement.ts
+
+に集約されている。
+
+良い点
+
+any乱用は見られない
+
+全体検索で
+
+any
+
+の出現は少数。
+
+かなり抑制されている。
+
+-2点
+
+一部でany使用
+
+確認箇所例
+
+PromptEditorScreen
+middleware
+prisma関連
+
+など。
+
+件数は少ないがゼロではない。
+
+-1点
+
+画面内部interfaceが残っている
+
+例
+
+interface HomeScreenProps
+
+など。
+
+規模がさらに増えるなら
+
+types/screens/
+
+へ集約した方がよい。
+
+-1点
+
+API DTOの境界が弱い
+
+Frontend型
+
+Backend型
+
+Prisma型
+
+が完全共有ではない。
+
+将来的にOpenAPI生成などへ進める余地あり。
+
+4. 保守性とクリーン度
+得点
+
+18 / 25
+
+減点 -7
+-3点
+
+画面単位の結合度が高い
+
+特に
+
+Home
+Settlement
+ReceiptScan
+
+周辺。
+
+状態が画面内に集中している。
+
+修正影響範囲の見通しが悪くなる。
+
+-2点
+
+機能別モジュール分割が不十分
+
+現在は
+
+screens
+components
+api
+utils
+
+中心。
+
+規模拡大時は
+
+features/
+  settlement/
+  receipt/
+  statistics/
+
+へ移行した方が保守しやすい。
+
+-1点
+
+テスト比率が低い
+
+確認できた大型テストは
+
+app.integration.test.ts
+
+中心。
+
+業務ロジックのユニットテストが少ない。
+
+-1点
+
+Context利用が限定的
+
+ReceiptTrayContextは存在するが、
+
+画面規模からすると状態共有戦略がまだ弱い。
+
+このプロジェクトで最優先の改善Issue
+
+優先順位順。
+
+Issue 1
+
+Settlement機能を分解
+
+対象
+
+SplitEditorScreen
+SettlementSummaryScreen
+
+期待効果
+
+約1200行削減
+保守性大幅向上
+Issue 2
+
+HomeScreen分解
+
+対象
+
+画像取得
+API処理
+画面表示
+
+をHook化
+
+Issue 3
+
+App.tsx解体
+
+認証管理
+
+初期化
+
+画面遷移
+
+を分離
+
+Issue 4
+
+Feature構成へ移行
+
+現状
+
+screens/
+components/
+utils/
+
+↓
+
+推奨
+
+features/
+  receipt/
+  settlement/
+  statistics/
+Issue 5
+
+型の共有化
+
+Backend DTO
+
+Frontend DTO
+
+OpenAPI生成
+
+または共有パッケージ化。
+
+結論
+
+このZIPの実装品質は、
+
+「個人開発〜小規模チームとしては良好」
+ですが、
+
+「非AIネイティブの第三者が3年保守する前提」
+で見ると、
+
+最大の問題は型ではなく 画面肥大化（500〜600行級Screenの存在） です。
+
+厳格採点では 72/100点。
+
+現時点では「破綻しているコードベース」ではありませんが、Settlement系とHome系を中心に責務分割を行わないまま機能追加を続けると、1年後には保守コストが急増する構造に入っています。

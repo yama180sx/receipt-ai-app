@@ -153,3 +153,73 @@ Epic: [#370 Issue #98](https://github.com/yama180sx/receipt-ai-app/issues/370)
 ```
 
 Navigation（#403 / #404）は Phase 2 中でリスク最高。Android / iOS / Web 同一 Screen 構成は維持。Web の URL / リロード / ブラウザ戻るを PoC で重点検証する。
+
+## 7. Epic #100 — ChatGPT レビュー 20260621 フォローアップ（Phase 3）
+
+Epic: [#423 Epic #100](https://github.com/yama180sx/receipt-ai-app/issues/423)
+
+[ChatGPT レビュー 20260621](../specs/chatgpt/ChatGPT_レビュー_20260621.txt)（74/100点）のフォローアップ。#98 / #99 / #98-8 Phase 2 完了後も残る **層境界・Screen 肥大・型/Mapper 不足** を解消する。
+
+### 7.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | ChatGPT レビュー 20260621 + 本セッション設計議論 + コード突合 |
+| BE 方針 | Service = Application 層。UseCase 物理層は新設しない |
+| FE 方針 | Hook = Application 層。Style Pattern 段階移行（big-bang 禁止） |
+| 型方針 | DTO = `api/generated`、ViewModel = `types/`、変換 = `mappers/` |
+| スコープ外 | Drizzle 移行、UseCase フォルダ新設、StyleSheet big-bang 一括 PR |
+
+### 7.2 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #100 Epic | [#423](https://github.com/yama180sx/receipt-ai-app/issues/423) | — | — |
+| #100-0 | [#424](https://github.com/yama180sx/receipt-ai-app/issues/424) | Must | 0.5 人日 |
+| #100-1 | [#425](https://github.com/yama180sx/receipt-ai-app/issues/425) | Must | 1.5〜2 人日 |
+| #100-2 | [#426](https://github.com/yama180sx/receipt-ai-app/issues/426) | Must | 1.5〜2 人日 |
+| #100-3 | [#427](https://github.com/yama180sx/receipt-ai-app/issues/427) | Must | 1〜1.5 人日 |
+| #100-4 | [#428](https://github.com/yama180sx/receipt-ai-app/issues/428) | Must | 1.5〜2 人日 |
+| #100-5 | [#429](https://github.com/yama180sx/receipt-ai-app/issues/429) | Should | 1〜1.5 人日 |
+| #100-6 | [#430](https://github.com/yama180sx/receipt-ai-app/issues/430) | Must | 0.5 人日 |
+| #100-7 | [#431](https://github.com/yama180sx/receipt-ai-app/issues/431) | Must | 1.5〜2 人日 |
+| #100-8 | [#432](https://github.com/yama180sx/receipt-ai-app/issues/432) | Must | 1.5〜2 人日 |
+| #100-9 | [#433](https://github.com/yama180sx/receipt-ai-app/issues/433) | Must | 1 人日 |
+| #100-10 | [#434](https://github.com/yama180sx/receipt-ai-app/issues/434) | Should | 1 人日 |
+| #100-11 | [#435](https://github.com/yama180sx/receipt-ai-app/issues/435) | Should | 0.5 人日 |
+| #100-12 | [#436](https://github.com/yama180sx/receipt-ai-app/issues/436) | Should | 1〜1.5 人日 |
+| #100-13 | [#437](https://github.com/yama180sx/receipt-ai-app/issues/437) | Should | 0.5〜1 人日 |
+| #100-14 | [#438](https://github.com/yama180sx/receipt-ai-app/issues/438) | Should | 1.5〜2 人日 |
+| #100-15 | [#439](https://github.com/yama180sx/receipt-ai-app/issues/439) | Must | 0.5 人日 |
+| #100-16 | [#440](https://github.com/yama180sx/receipt-ai-app/issues/440) | Should | 1〜1.5 人日 |
+
+### 7.3 #98-8 との関係（重複しない既存 Issue）
+
+| 既存 Issue | 内容 | #100 との関係 |
+|-----------|------|--------------|
+| #393 [#98-8-1] | features/ 移行 | #100-5 が auth/stats/history/category を補完 |
+| #394 [#98-8-2] | FE 残存 any 排除 | 並行実施（#100 スコープ外） |
+| #397 [#98-8-5] | Context 明示渡し | 並行実施 |
+| #398 [#98-8-6] | prisma `$extends` 型安全化 | 並行実施 |
+| #399 [#98-8-7] | Repository Phase 1 | #100-2 の前提 |
+| #400 [#98-8-8] | Repository Phase 2 | #100-3 の前提 |
+| #401 [#98-8-9] | OpenAPI 型生成 | #100-4 の前提 |
+
+### 7.4 Won't fix / 見送り（記録）
+
+| 項目 | 判定 | 理由 |
+|------|------|------|
+| Drizzle ORM 移行 | **Won't fix** | 現状 pain point なし。Prisma `$extends` テナント資産を維持 |
+| UseCase 物理層（`usecases/` フォルダ） | **Won't fix** | Service / Hook = Application 層として十分 |
+| StyleSheet big-bang 一括 PR | **Won't fix** | #100-6〜#100-11 で計画的段階移行 |
+
+### 7.5 推奨着手順
+
+```
+#424（#100-0 plan）→ #425 → #426 → #427 → #428 → #439
+  → #430 → #431 / #432 / #433（並行可）
+  → #434 → #435
+  → #436 → #437 → #438 → #440
+
+（#98-8 と並行: #393, #394, #397, #399, #400, #401）
+```
