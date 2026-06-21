@@ -16,6 +16,7 @@ import { getAppDisplayName, devUiColors, isDevAppEnv } from '../config/appEnv';
 import { DevEnvironmentBanner } from '../components/DevEnvironmentBanner';
 import { theme } from '../theme';
 import { showAlert } from '../utils/alertMessage';
+import { getApiErrorMessage } from '../utils/apiError';
 
 type LoginStep = 'invite' | 'member' | 'password' | 'totp_setup' | 'totp_verify';
 
@@ -71,8 +72,10 @@ export function LoginScreen({ onLoginSuccess }: Props) {
       setMembers(memberList);
       setStep('member');
     } catch (e: unknown) {
-      const message =
-        e instanceof Error ? e.message : '招待コードの確認に失敗しました。';
+      const message = getApiErrorMessage(
+        e,
+        '招待コードの確認に失敗しました。ネットワーク接続を確認してください。'
+      );
       showAlert('エラー', message);
     } finally {
       setLoading(false);

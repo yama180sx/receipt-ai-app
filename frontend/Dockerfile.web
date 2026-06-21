@@ -10,8 +10,8 @@ RUN npm install
 # ソースコピー
 COPY . .
 
-# [重要] Expo Webのビルド時にAPI URLを静的に埋め込む
-# 実行時ではなくビルド時に確定させる必要があります
+# [重要] Expo Web のビルド時に API URL を静的に埋め込む（stable/dev Web は /api = Nginx プロキシ）
+# Expo Go 開発は frontend/.env の EXPO_PUBLIC_API_URL（絶対 URL）を使用
 ARG EXPO_PUBLIC_API_URL
 ARG EXPO_PUBLIC_APP_ENV=stable
 ENV EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL}
