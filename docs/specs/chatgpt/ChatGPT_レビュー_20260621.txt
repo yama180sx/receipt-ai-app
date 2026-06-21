@@ -1,0 +1,405 @@
+現在React Native (Expo), TypeScript, PostgreSQLで構築中のアプリ「RecAIpt」のソースコード一式です。
+
+人間による細部レビューを一切排除した『真の品質ガバナンス』の検証として、以下の4観点から【100点満点からの厳格な減点方式】でシビアに採点してください。
+冗長な褒め言葉や配慮は一切不要です。将来の保守者（非AIネイティブな人間）への引き継ぎに耐えうるかという視点で、具体的な減点理由と改善ポイントをストレートに提示してください。
+
+【評価観点】
+1. コードの共通化とDRY原則（25点）: 微調整の連発によって、似たロジックやインラインコードが重複・コピペされていないか。
+2. コンポーネントの責務分割（25点）: 1つのファイルにロジック、UI、データ処理が詰め込まれすぎ、ファイルが肥大化していないか。
+3. 型定義の堅牢性と一元管理（25点）: Anyの乱用や不適切なアサーションがなく、型が適切に共通化されているか。
+4. 保守性とクリーン度（25点）: 結合度が強すぎて、将来の修正で別画面に予期せぬバグを誘発しやすくないか。
+思考を停止しました
+
+ZIPを実際に展開してソース構成を確認した上で採点します。
+
+対象概要
+
+React Native (Expo) + TypeScript
+Backend: Node.js + Prisma + PostgreSQL
+ソース総数：約434ファイル
+TypeScript系：約242ファイル
+総合評価
+観点	配点	得点
+1. DRY原則・共通化	25	19
+2. 責務分割	25	17
+3. 型定義の堅牢性	25	20
+4. 保守性・クリーン度	25	18
+合計	100	74
+1. コードの共通化とDRY原則
+得点
+
+19 / 25
+
+減点 -6
+-2点
+
+画面単位で独自型を再定義している
+
+例
+
+StatisticsScreen.tsx
+
+interface Category
+interface StatItem
+interface ReceiptItem
+interface ReceiptInfo
+interface MonthlyData
+
+これらが画面内ローカル定義になっている。
+
+本来は
+
+types/
+models/
+dto/
+
+へ集約すべき。
+
+-2点
+
+APIレスポンス変換ロジックが複数箇所に散在
+
+特に
+
+receipt
+statistics
+settlement
+
+周辺で同じデータ加工パターンが見える。
+
+Mapper層が薄い。
+
+-1点
+
+画面ごとのStyleSheet定義量が多い
+
+コンポーネント共通化が進んでいるものの、
+
+screen固有UI
+
+が増え始めている。
+
+今後画面が20→50になるとスタイル重複が増える。
+
+-1点
+
+エラーハンドリング文言が各画面に残っている
+
+Alert
+showAlert
+
+の利用はあるが完全統一ではない。
+
+評価
+
+初期開発段階としては良好。
+
+ただし
+
+「機能追加に追われて後から共通化する」
+
+典型パターンに入り始めている。
+
+2. コンポーネントの責務分割
+得点
+
+17 / 25
+
+減点 -8
+-3点
+
+LoginScreen.tsx
+
+約487行
+
+責務
+
+招待コード入力
+メンバー選択
+パスワード認証
+TOTP設定
+TOTP認証
+
+全部入り。
+
+-2点
+
+HomeScreen.tsx
+
+約423行
+
+本来
+
+DashboardView
+TrayView
+MenuView
+
+へ分離可能。
+
+-2点
+
+ReceiptDetailComponent.tsx
+
+約383行
+
+データ表示＋UI制御が混在。
+
+-1点
+
+StatisticsScreen.tsx
+
+約342行
+
+統計ロジックと表示ロジックが同居。
+
+良い点
+
+feature構成が導入されている。
+
+features/
+  app/
+  home/
+  settlement/
+
+は保守性向上に寄与。
+
+評価
+
+昔ながらの
+
+巨大Screen.tsx
+
+から脱却しようとしている途中段階。
+
+現時点ではまだ画面肥大化が目立つ。
+
+3. 型定義の堅牢性と一元管理
+得点
+
+20 / 25
+
+減点 -5
+-2点
+
+any利用あり
+
+確認できた箇所
+
+authMiddleware
+tenantMiddleware
+validate
+retry
+receiptWorker
+geminiService
+
+など。
+
+件数自体は多くない。
+
+-1点
+
+as any 使用
+
+完全にゼロではない。
+
+-1点
+
+型定義ファイル数が少ない
+
+確認できた共通型
+
+types/auth.ts
+types/receipt.ts
+types/receiptScan.ts
+types/settlement.ts
+
+程度。
+
+規模の割に不足。
+
+-1点
+
+DTOとDomain型の区別が弱い
+
+例えば
+
+APIレスポンス型
+画面表示型
+DB型
+
+が混ざりやすい構造。
+
+良い点
+
+大部分はTypeScriptが真面目に使われている。
+
+良い点
+
+generated schemaが存在
+
+frontend/src/api/generated/schema.ts
+
+を利用している。
+
+良い点
+
+any地獄にはなっていない。
+
+評価
+
+一般的な業務システム平均より上。
+
+TypeScript品質は比較的高い。
+
+4. 保守性とクリーン度
+得点
+
+18 / 25
+
+減点 -7
+-2点
+
+画面からAPIへの依存がまだ強い
+
+例
+
+categoryApi
+receiptApi
+statsApi
+
+を画面で直接扱う箇所がある。
+
+理想は
+
+Service
+UseCase
+Hook
+
+へ集約。
+
+-2点
+
+Repository層の肥大化傾向
+
+例
+
+receiptRepository.ts
+349行
+
+今後危険。
+
+-1点
+
+AuthController
+
+約359行
+
+認証周辺の責務が集中。
+
+-1点
+
+Integration Test
+
+app.integration.test.ts
+636行
+
+かなり巨大。
+
+テスト保守性が低下し始めている。
+
+-1点
+
+Feature境界が完全ではない
+
+現在
+
+screen
+component
+feature
+service
+api
+
+が混在。
+
+設計思想が過渡期。
+
+良い点
+
+以下はかなり評価できる。
+
+contexts
+hooks
+features
+generated api schema
+prisma
+repository
+service
+
+が導入済み。
+
+設計崩壊レベルではない。
+
+最も危険な箇所 TOP5
+
+優先度順。
+
+1位
+
+LoginScreen.tsx
+
+487行
+
+認証方式追加時に破綻しやすい。
+
+2位
+
+HomeScreen.tsx
+
+423行
+
+今後機能追加の受け皿になって肥大化する。
+
+3位
+
+ReceiptDetailComponent.tsx
+
+383行
+
+修正影響範囲が読みにくい。
+
+4位
+
+AuthController.ts
+
+359行
+
+認証ロジックの集約が過剰。
+
+5位
+
+StatisticsScreen.tsx
+
+342行
+
+集計ロジックをHookへ分離したい。
+
+結論
+
+このコードベースは
+
+「個人開発レベルを超え、業務開発レベルに入りつつある」
+
+一方で、
+
+「機能追加を優先した結果、Screen肥大化が始まっている段階」
+
+です。
+
+厳しめに採点すると 74/100点。
+
+現時点で全面リファクタリングは不要ですが、次のフェーズで
+
+Screen分割
+型定義集約
+UseCase層追加
+DTO/Domain分離
