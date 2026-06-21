@@ -20,6 +20,7 @@ if (!API_BASE) {
 
 const apiClient = axios.create({
   baseURL: API_BASE || 'http://localhost:3000/api',
+  timeout: 30_000,
   headers: {
     'Content-Type': 'application/json',
   },
