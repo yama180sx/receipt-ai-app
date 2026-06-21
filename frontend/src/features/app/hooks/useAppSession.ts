@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { categoryApi } from '../../../api/categoryApi';
 import { setOnUnauthorized } from '../../../utils/apiClient';
@@ -8,26 +7,6 @@ import { authService } from '../../../services/authService';
 import { canUseBiometric } from '../../../services/biometricService';
 import type { LoginResult, StoredSession } from '../../../types/auth';
 import type { CategorySummary } from '../../../types/receipt';
-
-const STORAGE_KEYS = {
-  VIEW: '@app_view',
-  RESULT: '@app_result',
-};
-
-export type AppViewType =
-  | 'main'
-  | 'history'
-  | 'stats'
-  | 'category_mgr'
-  | 'product_master'
-  | 'receipt_scan'
-  | 'receipt_tray'
-  | 'prompt_editor'
-  | 'admin_stats'
-  | 'admin_menu'
-  | 'split_editor'
-  | 'settlement_summary'
-  | 'totp_settings';
 
 export function useAppSession() {
   const [isReady, setIsReady] = useState(false);
@@ -40,7 +19,6 @@ export function useAppSession() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [currentView, setCurrentView] = useState<AppViewType>('main');
 
   const applySession = useCallback((session: StoredSession) => {
     setUserToken(session.token);
@@ -69,7 +47,6 @@ export function useAppSession() {
     setBiometricLockActive(false);
     setBiometricEnabled(false);
     setTotpEnabled(false);
-    setCurrentView('main');
     setCategories([]);
   }, []);
 
@@ -81,10 +58,9 @@ export function useAppSession() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const [session, bioEnabled, v] = await Promise.all([
+        const [session, bioEnabled] = await Promise.all([
           authService.loadSession(),
           authService.isBiometricEnabled(),
-          AsyncStorage.getItem(STORAGE_KEYS.VIEW),
         ]);
 
         setBiometricEnabled(bioEnabled);
@@ -99,8 +75,6 @@ export function useAppSession() {
             await fetchCategoriesForSession();
           }
         }
-
-        if (v) setCurrentView(v as AppViewType);
       } catch (e) {
         console.error('初期化失敗', e);
       } finally {
@@ -214,14 +188,11 @@ export function useAppSession() {
     totpEnabled,
     setTotpEnabled,
     categories,
-    currentView,
-    setCurrentView,
     handleLoginSuccess,
     handleBiometricUnlock,
     handleUsePasswordFromLock,
     handleDisableBiometric,
     handleLogout,
     fetchCategories,
-    storageKeys: STORAGE_KEYS,
   };
 }

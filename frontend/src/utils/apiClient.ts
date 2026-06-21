@@ -5,7 +5,7 @@ import { Platform, Alert } from 'react-native';
 import { AUTH_STORAGE_KEYS } from '../services/authService';
 
 /**
- * [Issue #52] 401エラー時に App.tsx 等の UI 側でログアウト処理を発火させるためのハンドラ
+ * 401エラー時にセッション Context / ルート側でログアウト処理を発火させるためのハンドラ
  */
 let onUnauthorizedHandler: (() => void) | null = null;
 

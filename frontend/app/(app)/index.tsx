@@ -1,64 +1,58 @@
-import React, { useCallback } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 
-import { DevEnvironmentBanner } from '../../src/components/DevEnvironmentBanner';
-import { ResponsiveContainer } from '../../src/components/ResponsiveContainer';
 import { MainToolbar } from '../../src/features/app/components/MainToolbar';
-import { useAppSessionContext } from '../../src/features/app/contexts/AppSessionContext';
+import { AppScreenShell } from '../../src/features/app/components/AppScreenShell';
+import { useAppNavigation } from '../../src/features/app/hooks/useAppNavigation';
+import { scanPath } from '../../src/features/app/navigation/scanRoutes';
 import { HomeScreen } from '../../src/screens/HomeScreen';
-import { theme } from '../../src/theme';
-
-function showPocScopeAlert() {
-  Alert.alert('PoC スコープ外', 'この画面は Issue #404（本番移行）で Expo Router に移行予定です。');
-}
+import type { ReceiptScanInitialData } from '../../src/types/receiptScan';
 
 export default function HomeRoute() {
-  const router = useRouter();
+  const { router, logout, session } = useAppNavigation();
   const {
     currentMemberId,
     currentMemberName,
     currentUserRole,
     biometricEnabled,
     handleDisableBiometric,
-    handleLogout,
-  } = useAppSessionContext();
-
-  const onLogout = useCallback(async () => {
-    await handleLogout();
-    router.replace('/login');
-  }, [handleLogout, router]);
+  } = session;
 
   if (!currentMemberId) {
     return null;
   }
 
+  const handleAnalysisReady = (data: ReceiptScanInitialData) => {
+    if (data.jobId) {
+      router.push(scanPath(data.jobId, 'home'));
+    }
+  };
+
   return (
-    <ResponsiveContainer fullWidth={false}>
-      <View style={styles.container}>
-        <DevEnvironmentBanner />
+    <AppScreenShell fullWidth={false}>
+      <View style={styles.home}>
         <MainToolbar
           memberName={currentMemberName}
           biometricEnabled={biometricEnabled}
           onDisableBiometric={() => void handleDisableBiometric()}
-          onLogout={() => void onLogout()}
+          onLogout={() => void logout()}
         />
         <HomeScreen
-          onAnalysisReady={() => showPocScopeAlert()}
+          onAnalysisReady={handleAnalysisReady}
           onGoToHistory={() => router.push('/history')}
-          onGoToStats={() => showPocScopeAlert()}
-          onGoToReceiptTray={() => showPocScopeAlert()}
-          onGoToSettlement={() => showPocScopeAlert()}
-          onGoToAdminMenu={() => showPocScopeAlert()}
+          onGoToStats={() => router.push('/stats')}
+          onGoToReceiptTray={() => router.push('/tray')}
+          onGoToSettlement={() => router.push('/settlement')}
+          onGoToAdminMenu={() => router.push('/admin')}
           currentMemberId={currentMemberId}
           memberName={currentMemberName}
           userRole={currentUserRole}
         />
       </View>
-    </ResponsiveContainer>
+    </AppScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
+  home: { flex: 1 },
 });
