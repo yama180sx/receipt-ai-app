@@ -23,6 +23,38 @@ export async function findProductMasterByIdAndFamilyGroup(id: number, familyGrou
   });
 }
 
+export async function findProductMasterByCompositeKey(
+  name: string,
+  storeName: string,
+  familyGroupId: number
+) {
+  return prisma.productMaster.findUnique({
+    where: {
+      name_storeName_familyGroupId: { name, storeName, familyGroupId },
+    },
+  });
+}
+
+export async function findProductMasterForEstimateInTx(
+  tx: PrismaTx,
+  input: { name: string; storeName: string; familyGroupId: number }
+) {
+  return tx.productMaster.findFirst({
+    where: { name: input.name, storeName: input.storeName, familyGroupId: input.familyGroupId },
+    select: { categoryId: true },
+  });
+}
+
+export async function findProductMasterByNameInTx(
+  tx: PrismaTx,
+  input: { name: string; familyGroupId: number }
+) {
+  return tx.productMaster.findFirst({
+    where: { name: input.name, familyGroupId: input.familyGroupId },
+    select: { categoryId: true },
+  });
+}
+
 export async function updateProductMasterRecord(
   id: number,
   data: { name: string; storeName: string; categoryId: number }

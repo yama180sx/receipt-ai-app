@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
+import { findCategoriesByFamilyGroup } from '../repositories/categoryRepository';
 import {
   enrichCompletedJobPayload,
   listReceiptJobsForMember,
@@ -74,7 +74,8 @@ export const discardReceiptJob = async (req: Request<{ jobId: string }>, res: Re
 
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
+    const { familyGroupId } = requireTenantContext();
+    const categories = await findCategoriesByFamilyGroup(familyGroupId);
     res.json({ success: true, data: categories });
   } catch (error) {
     next(error);
