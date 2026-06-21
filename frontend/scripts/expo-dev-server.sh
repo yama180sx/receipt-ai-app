@@ -17,4 +17,11 @@ fi
 echo "=============================================="
 echo ""
 
+# node_modules が不完全だと expo-router のバンドルが失敗する（EXPO_ROUTER_APP_ROOT 等）
+if [ ! -f node_modules/expo-router/build/global-state/storeContext.js ]; then
+  echo "Repairing frontend dependencies (npm install)..."
+  npm install
+  echo ""
+fi
+
 exec npx expo start --web --port "${PORT}" --host lan

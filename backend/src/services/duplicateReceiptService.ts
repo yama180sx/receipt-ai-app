@@ -1,5 +1,6 @@
-import { prisma } from '../utils/prismaClient';
 import { getCleanText, normalizeStoreName } from '../utils/normalizer';
+import type { ReceiptDuplicateCheckInput } from '../types/receipt';
+import { findReceiptForDuplicate } from '../repositories/receiptRepository';
 
 export type DuplicateCheckResult = {
   duplicateSuspected: boolean;
@@ -25,35 +26,28 @@ export function parseReceiptDate(dateStr: string | null | undefined): Date {
   return isNaN(fallback.getTime()) ? new Date() : fallback;
 }
 
-type ParsedLike = {
-  storeName?: string | null;
-  purchaseDate?: string | null;
-  date?: string | null;
-  totalAmount?: number | null;
-};
-
 /**
  * commit 前の read-only 重複候補判定（店名・日付・金額）。
  * saveParsedReceipt と同一ロジック。
  */
 export async function checkDuplicateReceipt(
   familyGroupId: number,
-  parsedData: ParsedLike,
+  parsedData: ReceiptDuplicateCheckInput,
   imagePath?: string | null
 ): Promise<DuplicateCheckResult> {
   const normalizedImage = imagePath?.replace(/\\/g, '/');
 
   if (normalizedImage) {
-    const existingByImage = await prisma.receipt.findFirst({
-      where: { familyGroupId, imagePath: normalizedImage },
-      select: { id: true },
-    });
+    const existingByImage = await findReceiptForDuplicate(
+      { familyGroupId, imagePath: normalizedImage },
+      { id: true }
+    );
     if (existingByImage) {
       return { duplicateSuspected: false, existingReceiptId: existingByImage.id };
     }
   }
 
-  const officialStoreName = await normalizeStoreName(parsedData.storeName || '');
+  const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
   const cleanStore = getCleanText(officialStoreName);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
   const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
@@ -82,10 +76,7 @@ export async function checkDuplicateReceipt(
     };
   }
 
-  const existing = await prisma.receipt.findFirst({
-    where: duplicateWhere,
-    select: { id: true, storeName: true },
-  });
+  const existing = await findReceiptForDuplicate(duplicateWhere, { id: true, storeName: true });
 
   if (existing && getCleanText(existing.storeName) === cleanStore) {
     return { duplicateSuspected: true, existingReceiptId: existing.id };

@@ -20,10 +20,10 @@ const receiptWorker = new Worker(
     return await runWithTenant({ familyGroupId, memberId }, async () => {
       try {
         /**
-         * analyzeOnly の内部で geminiService.analyzeReceiptImage が呼ばれます。
+         * analyzeOnly の内部で ReceiptAnalysisProvider（Gemini）が呼ばれます。
          * [Issue #71] により、戻り値の ParsedReceipt に taxAmount が含まれるようになっています。
          */
-        const result = await analyzeOnly(memberId, imagePath);
+        const result = await analyzeOnly({ familyGroupId, memberId }, imagePath);
         
         logger.info(`[Worker] 解析完了: ID ${job.id} (画像: ${imagePath}, taxAmount抽出: ${result.parsedData.taxAmount ?? 0})`);
 

@@ -1,23 +1,34 @@
 import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger';
-import { prisma } from '../utils/prismaClient'; 
+import { prisma } from '../utils/prismaClient';
 import { AppError } from '../utils/appError';
-import { getCleanText } from '../utils/normalizer';
 import { receiptQueue } from '../queues/receiptQueue';
-import { saveParsedReceipt, saveConfirmedReceipt } from '../services/receiptService';
-import { enrichCompletedJobPayload, listReceiptJobsForMember, discardReceiptJobForMember, removeReceiptJobAfterCommit } from '../services/receiptJobService'; 
-import { getFamilyGroupId, getMemberId } from '../utils/context';
-import { allocateItemSplits, SplitInput } from '../utils/itemSplitAllocation';
-import { calcItemLineTotal } from '../utils/itemLineTotal';
-import { getLocalMonthDateRange, normalizeYearMonth } from '../utils/yearMonth';
+import {
+  enrichCompletedJobPayload,
+  listReceiptJobsForMember,
+  discardReceiptJobForMember,
+} from '../services/receiptJobService';
+import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
+import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
+import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
+import { createManualReceipt } from '../services/receipt/receiptUpdateService';
+import {
+  listReceipts,
+  getLatestReceipt as fetchLatestReceipt,
+  deleteReceiptById,
+  listFamilyMembers,
+} from '../services/receipt/receiptQueryService';
+import { updateReceiptById, updateItemCategoryById } from '../services/receipt/receiptUpdateService';
+import { updateItemSplitsById } from '../services/receipt/receiptSplitService';
+import {
+  getMonthlyStats as fetchMonthlyStats,
+  getAdvancedStats as fetchAdvancedStats,
+} from '../services/receipt/receiptStatsService';
+import { SplitInput } from '../utils/itemSplitAllocation';
 
-/**
- * [Issue #43] ジョブステータス取得
- */
 export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
-    const familyGroupId = getFamilyGroupId();
+    const { familyGroupId } = requireTenantContext();
     const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
     if (!job) throw new AppError('ジョブが見つかりません。', 404);
 
@@ -35,568 +46,211 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
     };
     data = await enrichCompletedJobPayload(job, familyGroupId, data);
 
-    res.status(200).json({
-      success: true,
-      data,
-    });
-  } catch (error) { next(error); }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #95-1] ログインメンバー本人の解析ジョブ一覧（確認トレイ用）
- */
 export const getReceiptJobs = async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const familyGroupId = getFamilyGroupId();
-    const memberId = getMemberId();
-    if (!memberId) {
-      throw new AppError('メンバーIDが指定されていません。', 400);
-    }
-
-    const jobs = await listReceiptJobsForMember(familyGroupId, Number(memberId));
+    const ctx = requireTenantContext();
+    const jobs = await listReceiptJobsForMember(ctx.familyGroupId, ctx.memberId);
     res.status(200).json({ success: true, data: jobs });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #95-4] 未取り込み解析ジョブの破棄
- */
 export const discardReceiptJob = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
   try {
-    const familyGroupId = getFamilyGroupId();
-    const memberId = getMemberId();
-    if (!memberId) {
-      throw new AppError('メンバーIDが指定されていません。', 400);
-    }
-
-    await discardReceiptJobForMember(
-      getRouteParam(req, 'jobId'),
-      familyGroupId,
-      Number(memberId)
-    );
-
+    const ctx = requireTenantContext();
+    await discardReceiptJobForMember(getRouteParam(req, 'jobId'), ctx.familyGroupId, ctx.memberId);
     res.status(200).json({ success: true, message: 'Discarded' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * カテゴリ一覧取得
- */
 export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
     res.json({ success: true, data: categories });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * レシートアップロード (AI解析ジョブ投入)
- */
 export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = getMemberId();
-    const familyGroupId = getFamilyGroupId();
+    const ctx = requireTenantContext();
     const imagePath = req.file?.path;
 
     if (!imagePath) throw new AppError('画像がアップロードされていません。', 400);
-    if (!memberId) throw new AppError('メンバーIDが指定されていません。', 400);
 
     const job = await receiptQueue.add('analyze-receipt', {
-      memberId: Number(memberId),
-      familyGroupId,
+      memberId: ctx.memberId,
+      familyGroupId: ctx.familyGroupId,
       imagePath,
     });
 
     res.status(202).json({ success: true, data: { jobId: job.id } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #49-8 / #63] 解析結果の確定保存
- * フロントエンドから送還される parsedData 内の usageLogId を欠落させずにサービス層へ引き渡します。
- */
 export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = getMemberId();
-    const familyGroupId = getFamilyGroupId();
+    const ctx = requireTenantContext();
     const { parsedData, imagePath, validation, jobId } = req.body;
 
-    if (!parsedData || !imagePath) {
-      throw new AppError('必要なデータが不足しています。', 400);
-    }
+    if (!parsedData || !imagePath) throw new AppError('必要なデータが不足しています。', 400);
 
-    if (!memberId || !familyGroupId) {
-      throw new AppError('認証情報または世帯情報が取得できません。', 401);
-    }
-
-    // parsedData オブジェクト内に含まれる usageLogId がそのまま引き渡されます
-    const result = await saveConfirmedReceipt(
-      memberId,
-      familyGroupId,
-      parsedData,
+    const result = await commitReceiptService({
+      ctx,
+      parsedData: parsedData as ReceiptCommitPayload,
       imagePath,
-      validation?.isSuspicious || false,
-      validation?.warnings || []
-    );
-
-    if (jobId) {
-      await removeReceiptJobAfterCommit(String(jobId), familyGroupId, Number(memberId)).catch(() => {
-        // 既に破棄済み等は無視（保存は成功している）
-      });
-    }
+      isSuspicious: validation?.isSuspicious || false,
+      warnings: validation?.warnings || [],
+      jobId,
+    });
 
     res.status(201).json({ success: true, data: result });
-  } catch (error: any) { 
-    if (error.statusCode === 409) {
-      return res.status(409).json({
-        success: false,
-        message: 'DUPLICATE',
-        existingId: error.existingId ?? null,
-      });
-    }
-    next(error); 
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * 手動登録 (Issue #67: Float対応 & 合計額自動算出)
- * ※手動登録ルートのため、解析用トークンログ（usageLogId）の紐付け処理は対象外
- */
 export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const memberId = getMemberId();
-    const familyGroupId = getFamilyGroupId();
+    const ctx = requireTenantContext();
     const { date, storeName, items, imagePath } = req.body;
 
-    // 単価×数量の合計を算出し、四捨五入して整数にする
-    const calculatedTotal = items.reduce((sum: number, i: any) => {
-      return sum + (Number(i.price || 0) * Number(i.quantity || 0));
-    }, 0);
-
-    const newReceipt = await saveParsedReceipt(
-      Number(memberId),
-      familyGroupId,
-      {
-        storeName,
-        purchaseDate: date,
-        totalAmount: Math.round(calculatedTotal), // 合計は整数
-        items: items.map((i: any) => ({
-          name: i.name,
-          price: parseFloat(i.price), 
-          quantity: parseFloat(i.quantity || 1),
-          categoryId: i.categoryId ? Number(i.categoryId) : null
-        }))
-      },
-      imagePath || "",
-      false, 
-      []
-    );
+    const newReceipt = await createManualReceipt(ctx, {
+      date,
+      storeName,
+      items: items as ReceiptCreateItemInput[],
+      imagePath,
+    });
 
     res.status(201).json({ success: true, data: newReceipt });
-  } catch (error: any) { 
-    if (error.statusCode === 409) {
-      return res.status(409).json({
-        success: false,
-        message: 'DUPLICATE',
-        existingId: error.existingId ?? null,
-      });
-    }
-    next(error); 
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * [Issue #67] 保存済みレシートの完全編集
- */
 export const updateReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  const id = getRouteParam(req, 'id');
-  const { date, storeName, items } = req.body;
-  const familyGroupId = getFamilyGroupId();
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. 存在確認
-      const existing = await tx.receipt.findUnique({
-        where: { id: Number(id) },
-      });
-      if (!existing || existing.familyGroupId !== familyGroupId) {
-        throw new AppError('ReceiptNotFound', 404);
-      }
+    const { familyGroupId } = requireTenantContext();
+    const id = getRouteParam(req, 'id');
+    const { date, storeName, items } = req.body;
 
-      // 2. 合計金額の再計算（小数点対応後の整合性確保）
-      const calculatedTotal = items.reduce((sum: number, i: any) => {
-        return sum + (Number(i.price || 0) * Number(i.quantity || 0));
-      }, 0);
-      const finalTotal = Math.round(calculatedTotal);
-
-      // 3. レシート基本情報の更新
-      await tx.receipt.update({
-        where: { id: Number(id) },
-        data: {
-          date: date ? new Date(date) : undefined,
-          storeName: storeName || undefined,
-          totalAmount: finalTotal, // 四捨五入した整数値を保存
-        }
-      });
-
-      // 4. 明細（Item）の差し替え
-      await tx.item.deleteMany({ where: { receiptId: Number(id) } });
-      
-      if (items && Array.isArray(items)) {
-        await tx.item.createMany({
-          data: items.map((i: any) => ({
-            receiptId: Number(id),
-            name: i.name,
-            price: parseFloat(i.price) || 0,
-            quantity: parseFloat(i.quantity) || 0,
-            categoryId: i.categoryId ? Number(i.categoryId) : null,
-          }))
-        });
-
-        // 5. 学習マスタへのフィードバック
-        for (const item of items) {
-          if (item.categoryId) {
-            await tx.productMaster.upsert({
-              where: {
-                name_storeName_familyGroupId: {
-                  name: getCleanText(item.name),
-                  storeName: getCleanText(storeName || existing.storeName),
-                  familyGroupId
-                }
-              },
-              update: { categoryId: Number(item.categoryId) },
-              create: {
-                name: getCleanText(item.name),
-                storeName: getCleanText(storeName || existing.storeName),
-                categoryId: Number(item.categoryId),
-                familyGroupId
-              }
-            });
-          }
-        }
-      }
-
-      return await tx.receipt.findUnique({
-        where: { id: Number(id) },
-        include: { items: { include: { category: true } } }
-      });
+    const result = await updateReceiptById(Number(id), familyGroupId, {
+      date,
+      storeName,
+      items: items as ReceiptCreateItemInput[],
     });
 
     res.json({ success: true, data: result });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * カテゴリ更新 ＋ 学習マスタ反映
- */
 export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
-  const id = getRouteParam(req, 'id');
-  const { categoryId } = req.body;
-  const familyGroupId = getFamilyGroupId();
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const currentItem = await tx.item.findUnique({
-        where: { id: Number(id) },
-        include: { receipt: true }
-      });
+    const { familyGroupId } = requireTenantContext();
+    const id = getRouteParam(req, 'id');
+    const { categoryId } = req.body;
 
-      if (!currentItem || currentItem.receipt.familyGroupId !== familyGroupId) {
-        throw new AppError('ItemNotFound', 404);
-      }
-
-      if (categoryId) {
-        const category = await tx.category.findFirst({
-          where: { id: Number(categoryId), familyGroupId },
-        });
-        if (!category) throw new AppError('CategoryNotFound', 404);
-      }
-
-      const updatedItem = await tx.item.update({
-        where: { id: Number(id) },
-        data: { categoryId: categoryId ? Number(categoryId) : null },
-        include: { category: true }
-      });
-
-      if (categoryId) {
-        await tx.productMaster.upsert({
-          where: {
-            name_storeName_familyGroupId: {
-              name: getCleanText(currentItem.name),
-              storeName: getCleanText(currentItem.receipt.storeName),
-              familyGroupId
-            }
-          },
-          update: { categoryId: Number(categoryId) },
-          create: {
-            name: getCleanText(currentItem.name),
-            storeName: getCleanText(currentItem.receipt.storeName),
-            categoryId: Number(categoryId),
-            familyGroupId
-          }
-        });
-      }
-      return updatedItem;
-    });
+    const result = await updateItemCategoryById(Number(id), familyGroupId, categoryId);
     res.json({ success: true, data: result });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * レシート一覧取得
- */
 export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { month } = req.query;
-    const familyGroupId = getFamilyGroupId();
-
-    const where: any = { familyGroupId };
-
-    // 「世帯全体」は memberId="" → 世帯全件。空文字を x-member-id にフォールバックしない
-    const rawMemberId = req.query.memberId;
-    if (
-      rawMemberId !== undefined &&
-      rawMemberId !== null &&
-      String(rawMemberId).trim() !== ''
-    ) {
-      const filterMemberId = Number(rawMemberId);
-      if (!Number.isNaN(filterMemberId)) {
-        where.memberId = filterMemberId;
-      }
-    }
-
-    const normalizedMonth = normalizeYearMonth(
-      typeof month === 'string' ? month : undefined
-    );
-    if (normalizedMonth) {
-      const { start, end } = getLocalMonthDateRange(normalizedMonth);
-      where.date = { gte: start, lt: end };
-    }
-
-    const receipts = await prisma.receipt.findMany({
-      where,
-      include: { items: { include: { category: true, splits: true } } }, // ★ Issue #78: splitsも一緒に取得するよう変更
-      orderBy: { date: 'desc' }
+    const { familyGroupId } = requireTenantContext();
+    const { month, memberId } = req.query;
+    const receipts = await listReceipts({
+      familyGroupId,
+      memberId: typeof memberId === 'string' ? memberId : undefined,
+      month: typeof month === 'string' ? month : undefined,
     });
     res.json({ success: true, data: receipts });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * 最新1件取得
- */
 export const getLatestReceipt = async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const receipt = await prisma.receipt.findFirst({
-      where: { familyGroupId: getFamilyGroupId() },
-      orderBy: { createdAt: 'desc' },
-      include: { items: { include: { category: true, splits: true } } } // ★ Issue #78
-    });
+    const { familyGroupId } = requireTenantContext();
+    const receipt = await fetchLatestReceipt(familyGroupId);
     res.json({ success: true, data: receipt });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * 削除
- */
 export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.receipt.delete({ 
-      where: { id: Number(getRouteParam(req, 'id')) } 
-    });
+    const { familyGroupId } = requireTenantContext();
+    await deleteReceiptById(Number(getRouteParam(req, 'id')), familyGroupId);
     res.json({ success: true, message: 'Deleted' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #49-8] 月別統計
- */
 export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
-  const familyGroupId = getFamilyGroupId();
-  const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
-
   try {
-    const totalRes = await prisma.$queryRaw<any[]>`
-      SELECT SUM("totalAmount")::double precision as total
-      FROM "Receipt"
-      WHERE "familyGroupId" = ${familyGroupId}
-      AND TO_CHAR(date, 'YYYY-MM') = ${month}
-    `;
-    const totalAmount = totalRes[0]?.total || 0;
-
-    const categoryStats = await prisma.$queryRaw<any[]>`
-      SELECT 
-        c.id as "categoryId",
-        c.name as "categoryName",
-        c.color as "color",
-        SUM(i.price * i.quantity)::double precision as "totalAmount"
-      FROM "Item" i
-      JOIN "Receipt" r ON i."receiptId" = r.id
-      LEFT JOIN "Category" c ON i."categoryId" = c.id
-      WHERE r."familyGroupId" = ${familyGroupId}
-      AND TO_CHAR(r.date, 'YYYY-MM') = ${month}
-      GROUP BY c.id, c.name, c.color
-      ORDER BY "totalAmount" DESC
-    `;
-
-    const latestReceipt = await prisma.receipt.findFirst({
-      where: { 
-        familyGroupId, 
-        date: { 
-          gte: new Date(`${month}-01`), 
-          lt: new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)) 
-        } 
-      },
-      orderBy: { date: 'desc' },
-      include: { items: { include: { category: true } } }
-    });
-
-    res.json({ 
-      success: true, 
-      data: {
-        month,
-        totalAmount,
-        stats: categoryStats.map(s => ({
-          ...s,
-          categoryName: s.categoryName || '未分類'
-        })),
-        latestReceipt
-      }
-    });
-  } catch (error) { next(error); }
+    const { familyGroupId } = requireTenantContext();
+    const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+    const data = await fetchMonthlyStats(familyGroupId, month);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #49-8] 高度な統計
- */
 export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
-  const fId = getFamilyGroupId();
   try {
-    const trend = await prisma.$queryRaw<any[]>`
-      SELECT 
-        TO_CHAR(date, 'YYYY-MM') as period, 
-        SUM("totalAmount")::double precision as total 
-      FROM "Receipt" 
-      WHERE "familyGroupId" = ${fId} 
-      GROUP BY period 
-      ORDER BY period DESC 
-      LIMIT 6
-    `;
-
-    const month = new Date().toISOString().slice(0, 7);
-    const paretoRaw = await prisma.$queryRaw<any[]>`
-      SELECT 
-        COALESCE(c.name, '未分類') as name,
-        SUM(i.price * i.quantity)::double precision as amount
-      FROM "Item" i
-      JOIN "Receipt" r ON i."receiptId" = r.id
-      LEFT JOIN "Category" c ON i."categoryId" = c.id
-      WHERE r."familyGroupId" = ${fId}
-      AND TO_CHAR(r.date, 'YYYY-MM') = ${month}
-      GROUP BY c.name
-      ORDER BY amount DESC
-    `;
-
-    const total = paretoRaw.reduce((sum, item) => sum + (item.amount || 0), 0);
-    let cumulative = 0;
-    const pareto = paretoRaw.map(item => {
-      const ratio = total > 0 ? Math.round((item.amount / total) * 100) : 0;
-      cumulative += ratio;
-      return {
-        ...item,
-        ratio,
-        cumulative_ratio: cumulative > 100 ? 100 : cumulative
-      };
-    });
-
-    res.json({ success: true, data: { trend, pareto } });
-  } catch (error) { next(error); }
+    const { familyGroupId } = requireTenantContext();
+    const data = await fetchAdvancedStats(familyGroupId);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * [Issue #64] 所属世帯のメンバー一覧取得
- */
 export const getFamilyMembers = async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const familyGroupId = getFamilyGroupId();
-    if (!familyGroupId) {
-      throw new AppError('世帯情報が取得できません。', 400);
-    }
-
-    const members = await prisma.familyMember.findMany({
-      where: { familyGroupId },
-      select: {
-        id: true,
-        name: true,
-      },
-      orderBy: { id: 'asc' }
-    });
-
+    const { familyGroupId } = requireTenantContext();
+    const members = await listFamilyMembers(familyGroupId);
     res.json({ success: true, data: members });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-/**
- * ★ [Issue #78] 明細（Item）の負担内訳（ItemSplit）を更新・保存する
- * 要求されるデータ形式:
- * { splits: [{ familyMemberId: 1, ratio: 0.5 }, { familyMemberId: 2, amount: 500 }] }
- * 配列が空の場合は「按分なし」とみなし、既存のSplitを全削除します。
- */
 export const updateItemSplits = async (req: Request, res: Response, next: NextFunction) => {
-  const itemId = getRouteParam(req, 'itemId');
-  const { splits } = req.body;
-  const familyGroupId = getFamilyGroupId();
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. 対象明細の存在とテナント権限の確認
-      const item = await tx.item.findUnique({
-        where: { id: Number(itemId) },
-        include: { receipt: true }
-      });
+    const { familyGroupId } = requireTenantContext();
+    const itemId = getRouteParam(req, 'itemId');
+    const { splits } = req.body;
 
-      if (!item || item.receipt.familyGroupId !== familyGroupId) {
-        throw new AppError('ItemNotFound', 404);
-      }
-
-      // 2. 空配列が送られてきた場合は、暗黙的デフォルト（按分なし）とみなして削除のみ行う
-      if (!splits || !Array.isArray(splits) || splits.length === 0) {
-        await tx.itemSplit.deleteMany({ where: { itemId: Number(itemId) } });
-        return { message: 'Splits cleared (Fallback to default payer)' };
-      }
-
-      const totalAmount = calcItemLineTotal(item.price, item.quantity);
-      const splitInputs: SplitInput[] = splits.map((split: SplitInput) => ({
-        familyMemberId: Number(split.familyMemberId),
-        ratio: split.ratio,
-        amount: split.amount,
-      }));
-
-      const memberIds = [...new Set(splitInputs.map((s) => s.familyMemberId))];
-      const validMembers = await tx.familyMember.findMany({
-        where: { id: { in: memberIds }, familyGroupId },
-        select: { id: true },
-      });
-      if (validMembers.length !== memberIds.length) {
-        throw new AppError('Invalid familyMemberId in splits', 403);
-      }
-
-      const finalSplits = allocateItemSplits(totalAmount, splitInputs);
-
-      // DBの洗い替え（Delete & Insert）
-      await tx.itemSplit.deleteMany({ where: { itemId: Number(itemId) } });
-      await tx.itemSplit.createMany({
-        data: finalSplits.map(fs => ({
-          itemId: Number(itemId),
-          familyMemberId: fs.familyMemberId,
-          amount: fs.amount,
-        }))
-      });
-
-      // 更新後のSplitリストを返す
-      return await tx.itemSplit.findMany({ where: { itemId: Number(itemId) } });
-    });
+    const result = await updateItemSplitsById(
+      Number(itemId),
+      familyGroupId,
+      splits as SplitInput[] | undefined
+    );
 
     res.json({ success: true, data: result });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };

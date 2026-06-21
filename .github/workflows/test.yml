@@ -54,6 +54,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Verify OpenAPI generated types
+        run: npm run check:api
+
   backend-integration:
     name: Backend API integration (Postgres)
     runs-on: ubuntu-latest

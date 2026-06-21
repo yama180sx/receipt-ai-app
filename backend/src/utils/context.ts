@@ -35,6 +35,14 @@ export const getMemberId = (): number => {
 export const hasContext = (): boolean => !!tenantStorage.getStore();
 
 /**
+ * Controller 等の HTTP 境界でテナント ctx を明示取得する
+ */
+export const requireTenantContext = (): TenantContext => ({
+  familyGroupId: getFamilyGroupId(),
+  memberId: getMemberId(),
+});
+
+/**
  * ALC内で関数を実行するためのラッパー
  */
 export const runWithTenant = <T>(context: TenantContext, fn: () => T): T => {
