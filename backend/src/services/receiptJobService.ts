@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { receiptQueue } from '../queues/receiptQueue';
 import { checkDuplicateReceipt } from './duplicateReceiptService';
-import { prisma } from '../utils/prismaClient';
+import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
 import { AppError } from '../utils/appError';
 
 const LIST_JOB_STATES = ['waiting', 'active', 'completed', 'failed', 'delayed', 'paused'] as const;
@@ -176,10 +176,7 @@ async function deletePendingJobImage(
   if (!imagePath || typeof imagePath !== 'string') return;
 
   const normalized = imagePath.replace(/\\/g, '/');
-  const saved = await prisma.receipt.findFirst({
-    where: { familyGroupId, imagePath: normalized },
-    select: { id: true },
-  });
+  const saved = await findReceiptIdByImagePath(familyGroupId, normalized);
   if (saved) return;
 
   try {

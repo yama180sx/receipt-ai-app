@@ -1,9 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as fs from "fs";
 import * as path from "path";
-import prisma from "../utils/prismaClient"; 
 import logger from "../utils/logger";
 import type { ParsedReceipt } from "../types/receipt";
+import { findActivePromptTemplateByKey } from "../repositories/promptRepository";
+import {
+  createApiUsageLog,
+  incrementApiUsageLogTokens,
+} from "../repositories/apiUsageLogRepository";
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
 
@@ -48,12 +52,7 @@ async function withRetry<T>(
  * [Issue #72/76] プロンプトをDBから取得し、ドメインヒントを結合
  */
 async function buildPrompt(): Promise<string> {
-  // ★修正: @unique制約を外したため、findUniqueからfindFirstへ変更。
-  // 現在アクティブ(isActive: true)なRECEIPT_ANALYSISプロンプトを取得する。
-  const template = await prisma.promptTemplate.findFirst({
-    where: { key: "RECEIPT_ANALYSIS", isActive: true },
-    orderBy: { updatedAt: 'desc' } // 念のため最新のものを優先
-  });
+  const template = await findActivePromptTemplateByKey("RECEIPT_ANALYSIS");
 
   if (!template) {
     throw new Error("プロンプトテンプレート(RECEIPT_ANALYSIS)がDBに見つかりません。");
@@ -128,26 +127,19 @@ export const analyzeReceiptImage = async (
     if (usage) {
       try {
         if (existingLogId) {
-          // 自己修復リトライ時は、既存のログレコードにトークン使用量を合算（累積）
-          await prisma.apiUsageLog.update({
-            where: { id: existingLogId },
-            data: {
-              promptTokens: { increment: usage.promptTokenCount },
-              candidatesTokens: { increment: usage.candidatesTokenCount },
-              totalTokens: { increment: usage.totalTokenCount },
-            }
+          await incrementApiUsageLogTokens(existingLogId, {
+            promptTokens: usage.promptTokenCount ?? 0,
+            candidatesTokens: usage.candidatesTokenCount ?? 0,
+            totalTokens: usage.totalTokenCount ?? 0,
           });
           logger.info(`[Gemini_Log] 自己修復リトライ分のトークンを合算しました (LogID: ${existingLogId})`);
         } else {
-          // 初回解析時は新規ログレコードを作成
-          const log = await prisma.apiUsageLog.create({
-            data: {
-              familyMemberId: familyMemberId || null,
-              modelId: GEMINI_MODEL,
-              promptTokens: usage.promptTokenCount,
-              candidatesTokens: usage.candidatesTokenCount,
-              totalTokens: usage.totalTokenCount,
-            }
+          const log = await createApiUsageLog({
+            familyMemberId: familyMemberId || null,
+            modelId: GEMINI_MODEL,
+            promptTokens: usage.promptTokenCount ?? 0,
+            candidatesTokens: usage.candidatesTokenCount ?? 0,
+            totalTokens: usage.totalTokenCount ?? 0,
           });
           usageLogId = log.id;
         }
