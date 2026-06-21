@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/server.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
+    "start": "ts-node --transpile-only src/server.ts",
     "dev": "tsx watch src/server.ts",
     "backend:dev": "ts-node-dev --respawn src/server.ts",
     "prisma:generate": "prisma generate",
