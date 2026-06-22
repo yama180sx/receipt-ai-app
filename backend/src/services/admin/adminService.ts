@@ -14,6 +14,7 @@ import {
   updatePromptTemplateRecord,
 } from '../../repositories/promptRepository';
 import { queryAdminCostStatsByFamilyGroup } from '../../repositories/apiUsageLogRepository';
+import type { AdminCostStatDomain } from '../../mappers/adminMapper';
 
 const RATE_USD_TO_JPY = 150;
 const PRICE_USD_PER_INPUT = 0.075 / 1000000;
@@ -127,13 +128,7 @@ export async function deletePromptTemplate(ctx: TenantContext, id: number) {
   await syncPromptsToJson(ctx.familyGroupId);
 }
 
-type CostStatRow = {
-  month: string;
-  modelId: string;
-  totalPromptTokens: number;
-  totalCandidatesTokens: number;
-  estimatedCostJpy: number;
-};
+type CostStatRow = AdminCostStatDomain;
 
 export async function getAdminCostStats(ctx: TenantContext): Promise<CostStatRow[]> {
   const stats = await queryAdminCostStatsByFamilyGroup(ctx.familyGroupId);

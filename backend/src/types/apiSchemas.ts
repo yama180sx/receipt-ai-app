@@ -9,9 +9,8 @@
 
 // --- auth ---
 export type ResolvedFamily = {
-  id: number;
+  familyGroupId: number;
   name: string;
-  inviteCode: string;
 };
 
 export type AuthFamilyMember = {
@@ -208,13 +207,14 @@ export type MergeStoreNamesResponse = {
 // --- admin ---
 export type PromptTemplate = {
   id: number;
-  name: string;
-  description: string | null;
+  key: string;
+  name?: string | null;
+  description?: string | null;
   systemPrompt: string;
-  domainHints: string | null;
+  domainHints?: Record<string, unknown> | null;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  version: number;
+  familyGroupId?: number;
 };
 
 export type AdminCostStatRow = {
