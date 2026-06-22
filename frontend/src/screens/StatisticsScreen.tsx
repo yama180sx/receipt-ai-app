@@ -7,7 +7,6 @@ import {
   ActivityIndicator, 
   Image, 
   TouchableOpacity, 
-  Alert, 
   FlatList, 
   useWindowDimensions, 
 } from 'react-native';
@@ -19,38 +18,19 @@ import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { theme } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
-import type { ReceiptDetail } from '../types/receipt';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
-
-// --- interface 定義 ---
-interface Category { id: number; name: string; color: string; }
-interface StatItem { categoryId: number | null; categoryName: string; totalAmount: number | string; color: string; }
-interface ReceiptItem { id: number; name: string; price: number; quantity: number; categoryId: number; category?: { name: string; color: string }; }
-
-// [Issue #71] taxAmount を追加
-interface ReceiptInfo { 
-  id: number; 
-  imagePath: string | null; 
-  storeName: string; 
-  totalAmount: number; 
-  taxAmount?: number; 
-  items: ReceiptItem[]; 
-  date?: string; 
-}
-
-interface MonthlyData { 
-  month: string; 
-  totalAmount: number; 
-  prevTotal: number; 
-  diffAmount: number; 
-  diffPercentage: number; 
-  stats: StatItem[]; 
-  latestReceipt: ReceiptInfo | null; 
-}
-
-interface TrendData { period: string; total: number; prev_total: number | null; }
-interface ParetoData { name: string; amount: number; ratio: number; cumulative_ratio: number; }
-interface AdvancedStats { trend: TrendData[]; pareto: ParetoData[]; }
+import {
+  mapAdvancedStatsResponse,
+  mapCategoryList,
+  mapMonthlyStatsResponse,
+} from '../mappers/statsMapper';
+import type {
+  AdvancedStatsViewModel,
+  MonthlyStatsViewModel,
+  StatsCategoryOption,
+} from '../types/stats';
+import { showAlert } from '../utils/alertMessage';
+import { getApiErrorMessage } from '../utils/apiError';
 
 interface StatisticsScreenProps { 
   currentMemberId: number; 
@@ -68,9 +48,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
-  const [data, setData] = useState<MonthlyData | null>(null);
-  const [advancedData, setAdvancedData] = useState<AdvancedStats | null>(null);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [data, setData] = useState<MonthlyStatsViewModel | null>(null);
+  const [advancedData, setAdvancedData] = useState<AdvancedStatsViewModel | null>(null);
+  const [allCategories, setAllCategories] = useState<StatsCategoryOption[]>([]);
   
   const [isMainModalVisible, setMainModalVisible] = useState(false);
 
@@ -93,25 +73,13 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       ]);
 
       if (statsRes.success) {
-        const raw = statsRes.data;
-        if (Array.isArray(raw)) {
-          const target = raw.find(item => item.month === selectedMonth) || raw[0];
-          setData({
-            month: target?.month || selectedMonth,
-            totalAmount: Number(target?.total || 0),
-            prevTotal: 0, diffAmount: 0, diffPercentage: 0,
-            stats: target?.stats || [], 
-            latestReceipt: target?.latestReceipt || null
-          });
-        } else {
-          setData(raw);
-        }
+        setData(mapMonthlyStatsResponse(statsRes.data, selectedMonth));
       }
-      if (advRes.success) setAdvancedData(advRes.data);
-      if (catRes.success) setAllCategories(catRes.data);
+      if (advRes.success) setAdvancedData(mapAdvancedStatsResponse(advRes.data));
+      if (catRes.success) setAllCategories(mapCategoryList(catRes.data));
     } catch (error: unknown) {
       console.error('[DEBUG-STATS] Fetch Error:', error);
-      Alert.alert("エラー", "データの取得に失敗しました");
+      showAlert('エラー', getApiErrorMessage(error, 'データの取得に失敗しました'));
     } finally {
       setLoading(false);
     }
@@ -125,7 +93,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
       await receiptApi.updateItemCategory(itemId, Number(categoryId));
       await fetchData(); 
     } catch (error) {
-      Alert.alert("エラー", "カテゴリーの更新に失敗しました");
+      showAlert('エラー', getApiErrorMessage(error, 'カテゴリーの更新に失敗しました'));
     }
   };
 
@@ -238,13 +206,13 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
                 <View style={styles.statsCard}>
                   {advancedData?.trend.map((t, i) => {
-                    const diff = t.prev_total ? t.total - t.prev_total : 0;
+                    const diff = t.prevTotal != null ? t.total - t.prevTotal : 0;
                     return (
                       <View key={i} style={styles.trendRow}>
                         <Text style={styles.trendPeriod}>{t.period}</Text>
                         <Text style={styles.trendAmount}>¥{Math.round(Number(t.total) || 0).toLocaleString()}</Text>
                         <Text style={[styles.trendDiff, { color: diff > 0 ? theme.colors.error : theme.colors.success }]}>
-                          {t.prev_total !== null ? `${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString()}` : '-'}
+                          {t.prevTotal !== null ? `${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString()}` : '-'}
                         </Text>
                       </View>
                     );
@@ -264,9 +232,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                       <View style={styles.paretoBarContainer}>
                         <View style={[
                           styles.paretoBar, 
-                          { width: `${p.ratio}%`, backgroundColor: p.cumulative_ratio <= 80 ? theme.colors.primary : theme.colors.semantic.chart.barInactive }
+                          { width: `${p.ratio}%`, backgroundColor: p.cumulativeRatio <= 80 ? theme.colors.primary : theme.colors.semantic.chart.barInactive }
                         ]} />
-                        <Text style={styles.cumText}>{p.cumulative_ratio}%</Text>
+                        <Text style={styles.cumText}>{p.cumulativeRatio}%</Text>
                       </View>
                     </View>
                   ))}
@@ -285,7 +253,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         title="解析レシート詳細"
       >
         <ReceiptDetailComponent
-          receipt={data?.latestReceipt as ReceiptDetail | null | undefined}
+          receipt={data?.latestReceipt}
           categories={allCategories}
           onCategoryChange={handleCategoryChange}
           baseUrl={BASE_URL}
