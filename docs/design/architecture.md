@@ -1,8 +1,8 @@
 # アーキテクチャ概要（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)  
-子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292)  
-計画: [plan.md](./plan.md)
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423)  
+子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439)  
+計画: [plan.md](../refactor/plan.md)
 
 本ドキュメントは **実装準拠（as-built）** で記述する。コード・テスト済み挙動を正とし、詳細なドメイン・API・画面仕様は後続の設計資料を参照する。
 
@@ -88,19 +88,27 @@ receipt-ai-app/
 │   ├── src/
 │   │   ├── app.ts           # Express アプリファクトリ（テスト共有可能）
 │   │   ├── server.ts        # 起動エントリ + Worker import
-│   │   ├── controllers/     # HTTP ハンドラ
+│   │   ├── controllers/     # HTTP ハンドラ（Service 呼び出しのみ）
 │   │   ├── middleware/      # auth, tenant, validate, error
 │   │   ├── routes/          # ルート定義
-│   │   ├── services/        # ビジネスロジック
+│   │   ├── services/        # ビジネスロジック（Application 層）
+│   │   ├── repositories/    # Prisma 永続化（#100-2 / #98-8）
 │   │   ├── queues/          # BullMQ キュー定義
-│   │   └── workers/         # BullMQ Worker
+│   │   ├── workers/         # BullMQ Worker
+│   │   └── __tests__/integration/  # Supertest 結合テスト（ドメイン別 #100-16）
 │   └── uploads/             # レシート画像（ローカル FS）
 ├── frontend/                # Expo アプリ
+│   ├── app/                 # Expo Router ルート（#98-8 Phase 2）
 │   └── src/
-│       ├── screens/         # 画面コンポーネント
+│       ├── screens/         # 薄型 Screen（UI + Hook 接続）
+│       ├── features/        # ドメイン別 Hook / コンポーネント / スタイル
+│       ├── api/             # HTTP クライアント（axios ラッパー）
+│       ├── mappers/         # API レスポンス → ViewModel（#100-4）
+│       ├── components/      # 共有 UI・レイアウト
 │       ├── contexts/        # ReceiptTray, DisplayMode
-│       ├── services/        # auth, login, biometric
-│       └── utils/           # apiClient 等
+│       ├── services/        # auth, login, biometric（端末永続化）
+│       ├── theme/           # screenLayout, cardStyles 等
+│       └── utils/           # apiClient, showAlert 等
 ├── scripts/                 # backup.sh, notify.sh
 ├── docs/                    # 設計・運用ドキュメント
 ├── docker-compose.yml
@@ -169,6 +177,22 @@ flowchart LR
 | `/api` | JWT + tenant | レシート・カテゴリ・商品マスタ・精算 |
 
 詳細なエンドポイント一覧は [api-spec.md](./api-spec.md)（#90-3）で記述する。plan.md §8 に抜粋あり。
+
+### 4.4 Repository 層（#100-2 / #98-8）
+
+Prisma への直接アクセスは **Repository に集約** する。Service は Repository 経由でのみ DB を操作し、Controller は Prisma を import しない（#100-3 完了時点で Controller 直叩き 0 件）。
+
+| リポジトリ | 主な責務 |
+|------------|----------|
+| `repositories/receipt/` | レシート・明細・按分の CRUD・検索（read / write / stats に分割） |
+| `repositories/categoryRepository.ts` | カテゴリ CRUD・最適化 |
+| `repositories/memberRepository.ts` | メンバー・認証関連 |
+| `repositories/settlementRepository.ts` | 精算・送金 |
+| `repositories/productMasterRepository.ts` | 商品マスタ |
+| `repositories/promptRepository.ts` | プロンプトテンプレート |
+| `repositories/apiUsageLogRepository.ts` | AI 利用ログ |
+
+テナントスコープは Prisma Client Extension（`$extends`）で Repository 内部から適用する。UseCase 物理層（`usecases/` フォルダ）は設けず、**Service メソッド = Application 操作** とする（[plan.md](../refactor/plan.md) §7）。
 
 ---
 
@@ -250,20 +274,59 @@ Worker の実装: `backend/src/workers/receiptWorker.ts`
 
 ## 6. フロントエンド概要
 
-Expo ベースの単一 `App.tsx` アプリ。React Navigation は未使用で、`currentView` ステートによる画面切替を行う。
+Expo Router（`frontend/app/`）によるファイルベースルーティング。**Screen は UI の薄型ラッパー** とし、API 呼び出し・画面状態は `features/*/hooks` に集約する（#98-8 Phase 2 / #100-7〜#100-14）。
 
-| 区分 | 主要画面 |
-|------|----------|
-| 認証 | LoginScreen, BiometricLockScreen |
-| レシート | HomeScreen, ReceiptTrayScreen, ReceiptScanScreen |
-| 精算・統計 | SettlementSummaryScreen, StatisticsScreen, HistoryScreen, SplitEditorScreen |
-| 管理（ADMIN） | AdminMenuScreen, CategoryManagementScreen, ProductMasterScreen, PromptEditorScreen, AdminStatsScreen |
+| 区分 | ルート例 | Screen / features |
+|------|----------|-------------------|
+| 認証 | `/login` | `LoginScreen` → `features/auth` |
+| ホーム | `/` | `HomeScreen` → `features/home` |
+| レシート | `/history`, `/tray`, `/scan/[jobId]` | `HistoryScreen`, `ReceiptTrayScreen`, `ReceiptScanScreen` → `features/history`, `features/receipt` |
+| 精算・統計 | `/settlement`, `/stats`, `/history/[receiptId]/split` | `SettlementSummaryScreen`, `StatisticsScreen`, `SplitEditorScreen` → `features/settlement`, `features/stats` |
+| 管理（ADMIN） | `/admin/*` | `AdminMenuScreen` 他 → 各 Screen + `features/category` 等 |
+| 設定 | `/settings/totp` | `TotpSettingsScreen` |
 
-**状態管理**: React Context（`ReceiptTrayContext`, `DisplayModeContext`）+ 画面ローカル state。Redux / Zustand は未使用。
+**状態管理**: `AppSessionProvider`（`features/app`）+ `ReceiptTrayProvider` + 各 Hook のローカル state。Redux / Zustand は未使用。
 
-**API 接続**: `EXPO_PUBLIC_API_URL`（例: `http://<host>:<port>/api`）を `apiClient.ts` が参照する。
+**API 接続**: `frontend/src/api/*`（型付きラッパー）→ `apiClient.ts`（認証ヘッダ注入・403 通知）。Screen / Hook から `categoryApi` / `receiptApi` / `statsApi` を直接 import しない（#100-14）。
 
-詳細は [frontend-screens.md](./frontend-screens.md)（#90-5）で記述する。
+**Mapper**: API 生レスポンスの画面向け整形は `frontend/src/mappers/`（例: `statsMapper.ts`）。
+
+詳細は [frontend-screens.md](./frontend-screens.md)（#90-5 / #100-15）を参照。
+
+### 6.1 features/ 構成（as-built）
+
+| モジュール | Hook（代表） | 役割 |
+|------------|--------------|------|
+| `features/app` | `useAppSession`, `useAppNavigation` | セッション・ルーター・シェル |
+| `features/auth` | `useLoginFlow` | ログイン step フロー |
+| `features/home` | `useHomeDashboard`, `useReceiptUpload` | ダッシュボード・撮影アップロード |
+| `features/history` | `useReceiptHistory` | 履歴一覧・フィルタ・カテゴリ更新 |
+| `features/receipt` | `useReceiptDetail`, `useReceiptScan` | 詳細編集・解析結果 commit |
+| `features/stats` | `useStatistics` | 月次統計・グラフ |
+| `features/settlement` | `useSettlementSummary`, `useSplitEditor` | 精算・按分 |
+| `features/category` | `useCategoryManagement` | カテゴリ CRUD |
+
+各 feature は `hooks/`, `components/`, `styles/`（任意）, `index.ts`（バレル）で構成する。
+
+### 6.2 レイヤールール（AI プロンプト転用用）
+
+以下は **新規実装・レビュー時の必須ルール**（[plan.md](../refactor/plan.md) Epic #100 方針）。
+
+| 層 | 場所 | 許可 | 禁止 |
+|----|------|------|------|
+| Presentation | `screens/`, `features/*/components` | JSX・スタイル・Hook 呼び出し | `prisma` / `categoryApi` 等の直 import（Screen） |
+| Application | `features/*/hooks`, `services/` | 複数 API の編成・UI 向け state | Prisma 直叩き（FE） |
+| API Client | `src/api/*`, `apiClient.ts` | HTTP・認証ヘッダ | ビジネスロジック |
+| Mapper | `src/mappers/*` | DTO → ViewModel 変換 | API 呼び出し |
+| Controller | `backend/controllers` | Service 1 呼び出し + レスポンス整形 | Prisma 直叩き |
+| Service | `backend/services` | Repository 経由の業務ロジック | — |
+| Repository | `backend/repositories` | Prisma クエリ | HTTP レスポンス生成 |
+
+**粒度ルール**
+
+1. **1 エンドポイント = 1 Service メソッド**（Controller は薄く保つ）
+2. **1 画面の主要操作 = 1 Hook**（fetch・保存・フィルタ変更などを Screen 内に直書きしない）
+3. **ユーザー通知**は `showAlert` / `showConfirmDialog` に統一（Web 対応 #100-13）
 
 ---
 
@@ -329,7 +392,7 @@ BullMQ のジョブキュー専用。`redisdata/` ボリュームで永続化。
 
 1. Backend unit（Vitest）
 2. Frontend unit（Vitest）
-3. Backend integration（Postgres service + `prisma migrate deploy` + seed）
+3. Backend integration（Postgres service + `prisma migrate deploy` + seed）— `src/__tests__/integration/*.integration.test.ts`（#100-16、直列実行）
 
 `createApp()` 分離により、結合テストは Worker なしで Supertest 実行可能。
 
