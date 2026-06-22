@@ -424,8 +424,128 @@ flowchart LR
 
 ### 9.9 後続 Epic（Phase 5、本 Epic スコープ外）
 
-| Epic | GitHub | テーマ |
-|------|--------|--------|
-| #103 | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | Backend 層境界（Response Mapper、errorHandler 一本化） |
+| Epic | GitHub | テーマ | plan 正本 |
+|------|--------|--------|-----------|
+| #103 | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | Backend 層境界（Response Mapper、errorHandler 一本化） | **§10** |
 
-詳細は #103-0（[#475](https://github.com/yama180sx/receipt-ai-app/issues/475)）で §10 として正本化する。
+## 10. Epic #103 — Backend 層境界整理（Phase 5）
+
+Epic: [#469 Epic #103](https://github.com/yama180sx/receipt-ai-app/issues/469)
+
+[ChatGPT レビュー 20260622](../specs/chatgpt/ChatGPT_レビュー_20260622.txt) 優先度 **C-4** の対応 Epic。Epic #102（API 契約型 SSOT）完了後、**Controller / Service / Repository の責務を明確化**し、レスポンス整形・DTO 変換・エラー envelope を層ごとに分離する。
+
+### 10.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | ChatGPT レビュー C-4 + Epic #98 / #100 成果 + コード突合 |
+| 目標構造 | Controller（HTTP）→ Mapper（DTO 変換）→ Service（業務）→ Repository（永続化） |
+| Mapper 配置 | `backend/src/mappers/`（ドメイン単位。FE `frontend/src/mappers/` と対） |
+| DTO 正本 | `backend/src/types/apiSchemas.ts`（#102-3）＝ OpenAPI 契約形 |
+| エラー方針 | `errorHandler` が全例外を envelope 化。Controller / Service の `res.status` 直書きを削減 |
+| スコープ外 | `usecases/` 物理層新設、全 Controller 一括書き換え |
+
+### 10.2 層境界図
+
+```mermaid
+flowchart TB
+  subgraph http [HTTP 層]
+    CTRL[Controller]
+    MW[Middleware]
+    EH[errorHandler]
+  end
+
+  subgraph app [Application 層]
+    MAP[Mapper]
+    SVC[Service]
+  end
+
+  subgraph infra [Infrastructure]
+    REPO[Repository]
+    PRISMA[(Prisma)]
+  end
+
+  REQ[Client] --> MW
+  MW --> CTRL
+  CTRL --> MAP
+  MAP --> SVC
+  SVC --> REPO
+  REPO --> PRISMA
+  SVC --> MAP
+  MAP --> CTRL
+  CTRL --> EH
+  EH --> REQ
+```
+
+**データの流れ（読み取り）**: Controller が Service を呼び、戻り値（Prisma / ドメイン）を Mapper で `apiSchemas` DTO に変換して `res.json({ success, data })` する。例外は `next(error)` → `errorHandler` のみが HTTP ステータスとエラー body を決定する。
+
+### 10.3 層ごとの責務と禁止事項
+
+| 層 | 配置 | 責務 | 禁止 |
+|----|------|------|------|
+| Middleware | `backend/src/middleware/` | 認証・テナント・Zod バリデーション | 業務ロジック・Prisma 直叩き |
+| Controller | `backend/src/controllers/` | `req` 抽出、`Service` / `Mapper` 呼び出し、`res.status` + envelope | Prisma 直叩き、DTO 整形の複雑ロジック、try/catch 内の独自エラー JSON |
+| Mapper | `backend/src/mappers/`（新設） | Prisma / ドメイン → `apiSchemas` DTO、リクエスト DTO → Service 入力 | 業務判断、DB アクセス |
+| Service | `backend/src/services/` | 業務ルール、Repository 編成、トランザクション境界 | `res` / `req` 参照、HTTP ステータス決定 |
+| Repository | `backend/src/repositories/` | Prisma クエリ、テナントスコープ | HTTP レスポンス生成 |
+| errorHandler | `backend/src/middleware/errorHandler.ts` | 全エラーの envelope 統一（`AppError` / 未知例外） | ドメイン固有の分岐肥大化 |
+| ドメイン型 | `backend/src/types/receipt.ts` 等 | Gemini 解析・commit 内部モデル | API レスポンス型の手動定義（`apiSchemas` を使用） |
+| API DTO | `backend/src/types/apiSchemas.ts` | OpenAPI 契約ミラー（#102-3） | 業務ロジック |
+
+### 10.4 現状 as-built と残タスク
+
+| 領域 | Epic #98 / #100 で **完了** | Epic #103 で **追加** |
+|------|------------------------------|------------------------|
+| Repository 層 | receipt / category / member / settlement 等（#100-2 / #98-8） | 維持。Mapper 導入で Service 戻り値の整形責務を移す |
+| Controller 薄型化 | `receiptController` 601→266 行（#98-3） | 残存の `res.json` 直前整形を Mapper へ（#103-1〜3） |
+| エラー統一 | `AppError` + `errorHandler`（#98-5） | Controller / Service 内の重複 catch・固定メッセージを整理（#103-4） |
+| API 契約 DTO | `apiSchemas.ts` + drift CI（#102） | Mapper 出力型の正本として利用 |
+| FE Mapper | `frontend/src/mappers/statsMapper.ts` 等（#100-4） | BE Mapper は未着手（`backend/src/mappers/` なし） |
+| auth 内部 DTO | `AuthMemberDto` 等（authService 内） | `LoginMember`（apiSchemas）への Mapper 経由統一（#103-2） |
+| ジョブ API 整形 | `receiptJobService.formatReceiptJobForApi` | receipt Mapper への移管候補（#103-1） |
+
+### 10.5 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #103 Epic | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | — | — |
+| #103-0 | [#475](https://github.com/yama180sx/receipt-ai-app/issues/475) | Must | 0.5 人日 |
+| #103-1 | [#476](https://github.com/yama180sx/receipt-ai-app/issues/476) | Must | 2〜3 人日 |
+| #103-2 | [#477](https://github.com/yama180sx/receipt-ai-app/issues/477) | Should | 1.5〜2 人日 |
+| #103-3 | [#478](https://github.com/yama180sx/receipt-ai-app/issues/478) | Should | 1.5〜2 人日 |
+| #103-4 | [#479](https://github.com/yama180sx/receipt-ai-app/issues/479) | Must | 1〜1.5 人日 |
+| #103-5 | [#480](https://github.com/yama180sx/receipt-ai-app/issues/480) | Must | 0.5 人日 |
+
+### 10.6 Epic #102 / #100 / #98 との関係
+
+| 前提 Epic | #103 への提供 |
+|-----------|---------------|
+| #102（#468） | OpenAPI DTO 正本（`apiSchemas.ts`）、`check:openapi` — Mapper **出力型** の基盤 |
+| #100（#423） | Service = Application 層、Repository 分離、FE Mapper パターン |
+| #98（#370） | `AppError` / `errorHandler` 初版、Controller 分割 |
+
+**重複しないことの確認**: #103 は **BE 内部の変換層（Mapper）とエラー責務の再整理** に限定。OpenAPI 契約そのもの（#102）や FE 規約（#101-7）は触らない。
+
+### 10.7 Won't fix / Later（記録）
+
+| 項目 | 判定 | 理由 |
+|------|------|------|
+| `usecases/` 物理フォルダ新設 | **Won't fix** | Epic #100 で Service = Application 層と決定済み |
+| 全 Controller 一括 Mapper 化 | **Won't fix** | ドメイン単位の段階移行（#103-1〜3） |
+| BE から FE generated 型の import | **Won't fix** | `apiSchemas.ts` で BE 側ミラー（#102 Won't fix と同型） |
+| GraphQL / tRPC 導入 | **Won't fix** | REST + OpenAPI 維持 |
+
+### 10.8 推奨着手順
+
+```
+#475（#103-0 plan）→ #476（receipt Mapper PoC）→ #479（エラー一本化）
+  → #477 / #478（並行可）→ #480（architecture as-built）
+```
+
+**Mapper 新設時のチェックリスト（#103-1 以降）**
+
+1. Service は Prisma / ドメイン型を返す（`apiSchemas` 形を返さない）
+2. Mapper が `apiSchemas` DTO に変換する
+3. Controller は `sendSuccess(res, mapper.toXxx(dto))` 程度に留める
+4. 新規 DTO フィールドは先に `openapi.yaml` + `apiSchemas.ts` を更新（#102-4 手順）
+5. `npm run check:openapi` と integration test がパスすること
