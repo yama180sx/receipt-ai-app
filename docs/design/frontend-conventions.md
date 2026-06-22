@@ -1,7 +1,7 @@
 # フロントエンド実装規約 & AI プロンプトテンプレート
 
-Epic: [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459)  
-子 Issue: [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461)  
+Epic: [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468)  
+子 Issue: [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474)  
 計画: [plan.md](../refactor/plan.md) §8
 
 本ドキュメントは **新規実装・AI 駆動開発・コードレビュー** の正本とする。層の全体像は [architecture.md](./architecture.md) §6、画面一覧は [frontend-screens.md](./frontend-screens.md) を参照。
@@ -141,6 +141,17 @@ try {
 | ViewModel | 手動定義 | `frontend/src/types/`（generated の再 export + 画面拡張） |
 | 変換 | Mapper | `frontend/src/mappers/` |
 
+**新 API 追加時（#102-4）**
+
+1. `docs/openapi/openapi.yaml` を **先に** 更新する（契約 SSOT）
+2. `npm run generate:api` で `api/generated/schema.ts` を再生成する
+3. 必要なら `api/generated/index.ts` にエイリアスを追加する
+4. Hook は generated 型または `types/` の re-export を使う。**API レスポンスと同形の interface を `types/` に新規定義しない**
+5. 画面固有の入力中 state・表示用型のみ `types/` に置く（例: `ParsedReceiptData`, `ReceiptForSplitEditor`）
+6. PR 前に `npm run check:api`（generated diff）をパスする
+
+手順の正本: [api-spec.md](./api-spec.md) §9。
+
 - `any` / `as any` **禁止**。`unknown` + 型ガードまたは Zod 等で絞る
 - React Hook Form は **導入しない**（hook + `useState` で十分。Epic #101 Won't fix）
 
@@ -223,6 +234,30 @@ try {
 分割が必要な場合は具体的なファイル名案を提示してください。
 ```
 
+### 6.4 新 API 追加の実装依頼
+
+```markdown
+## タスク
+{新エンドポイント / 既存 API 拡張の概要}
+
+## 契約（OpenAPI first — [api-spec.md](docs/design/api-spec.md) §9 準拠）
+- [ ] docs/openapi/openapi.yaml を先に更新
+- [ ] npm run generate:api で FE 型を再生成
+- [ ] DTO は api/generated のみ。ViewModel は types/（API レスポンスの手動二重定義禁止）
+- [ ] BE レスポンス envelope（success + data）は OpenAPI schema と一致
+
+## 実装規約
+- backend: routes → controller → service
+- frontend: api/* ラッパー → features/*/hooks（Screen から api 直 import 禁止）
+- エラー: showApiErrorAlert / getApiErrorMessage
+- any / as any 禁止
+
+## 完了条件
+- [ ] npm run check:api && npm run check:openapi がパス
+- [ ] npm test（frontend / backend）がパス
+- [ ] api-spec.md に as-built 追記
+```
+
 ---
 
 ## 7. Epic #101 との対応
@@ -234,4 +269,4 @@ try {
 | `showApiErrorAlert` 横断適用 | #101-6 [#464](https://github.com/yama180sx/receipt-ai-app/issues/464) |
 | 本ドキュメント | #101-7 [#461](https://github.com/yama180sx/receipt-ai-app/issues/461) |
 
-Phase 5（API 契約 SSOT / BE Mapper）は Epic [#102](https://github.com/yama180sx/receipt-ai-app/issues/468) / [#103](https://github.com/yama180sx/receipt-ai-app/issues/469) で対応する。
+Phase 5（API 契約 SSOT / BE Mapper）は Epic [#102](https://github.com/yama180sx/receipt-ai-app/issues/468) / [#103](https://github.com/yama180sx/receipt-ai-app/issues/469) で対応する。新 API 手順は [#474 #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474) → [api-spec.md](./api-spec.md) §9。
