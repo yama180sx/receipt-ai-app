@@ -1,0 +1,347 @@
+現在React Native (Expo), TypeScript, PostgreSQLで構築中のアプリ「RecAIpt」のソースコード一式です。
+
+人間による細部レビューを一切排除した『真の品質ガバナンス』の検証として、以下の4観点から【100点満点からの厳格な減点方式】でシビアに採点してください。
+冗長な褒め言葉や配慮は一切不要です。将来の保守者（非AIネイティブな人間）への引き継ぎに耐えうるかという視点で、具体的な減点理由と改善ポイントをストレートに提示してください。
+
+【評価観点】
+1. コードの共通化とDRY原則（25点）: 微調整の連発によって、似たロジックやインラインコードが重複・コピペされていないか。
+2. コンポーネントの責務分割（25点）: 1つのファイルにロジック、UI、データ処理が詰め込まれすぎ、ファイルが肥大化していないか。
+3. 型定義の堅牢性と一元管理（25点）: Anyの乱用や不適切なアサーションがなく、型が適切に共通化されているか。
+4. 保守性とクリーン度（25点）: 結合度が強すぎて、将来の修正で別画面に予期せぬバグを誘発しやすくないか。
+思考を停止しました
+
+ZIPを実際に展開・走査したうえで評価します。
+（対象：約512ファイル、TypeScript/TSX 約298ファイル）
+
+総合評価
+観点	点数
+1. 共通化・DRY	18 / 25
+2. 責務分割	20 / 25
+3. 型定義	22 / 25
+4. 保守性	19 / 25
+総合	79 / 100
+1. コードの共通化とDRY原則
+18 / 25
+減点 -3
+
+画面レベルでフォーム管理が散在
+
+例：
+
+PromptEditorScreen.tsx
+ReceiptScanScreen.tsx
+ProductMasterScreen.tsx
+
+などで
+
+const [formName, setFormName]
+const [formDesc, setFormDesc]
+const [isLoading, setIsLoading]
+const [error, setError]
+
+のような管理が繰り返されている。
+
+React Hook Formや共通Form Hookへ寄せられる部分が残っている。
+
+減点 -2
+
+APIエラー処理が各所に分散
+
+try {
+ ...
+} catch (err) {
+ setError(...)
+}
+
+が大量に存在。
+
+APIラッパ層に寄せれば画面側コード量を削減可能。
+
+減点 -2
+
+状態管理パターンが統一されていない。
+
+一部
+
+useState
+
+一部
+
+useMemo
+useCallback
+
+一部
+
+Context
+
+で実装されている。
+
+アーキテクチャとしては許容範囲だが、
+将来参加者が「どれを採用するのが正解か」を迷う。
+
+良い点
+
+以下はかなり整理されている。
+
+theme/
+components/ui/
+features/
+hooks/
+utils/
+
+構造が明確。
+
+2020年代のReact Native案件としては平均以上。
+
+2. コンポーネント責務分割
+20 / 25
+減点 -3
+
+まだ肥大化した画面が存在
+
+確認できたもの
+
+PromptEditorScreen.tsx (355行)
+ReceiptScanScreen.tsx (237行)
+ReceiptImageCropModal.tsx (287行)
+SplitEditorItemTable.tsx (292行)
+
+特に
+
+PromptEditorScreen
+
+UI
+
+API通信
+
+フォーム管理
+
+状態管理
+
+編集モード切替
+
+保存処理
+
+削除処理
+
+を1ファイルに持っている。
+
+実質
+
+PromptEditorForm
+PromptEditorList
+PromptEditorActions
+
+へ分離できる。
+
+減点 -2
+
+ReceiptImageCropModal
+
+画像操作ロジックとUIが密結合。
+
+将来
+
+Androidのみ対応修正
+iOSのみ修正
+
+が発生した時に変更範囲が大きい。
+
+良い点
+
+逆に
+
+features/
+hooks/
+utils/
+
+への分離はかなり進んでいる。
+
+特に
+
+useSplitEditor
+useSettlementSummary
+useLoginFlow
+
+は責務分離できている。
+
+ここは高評価。
+
+3. 型定義の堅牢性
+22 / 25
+減点 -1
+
+any使用が残存
+
+確認できたファイル
+
+geminiService.ts
+authMiddleware.ts
+tenantMiddleware.ts
+validate.ts
+receiptWorker.ts
+appError.ts
+
+など。
+
+件数としては少ない。
+
+全体規模から見ると良好。
+
+減点 -1
+
+一部
+
+as any
+
+キャストが存在
+
+約6箇所確認。
+
+本来は型ガードで解決したい。
+
+減点 -1
+
+型定義が
+
+backend/src/types
+frontend/src/types
+
+に分散。
+
+API契約型を完全共有できていない。
+
+良い点
+
+これはかなり優秀。
+
+確認できた限り
+
+unknown
+
+を適切に利用している箇所が多い。
+
+また
+
+PromptTemplate
+ReceiptForSplitEditor
+FamilyMemberSummary
+
+などドメイン型が整理されている。
+
+「TypeScriptを書いているだけ」の案件より明らかに上。
+
+4. 保守性とクリーン度
+19 / 25
+減点 -2
+
+Context依存がやや増え始めている。
+
+例
+
+ReceiptTrayContext
+
+今後増殖すると
+
+変更影響範囲が読みにくくなる。
+
+減点 -2
+
+API層の責務がやや曖昧
+
+receiptApi
+adminApi
+service
+controller
+
+の境界はあるが
+
+変換責務
+
+エラーハンドリング責務
+
+DTO責務
+
+が完全には分離されていない。
+
+減点 -2
+
+生成コード以外でも200〜300行超のファイルが複数ある。
+
+確認対象
+
+PromptEditorScreen.tsx
+SplitEditorItemTable.tsx
+useSplitEditor.ts
+ReceiptImageCropModal.tsx
+ReceiptScanScreen.tsx
+
+この規模になると保守者は全体把握に時間を要する。
+
+良い点
+
+循環参照臭はほぼ見当たらない。
+
+ディレクトリ構造も比較的整理されている。
+
+「どこに何があるかわからない」
+
+状態にはなっていない。
+
+保守者目線で最も危険な箇所
+
+優先順位順。
+
+優先度A
+
+PromptEditorScreen.tsx
+
+355行
+
+最初に分割すべき。
+
+優先度A
+
+ReceiptImageCropModal.tsx
+
+画像処理＋UI混在
+
+将来の不具合温床。
+
+優先度B
+
+SplitEditorItemTable.tsx
+
+292行
+
+テーブル描画責務過多。
+
+優先度B
+
+useSplitEditor.ts
+
+303行
+
+Hookとしては大きすぎる。
+
+最終判定
+
+このコードベースは
+
+「個人開発レベルは卒業しているが、企業案件として長期運用するにはもう一段階の整理が必要」
+
+という状態です。
+
+厳格採点すると
+
+79/100
+
+です。
+
+70点台後半なので品質は決して低くありませんが、
+
+「AIで高速実装した結果、画面単位で責務が肥大化し始めている兆候」
+
+が見えています。
+
+今の段階で画面分割・フォーム共通化・API責務整理を実施すれば、85〜90点台までは十分狙える状態です。

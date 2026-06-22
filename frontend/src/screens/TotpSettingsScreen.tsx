@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -9,7 +8,12 @@ import {
   View,
 } from 'react-native';
 import { loginService } from '../services/loginService';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { borderRadius } from '../theme/radii';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
+import { showAlert } from '../utils/alertMessage';
 
 type Props = {
   totpEnabled: boolean;
@@ -29,7 +33,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       setSecret(setup.secret);
       setCode('');
     } catch (e: unknown) {
-      Alert.alert('エラー', e instanceof Error ? e.message : 'セットアップに失敗しました。');
+      showAlert('エラー', e instanceof Error ? e.message : 'セットアップに失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -37,7 +41,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
 
   const handleConfirmEnable = async () => {
     if (!code.trim()) {
-      Alert.alert('入力エラー', '6桁コードを入力してください。');
+      showAlert('入力エラー', '6桁コードを入力してください。');
       return;
     }
     setLoading(true);
@@ -46,16 +50,16 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       setSecret(null);
       setCode('');
       onChanged(true);
-      Alert.alert('完了', '二要素認証を有効にしました。');
+      showAlert('完了', '二要素認証を有効にしました。');
     } catch (e: unknown) {
-      Alert.alert('エラー', e instanceof Error ? e.message : '有効化に失敗しました。');
+      showAlert('エラー', e instanceof Error ? e.message : '有効化に失敗しました。');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[screenLayout.container, styles.content]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
         <Text style={styles.backText}>← 戻る</Text>
       </TouchableOpacity>
@@ -71,9 +75,11 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       ) : secret ? (
         <>
           <Text style={styles.subtitle}>認証アプリに以下のキーを登録してください</Text>
-          <Text style={styles.secret} selectable>
-            {secret}
-          </Text>
+          <View style={[cardStyles.listCard, styles.secretBox]}>
+            <Text style={styles.secret} selectable>
+              {secret}
+            </Text>
+          </View>
           <TextInput
             style={styles.input}
             placeholder="6桁コード"
@@ -88,7 +94,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color={theme.colors.primary} />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.primaryButtonText}>有効化</Text>
             )}
@@ -103,7 +109,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color={theme.colors.primary} />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.primaryButtonText}>セットアップを開始</Text>
             )}
@@ -115,33 +121,30 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: theme.colors.background },
-  backButton: { marginBottom: 16 },
-  backText: { color: theme.colors.primary, fontSize: 16 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8, color: theme.colors.text.main },
-  subtitle: { fontSize: 15, color: theme.colors.text.muted, marginBottom: 20 },
+  content: { padding: spacing.lg },
+  backButton: { marginBottom: spacing.md },
+  backText: { color: colors.primary, fontSize: 16 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: spacing.sm, color: colors.text.main },
+  subtitle: { fontSize: 15, color: colors.text.muted, marginBottom: spacing.lg },
+  secretBox: { marginBottom: spacing.md },
   secret: {
     fontFamily: 'monospace',
     fontSize: 14,
-    backgroundColor: theme.colors.surface,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: spacing.md - 4,
     fontSize: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   primaryButton: {
-    backgroundColor: theme.colors.primary,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
-  primaryButtonText: { color: 'white', fontWeight: 'bold' },
+  primaryButtonText: { color: colors.text.inverse, fontWeight: 'bold' },
 });

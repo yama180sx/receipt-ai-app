@@ -33,6 +33,12 @@ jobs:
           # app.integration.test.ts が createApp 経由で Prisma を import するため必須（DB 結合は skip）
           DATABASE_URL: postgresql://vitest:vitest@127.0.0.1:5432/vitest?schema=public
 
+      - name: Verify OpenAPI route drift
+        run: npm run check:openapi
+        env:
+          JWT_SECRET: ci-test-jwt-secret
+          DATABASE_URL: postgresql://vitest:vitest@127.0.0.1:5432/vitest?schema=public
+
   frontend-unit:
     name: Frontend unit tests
     runs-on: ubuntu-latest

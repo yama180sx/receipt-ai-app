@@ -1,9 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import prisma from '../../utils/prismaClient';
 import logger from '../../utils/logger';
 import { AppError } from '../../utils/appError';
 import type { TenantContext } from '../../utils/context';
+import {
+  activatePromptTemplateInTransaction,
+  createPromptTemplateRecord,
+  deactivatePromptTemplatesByKey,
+  deletePromptTemplateById,
+  findAllPromptTemplatesForSync,
+  findPromptTemplateById,
+  findPromptTemplatesByFamilyGroup,
+  updatePromptTemplateRecord,
+} from '../../repositories/promptRepository';
+import { queryAdminCostStatsByFamilyGroup } from '../../repositories/apiUsageLogRepository';
 
 const RATE_USD_TO_JPY = 150;
 const PRICE_USD_PER_INPUT = 0.075 / 1000000;
@@ -11,10 +21,7 @@ const PRICE_USD_PER_OUTPUT = 0.3 / 1000000;
 
 const syncPromptsToJson = async (familyGroupId: number) => {
   try {
-    const prompts = await prisma.promptTemplate.findMany({
-      where: { familyGroupId },
-      orderBy: { id: 'asc' },
-    });
+    const prompts = await findAllPromptTemplatesForSync(familyGroupId);
     const seedsDir = path.join(__dirname, '../../../prisma/seeds');
     const filePath = path.join(seedsDir, 'prompt_templates.json');
 
@@ -30,10 +37,7 @@ const syncPromptsToJson = async (familyGroupId: number) => {
 };
 
 export async function listPromptTemplates(ctx: TenantContext) {
-  return prisma.promptTemplate.findMany({
-    where: { familyGroupId: ctx.familyGroupId },
-    orderBy: [{ key: 'asc' }, { isActive: 'desc' }, { updatedAt: 'desc' }],
-  });
+  return findPromptTemplatesByFamilyGroup(ctx.familyGroupId);
 }
 
 export async function createPromptTemplate(
@@ -55,23 +59,18 @@ export async function createPromptTemplate(
   const { familyGroupId } = ctx;
 
   if (isActive) {
-    await prisma.promptTemplate.updateMany({
-      where: { key, familyGroupId },
-      data: { isActive: false },
-    });
+    await deactivatePromptTemplatesByKey(familyGroupId, key);
   }
 
-  const newPrompt = await prisma.promptTemplate.create({
-    data: {
-      key,
-      name,
-      description,
-      systemPrompt,
-      domainHints,
-      isActive,
-      version: 1,
-      familyGroupId,
-    },
+  const newPrompt = await createPromptTemplateRecord({
+    key,
+    name,
+    description,
+    systemPrompt,
+    domainHints,
+    isActive,
+    version: 1,
+    familyGroupId,
   });
 
   await syncPromptsToJson(familyGroupId);
@@ -88,22 +87,17 @@ export async function updatePromptTemplate(
     domainHints?: unknown;
   }
 ) {
-  const existing = await prisma.promptTemplate.findFirst({
-    where: { id, familyGroupId: ctx.familyGroupId },
-  });
+  const existing = await findPromptTemplateById(ctx.familyGroupId, id);
   if (!existing) {
     throw new AppError('対象のプロンプトが見つかりません', 404);
   }
 
-  const updated = await prisma.promptTemplate.update({
-    where: { id: existing.id },
-    data: {
-      name: input.name,
-      description: input.description,
-      systemPrompt: input.systemPrompt,
-      domainHints: input.domainHints,
-      version: { increment: 1 },
-    },
+  const updated = await updatePromptTemplateRecord(existing.id, {
+    name: input.name,
+    description: input.description,
+    systemPrompt: input.systemPrompt,
+    domainHints: input.domainHints,
+    version: { increment: 1 },
   });
 
   await syncPromptsToJson(ctx.familyGroupId);
@@ -111,31 +105,17 @@ export async function updatePromptTemplate(
 }
 
 export async function activatePromptTemplate(ctx: TenantContext, id: number) {
-  const target = await prisma.promptTemplate.findFirst({
-    where: { id, familyGroupId: ctx.familyGroupId },
-  });
+  const target = await findPromptTemplateById(ctx.familyGroupId, id);
   if (!target) {
     throw new AppError('対象のプロンプトが見つかりません', 404);
   }
 
-  await prisma.$transaction([
-    prisma.promptTemplate.updateMany({
-      where: { key: target.key, familyGroupId: ctx.familyGroupId },
-      data: { isActive: false },
-    }),
-    prisma.promptTemplate.update({
-      where: { id: target.id },
-      data: { isActive: true },
-    }),
-  ]);
-
+  await activatePromptTemplateInTransaction(ctx.familyGroupId, target.id, target.key);
   await syncPromptsToJson(ctx.familyGroupId);
 }
 
 export async function deletePromptTemplate(ctx: TenantContext, id: number) {
-  const target = await prisma.promptTemplate.findFirst({
-    where: { id, familyGroupId: ctx.familyGroupId },
-  });
+  const target = await findPromptTemplateById(ctx.familyGroupId, id);
   if (!target) {
     throw new AppError('対象のプロンプトが見つかりません', 404);
   }
@@ -143,7 +123,7 @@ export async function deletePromptTemplate(ctx: TenantContext, id: number) {
     throw new AppError('使用中のプロンプトは削除できません', 400);
   }
 
-  await prisma.promptTemplate.delete({ where: { id: target.id } });
+  await deletePromptTemplateById(target.id);
   await syncPromptsToJson(ctx.familyGroupId);
 }
 
@@ -156,25 +136,7 @@ type CostStatRow = {
 };
 
 export async function getAdminCostStats(ctx: TenantContext): Promise<CostStatRow[]> {
-  const stats = await prisma.$queryRaw<
-    Array<{
-      month: string;
-      modelId: string;
-      totalPromptTokens: number;
-      totalCandidatesTokens: number;
-    }>
-  >`
-    SELECT
-      TO_CHAR(l."createdAt", 'YYYY-MM') AS month,
-      l."modelId",
-      SUM(l."promptTokens")::int AS "totalPromptTokens",
-      SUM(l."candidatesTokens")::int AS "totalCandidatesTokens"
-    FROM "ApiUsageLog" l
-    INNER JOIN "FamilyMember" fm ON l."familyMemberId" = fm.id
-    WHERE fm."familyGroupId" = ${ctx.familyGroupId}
-    GROUP BY month, l."modelId"
-    ORDER BY month DESC;
-  `;
+  const stats = await queryAdminCostStatsByFamilyGroup(ctx.familyGroupId);
 
   return stats.map((row) => {
     const costUsd =

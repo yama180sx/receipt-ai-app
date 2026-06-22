@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { receiptApi } from '../../../api';
 import { buildReceiptUploadFormData } from '../../../utils/receiptUploadFormData';
@@ -9,6 +9,7 @@ import {
   registerWebImageFile,
   clearPendingCropUri,
 } from '../../../utils/webImageFileRegistry';
+import { showApiErrorAlert } from '../../../utils/apiError';
 import { showAlert } from '../../../utils/alertMessage';
 
 const ACCEPTANCE_MESSAGE_MS = 3000;
@@ -63,15 +64,8 @@ export function useReceiptUpload({
         registerLocalUploadFailure('サーバーが受付を拒否しました。');
         showAlert('エラー', 'レシートの受付に失敗しました。');
       } catch (err) {
-        console.error('uploadReceiptImage', err);
-        const message =
-          err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
-        registerLocalUploadFailure(message);
-        if (Platform.OS === 'web') {
-          showAlert('エラー', message);
-        } else {
-          Alert.alert('エラー', message);
-        }
+        registerLocalUploadFailure('画像のアップロードに失敗しました。');
+        showApiErrorAlert('エラー', err, '画像のアップロードに失敗しました。');
       } finally {
         setUploadingCount((count) => Math.max(0, count - 1));
       }
@@ -114,7 +108,7 @@ export function useReceiptUpload({
   const pickImageNative = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('権限エラー', 'カメラの使用を許可してください。');
+      showAlert('権限エラー', 'カメラの使用を許可してください。');
       return;
     }
 
@@ -137,8 +131,7 @@ export function useReceiptUpload({
     try {
       await pickImageNative();
     } catch (err) {
-      console.error('handleScan Error:', err);
-      Alert.alert('エラー', '画像のアップロードに失敗しました。');
+      showApiErrorAlert('エラー', err, '画像のアップロードに失敗しました。');
     }
   }, [pickImageNative]);
 

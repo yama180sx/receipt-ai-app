@@ -1,166 +1,50 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  FlatList, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  Platform, 
-  Alert,
+import React from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
-import { categoryApi, receiptApi } from '../api';
-import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
-// Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
-import { theme } from '../theme';
-import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
-import type { CategorySummary, ReceiptDetail } from '../types/receipt';
-import type { FamilyMemberSummary, ReceiptForSplitEditor } from '../types/settlement';
+import { useReceiptHistory } from '../features/history';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
+import type { ReceiptDetail } from '../types/receipt';
+import type { ReceiptForSplitEditor } from '../types/settlement';
 
 interface HistoryScreenProps {
   onBack: () => void;
-  currentMemberId: number; 
+  currentMemberId: number;
   onGoToSplitEditor?: (receipt: ReceiptForSplitEditor) => void;
 }
 
 /**
- * [Issue #67 / #64 / Web・ネイティブ完全互換] 履歴一覧画面
+ * [Issue #67 / #64 / #100-14] 履歴一覧画面 — Hook + UI の薄型 Screen
  */
 export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEditor }: HistoryScreenProps) {
-  const isWide = useIsWideLayout();
-
-  const [loading, setLoading] = useState(true);
-  const [receipts, setReceipts] = useState<ReceiptDetail[]>([]);
-  const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [members, setMembers] = useState<FamilyMemberSummary[]>([]);
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
-  
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
-
-  const months = useMemo(() => getRecentYearMonths(6), []);
-
-  const monthSelectOptions = useMonthSelectOptions(months, isWide);
-
-  const memberSelectOptions = useMemo(
-    () =>
-      members.map((m) => ({
-        label: m.id === currentMemberId ? `自分 (${m.name})` : m.name,
-        value: m.id.toString(),
-      })),
-    [members, currentMemberId]
-  );
-
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
-  const BASE_URL = API_URL.replace(/\/api\/?$/, '');
-
-  // カテゴリマスタの取得
-  const fetchCategories = useCallback(async () => {
-    try {
-      const res = await categoryApi.listCategories();
-      if (res.success) {
-        setCategories(res.data);
-      }
-    } catch (err) {
-      console.error('カテゴリー取得失敗', err);
-    }
-  }, []);
-
-  // ★ Issue #64: 所属世帯のメンバー一覧を取得
-  const fetchMembers = useCallback(async () => {
-    try {
-      const res = await receiptApi.getFamilyMembers();
-      if (res.success) {
-        setMembers(res.data);
-      }
-    } catch (err) {
-      console.error('世帯メンバー取得失敗', err);
-    }
-  }, []);
-
-  // 履歴データの取得
-  const fetchReceipts = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await receiptApi.listReceipts({
-        ...(selectedMonth ? { month: selectedMonth } : {}),
-        memberId: selectedMember,
-      });
-      if (res.success) {
-        const data = res.data;
-        setReceipts(data);
-        
-        // 編集・保存後に選択中データの参照を最新に更新
-        if (selectedReceipt) {
-          const updated = data.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
-          if (updated) setSelectedReceipt(updated);
-        } else if (isWide && data.length > 0) {
-          // 初回ロード時は1件目を選択
-          setSelectedReceipt(data[0]);
-        }
-      }
-    } catch (err) {
-      console.error('履歴取得失敗', err);
-      if (Platform.OS !== 'web') {
-        Alert.alert('エラー', '履歴の取得に失敗しました');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedMonth, selectedMember, isWide, selectedReceipt?.id]);
-
-  useEffect(() => {
-    fetchCategories();
-    fetchMembers(); // ★ 初期化時にメンバーマスタをロード
-  }, [fetchCategories, fetchMembers]);
-
-  useEffect(() => {
-    fetchReceipts();
-  }, [selectedMonth, selectedMember]); // フィルタ変更時のみ自動発火
-
-  // カテゴリのみの簡易変更処理（既存互換）
-  const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
-    if (!categoryId) return;
-    try {
-      const response = await receiptApi.updateItemCategory(itemId, Number(categoryId));
-
-      if (response.success) {
-        const updatedItem = response.data;
-        const mapper = (r: ReceiptDetail): ReceiptDetail => ({
-          ...r,
-          items: r.items.map((item) =>
-            item.id === itemId ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category } : item
-          ),
-        });
-
-        setReceipts(prev => prev.map(mapper));
-        if (selectedReceipt) setSelectedReceipt((prev) => (prev ? mapper(prev) : null));
-      }
-    } catch (err) {
-      console.error('カテゴリー更新失敗', err);
-      if (Platform.OS !== 'web') {
-        Alert.alert('エラー', 'カテゴリーの更新に失敗しました');
-      }
-    }
-  };
+  const history = useReceiptHistory({ currentMemberId });
 
   const renderItem = ({ item }: { item: ReceiptDetail }) => {
-    const isSelected = selectedReceipt?.id === item.id;
+    const isSelected = history.selectedReceipt?.id === item.id;
     const displayAmount = Math.round(item.totalAmount || 0);
 
     return (
-      <TouchableOpacity 
-        style={[styles.card, isSelected && isWide && styles.activeCard]} 
-        onPress={() => setSelectedReceipt(item)}
+      <TouchableOpacity
+        style={[cardStyles.listCard, styles.listCardExtra, isSelected && history.isWide && styles.activeCard]}
+        onPress={() => history.setSelectedReceipt(item)}
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.date}>
             {item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '日付不明'}
           </Text>
-          <Text style={[styles.store, isSelected && isWide && { color: theme.colors.primary }]} numberOfLines={1}>
+          <Text style={[styles.store, isSelected && history.isWide && { color: colors.primary }]} numberOfLines={1}>
             {item.storeName || '店名不明'}
           </Text>
         </View>
@@ -177,44 +61,44 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenLayout.container}>
       <View style={styles.mainWrapper}>
-        <View style={styles.header}>
+        <View style={screenLayout.header}>
           <AppBackButton onPress={onBack} />
-          <Text style={styles.title}>レシート履歴</Text>
+          <Text style={screenLayout.headerTitle}>レシート履歴</Text>
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={[styles.filterContainer, isWide ? styles.filterContainerWide : styles.filterContainerMobile]}>
-          <View style={[styles.filterSelectWrap, isWide && styles.filterSelectWrapWide]}>
+        <View style={[styles.filterContainer, history.isWide ? styles.filterContainerWide : styles.filterContainerMobile]}>
+          <View style={[styles.filterSelectWrap, history.isWide && styles.filterSelectWrapWide]}>
             <AppSelect<string>
-              selectedValue={selectedMonth}
-              onValueChange={setSelectedMonth}
-              options={monthSelectOptions}
+              selectedValue={history.selectedMonth}
+              onValueChange={history.setSelectedMonth}
+              options={history.monthSelectOptions}
               placeholder="全期間"
               placeholderValue=""
             />
           </View>
-          <View style={[styles.filterSelectWrap, isWide && styles.filterSelectWrapWide]}>
+          <View style={[styles.filterSelectWrap, history.isWide && styles.filterSelectWrapWide]}>
             <AppSelect<string>
-              selectedValue={selectedMember}
-              onValueChange={setSelectedMember}
-              options={memberSelectOptions}
+              selectedValue={history.selectedMember}
+              onValueChange={history.setSelectedMember}
+              options={history.memberSelectOptions}
               placeholder="世帯全体"
               placeholderValue=""
             />
           </View>
         </View>
 
-        <View style={isWide ? styles.mainContentWide : styles.mainContentMobile}>
-          <View style={isWide ? styles.masterPane : styles.fullPane}>
-            {loading ? (
+        <View style={history.isWide ? styles.mainContentWide : styles.mainContentMobile}>
+          <View style={history.isWide ? styles.masterPane : styles.fullPane}>
+            {history.loading ? (
               <View style={styles.centerLoading}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : (
               <FlatList
-                data={receipts}
+                data={history.receipts}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={renderItem}
                 contentContainerStyle={styles.list}
@@ -224,17 +108,17 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
             )}
           </View>
 
-          {isWide && (
+          {history.isWide && (
             <View style={styles.detailPane}>
-              {selectedReceipt ? (
-                <ReceiptDetailComponent 
-                  receipt={selectedReceipt}
-                  categories={categories}
-                  onCategoryChange={handleCategoryChange}
-                  baseUrl={BASE_URL}
+              {history.selectedReceipt ? (
+                <ReceiptDetailComponent
+                  receipt={history.selectedReceipt}
+                  categories={history.categories}
+                  onCategoryChange={history.handleCategoryChange}
+                  baseUrl={history.baseUrl}
                   fullWidth={false}
-                  onSaveSuccess={fetchReceipts}
-                  onGoToSplitEditor={onGoToSplitEditor} // ★ 追加: Componentへハンドラを渡す
+                  onSaveSuccess={history.fetchReceipts}
+                  onGoToSplitEditor={onGoToSplitEditor}
                 />
               ) : (
                 <View style={styles.emptyDetailWrapper}>
@@ -246,21 +130,21 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
         </View>
       </View>
 
-      {!isWide && (
+      {!history.isWide && (
         <AppModal
-          visible={!!selectedReceipt}
-          onRequestClose={() => setSelectedReceipt(null)}
+          visible={!!history.selectedReceipt}
+          onRequestClose={() => history.setSelectedReceipt(null)}
           variant="sheet"
-          title={selectedReceipt?.storeName || '店名不明'}
+          title={history.selectedReceipt?.storeName || '店名不明'}
         >
-          {selectedReceipt ? (
+          {history.selectedReceipt ? (
             <ReceiptDetailComponent
-              receipt={selectedReceipt}
-              categories={categories}
-              onCategoryChange={handleCategoryChange}
-              baseUrl={BASE_URL}
+              receipt={history.selectedReceipt}
+              categories={history.categories}
+              onCategoryChange={history.handleCategoryChange}
+              baseUrl={history.baseUrl}
               fullWidth={true}
-              onSaveSuccess={fetchReceipts}
+              onSaveSuccess={history.fetchReceipts}
               onGoToSplitEditor={onGoToSplitEditor}
             />
           ) : null}
@@ -271,31 +155,28 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
   mainWrapper: { flex: 1, width: '100%', alignSelf: 'stretch', paddingTop: Platform.OS === 'ios' ? 60 : 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
-  title: { ...theme.typography.h2, color: theme.colors.text.main },
-  filterContainer: { paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 8 },
+  filterContainer: { paddingHorizontal: spacing.md, marginBottom: spacing.md, gap: 8 },
   filterContainerMobile: { flexDirection: 'column' },
   filterContainerWide: { flexDirection: 'row', justifyContent: 'flex-start' },
   filterSelectWrap: { width: '100%', justifyContent: 'center' },
   filterSelectWrapWide: { flex: 1, width: undefined, minWidth: 160, maxWidth: 220 },
   mainContentMobile: { flex: 1 },
-  mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.colors.border },
-  masterPane: { width: 350, height: '100%', backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },
+  mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border },
+  masterPane: { width: 350, height: '100%', backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border },
   fullPane: { flex: 1 },
-  detailPane: { flex: 1, height: '100%', backgroundColor: theme.colors.background },
-  list: { padding: theme.spacing.md },
-  card: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border },
-  activeCard: { borderColor: theme.colors.primary, backgroundColor: theme.colors.semantic.active.bg, elevation: 0 },
+  detailPane: { flex: 1, height: '100%', backgroundColor: colors.background },
+  list: { padding: spacing.md },
+  listCardExtra: { marginBottom: 10 },
+  activeCard: { borderColor: colors.primary, backgroundColor: colors.semantic.active.bg, elevation: 0 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  date: { fontSize: 12, color: theme.colors.text.muted },
-  store: { fontWeight: '700', color: theme.colors.text.main, flex: 1, marginLeft: 10, textAlign: 'right' },
+  date: { fontSize: 12, color: colors.text.muted },
+  store: { fontWeight: '700', color: colors.text.main, flex: 1, marginLeft: 10, textAlign: 'right' },
   cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  amount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary },
-  itemCountBadge: { backgroundColor: theme.colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  itemCountText: { fontSize: 10, color: theme.colors.secondary },
-  empty: { textAlign: 'center', marginTop: 50, color: theme.colors.text.muted },
+  amount: { fontSize: 18, fontWeight: 'bold', color: colors.primary },
+  itemCountBadge: { backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  itemCountText: { fontSize: 10, color: colors.secondary },
+  empty: { textAlign: 'center', marginTop: 50, color: colors.text.muted },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+  emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

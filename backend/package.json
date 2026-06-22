@@ -11,7 +11,8 @@
     "prisma:seed": "prisma db seed",
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
     "test": "vitest run",
-    "test:integration": "RUN_API_INTEGRATION=1 vitest run src/app.integration.test.ts"
+    "test:integration": "RUN_API_INTEGRATION=1 vitest run --config vitest.integration.config.ts",
+    "check:openapi": "vitest run src/openapiDrift.test.ts src/utils/openapiRouteCollector.test.ts src/utils/apiRouteEndpoint.test.ts src/types/apiSchemas.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

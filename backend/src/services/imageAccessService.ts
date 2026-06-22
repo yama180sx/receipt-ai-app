@@ -1,6 +1,6 @@
 import path from 'path';
-import { prisma } from '../utils/prismaClient';
 import { receiptQueue } from '../queues/receiptQueue';
+import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
 
 function normalizeImagePath(imagePath: string): string {
   return imagePath.replace(/\\/g, '/');
@@ -35,10 +35,7 @@ export async function canAccessReceiptImage(
 ): Promise<boolean> {
   const normalized = normalizeImagePath(imagePath);
 
-  const receipt = await prisma.receipt.findFirst({
-    where: { familyGroupId, imagePath: normalized },
-    select: { id: true },
-  });
+  const receipt = await findReceiptIdByImagePath(familyGroupId, normalized);
   if (receipt) return true;
 
   return hasQueueJobForImage(familyGroupId, normalized);

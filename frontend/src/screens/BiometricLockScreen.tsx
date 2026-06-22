@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { authScreenStyles } from '../features/auth';
 import { authenticateWithBiometric } from '../services/biometricService';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
 
 type Props = {
   memberName?: string;
@@ -42,25 +44,25 @@ export function BiometricLockScreen({ memberName, onUnlocked, onUsePassword }: P
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ロック中</Text>
+      <Text style={authScreenStyles.title}>ロック中</Text>
       {memberName ? (
-        <Text style={styles.subtitle}>{memberName} としてログイン済み</Text>
+        <Text style={authScreenStyles.subtitle}>{memberName} としてログイン済み</Text>
       ) : (
-        <Text style={styles.subtitle}>生体認証でロックを解除してください</Text>
+        <Text style={authScreenStyles.subtitle}>生体認証でロックを解除してください</Text>
       )}
 
       {isAuthenticating ? (
-        <ActivityIndicator size="large" color="white" style={styles.spinner} />
+        <ActivityIndicator size="large" color={colors.text.inverse} style={styles.spinner} />
       ) : (
-        <TouchableOpacity style={styles.primaryButton} onPress={tryUnlock}>
-          <Text style={styles.primaryButtonText}>生体認証で解除</Text>
+        <TouchableOpacity style={authScreenStyles.primaryButton} onPress={tryUnlock}>
+          <Text style={[authScreenStyles.primaryButtonText, { color: colors.primary }]}>生体認証で解除</Text>
         </TouchableOpacity>
       )}
 
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
-      <TouchableOpacity style={styles.linkButton} onPress={onUsePassword} disabled={isAuthenticating}>
-        <Text style={styles.linkButtonText}>パスワードでログイン</Text>
+      <TouchableOpacity style={authScreenStyles.linkButton} onPress={onUsePassword} disabled={isAuthenticating}>
+        <Text style={authScreenStyles.linkButtonText}>パスワードでログイン</Text>
       </TouchableOpacity>
     </View>
   );
@@ -68,52 +70,19 @@ export function BiometricLockScreen({ memberName, onUnlocked, onUsePassword }: P
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    ...authScreenStyles.container,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.primary,
-    padding: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
-    marginBottom: 32,
-    textAlign: 'center',
+    backgroundColor: colors.primary,
+    padding: spacing.xl + spacing.sm,
   },
   spinner: {
-    marginVertical: 24,
-  },
-  primaryButton: {
-    backgroundColor: 'white',
-    width: '100%',
-    padding: 18,
-    borderRadius: 15,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  primaryButtonText: {
-    color: theme.colors.primary,
-    fontWeight: 'bold',
-    fontSize: 16,
+    marginVertical: spacing.lg,
   },
   error: {
-    color: '#ffcccc',
+    color: 'rgba(255, 204, 204, 1)',
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 12,
-  },
-  linkButton: {
-    padding: 12,
-  },
-  linkButtonText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    textDecorationLine: 'underline',
+    marginBottom: spacing.md - 4,
   },
 });

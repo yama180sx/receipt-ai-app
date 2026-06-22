@@ -37,6 +37,9 @@ export type ItemSplitInput = Schemas['ItemSplitInput'];
 // --- stats ---
 export type MonthlyStatsData = Schemas['MonthlyStatsData'];
 export type AdvancedStatsData = Schemas['AdvancedStatsData'];
+export type CategoryStatRow = Schemas['CategoryStatRow'];
+export type TrendRow = Schemas['TrendRow'];
+export type ParetoRow = Schemas['ParetoRow'];
 export type SettlementStatusData = Schemas['SettlementStatusData'];
 export type SettlementMemberSummary = Schemas['SettlementMemberSummary'];
 export type SettlementTransfer = Schemas['SettlementTransfer'];

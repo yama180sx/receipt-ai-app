@@ -33,8 +33,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  // Requestオブジェクトを拡張して情報を保持 (anyキャストで型定義不足を回避)
-  (req as any).user = decoded;
+  req.user = decoded;
   
   next();
 };
@@ -46,7 +45,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
  */
 export const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user?.id; 
+    const userId = req.user?.id; 
     
     if (!userId) {
       return res.status(401).json({ success: false, message: 'ユーザー情報が取得できません' });

@@ -1,4 +1,4 @@
-import type { ItemSplitSavePayload } from '../types/settlement';
+import type { ItemSplitInput } from '../api/generated';
 
 /** 明細の税込小計（Backend の calcItemLineTotal と同じ丸め） */
 export function calcItemTotal(item: {
@@ -21,7 +21,7 @@ export function buildItemSplitSavePayload(
   activeMembers: SplitSaveMember[],
   amountsByMemberId: Record<number, number>,
   remainderMemberId: number
-): ItemSplitSavePayload[] {
+): ItemSplitInput[] {
   if (activeMembers.length === 0) return [];
 
   const others = activeMembers.filter((m) => m.id !== remainderMemberId);

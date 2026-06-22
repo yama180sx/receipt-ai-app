@@ -1,14 +1,15 @@
 # 画面遷移 & フロント設計（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)  
-子 Issue: [#296 Issue #90-5](https://github.com/yama180sx/receipt-ai-app/issues/296)  
-計画: [plan.md](./plan.md)
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459)  
+子 Issue: [#296 Issue #90-5](https://github.com/yama180sx/receipt-ai-app/issues/296) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461)  
+計画: [plan.md](../refactor/plan.md)
 
-本ドキュメントは **実装準拠（as-built）** で記述する。`frontend/App.tsx` と各 Screen コンポーネントの挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）、API は [api-spec.md](./api-spec.md)（#90-3）を参照する。
+本ドキュメントは **実装準拠（as-built）** で記述する。`frontend/app/`（Expo Router）と各 Screen / `features/` の挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）、API は [api-spec.md](./api-spec.md)（#90-3）、層ルールは [architecture.md](./architecture.md) §6、[実装規約](./frontend-conventions.md) を参照する。
 
 | 資料 | 内容 |
 |------|------|
 | [architecture.md](./architecture.md) §6 | フロントエンド概要（#90-1） |
+| [frontend-conventions.md](./frontend-conventions.md) | 実装規約・行数上限・AI プロンプト（#101-7） |
 | [domain-model.md](./domain-model.md) §4–5 | 按分・精算の業務ルール（#90-2） |
 | [api-spec.md](./api-spec.md) §7 | 精算・按分 API（#90-3） |
 | [docs/reviews/issue-87/](../reviews/issue-87/README.md) | 精算ドメイン LLM レビュー資材 |
@@ -17,49 +18,50 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ## 1. 概要
 
-RecAIpt のフロントエンドは **Expo（React Native + Web）** の単一ルートアプリである。React Navigation は未使用で、`App.tsx` が `currentView` ステートによる画面切替を担う。
+RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router** のファイルベースルーティングアプリである（#98-8 Phase 2）。旧来の `App.tsx` + `currentView` 切替は廃止済み。
 
 | 項目 | 内容 |
 |------|------|
-| エントリポイント | `frontend/App.tsx` |
-| 画面数 | ViewType 13 種 + 認証ゲート 3 種 |
-| 状態管理 | React Context + 画面ローカル state（Redux / Zustand なし） |
-| API 接続 | `EXPO_PUBLIC_API_URL` → `frontend/src/utils/apiClient.ts` |
+| エントリポイント | `frontend/app/_layout.tsx`（ルートレイアウト） |
+| 認証ゲート | `(app)/_layout.tsx` — 未ログイン時 `/login` へ Redirect |
+| 画面数 | 16 ルート（`app/` 配下） |
+| 状態管理 | `AppSessionProvider` + `ReceiptTrayProvider` + `features/*/hooks` |
+| API 接続 | `src/api/*` → `apiClient.ts`（Hook 経由。Screen 直 import 禁止 #100-14） |
 | 永続化 | AsyncStorage（セッション・画面復元） |
 
 ---
 
 ## 2. ナビゲーションアーキテクチャ
 
-### 2.1 ViewType 一覧
+### 2.1 ルート一覧（Expo Router）
 
-`App.tsx` で定義される画面識別子。ルーティングライブラリは使わず、`switch (currentView)` で描画する。
+`frontend/app/` のファイルパスが URL になる。旧 ViewType 名との対応は移行期の参照用。
 
-| ViewType | 画面コンポーネント | 主な責務 | 戻り先 |
-|----------|-------------------|----------|--------|
-| `main` | `HomeScreen` | ダッシュボード・撮影アップロード・トレイプレビュー | — |
-| `history` | `HistoryScreen` | レシート履歴一覧・詳細・按分導線 | `main` |
-| `stats` | `StatisticsScreen` | 月次支出統計・円グラフ | `main` |
-| `receipt_tray` | `ReceiptTrayScreen` | 確認トレイ全件 | `main` |
-| `receipt_scan` | `ReceiptScanScreen` | AI 解析結果の確認・DB 登録 | `scanReturnView` |
-| `split_editor` | `SplitEditorScreen` | 明細ごとの按分（割り勘）編集 | `history` |
-| `settlement_summary` | `SettlementSummaryScreen` | 家族間月次精算サマリー・送金記録 | `main` |
-| `admin_menu` | `AdminMenuScreen` | 管理者機能ハブ | `main` |
-| `category_mgr` | `CategoryManagementScreen` | カテゴリマスタ CRUD | `admin_menu` |
-| `product_master` | `ProductMasterScreen` | 学習マスタ（商品名→カテゴリ） | `admin_menu` |
-| `prompt_editor` | `PromptEditorScreen` | AI プロンプト・外税ヒント編集 | `admin_menu` |
-| `admin_stats` | `AdminStatsScreen` | AI トークン・コスト統計 | `admin_menu` |
-| `totp_settings` | `TotpSettingsScreen` | ログイン後の TOTP 有効化 | `main` |
+| ルート | 画面コンポーネント | 主な Hook / features | 戻り先 |
+|--------|-------------------|----------------------|--------|
+| `/` | `HomeScreen` | `features/home` | — |
+| `/history` | `HistoryScreen` | `useReceiptHistory` | `/` |
+| `/stats` | `StatisticsScreen` | `useStatistics` | `/` |
+| `/tray` | `ReceiptTrayScreen` | `ReceiptTrayContext` | `/` |
+| `/scan/[jobId]` | `ReceiptScanScreen` | `useReceiptScan` | query `returnTo`（`home` / `tray`） |
+| `/history/[receiptId]/split` | `SplitEditorScreen` | `useSplitEditor` | `/history` |
+| `/settlement` | `SettlementSummaryScreen` | `useSettlementSummary` | `/` |
+| `/admin` | `AdminMenuScreen` | — | `/` |
+| `/admin/categories` | `CategoryManagementScreen` | `useCategoryManagement` | `/admin` |
+| `/admin/product-master` | `ProductMasterScreen` | — | `/admin` |
+| `/admin/prompts` | `PromptEditorScreen` | — | `/admin` |
+| `/admin/stats` | `AdminStatsScreen` | — | `/admin` |
+| `/settings/totp` | `TotpSettingsScreen` | — | `/` |
+| `/login` | `LoginScreen` | `useLoginFlow` | ログイン後 `/` |
 
-**ViewType に含まれない認証ゲート画面:**
+**認証ゲート（ルート外）:**
 
 | 画面 | ファイル | 表示条件 |
 |------|----------|----------|
-| スプラッシュ / 初期化 | `App.tsx` 内 | `!isReady` |
+| スプラッシュ / 初期化 | `app/_layout.tsx` `RootGate` | `!isReady` |
 | 生体認証ロック | `screens/BiometricLockScreen.tsx` | `biometricLockActive && pendingSession`（Native のみ） |
-| ログイン | `screens/LoginScreen.tsx` | `!userToken` |
 
-> **実装上の注意:** `totp_settings` は ViewType として定義されているが、現行 UI からの遷移コードはない（ログイン時の TOTP セットアップは `LoginScreen` 内で完結）。TOTP 有効化後の変更は将来の導線追加を想定したデッドルートに近い。
+> `/settings/totp` はルートとして存在する。ホーム等からの導線は限定的だが、TOTP 有効化 UI は `LoginScreen` 内フローでも完結する。
 
 ### 2.2 画面遷移図
 
@@ -70,50 +72,37 @@ flowchart TD
   Ready -->|Yes| Bio{生体ロック?}
   Bio -->|Yes| BioScreen[BiometricLockScreen]
   Bio -->|No| Auth{userToken?}
-  Auth -->|No| Login[LoginScreen]
-  Auth -->|Yes| Switch{currentView}
+  Auth -->|No| Login["/login"]
+  Auth -->|Yes| Routes[Expo Router Stack]
 
-  Switch -->|main| Home[HomeScreen]
-  Switch -->|history| Hist[HistoryScreen]
-  Switch -->|split_editor| Split[SplitEditorScreen]
-  Switch -->|settlement_summary| Settle[SettlementSummaryScreen]
-  Switch -->|stats| Stats[StatisticsScreen]
-  Switch -->|receipt_tray| Tray[ReceiptTrayScreen]
-  Switch -->|receipt_scan| Scan[ReceiptScanScreen]
-  Switch -->|admin_menu| AdminM[AdminMenuScreen]
-  Switch -->|category_mgr| Cat[CategoryManagementScreen]
-  Switch -->|product_master| Prod[ProductMasterScreen]
-  Switch -->|prompt_editor| Prompt[PromptEditorScreen]
-  Switch -->|admin_stats| AdminS[AdminStatsScreen]
-  Switch -->|totp_settings| Totp[TotpSettingsScreen]
+  Routes --> Home["/ HomeScreen"]
+  Routes --> Hist["/history"]
+  Routes --> Split["/history/.../split"]
+  Routes --> Settle["/settlement"]
+  Routes --> Stats["/stats"]
+  Routes --> Tray["/tray"]
+  Routes --> Scan["/scan/jobId"]
+  Routes --> Admin["/admin"]
+  Routes --> Cat["/admin/categories"]
+  Routes --> Prod["/admin/product-master"]
+  Routes --> Prompt["/admin/prompts"]
+  Routes --> AdminS["/admin/stats"]
+  Routes --> Totp["/settings/totp"]
 
-  Home -->|履歴| Hist
-  Home -->|統計| Stats
-  Home -->|トレイ| Tray
-  Home -->|精算 wide のみ| Settle
-  Home -->|管理者 ADMIN のみ| AdminM
-  Home -->|アップロード| Tray
-
-  Tray -->|解析完了| Scan
-  Hist -->|割り勘 wide のみ| Split
-  AdminM --> Cat & Prod & Prompt & AdminS
+  Home --> Hist & Stats & Tray & Settle & Admin
+  Tray --> Scan
+  Hist --> Split
+  Admin --> Cat & Prod & Prompt & AdminS
 ```
 
-### 2.3 App.tsx の状態管理
+### 2.3 セッション・ナビゲーション状態
 
-| カテゴリ | state | 用途 |
-|----------|-------|------|
-| 認証 | `userToken`, `currentMemberId`, `currentMemberName`, `currentUserRole`, `totpEnabled` | セッション・ロール |
-| ナビ | `currentView`, `scanReturnView` | 画面切替・スキャン画面の戻り先 |
-| データ | `resultData`, `targetReceipt`, `categories` | スキャン画面・按分エディタへの受け渡し |
-| 生体認証 | `biometricLockActive`, `pendingSession`, `biometricEnabled` | Native ロック画面 |
-
-**永続化（ログイン中のみ）:**
-
-| キー | 内容 |
-|------|------|
-| `@app_view` | `currentView` の復元 |
-| `@app_result` | `resultData`（スキャン画面用）の復元 |
+| カテゴリ | 実装 | 用途 |
+|----------|------|------|
+| 認証 | `AppSessionProvider` / `useAppSession` | トークン・メンバー・ロール・TOTP・生体認証 |
+| ナビ | `useAppNavigation` + Expo Router | `router.push` / `replace` / `back` |
+| スキャン戻り | `scanRoutes.ts` query `returnTo` | スキャン画面の戻り先（`home` / `tray`） |
+| トレイ | `ReceiptTrayProvider` | ジョブポーリング・スキャン画面起動 |
 
 セッション本体は `authService` が AsyncStorage の `@token`, `@member_id`, `@role` 等を管理する。
 
@@ -121,10 +110,13 @@ flowchart TD
 
 ```
 SafeAreaProvider
-  └ DisplayModeProvider（Web 表示モード: auto / mobile / web）
-       └ ReceiptTrayProvider（ログイン時のみ — ジョブポーリング）
-            └ ResponsiveContainer
-                 └ renderMainContent()
+  └ DisplayModeProvider
+       └ AppSessionProvider（features/app）
+            └ RootGate（スプラッシュ / 生体ロック）
+                 └ Slot（Expo Router）
+                      └ (app)/_layout
+                           └ ReceiptTrayProvider（ログイン時）
+                                └ Stack（各ルート Screen）
 ```
 
 | Context | ファイル | 役割 |
@@ -138,22 +130,22 @@ SafeAreaProvider
 
 ### 3.1 ユーザー向け画面
 
-| 画面 | ファイル | 主な責務 | 主要 API |
-|------|----------|----------|----------|
-| **Home** | `screens/HomeScreen.tsx` | 今月合計・最新レシート・撮影アップロード・トレイプレビュー・ナビグリッド | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
-| **History** | `screens/HistoryScreen.tsx` | 月・メンバーフィルタ、一覧、詳細（2 ペイン or モーダル） | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
-| **Statistics** | `screens/StatisticsScreen.tsx` | 月次統計・円グラフ・高度統計 | `GET /stats/monthly`, `GET /stats/advanced`, `GET /categories`, `PATCH /receipts/items/:id` |
-| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | 確認トレイ全件・プルリフレッシュ | コンテキスト経由: `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
-| **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | 解析結果の編集・重複チェック・DB 登録 | `POST /receipts/commit` |
-| **SplitEditor** | `screens/SplitEditorScreen.tsx` | 明細ごとの按分（金額/％）、均等割、一括調整、保存 | `GET /family-groups/members`, `POST /receipts/items/:id/splits` |
-| **Settlement** | `screens/SettlementSummaryScreen.tsx` | 月次精算残額、送金記録の登録・取消、内訳テーブル | `GET /stats/settlement`, `POST /stats/settlement/transfers`, `DELETE /stats/settlement/transfers/:id` |
+| 画面 | ファイル | 主な Hook | 主要 API（Hook 内） |
+|------|----------|-----------|---------------------|
+| **Home** | `screens/HomeScreen.tsx` | `useHomeDashboard`, `useReceiptUpload` | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
+| **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
+| **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /categories`, `PATCH /receipts/items/:id` |
+| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
+| **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | `useReceiptScan` | `POST /receipts/commit` |
+| **SplitEditor** | `screens/SplitEditorScreen.tsx` | `useSplitEditor` | `GET /family-groups/members`, `POST /receipts/items/:id/splits` |
+| **Settlement** | `screens/SettlementSummaryScreen.tsx` | `useSettlementSummary` | `GET /stats/settlement`, `POST /stats/settlement/transfers`, `DELETE /stats/settlement/transfers/:id` |
 
 ### 3.2 管理者向け画面（ADMIN）
 
 | 画面 | ファイル | 主な責務 | 主要 API |
 |------|----------|----------|----------|
 | **AdminMenu** | `screens/AdminMenuScreen.tsx` | 管理機能へのナビゲーションハブ | なし |
-| **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | カテゴリ CRUD・AI 最適化 | `GET/POST/DELETE /categories`, `POST /categories/optimize` |
+| **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | `useCategoryManagement` | `GET/POST/DELETE /categories`, `POST /categories/optimize` |
 | **ProductMaster** | `screens/ProductMasterScreen.tsx` | 商品マスタ検索・削除・店舗マージ | `GET /product-master`, `DELETE /product-master/:id`, `POST /product-master/merge-stores` |
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
@@ -162,7 +154,7 @@ SafeAreaProvider
 
 | 画面 | ファイル | 主な責務 | 主要 API |
 |------|----------|----------|----------|
-| **Login** | `screens/LoginScreen.tsx` | 招待コード → メンバー選択 → パスワード → TOTP セットアップ/検証 | `/auth/resolve-family`, `/auth/login`, `/auth/totp/*`, `/auth/verify-totp` |
+| **Login** | `screens/LoginScreen.tsx` | `useLoginFlow` | `/auth/resolve-family`, `/auth/login`, `/auth/totp/*`, `/auth/verify-totp` |
 | **TotpSettings** | `screens/TotpSettingsScreen.tsx` | ログイン後の TOTP 有効化 | `POST /auth/totp/setup`, `POST /auth/totp/confirm` |
 | **BiometricLock** | `screens/BiometricLockScreen.tsx` | Native 生体認証アンロック | なし（ローカル生体認証のみ） |
 
@@ -170,10 +162,10 @@ SafeAreaProvider
 
 | コンポーネント | ファイル | 責務 |
 |----------------|----------|------|
-| `ReceiptDetailComponent` | `components/ReceiptDetailComponent.tsx` | 履歴/統計でのレシート詳細・編集・割り勘ボタン |
+| `ReceiptDetailComponent` | `features/receipt/components/ReceiptDetailComponent.tsx` | 履歴/統計でのレシート詳細・編集・割り勘ボタン（`useReceiptDetail`） |
 | `ReceiptTrayPanel` | `components/ReceiptTrayPanel.tsx` | トレイ UI（ホーム/トレイ画面） |
 | `ReceiptImageCropModal` | `components/ReceiptImageCropModal.tsx` | Web 向け画像クロップ |
-| `DisplayModeSettings` | `components/DisplayModeSettings.tsx` | Web 表示モード切替（`main` ツールバー） |
+| `DisplayModeSettings` | `components/DisplayModeSettings.tsx` | Web 表示モード切替（ホーム `MainToolbar`） |
 | `DevEnvironmentBanner` | `components/DevEnvironmentBanner.tsx` | dev 環境バナー |
 
 ---
@@ -185,11 +177,11 @@ SafeAreaProvider
 | 層 | 実装 | 内容 |
 |----|------|------|
 | **ナビゲーション** | `HomeScreen` | `userRole === 'ADMIN'` のときのみ「管理者メニュー」を表示 |
-| **ロール保持** | `App.tsx` / `authService` | ログイン時 `result.member.role` → `currentUserRole`、ストレージ `@role` |
-| **API 403** | `apiClient` レスポンス interceptor | `Alert.alert('アクセス権限エラー', ...)` |
+| **ロール保持** | `AppSessionProvider` / `authService` | ログイン時 `result.member.role` → Context、ストレージ `@role` |
+| **API 403** | `apiClient` レスポンス interceptor | `showAlert('アクセス権限エラー', ...)` |
 | **AdminStats** | `AdminStatsScreen` | 403 時 UI にエラー帯表示 |
 
-**重要:** 管理画面（`admin_menu` 以下）へのルートは **UI で ADMIN のみリンク表示** する。`currentView` を直接変更すれば USER も遷移可能だが、**実際の制限はバックエンドの `isAdmin` ミドルウェア（403）** に依存する。`AdminMenuScreen` 自体にロールチェックはない。
+**重要:** 管理画面（`/admin/*`）へのルートは **UI で ADMIN のみリンク表示** する。URL を直接開けば USER も遷移可能だが、**実際の制限はバックエンドの `isAdmin` ミドルウェア（403）** に依存する。
 
 ### 4.2 バックエンドとの対応
 
@@ -264,7 +256,7 @@ sequenceDiagram
 | 送金履歴 | `transferList[]` | `SettlementTransfer` の CRUD |
 | 精算済バッジ | `balance ≈ 0` | — |
 
-**モバイル制限:** ホームの「精算サマリー」リンクは `useIsWideHomeMenu()`（600px 閾値）で非表示。`settlement_summary` は ViewType として存在し AsyncStorage 復元も可能だが、**通常 UI からの導線は wide のみ**。
+**モバイル制限:** ホームの「精算サマリー」リンクは `useIsWideHomeMenu()`（600px 閾値）で非表示。`/settlement` ルートは存在するが、**通常 UI からの導線は wide のみ**。
 
 ### 5.3 issue-87 との整合
 
@@ -298,10 +290,10 @@ sequenceDiagram
   Scan->>Home: onSuccess → scanReturnView へ復帰
 ```
 
-| 経路 | `scanReturnView` | トリガー |
-|------|------------------|----------|
-| ホームから（レガシー） | `main` | `handleAnalysisReady`（現在 `HomeScreen` では未使用） |
-| トレイから | `receipt_tray` または `main` | `ReceiptTrayProvider` → `handleOpenScanFromTray` |
+| 経路 | 戻り先 | トリガー |
+|------|--------|----------|
+| ホームから | `/` | `scanPath(jobId, 'home')` |
+| トレイから | `/tray` | `scanPath(jobId, 'tray')` |
 
 `ReceiptTrayProvider` はログイン後に `useReceiptJobs` でジョブをポーリングし、完了時にスキャン画面を開く。
 
@@ -328,6 +320,22 @@ Issue #82〜#85 で共通化された UI 部品。`frontend/src/components/ui/in
 
 > issue-87 レビュー（[scope.md](../reviews/issue-87/scope.md)）では #82〜#86 の UI 共通化はスコープ外としている。本節は参照用。
 
+### 7.1 Screen Style Pattern（#100-6 / #100-10 / #100-11）
+
+全 Screen は **共通 theme + feature 固有 styles** の 2 層でスタイルを定義する（big-bang 移行禁止）。
+
+| レイヤー | ファイル | 用途 |
+|----------|----------|------|
+| 共通レイアウト | `theme/screenLayout.ts` | `container`, `header`, `headerTitle`, `scrollContent` |
+| 共通カード | `theme/cardStyles.ts` | `summaryCard`, `chartCard`, `listCard`, `section` |
+| 画面固有 | `features/*/styles/*ScreenStyles.ts` または Screen 内 `StyleSheet` | ドメイン色・余白の上書き |
+
+**ルール**
+
+1. `theme/index.ts` バレル経由の import は **禁止**（循環参照で `spacing` が `undefined` になる）。`theme/colors`, `theme/spacing` 等を個別 import する。
+2. 一覧行には `cardStyles.listCard` を使う。`chartCard`（`minHeight: 220`）はグラフ・サマリー専用。
+3. 新規 Screen は API を Hook に寄せ、Screen ファイルは **UI + Hook 接続のみ**（[architecture.md](./architecture.md) §6.2）。
+
 ---
 
 ## 8. Web / モバイルの差分
@@ -341,7 +349,7 @@ Issue #82〜#85 で共通化された UI 部品。`frontend/src/components/ui/in
 | Web + wide + `fullWidth={false}` | `maxWidth: 600px`（`theme.layout.maxContentWidth`）+ 左右ボーダーで中央寄せ |
 | `fullWidth={true}` または Native / 狭い画面 | 幅 100% |
 
-`App.tsx` の `isFullWidth`: `main` のみ `false`、それ以外の ViewType は `true`。
+`AppScreenShell` / ルートファイルの `fullWidth` で制御する。ホーム（`/`）のみ `fullWidth={false}`、サブ画面は原則 `true`。
 
 ### 8.2 レイアウト判定フック
 
@@ -382,7 +390,7 @@ Native は常に幅ベース判定。永続化は `displayModeService`（AsyncSt
 | 生体認証 | 無効（ロック画面・有効化プロンプトなし） | Face ID / 指紋でロック解除 |
 | 撮影 | カメラ/ギャラリー選択 → `ReceiptImageCropModal` | カメラ直接 + `allowsEditing` |
 | FormData アップロード | `Content-Type` 自動 | `multipart/form-data` 明示（`apiClient`） |
-| アラート | `showAlert` ユーティリティ | `Alert.alert` 混在 |
+| アラート | `showAlert` / `showConfirmDialog` | 全プラットフォーム統一（#100-13） |
 
 ---
 
@@ -390,27 +398,35 @@ Native は常に幅ベース判定。永続化は `displayModeService`（AsyncSt
 
 ```
 frontend/
-├── App.tsx                              # ルート・ViewType・認証・ナビ
+├── app/                                 # Expo Router ルート
+│   ├── _layout.tsx                      # ルートレイアウト・AppSessionProvider
+│   ├── login.tsx
+│   └── (app)/
+│       ├── _layout.tsx                  # 認証ゲート・ReceiptTrayProvider
+│       ├── index.tsx                    # Home
+│       ├── history.tsx
+│       ├── stats.tsx
+│       ├── tray.tsx
+│       ├── settlement.tsx
+│       ├── scan/[jobId].tsx
+│       ├── history/[receiptId]/split.tsx
+│       ├── settings/totp.tsx
+│       └── admin/                       # categories, prompts, ...
 └── src/
-    ├── screens/
-    │   ├── HomeScreen.tsx
-    │   ├── HistoryScreen.tsx
-    │   ├── StatisticsScreen.tsx
-    │   ├── SplitEditorScreen.tsx
-    │   ├── SettlementSummaryScreen.tsx
-    │   ├── AdminMenuScreen.tsx
-    │   ├── CategoryManagementScreen.tsx
-    │   ├── ProductMasterScreen.tsx
-    │   ├── PromptEditorScreen.tsx
-    │   ├── AdminStatsScreen.tsx
-    │   ├── ReceiptScanScreen.tsx
-    │   ├── ReceiptTrayScreen.tsx
-    │   ├── LoginScreen.tsx
-    │   ├── BiometricLockScreen.tsx
-    │   └── TotpSettingsScreen.tsx
+    ├── screens/                         # 薄型 Screen（UI）
+    ├── features/                        # Hook + サブコンポーネント + styles
+    │   ├── app/                         # useAppSession, useAppNavigation
+    │   ├── auth/                        # useLoginFlow
+    │   ├── home/                        # useHomeDashboard, useReceiptUpload
+    │   ├── history/                     # useReceiptHistory
+    │   ├── receipt/                     # useReceiptDetail, useReceiptScan
+    │   ├── stats/                       # useStatistics
+    │   ├── settlement/                  # useSettlementSummary, useSplitEditor
+    │   └── category/                    # useCategoryManagement
+    ├── api/                             # categoryApi, receiptApi, statsApi
+    ├── mappers/                         # statsMapper 等
     ├── components/
     │   ├── ResponsiveContainer.tsx
-    │   ├── ReceiptDetailComponent.tsx
     │   ├── ReceiptTrayPanel.tsx
     │   └── ui/                          # 共通 UI (#82–#85)
     ├── contexts/
@@ -420,11 +436,14 @@ frontend/
     │   ├── useResponsive.ts
     │   └── useIsWideLayout.ts
     ├── utils/
-    │   ├── apiClient.ts                 # 認証注入・精算/按分 api ラッパー
-    │   └── splitEditorSplits.ts         # 按分 payload 生成（端数末尾配置）
+    │   ├── apiClient.ts
+    │   ├── alertMessage.ts              # showAlert
+    │   ├── confirmDialog.ts
+    │   └── splitEditorSplits.ts
     ├── types/
-    │   └── settlement.ts                # 精算・按分の型定義
     └── theme/
+        ├── screenLayout.ts              # Issue #100-6
+        ├── cardStyles.ts                # Issue #100-6
         ├── tableStyles.ts               # Issue #84
         ├── formStyles.ts                # Issue #85
         └── modalStyles.ts               # Issue #85

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { receiptApi, statsApi } from '../../../api';
+import { showApiErrorAlert } from '../../../utils/apiError';
 import { getCurrentYearMonth } from '../../../utils/monthSelectOptions';
 
 export function useHomeDashboard(currentMemberId: number) {
@@ -29,7 +30,7 @@ export function useHomeDashboard(currentMemberId: number) {
         setMonthlyTotal(Math.round(total));
       }
     } catch (error) {
-      console.error('Data fetch error:', error);
+      showApiErrorAlert('エラー', error, 'ダッシュボードの取得に失敗しました。');
     } finally {
       setLoading(false);
     }

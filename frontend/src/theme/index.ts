@@ -8,6 +8,8 @@ import { typography } from './typography';
 import { tableStyles, listItemStyles } from './tableStyles';
 import { formStyles } from './formStyles';
 import { modalStyles } from './modalStyles';
+import { screenLayout } from './screenLayout';
+import { cardStyles } from './cardStyles';
 
 export { BREAKPOINTS } from './breakpoints';
 export { colors } from './colors';
@@ -19,6 +21,8 @@ export { typography } from './typography';
 export { tableStyles, listItemStyles } from './tableStyles';
 export { formStyles } from './formStyles';
 export { modalStyles } from './modalStyles';
+export { screenLayout } from './screenLayout';
+export { cardStyles } from './cardStyles';
 
 export const theme = {
   colors,
@@ -32,6 +36,8 @@ export const theme = {
   listItemStyles,
   formStyles,
   modalStyles,
+  screenLayout,
+  cardStyles,
 } as const;
 
 export type Theme = typeof theme;

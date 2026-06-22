@@ -1,6 +1,8 @@
 /**
- * レシートドメイン型（Issue #98-2）
- * Gemini 解析出力・commit/save 経路の共通型。api-spec §5.3 と整合。
+ * レシートドメイン内部型（Issue #98-2 / #102-3）
+ *
+ * Gemini 解析・commit 入力・重複チェック等の **アプリケーション内部** 型。
+ * HTTP レスポンス DTO は types/apiSchemas.ts（OpenAPI 契約）を正とする。
  */
 
 /** Gemini 解析出力の明細 */

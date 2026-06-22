@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { categoryApi } from '../../../api/categoryApi';
 import { setOnUnauthorized } from '../../../utils/apiClient';
+import { showAlert } from '../../../utils/alertMessage';
+import { showConfirmDialog } from '../../../utils/confirmDialog';
 import { authService } from '../../../services/authService';
 import { canUseBiometric } from '../../../services/biometricService';
 import type { LoginResult, StoredSession } from '../../../types/auth';
@@ -88,7 +90,7 @@ export function useAppSession() {
   useEffect(() => {
     setOnUnauthorized(() => {
       void handleLogout();
-      Alert.alert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
+      showAlert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
     });
   }, [handleLogout]);
 
@@ -97,7 +99,7 @@ export function useAppSession() {
     const available = await canUseBiometric();
     if (!available) return;
 
-    Alert.alert(
+    showConfirmDialog(
       '生体認証',
       '次回起動時に生体認証でロック解除しますか？',
       [
@@ -155,7 +157,7 @@ export function useAppSession() {
   const handleDisableBiometric = useCallback(async () => {
     await authService.setBiometricEnabled(false);
     setBiometricEnabled(false);
-    Alert.alert('生体認証', '生体認証によるロック解除をオフにしました。');
+    showAlert('生体認証', '生体認証によるロック解除をオフにしました。');
   }, []);
 
   const fetchCategories = useCallback(async () => {

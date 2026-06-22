@@ -1,7 +1,8 @@
+import { Platform } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert } from 'react-native';
+import { showAlert } from './alertMessage';
 import { AUTH_STORAGE_KEYS } from '../services/authService';
 
 /**
@@ -98,7 +99,7 @@ apiClient.interceptors.response.use(
         }
       } else if (error.response.status === 403) {
         console.warn(`[API] Forbidden: ${serverMessage}`);
-        Alert.alert('アクセス権限エラー', 'この操作を行う権限がありません。');
+        showAlert('アクセス権限エラー', 'この操作を行う権限がありません。');
       }
     }
     return Promise.reject(error);

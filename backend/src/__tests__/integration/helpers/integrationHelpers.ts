@@ -2,8 +2,8 @@ import bcrypt from 'bcrypt';
 import { authenticator } from 'otplib';
 import request from 'supertest';
 import type { Express } from 'express';
-import { prisma } from '../utils/prismaClient';
-import { encryptSecretForStorage } from '../services/totpService';
+import { prisma } from '../../../utils/prismaClient';
+import { encryptSecretForStorage } from '../../../services/totpService';
 
 export const TEST_MEMBER_PASSWORD = 'integration-test-password';
 /** 結合テスト用固定 TOTP シークレット（base32） */

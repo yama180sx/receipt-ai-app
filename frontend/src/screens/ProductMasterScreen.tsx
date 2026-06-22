@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import { productMasterApi, type ProductMaster } from '../api';
+import { showAlert } from '../utils/alertMessage';
+import { showApiErrorAlert } from '../utils/apiError';
+import { showConfirmDialog } from '../utils/confirmDialog';
 import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { screenLayout } from '../theme/screenLayout';
 
 export const ProductMasterScreen = ({
   onBack,
-  currentMemberId
+  currentMemberId,
 }: {
-  onBack: () => void,
-  currentMemberId: number | null
+  onBack: () => void;
+  currentMemberId: number | null;
 }) => {
   const [masters, setMasters] = useState<ProductMaster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +33,7 @@ export const ProductMasterScreen = ({
       });
       setMasters(res.data ?? []);
     } catch (err) {
-      console.error('Fetch Masters Error:', err);
+      showApiErrorAlert('エラー', err, '学習マスタの取得に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -41,52 +46,62 @@ export const ProductMasterScreen = ({
   }, [fetchMasters, currentMemberId]);
 
   const handleDelete = (id: number) => {
-    Alert.alert('確認', 'この学習データを削除しますか？', [
+    showConfirmDialog('確認', 'この学習データを削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: async () => {
-        try {
-          await productMasterApi.deleteProductMaster(id);
-          fetchMasters();
-        } catch (e) {
-          Alert.alert('エラー', '削除に失敗しました');
-        }
-      }}
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await productMasterApi.deleteProductMaster(id);
+            fetchMasters();
+          } catch (err) {
+            showApiErrorAlert('エラー', err, '削除に失敗しました。');
+          }
+        },
+      },
     ]);
   };
 
   const handleMergeStores = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
-        "店舗名の統合",
-        "統合元の店舗名を入力（例: ｾﾌﾞﾝ）",
+        '店舗名の統合',
+        '統合元の店舗名を入力（例: ｾﾌﾞﾝ）',
         [
-          { text: "キャンセル", style: "cancel" },
-          { text: "次へ", onPress: (source: string | undefined) => {
-            if (!source) return;
-            Alert.prompt(
-              "統合先名称",
-              `${source} をどの名称に統合しますか？`,
-              [
-                { text: "実行", onPress: async (target: string | undefined) => {
-                  if (!target) return;
-                  try {
-                    await productMasterApi.mergeStoreNames({
-                      sourceStoreName: source,
-                      targetStoreName: target,
-                    });
-                    Alert.alert("完了", "統合完了しました");
-                    fetchMasters();
-                  } catch (e) {
-                    Alert.alert("エラー", "統合失敗");
-                  }
-                }}
-              ]
-            );
-          }}
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '次へ',
+            onPress: (source: string | undefined) => {
+              if (!source) return;
+              Alert.prompt(
+                '統合先名称',
+                `${source} をどの名称に統合しますか？`,
+                [
+                  {
+                    text: '実行',
+                    onPress: async (target: string | undefined) => {
+                      if (!target) return;
+                      try {
+                        await productMasterApi.mergeStoreNames({
+                          sourceStoreName: source,
+                          targetStoreName: target,
+                        });
+                        showAlert('完了', '統合完了しました');
+                        fetchMasters();
+                      } catch (err) {
+                        showApiErrorAlert('エラー', err, '統合に失敗しました。');
+                      }
+                    },
+                  },
+                ]
+              );
+            },
+          },
         ]
       );
     } else {
-      Alert.alert("通知", "店舗統合機能は現在iOSのみの対応です。");
+      showAlert('通知', '店舗統合機能は現在iOSのみの対応です。');
     }
   };
 
@@ -106,7 +121,7 @@ export const ProductMasterScreen = ({
       <View
         style={[
           styles.badge,
-          { backgroundColor: item.category?.color || theme.colors.semantic.placeholder.badge },
+          { backgroundColor: item.category?.color || colors.semantic.placeholder.badge },
         ]}
       >
         <Text style={styles.badgeText}>{item.category?.name || '未分類'}</Text>
@@ -115,16 +130,13 @@ export const ProductMasterScreen = ({
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[screenLayout.container, styles.containerProduct]}>
+      <View style={[screenLayout.header, styles.headerProduct]}>
         <AppBackButton onPress={onBack} />
-        <Text style={styles.title}>学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})</Text>
-        <AppButton
-          title="店舗統合"
-          onPress={handleMergeStores}
-          variant="ghost"
-          size="sm"
-        />
+        <Text style={[screenLayout.headerTitle, styles.titleProduct]}>
+          学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})
+        </Text>
+        <AppButton title="店舗統合" onPress={handleMergeStores} variant="ghost" size="sm" />
       </View>
 
       <View style={styles.searchBar}>
@@ -145,7 +157,7 @@ export const ProductMasterScreen = ({
       {!currentMemberId ? (
         <Text style={styles.empty}>メンバーを選択してください</Text>
       ) : loading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 20 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
       ) : (
         <FlatList
           data={masters}
@@ -161,21 +173,24 @@ export const ProductMasterScreen = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
-  header: {
+  containerProduct: { paddingTop: Platform.OS === 'ios' ? 60 : 20 },
+  headerProduct: { paddingBottom: spacing.md },
+  titleProduct: { flex: 1, textAlign: 'center' },
+  searchBar: {
+    padding: spacing.sm + 2,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border
+    gap: spacing.sm + 2,
+    backgroundColor: colors.surface,
   },
-  title: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main, flex: 1, textAlign: 'center' },
-  searchBar: { padding: 10, flexDirection: 'row', gap: 10, backgroundColor: theme.colors.surface },
   searchInput: { flex: 1 },
-  listContent: { paddingHorizontal: 15, paddingBottom: 40 },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 4 },
-  badgeText: { color: theme.colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
-  empty: { textAlign: 'center', marginTop: 40, color: theme.colors.text.muted }
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: 40 },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: spacing.xs,
+  },
+  badgeText: { color: colors.text.inverse, fontSize: 11, fontWeight: 'bold' },
+  empty: { textAlign: 'center', marginTop: 40, color: colors.text.muted },
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { receiptApi } from '../api/receiptApi';
+import { showApiErrorAlert } from '../utils/apiError';
 import { countActiveReceiptJobs } from '../utils/receiptJobDisplay';
 import type { ReceiptJobListItem } from '../types/receiptJob';
 
@@ -26,7 +27,11 @@ export function useReceiptJobs(enabled: boolean) {
           setJobs(res.data as ReceiptJobListItem[]);
         }
       } catch (error) {
-        console.error('[ReceiptJobs] refresh failed:', error);
+        if (userInitiated) {
+          showApiErrorAlert('エラー', error, '解析ジョブ一覧の取得に失敗しました。');
+        } else {
+          console.error('[ReceiptJobs] refresh failed:', error);
+        }
       } finally {
         if (userInitiated) setRefreshing(false);
       }
