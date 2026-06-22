@@ -1,5 +1,6 @@
 export { useReceiptDetail } from './hooks/useReceiptDetail';
 export type { ReceiptDetailFlow } from './hooks/useReceiptDetail';
+export { useReceiptScan } from './hooks/useReceiptScan';
 export { ReceiptDetailComponent } from './components/ReceiptDetailComponent';
 export type { ReceiptDetailComponentProps } from './components/ReceiptDetailComponent';
 export { ReceiptDetailActions } from './components/ReceiptDetailActions';
