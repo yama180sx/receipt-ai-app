@@ -52,9 +52,13 @@ export const errorHandler = (
       ? 'サーバー内部でエラーが発生しました。時間をおいて再度お試しください。'
       : message;
 
-  return res.status(statusCode).json({
+  const responseBody: { success: false; message: string; details?: unknown } = {
     success: false,
     message: safeMessage,
-    ...(details && { details }),
-  });
+  };
+  if (details !== undefined) {
+    responseBody.details = details;
+  }
+
+  return res.status(statusCode).json(responseBody);
 };

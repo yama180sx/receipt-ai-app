@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as fs from "fs";
 import * as path from "path";
 import logger from "../utils/logger";
+import { getHttpStatusFromError, isRetryableHttpError } from "../utils/httpError";
 import type { ParsedReceipt } from "../types/receipt";
 import { findActivePromptTemplateByKey } from "../repositories/promptRepository";
 import {
@@ -37,10 +38,9 @@ async function withRetry<T>(
 ): Promise<T> {
   try {
     return await fn();
-  } catch (error: any) {
-    const status = error?.status || error?.response?.status;
-    const isRetryable = status === 429 || status >= 500;
-    if (retries <= 0 || !isRetryable) throw error;
+  } catch (error: unknown) {
+    const status = getHttpStatusFromError(error);
+    if (retries <= 0 || !isRetryableHttpError(error)) throw error;
     
     logger.warn(`⚠️ Gemini APIリトライ中... 残り ${retries} 回 (Error: ${status})`);
     await new Promise(resolve => setTimeout(resolve, delay));

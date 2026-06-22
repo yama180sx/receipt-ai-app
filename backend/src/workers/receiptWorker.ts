@@ -4,6 +4,7 @@ import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
 import { analyzeOnly } from '../services/receiptService'; 
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
+import { getErrorMessage } from '../utils/httpError';
 
 /**
  * [Issue #49-8 / #71]
@@ -31,9 +32,8 @@ const receiptWorker = new Worker(
         // フロントエンドのポーリングエンドポイント経由でユーザーに渡されます。
         return result;
 
-      } catch (error: any) {
-        // 画像読み込みエラーや Gemini API エラー（429/500等）を捕捉
-        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${error.message}`);
+      } catch (error: unknown) {
+        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${getErrorMessage(error)}`);
         
         // ジョブを失敗状態 (failed) にし、必要に応じて BullMQ のリトライ機能に委ねる
         throw error;
