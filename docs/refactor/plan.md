@@ -492,17 +492,18 @@ flowchart TB
 | ドメイン型 | `backend/src/types/receipt.ts` 等 | Gemini 解析・commit 内部モデル | API レスポンス型の手動定義（`apiSchemas` を使用） |
 | API DTO | `backend/src/types/apiSchemas.ts` | OpenAPI 契約ミラー（#102-3） | 業務ロジック |
 
-### 10.4 現状 as-built と残タスク
+### 10.4 現状 as-built と完了状況（#103-5 反映）
 
-| 領域 | Epic #98 / #100 で **完了** | Epic #103 で **追加** |
-|------|------------------------------|------------------------|
-| Repository 層 | receipt / category / member / settlement 等（#100-2 / #98-8） | 維持。Mapper 導入で Service 戻り値の整形責務を移す |
-| Controller 薄型化 | `receiptController` 601→266 行（#98-3） | 残存の `res.json` 直前整形を Mapper へ（#103-1〜3） |
-| エラー統一 | `AppError` + `errorHandler`（#98-5） | Controller / Service 内の重複 catch・固定メッセージを整理（#103-4） |
+| 領域 | Epic #98 / #100 で **完了** | Epic #103 **完了**（as-built: [architecture.md](../design/architecture.md) §4.4） |
+|------|------------------------------|--------------------------------------------------------------------------------|
+| Repository 層 | receipt / category / member / settlement 等（#100-2 / #98-8） | 維持。Service 戻り値の整形は Mapper へ移管済み |
+| Controller 薄型化 | `receiptController` 601→266 行（#98-3） | `asyncHandler` + `sendSuccess` / Mapper 経由に統一（#103-1〜4） |
+| エラー統一 | `AppError` + `errorHandler`（#98-5） | `asyncHandler` / `zodErrorToAppError` で Controller catch 削減（#103-4） |
 | API 契約 DTO | `apiSchemas.ts` + drift CI（#102） | Mapper 出力型の正本として利用 |
-| FE Mapper | `frontend/src/mappers/statsMapper.ts` 等（#100-4） | BE Mapper は未着手（`backend/src/mappers/` なし） |
-| auth 内部 DTO | `AuthMemberDto` 等（authService 内） | `LoginMember`（apiSchemas）への Mapper 経由統一（#103-2） |
-| ジョブ API 整形 | `receiptJobService.formatReceiptJobForApi` | receipt Mapper への移管候補（#103-1） |
+| BE Response Mapper | — | `backend/src/mappers/` 新設（receipt / auth / admin / stats / settlement）（#103-1〜3） |
+| auth 内部 DTO | `AuthMemberDto` 等（authService 内） | `authMapper` 経由で `LoginMember`（apiSchemas）に統一（#103-2） |
+| ジョブ API 整形 | `receiptJobService.formatReceiptJobForApi` | `receiptMapper.mapReceiptJobToListItem` へ移管（#103-1） |
+| architecture as-built | §4 Repository / §4.5 型境界（#102） | §4.4 層責務表・エラー経路・Mapper 一覧（#103-5） |
 
 ### 10.5 子 Issue 対応表
 

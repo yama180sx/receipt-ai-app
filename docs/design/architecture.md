@@ -1,8 +1,8 @@
 # アーキテクチャ概要（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468)  
-子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474) / [#473 Issue #102-3](https://github.com/yama180sx/receipt-ai-app/issues/473)  
-計画: [plan.md](../refactor/plan.md)
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468) / [#469 Issue #103](https://github.com/yama180sx/receipt-ai-app/issues/469)  
+子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474) / [#473 Issue #102-3](https://github.com/yama180sx/receipt-ai-app/issues/473) / [#480 Issue #103-5](https://github.com/yama180sx/receipt-ai-app/issues/480)  
+計画: [plan.md](../refactor/plan.md)（Epic #103 層境界は **§10**）
 
 本ドキュメントは **実装準拠（as-built）** で記述する。コード・テスト済み挙動を正とし、詳細なドメイン・API・画面仕様は後続の設計資料を参照する。
 
@@ -90,11 +90,14 @@ receipt-ai-app/
 │   ├── src/
 │   │   ├── app.ts           # Express アプリファクトリ（テスト共有可能）
 │   │   ├── server.ts        # 起動エントリ + Worker import
-│   │   ├── controllers/     # HTTP ハンドラ（Service 呼び出しのみ）
-│   │   ├── middleware/      # auth, tenant, validate, error
+│   │   ├── controllers/     # HTTP ハンドラ（Service 呼び出し + Mapper + envelope）
+│   │   ├── mappers/         # Prisma / ドメイン → apiSchemas DTO（#103）
+│   │   ├── middleware/      # auth, tenant, validate, errorHandler
 │   │   ├── routes/          # ルート定義
 │   │   ├── services/        # ビジネスロジック（Application 層）
 │   │   ├── repositories/    # Prisma 永続化（#100-2 / #98-8）
+│   │   ├── types/           # apiSchemas（#102）, receipt ドメイン型, express.d.ts
+│   │   ├── utils/           # asyncHandler, sendApiResponse, AppError 等
 │   │   ├── queues/          # BullMQ キュー定義
 │   │   ├── workers/         # BullMQ Worker
 │   │   └── __tests__/integration/  # Supertest 結合テスト（ドメイン別 #100-16）
@@ -142,33 +145,41 @@ const app = createApp();
 app.listen(port, host);
 ```
 
-### 4.2 ミドルウェアチェーン
+### 4.2 ミドルウェアチェーンとエラー経路（#103-4）
 
 ```mermaid
-flowchart LR
+flowchart TB
     REQ[HTTP Request] --> CORS[cors]
     CORS --> JSON[express.json]
     JSON --> ROUTE{パス判定}
 
     ROUTE -->|/health| HEALTH[公開]
-    ROUTE -->|/api/auth/*| AUTH[authRoutes<br/>個別ミドルウェア]
-    ROUTE -->|/api/admin/*| ADM[auth → tenant → adminRoutes]
+    ROUTE -->|/api/auth/*| AUTH[authRoutes]
+    ROUTE -->|/api/admin/*| ADM[auth → tenant → isAdmin → adminRoutes]
     ROUTE -->|/api/*| PROT[protectedApi]
 
     PROT --> A1[authMiddleware]
     A1 --> T1[tenantMiddleware]
-    T1 --> BIZ[receipt / categories / product-master / stats]
-    BIZ --> ERR[errorHandler]
+    T1 --> CTRL[Controller<br/>asyncHandler]
+
+    CTRL -->|成功| OK[sendSuccess / sendMessage]
+    CTRL -->|throw / reject| NEXT[next error]
+    NEXT --> EH[errorHandler]
+    EH --> ERR_JSON[error envelope JSON]
+    OK --> RES[200/201 JSON]
 ```
 
-| ミドルウェア | 役割 |
-|--------------|------|
-| `authMiddleware` | Bearer JWT 検証（`purpose: access`）、`req.user` 設定 |
+| ミドルウェア / ユーティリティ | 役割 |
+|------------------------------|------|
+| `authMiddleware` | Bearer JWT 検証（`purpose: access`）、`req.user` 設定。認証失敗は **ミドルウェア直返し**（[api-spec.md](./api-spec.md) §2.3） |
 | `tenantMiddleware` | `memberId` → DB で `familyGroupId` 取得、`AsyncLocalStorage` にテナントコンテキスト設定 |
 | `pendingAuthMiddleware` | TOTP セットアップ・検証用短期トークン（10 分） |
-| `validate` | Zod スキーマ検証 |
+| `validate` | Zod 検証。失敗時は `zodErrorToAppError` → `next(error)` |
 | `isAdmin` | `role=ADMIN` かつ `totpEnabled=true`（管理者 API） |
-| `errorHandler` | グローバルエラー処理 |
+| `asyncHandler` | Controller の未捕捉例外を `next(error)` に委譲（#103-4） |
+| `errorHandler` | `AppError` / `ZodError` / `DuplicateReceiptError` / 未知例外の envelope 統一（#98-5 / #103-4） |
+
+**エラー envelope の正本**: [api-spec.md](./api-spec.md) **§2.3**。Controller / Service は `res.status(4xx/5xx).json(...)` を書かず、`throw new AppError(...)` または `next(error)` のみとする。
 
 ### 4.3 API ルートマウント（概要）
 
@@ -180,7 +191,69 @@ flowchart LR
 
 詳細なエンドポイント一覧は [api-spec.md](./api-spec.md)（#90-3）で記述する。plan.md §8 に抜粋あり。
 
-### 4.4 Repository 層（#100-2 / #98-8）
+### 4.4 層境界と責務（#103 as-built）
+
+Epic [#469 #103](https://github.com/yama180sx/receipt-ai-app/issues/469) 完了後の Backend 層構成。目標は **Controller → Service → Repository** の業務経路と、**Service 戻り値 → Mapper → HTTP envelope** の変換経路を分離することである（[plan.md](../refactor/plan.md) §10）。
+
+```mermaid
+flowchart TB
+  subgraph http [HTTP 層]
+    CTRL[Controller]
+    MW[Middleware]
+    EH[errorHandler]
+    SEND[sendSuccess / sendMessage]
+  end
+
+  subgraph app [Application 層]
+    MAP[Response Mapper]
+    SVC[Service]
+  end
+
+  subgraph infra [Infrastructure]
+    REPO[Repository]
+    PRISMA[(Prisma)]
+  end
+
+  REQ[Client] --> MW
+  MW --> CTRL
+  CTRL --> SVC
+  SVC --> REPO
+  REPO --> PRISMA
+  SVC -->|ドメイン / Prisma| MAP
+  MAP -->|apiSchemas DTO| SEND
+  SEND --> REQ
+  CTRL -->|next error| EH
+  EH --> REQ
+```
+
+| 層 | 配置 | やること | やらないこと |
+|----|------|----------|--------------|
+| Middleware | `src/middleware/` | JWT / テナント / Zod 検証、認証失敗の即時 401/403 | 業務ルール、Prisma 直叩き（`isAdmin` の role 確認を除く） |
+| Controller | `src/controllers/` | `req` から入力抽出、Service 呼び出し、Mapper で DTO 化、`sendSuccess` / `sendMessage` | Prisma 直叩き、複雑な DTO 整形、try/catch 内の独自エラー JSON、`res.status(4xx)` 直書き |
+| Response Mapper | `src/mappers/` | Prisma / 集計ドメイン → `apiSchemas` DTO（日付 ISO 化、ネスト整形） | DB アクセス、業務判断、HTTP ステータス決定 |
+| Service | `src/services/` | 業務ルール、Repository 編成、トランザクション、JWT 発行（auth） | `req` / `res` 参照、`apiSchemas` 形のレスポンス組み立て |
+| Repository | `src/repositories/` | Prisma クエリ、テナントスコープ | HTTP レスポンス生成 |
+| errorHandler | `src/middleware/errorHandler.ts` | 全例外の `{ success: false, message, ... }` 統一 | ドメイン固有ロジックの肥大化 |
+
+**読み取り API の典型フロー**: `Controller` → `Service`（Prisma / ドメインを返す）→ `Mapper`（`apiSchemas` DTO）→ `sendSuccess(res, dto)`。
+
+**書き込み API**: 同上。作成系は `sendSuccess(res, dto, 201)`。メッセージのみは `sendMessage`。
+
+#### 4.4.1 Response Mapper 一覧（as-built）
+
+| ファイル | ドメイン | 主な変換 |
+|----------|----------|----------|
+| `receiptMapper.ts` | receipt / ジョブ | `ReceiptDetail`, `ReceiptJobListItem`, `ReceiptJobStatus`, カテゴリ一覧 |
+| `authMapper.ts` | auth | `LoginResponse`, `ResolvedFamily`, `AuthFamilyMember`, `TotpSetupInfo` |
+| `adminMapper.ts` | admin | `PromptTemplate`, `AdminCostStatRow` |
+| `statsMapper.ts` | 統計 | `MonthlyStatsData`, `AdvancedStatsData` |
+| `settlementMapper.ts` | 精算 | `SettlementStatusData`, `SettlementTransfer` |
+
+ユーティリティ: `utils/asyncHandler.ts`（例外委譲）、`utils/sendApiResponse.ts`（成功 envelope）、`utils/zodError.ts`（Zod → `AppError`）。
+
+**FE Mapper との境界**: `frontend/src/mappers/` は **DTO → ViewModel**（表示用正規化）。BE Mapper は **Prisma / ドメイン → DTO** で方向が逆。統計画面は FE `statsMapper.mapMonthlyStatsResponse` が旧 API 互換も吸収する（§6）。
+
+### 4.5 Repository 層（#100-2 / #98-8）
 
 Prisma への直接アクセスは **Repository に集約** する。Service は Repository 経由でのみ DB を操作し、Controller は Prisma を import しない（#100-3 完了時点で Controller 直叩き 0 件）。
 
@@ -196,7 +269,7 @@ Prisma への直接アクセスは **Repository に集約** する。Service は
 
 テナントスコープは Prisma Client Extension（`$extends`）で Repository 内部から適用する。UseCase 物理層（`usecases/` フォルダ）は設けず、**Service メソッド = Application 操作** とする（[plan.md](../refactor/plan.md) §7）。
 
-### 4.5 API 契約型（OpenAPI SSOT / #102）
+### 4.6 API 契約型（OpenAPI SSOT / #102）と Mapper 出力（#103）
 
 Epic [#468 #102](https://github.com/yama180sx/receipt-ai-app/issues/468) に基づき、**公開 API の契約は OpenAPI YAML のみを正本** とする。FE/BE で手動に DTO を二重定義しない。
 
@@ -205,29 +278,36 @@ flowchart LR
   OAS[docs/openapi/openapi.yaml]
   GEN[frontend/api/generated]
   FET[frontend/types ViewModel]
-  MAP[frontend/mappers]
+  FEMAP[frontend/mappers]
   APISCH[backend/types/apiSchemas]
+  BEMAP[backend/mappers]
   CTRL[backend/controllers]
+  SVC[backend/services]
   DOM[backend/types/receipt]
 
   OAS -->|openapi-typescript| GEN
   GEN --> FET
-  GEN --> MAP
+  GEN --> FEMAP
   OAS -.->|手動同期| APISCH
-  APISCH --> CTRL
-  DOM --> CTRL
+  SVC --> BEMAP
+  BEMAP -->|apiSchemas DTO| CTRL
+  APISCH -.->|出力型の正本| BEMAP
+  SVC --> DOM
+  CTRL --> SVC
 ```
 
 | 層 | 正本 | 配置 | 備考 |
 |----|------|------|------|
-| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` | FE: `generate:api` / BE: `types/apiSchemas.ts` |
+| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` | FE: `generate:api` / BE: `types/apiSchemas.ts`（[plan.md](../refactor/plan.md) §9） |
 | FE ViewModel | 画面固有 | `frontend/src/types/` | generated の re-export + 拡張のみ |
-| FE Mapper | DTO → 表示用 | `frontend/src/mappers/` | — |
+| FE Mapper | DTO → 表示用 | `frontend/src/mappers/` | 例: `statsMapper.ts`（#100-4） |
 | BE API DTO | OpenAPI 契約ミラー | `backend/src/types/apiSchemas.ts` | `apiSchemas.test.ts` で schema 名を検証（#102-3） |
-| BE Response Mapper | Prisma / ドメイン → API DTO | `backend/src/mappers/` | Controller が Service 戻り値を `apiSchemas` 形に変換（#103-1〜3） |
-| BE ドメイン型 | 内部モデル | `backend/src/types/receipt.ts` 等 | `ParsedReceipt` 等。HTTP レスポンスは apiSchemas を使用 |
+| BE Response Mapper | Prisma / ドメイン → API DTO | `backend/src/mappers/` | **出力型は `apiSchemas` に一致**（#103-1〜3） |
+| BE ドメイン型 | 内部モデル | `backend/src/types/receipt.ts` 等 | `ParsedReceipt` 等。HTTP レスポンスは Mapper 経由で apiSchemas |
 | BE Express 拡張 | リクエストコンテキスト | `backend/src/types/express.d.ts` | `req.user` 等 |
 | DB | Prisma | `backend/prisma/schema.prisma` | API DTO とは別層 |
+
+**Epic #102 ↔ #103 の関係**: #102 が OpenAPI / `apiSchemas` の **契約正本** を定義し、#103 が Service 戻り値をその契約形に変換する **Mapper 層** を追加する。新規 DTO フィールドは先に `openapi.yaml` → FE `generate:api` → `apiSchemas.ts` の順（[plan.md](../refactor/plan.md) §10.8 チェックリスト）。
 
 **新 API 追加**: [api-spec.md](./api-spec.md) **§9**（チェックリスト・CI コマンド・AI プロンプト）を正本とする。PR では `check:api`（FE generated diff）と `check:openapi`（BE ルート突合）が必須。
 
@@ -235,7 +315,49 @@ flowchart LR
 
 ## 5. リクエストフロー
 
-### 5.1 認証 → テナント → 業務 API
+### 5.1 認証 → テナント → 業務 API（成功経路）
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware
+    participant CTRL as Controller
+    participant SVC as Service
+    participant MAP as Mapper
+    participant DB as PostgreSQL
+
+    C->>MW: GET /api/receipts + Bearer JWT
+    MW->>MW: authMiddleware / tenantMiddleware
+    MW->>CTRL: requireTenantContext 可能
+    CTRL->>SVC: listReceipts(ctx, query)
+    SVC->>DB: Repository 経由クエリ
+    DB-->>SVC: Prisma models
+    SVC-->>CTRL: ドメイン / Prisma
+    CTRL->>MAP: mapReceiptList(...)
+    MAP-->>CTRL: apiSchemas DTO
+    CTRL->>C: sendSuccess 200 JSON
+```
+
+### 5.1.1 エラー経路（#103-4）
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CTRL as Controller
+    participant SVC as Service
+    participant EH as errorHandler
+
+    C->>CTRL: API リクエスト
+    CTRL->>SVC: 業務処理
+    SVC-->>CTRL: throw AppError(404)
+    Note over CTRL: asyncHandler が catch
+    CTRL->>EH: next(error)
+    EH->>C: 404 { success: false, message }
+```
+
+バリデーション失敗（`validate` ミドルウェア）も同経路で `AppError(400, details)` として `errorHandler` に到達する。重複レシート（`DuplicateReceiptError`）は 409 + `existingId` の専用 envelope（[api-spec.md](./api-spec.md) §2.3）。
+
+### 5.1.2 認証フロー（概要）
 
 ```mermaid
 sequenceDiagram
@@ -354,10 +476,12 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 | Presentation | `screens/`, `features/*/components` | JSX・スタイル・Hook 呼び出し | `prisma` / `categoryApi` 等の直 import（Screen） |
 | Application | `features/*/hooks`, `services/` | 複数 API の編成・UI 向け state | Prisma 直叩き（FE） |
 | API Client | `src/api/*`, `apiClient.ts` | HTTP・認証ヘッダ | ビジネスロジック |
-| Mapper | `src/mappers/*` | DTO → ViewModel 変換 | API 呼び出し |
-| Controller | `backend/controllers` | Service 1 呼び出し + レスポンス整形 | Prisma 直叩き |
-| Service | `backend/services` | Repository 経由の業務ロジック | — |
-| Repository | `backend/repositories` | Prisma クエリ | HTTP レスポンス生成 |
+| Mapper（FE） | `src/mappers/*` | DTO → ViewModel 変換 | API 呼び出し |
+| Controller（BE） | `backend/controllers` | Service 呼び出し + Mapper + `sendSuccess` | Prisma 直叩き、DTO 整形の複雑ロジック |
+| Mapper（BE） | `backend/mappers` | Prisma / ドメイン → `apiSchemas` | DB アクセス、HTTP ステータス |
+| Service（BE） | `backend/services` | Repository 経由の業務ロジック | `req` / `res` 参照 |
+| Repository（BE） | `backend/repositories` | Prisma クエリ | HTTP レスポンス生成 |
+| errorHandler（BE） | `backend/middleware/errorHandler.ts` | 例外 envelope 統一 | 業務ロジック |
 
 **粒度ルール**
 
@@ -467,7 +591,7 @@ Gemini のプロンプトは DB の `PromptTemplate`（key=`RECEIPT_ANALYSIS`）
 
 ## 11. 関連資料
 
-- [plan.md](./plan.md) — Epic #90 全体計画
+- [plan.md](../refactor/plan.md) — Epic #90 / #100 / #101 / #102 / **#103** 全体計画（BE 層境界は §10）
 - [docs/testing/plan.md](../testing/plan.md) — テスト計画（#91）
 - [docs/reviews/issue-87/README.md](../reviews/issue-87/README.md) — 精算ドメイン詳細
 - [docs/MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md) — 3層正規化の起源
