@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { cardStyles, theme } from '../../../theme';
+import { colors } from '../../../theme/colors';
+import { cardStyles } from '../../../theme/cardStyles';
 import type { MonthlyStatsViewModel } from '../../../types/stats';
 import { statsScreenStyles } from '../styles/statsScreenStyles';
 
@@ -19,7 +20,7 @@ export const StatsSummaryCard: React.FC<Props> = ({ data }) => (
       <Text
         style={[
           statsScreenStyles.diffValue,
-          { color: (data?.diffAmount || 0) > 0 ? theme.colors.error : theme.colors.success },
+          { color: (data?.diffAmount || 0) > 0 ? colors.error : colors.success },
         ]}
       >
         {(data?.diffAmount || 0) > 0 ? '▲' : '▼'} ¥

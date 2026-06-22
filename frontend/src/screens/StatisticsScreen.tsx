@@ -12,7 +12,9 @@ import {
   statsScreenStyles,
   useStatistics,
 } from '../features/stats';
-import { screenLayout, theme, cardStyles } from '../theme';
+import { colors } from '../theme/colors';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
 
 interface StatisticsScreenProps {
   currentMemberId: number;
@@ -58,7 +60,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         {stats.loading && !stats.data ? (
           <ActivityIndicator
             size="large"
-            color={theme.colors.primary}
+            color={colors.primary}
             style={statsScreenStyles.loadingIndicator}
           />
         ) : (

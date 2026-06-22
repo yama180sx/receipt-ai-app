@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { cardStyles, theme } from '../../../theme';
+import { colors } from '../../../theme/colors';
+import { cardStyles } from '../../../theme/cardStyles';
 import type { ParetoStatItem, TrendStatItem } from '../../../types/stats';
 import { statsScreenStyles } from '../styles/statsScreenStyles';
 
@@ -23,7 +24,7 @@ export const StatsTrendSection: React.FC<TrendProps> = ({ trend }) => (
             <Text
               style={[
                 statsScreenStyles.trendDiff,
-                { color: diff > 0 ? theme.colors.error : theme.colors.success },
+                { color: diff > 0 ? colors.error : colors.success },
               ]}
             >
               {t.prevTotal !== null ? `${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString()}` : '-'}
@@ -59,8 +60,8 @@ export const StatsParetoSection: React.FC<ParetoProps> = ({ pareto }) => (
                   width: `${p.ratio}%`,
                   backgroundColor:
                     p.cumulativeRatio <= 80
-                      ? theme.colors.primary
-                      : theme.colors.semantic.chart.barInactive,
+                      ? colors.primary
+                      : colors.semantic.chart.barInactive,
                 },
               ]}
             />

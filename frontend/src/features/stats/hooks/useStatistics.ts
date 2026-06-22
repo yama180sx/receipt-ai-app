@@ -7,7 +7,7 @@ import {
   mapCategoryList,
   mapMonthlyStatsResponse,
 } from '../../../mappers/statsMapper';
-import { theme } from '../../../theme';
+import { colors } from '../../../theme/colors';
 import type {
   AdvancedStatsViewModel,
   MonthlyStatsViewModel,
@@ -89,8 +89,8 @@ export function useStatistics(currentMemberId: number) {
         return {
           name: s.categoryName || '未分類',
           population: val,
-          color: s.color || theme.colors.secondary,
-          legendFontColor: theme.colors.text.main,
+          color: s.color || colors.secondary,
+          legendFontColor: colors.text.main,
           legendFontSize: 12,
         };
       })
