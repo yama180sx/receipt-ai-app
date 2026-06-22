@@ -13,7 +13,13 @@ import { adminApi, type PromptTemplate } from '../api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { borderRadius } from '../theme/radii';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
+
+const adm = colors.semantic.admin;
 
 interface PromptEditorScreenProps {
   onBack: () => void;
@@ -168,22 +174,22 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
 
   if (isLoading && templates.length === 0) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[screenLayout.container, styles.center]}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>プロンプトを読み込み中...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[screenLayout.container, styles.containerAdmin]}>
+      <View style={[screenLayout.header, styles.headerAdmin]}>
         <AppBackButton onPress={onBack} />
-        <Text style={styles.headerTitle}>プロンプト管理</Text>
+        <Text style={screenLayout.headerTitle}>プロンプト管理</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.contentContainer}>
+      <ScrollView contentContainerStyle={[screenLayout.scrollContent, styles.contentContainer]}>
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
@@ -192,7 +198,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
 
         {/* フォーム画面（編集 または 新規作成） */}
         {(editingTemplate || isCreatingNew) ? (
-          <View style={styles.formContainer}>
+          <View style={[cardStyles.listCard, styles.formContainer]}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>
                 {isCreatingNew ? '新規プロンプトの作成' : 'プロンプトの編集'}
@@ -256,7 +262,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
             />
 
             {templates.map((tpl) => (
-              <View key={tpl.id} style={[styles.card, tpl.isActive && styles.activeCard]}>
+              <View key={tpl.id} style={[cardStyles.listCard, styles.card, tpl.isActive && styles.activeCard]}>
                 <View style={styles.cardHeader}>
                   {/* ★修正: タイトル部分に flex: 1 を当てて右側の要素を押し出さないようにする */}
                   <View style={styles.titleContainer}>
@@ -306,33 +312,48 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
   );
 };
 
-const adm = theme.colors.semantic.admin;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: adm.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: adm.surface, paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: adm.border },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  contentContainer: { padding: 16, paddingBottom: 40 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: adm.textMuted },
-  errorContainer: { backgroundColor: adm.errorBg, padding: 12, borderRadius: 6, marginBottom: 16 },
+  containerAdmin: { backgroundColor: adm.background },
+  headerAdmin: { backgroundColor: adm.surface, borderBottomColor: adm.border },
+  contentContainer: { paddingBottom: 40 },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: spacing.md - 4, color: adm.textMuted },
+  errorContainer: {
+    backgroundColor: adm.errorBg,
+    padding: spacing.md - 4,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.md,
+  },
   errorText: { color: adm.errorText },
-  
-  card: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 2, borderColor: adm.border },
-  activeCard: { borderColor: theme.colors.primary },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  titleContainer: { flex: 1, paddingRight: 8 },
+
+  card: {
+    backgroundColor: adm.surface,
+    marginBottom: spacing.md - 4,
+    borderWidth: 2,
+    borderColor: adm.border,
+  },
+  activeCard: { borderColor: colors.primary },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
+  titleContainer: { flex: 1, paddingRight: spacing.sm },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: adm.textDark, lineHeight: 22 },
   versionText: { fontSize: 12, color: adm.textMuted, fontWeight: 'normal' },
   badgeContainer: { justifyContent: 'flex-start', paddingTop: 2 },
-  badge: { backgroundColor: theme.colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { color: theme.colors.text.inverse, fontSize: 10, fontWeight: 'bold' },
-  
-  cardDesc: { fontSize: 13, color: adm.textMuted, marginBottom: 12 },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
+  badge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  badgeText: { color: colors.text.inverse, fontSize: 10, fontWeight: 'bold' },
 
-  formContainer: { backgroundColor: adm.surface, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: adm.border },
-  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  cardDesc: { fontSize: 13, color: adm.textMuted, marginBottom: spacing.md - 4 },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, flexWrap: 'wrap' },
+
+  formContainer: {
+    backgroundColor: adm.surface,
+    borderColor: adm.border,
+  },
+  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   formTitle: { fontSize: 18, fontWeight: 'bold', flex: 1 },
   promptTextArea: { minHeight: 200 },
   jsonTextArea: { minHeight: 150 },
