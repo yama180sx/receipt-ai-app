@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, Text, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { categoryApi, type Category } from '../api';
 import { getApiErrorStatus } from '../utils/apiError';
+import { showAlert } from '../utils/alertMessage';
 import { AppBackButton, AppButton, AppListColorDot, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { colors } from '../theme/colors';
@@ -36,9 +37,9 @@ export const CategoryManagementScreen = ({
       setCategories(res.data ?? []);
     } catch (e: unknown) {
       if (getApiErrorStatus(e) === 401) {
-        Alert.alert('セッション切れ', '再度ログインしてください。');
+        showAlert('セッション切れ', '再度ログインしてください。');
       } else {
-        Alert.alert('エラー', 'カテゴリーの取得に失敗しました。');
+        showAlert('エラー', 'カテゴリーの取得に失敗しました。');
       }
     } finally {
       setLoading(false);
@@ -55,7 +56,7 @@ export const CategoryManagementScreen = ({
       setNewName('');
       fetchCategories();
     } catch {
-      Alert.alert('エラー', '追加に失敗しました。');
+      showAlert('エラー', '追加に失敗しました。');
     }
   };
 
@@ -72,9 +73,9 @@ export const CategoryManagementScreen = ({
           } catch (e: unknown) {
             const status = getApiErrorStatus(e);
             if (status === 400 || status === 409) {
-              Alert.alert('制限', 'このカテゴリーは既に使用されているため削除できません。');
+              showAlert('制限', 'このカテゴリーは既に使用されているため削除できません。');
             } else {
-              Alert.alert('エラー', '削除に失敗しました。');
+              showAlert('エラー', '削除に失敗しました。');
             }
           }
         },
@@ -94,10 +95,10 @@ export const CategoryManagementScreen = ({
             setOptimizing(true);
             try {
               const res = await categoryApi.optimizeCategories();
-              Alert.alert('完了', res.data?.message ?? '最適化が完了しました。');
+              showAlert('完了', res.data?.message ?? '最適化が完了しました。');
               fetchCategories();
             } catch {
-              Alert.alert('エラー', '最適化処理に失敗しました。');
+              showAlert('エラー', '最適化処理に失敗しました。');
             } finally {
               setOptimizing(false);
             }

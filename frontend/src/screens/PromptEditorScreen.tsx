@@ -5,12 +5,12 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
 
 import { adminApi, type PromptTemplate } from '../api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { showAlert } from '../utils/alertMessage';
+import { showConfirmDialog } from '../utils/confirmDialog';
 import { AppBackButton, AppButton, AppFormField, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { colors } from '../theme/colors';
@@ -66,7 +66,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       await adminApi.activatePrompt(id);
       fetchPrompts();
     } catch (err: unknown) {
-      Alert.alert('エラー', getApiErrorMessage(err, 'デフォルトの切り替えに失敗しました。'));
+      showAlert('エラー', getApiErrorMessage(err, 'デフォルトの切り替えに失敗しました。'));
     }
   };
 
@@ -76,25 +76,19 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
         await adminApi.deletePrompt(id);
         fetchPrompts();
       } catch (err: unknown) {
-        Alert.alert('エラー', getApiErrorMessage(err, '削除に失敗しました。'));
+        showAlert('エラー', getApiErrorMessage(err, '削除に失敗しました。'));
       }
     };
 
-    if (Platform.OS === 'web') {
-      if (window.confirm('本当にこのプロンプトを削除しますか？')) {
-        executeDelete();
-      }
-    } else {
-      Alert.alert('削除確認', '本当にこのプロンプトを削除しますか？', [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '削除', style: 'destructive', onPress: executeDelete }
-      ]);
-    }
+    showConfirmDialog('削除確認', '本当にこのプロンプトを削除しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: executeDelete },
+    ]);
   };
 
   const handleSave = async () => {
     if (!formSystemPrompt.trim() || !formName.trim()) {
-      Alert.alert('入力エラー', '名前とシステムプロンプトは必須です。');
+      showAlert('入力エラー', '名前とシステムプロンプトは必須です。');
       return;
     }
 
@@ -103,7 +97,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
       try {
         parsedHints = JSON.parse(formDomainHints);
       } catch (e) {
-        Alert.alert('JSONエラー', 'Domain Hints の JSON 形式が不正です。');
+        showAlert('JSONエラー', 'Domain Hints の JSON 形式が不正です。');
         return;
       }
     }
@@ -121,7 +115,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
           domainHints: parsedHints,
           isActive: false
         });
-        if (Platform.OS !== 'web') Alert.alert('作成完了', '新しいプロンプトを作成しました。');
+        showAlert('作成完了', '新しいプロンプトを作成しました。');
       } else if (editingTemplate && editingTemplate.id) {
         await adminApi.updatePrompt(editingTemplate.id, {
           name: formName,
@@ -129,7 +123,7 @@ export const PromptEditorScreen: React.FC<PromptEditorScreenProps> = ({ onBack }
           systemPrompt: formSystemPrompt,
           domainHints: parsedHints,
         });
-        if (Platform.OS !== 'web') Alert.alert('更新完了', 'プロンプトを更新しました。');
+        showAlert('更新完了', 'プロンプトを更新しました。');
       } else {
         throw new Error('更新対象のプロンプトIDが見つかりません。');
       }

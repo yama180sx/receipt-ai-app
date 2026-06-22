@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { receiptApi } from '../../../api';
 import { buildReceiptUploadFormData } from '../../../utils/receiptUploadFormData';
@@ -67,11 +67,7 @@ export function useReceiptUpload({
         const message =
           err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
         registerLocalUploadFailure(message);
-        if (Platform.OS === 'web') {
-          showAlert('エラー', message);
-        } else {
-          Alert.alert('エラー', message);
-        }
+        showAlert('エラー', message);
       } finally {
         setUploadingCount((count) => Math.max(0, count - 1));
       }
@@ -114,7 +110,7 @@ export function useReceiptUpload({
   const pickImageNative = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('権限エラー', 'カメラの使用を許可してください。');
+      showAlert('権限エラー', 'カメラの使用を許可してください。');
       return;
     }
 
@@ -138,7 +134,7 @@ export function useReceiptUpload({
       await pickImageNative();
     } catch (err) {
       console.error('handleScan Error:', err);
-      Alert.alert('エラー', '画像のアップロードに失敗しました。');
+      showAlert('エラー', '画像のアップロードに失敗しました。');
     }
   }, [pickImageNative]);
 

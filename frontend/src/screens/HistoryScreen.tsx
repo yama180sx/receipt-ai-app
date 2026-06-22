@@ -7,10 +7,10 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   Platform, 
-  Alert,
 } from 'react-native';
 import { categoryApi, receiptApi } from '../api';
 import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
+import { showAlert } from '../utils/alertMessage';
 // Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
 import { colors } from '../theme/colors';
@@ -106,9 +106,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
       }
     } catch (err) {
       console.error('履歴取得失敗', err);
-      if (Platform.OS !== 'web') {
-        Alert.alert('エラー', '履歴の取得に失敗しました');
-      }
+      showAlert('エラー', '履歴の取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -143,9 +141,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
       }
     } catch (err) {
       console.error('カテゴリー更新失敗', err);
-      if (Platform.OS !== 'web') {
-        Alert.alert('エラー', 'カテゴリーの更新に失敗しました');
-      }
+      showAlert('エラー', 'カテゴリーの更新に失敗しました');
     }
   };
 
