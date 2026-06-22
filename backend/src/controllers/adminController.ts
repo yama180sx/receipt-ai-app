@@ -4,6 +4,11 @@ import { getRouteParam } from '../utils/routeParams';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendMessage, sendSuccess } from '../utils/sendApiResponse';
 import {
+  mapAdminCostStatsToApi,
+  mapPromptTemplateList,
+  mapPromptTemplateToApi,
+} from '../mappers/adminMapper';
+import {
   listPromptTemplates,
   createPromptTemplate,
   updatePromptTemplate,
@@ -22,12 +27,12 @@ function parsePromptId(req: Parameters<typeof getRouteParam>[0]): number {
 
 export const getPrompts = asyncHandler(async (_req, res) => {
   const prompts = await listPromptTemplates(requireTenantContext());
-  sendSuccess(res, prompts);
+  sendSuccess(res, mapPromptTemplateList(prompts));
 });
 
 export const createPrompt = asyncHandler(async (req, res) => {
   const newPrompt = await createPromptTemplate(requireTenantContext(), req.body);
-  sendSuccess(res, newPrompt);
+  sendSuccess(res, mapPromptTemplateToApi(newPrompt));
 });
 
 export const updatePrompt = asyncHandler(async (req, res) => {
@@ -36,7 +41,7 @@ export const updatePrompt = asyncHandler(async (req, res) => {
     parsePromptId(req),
     req.body
   );
-  sendSuccess(res, updated);
+  sendSuccess(res, mapPromptTemplateToApi(updated));
 });
 
 export const activatePrompt = asyncHandler(async (req, res) => {
@@ -51,5 +56,5 @@ export const deletePrompt = asyncHandler(async (req, res) => {
 
 export const getCostStats = asyncHandler(async (_req, res) => {
   const result = await getAdminCostStats(requireTenantContext());
-  sendSuccess(res, result);
+  sendSuccess(res, mapAdminCostStatsToApi(result));
 });

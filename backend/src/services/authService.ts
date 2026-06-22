@@ -1,5 +1,4 @@
 import bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
 import { AppError } from '../utils/appError';
 import {
   generateAccessToken,
@@ -24,81 +23,51 @@ import {
   findMembersByFamilyGroupId,
   saveMemberTotpSetup,
 } from '../repositories/memberRepository';
+import {
+  type AuthMemberRecord,
+  type LoginSessionDomain,
+  type TotpConfirmAccessDomain,
+  toAuthMemberRecord,
+} from '../mappers/authMapper';
 
-export type AuthMemberDto = {
-  id: number;
-  name: string;
-  familyGroupId: number;
-  role: Role;
-  totpEnabled: boolean;
-};
-
-export type AccessLoginData = {
-  token: string;
-  pendingToken: null;
-  member: AuthMemberDto;
-  requiresTotpVerification: false;
-  requiresTotpSetup: false;
-};
-
-export type PendingLoginData = {
-  token: null;
-  pendingToken: string;
-  member: AuthMemberDto;
-  requiresTotpVerification: boolean;
-  requiresTotpSetup: boolean;
-};
-
-type AuthMemberRecord = {
-  id: number;
-  name: string;
-  familyGroupId: number;
-  role: Role;
-  totpEnabled: boolean;
+type AuthMemberSource = AuthMemberRecord & {
   password_hash?: string | null;
   totpSecret?: string | null;
 };
 
-function formatMember(member: AuthMemberRecord): AuthMemberDto {
+function buildAccessSession(member: AuthMemberSource): LoginSessionDomain {
+  const record = toAuthMemberRecord(member);
   return {
-    id: member.id,
-    name: member.name,
-    familyGroupId: member.familyGroupId,
-    role: member.role,
-    totpEnabled: member.totpEnabled,
-  };
-}
-
-function buildAccessResponse(member: AuthMemberRecord): AccessLoginData {
-  return {
+    member: record,
     token: generateAccessToken({
-      id: member.id,
-      name: member.name,
-      familyGroupId: member.familyGroupId,
-      role: member.role,
+      id: record.id,
+      name: record.name,
+      familyGroupId: record.familyGroupId,
+      role: record.role,
     }),
     pendingToken: null,
-    member: formatMember(member),
     requiresTotpVerification: false,
     requiresTotpSetup: false,
   };
 }
 
-function buildPendingResponse(
-  member: AuthMemberRecord,
+function buildPendingSession(
+  member: AuthMemberSource,
   purpose: 'totp_pending' | 'totp_setup'
-): PendingLoginData {
-  const tokenInput = {
-    id: member.id,
-    name: member.name,
-    familyGroupId: member.familyGroupId,
-    role: member.role,
-  };
-
+): LoginSessionDomain {
+  const record = toAuthMemberRecord(member);
   return {
+    member: record,
     token: null,
-    pendingToken: generatePendingToken(tokenInput, purpose),
-    member: formatMember(member),
+    pendingToken: generatePendingToken(
+      {
+        id: record.id,
+        name: record.name,
+        familyGroupId: record.familyGroupId,
+        role: record.role,
+      },
+      purpose
+    ),
     requiresTotpVerification: purpose === 'totp_pending',
     requiresTotpSetup: purpose === 'totp_setup',
   };
@@ -115,10 +84,7 @@ export async function resolveFamilyByInviteCode(inviteCode: string) {
     throw new AppError('招待コードが正しくありません。', 404);
   }
 
-  return {
-    familyGroupId: familyGroup.id,
-    name: familyGroup.name,
-  };
+  return familyGroup;
 }
 
 export async function listFamilyMembersForInvite(familyGroupId: number, inviteCode: string) {
@@ -143,7 +109,7 @@ export async function loginMember(input: {
   familyGroupId: unknown;
   memberId: unknown;
   password: unknown;
-}): Promise<AccessLoginData | PendingLoginData> {
+}): Promise<LoginSessionDomain> {
   const { familyGroupId, memberId, password } = input;
 
   if (!familyGroupId || !memberId || !password) {
@@ -176,14 +142,14 @@ export async function loginMember(input: {
   }
 
   if (member.totpEnabled) {
-    return buildPendingResponse(member, 'totp_pending');
+    return buildPendingSession(member, 'totp_pending');
   }
 
   if (isTotpRequiredForRole(member.role)) {
-    return buildPendingResponse(member, 'totp_setup');
+    return buildPendingSession(member, 'totp_setup');
   }
 
-  return buildAccessResponse(member);
+  return buildAccessSession(member);
 }
 
 export async function startTotpSetupForMember(memberId: number) {
@@ -208,7 +174,7 @@ export async function confirmTotpSetupForMember(
   memberId: number,
   code: string,
   purpose: TokenPurpose
-): Promise<AccessLoginData | { member: AuthMemberDto; totpEnabled: true }> {
+): Promise<LoginSessionDomain | TotpConfirmAccessDomain> {
   if (!code.trim()) {
     throw new AppError('認証コードを入力してください。', 400);
   }
@@ -227,16 +193,21 @@ export async function confirmTotpSetupForMember(
   }
 
   const updated = await enableMemberTotp(member.id);
-  const memberDto = formatMember(updated);
 
   if (purpose === 'totp_setup') {
-    return buildAccessResponse(updated);
+    return buildAccessSession(updated);
   }
 
-  return { member: memberDto, totpEnabled: true };
+  return {
+    member: toAuthMemberRecord(updated),
+    totpEnabled: true,
+  };
 }
 
-export async function verifyTotpForMember(memberId: number, code: string): Promise<AccessLoginData> {
+export async function verifyTotpForMember(
+  memberId: number,
+  code: string
+): Promise<LoginSessionDomain> {
   if (!code.trim()) {
     throw new AppError('認証コードを入力してください。', 400);
   }
@@ -251,7 +222,7 @@ export async function verifyTotpForMember(memberId: number, code: string): Promi
     throw new AppError('認証コードが正しくありません。', 401);
   }
 
-  return buildAccessResponse(member);
+  return buildAccessSession(member);
 }
 
 export async function disableTotpForMember(memberId: number, password: string, code: string) {
