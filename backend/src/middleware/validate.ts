@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodError, type ZodType } from 'zod';
-import { AppError } from '../utils/appError';
+import type { ZodType } from 'zod';
+import { ZodError } from 'zod';
+import { zodErrorToAppError } from '../utils/zodError';
 
 /**
  * Zodバリデーションミドルウェア
@@ -13,12 +14,7 @@ export const validate = (schema: ZodType) =>
       next();
     } catch (error: unknown) {
       if (error instanceof ZodError) {
-        const details = error.issues.map((issue) => ({
-          field: issue.path.join('.') || 'unknown',
-          message: issue.message,
-        }));
-
-        return next(new AppError('入力内容に不備があります', 400, details));
+        return next(zodErrorToAppError(error));
       }
 
       next(error);
