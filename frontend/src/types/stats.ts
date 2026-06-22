@@ -1,6 +1,22 @@
+/**
+ * 統計ドメイン型
+ *
+ * - DTO: OpenAPI generated の re-export（Mapper 入力）
+ * - ViewModel: 画面表示用（Mapper 出力）
+ */
+
 import type { Category, ReceiptDetail } from '../api/generated';
 
-/** 画面表示用カテゴリ（セレクト等） */
+/** OpenAPI DTO（stats API）— Mapper 入力 */
+export type {
+  AdvancedStatsData,
+  CategoryStatRow,
+  MonthlyStatsData,
+  ParetoRow,
+  TrendRow,
+} from '../api/generated';
+
+/** 画面表示用カテゴリ（ViewModel） */
 export type StatsCategoryOption = Pick<Category, 'id' | 'name' | 'color'>;
 
 /** 月次カテゴリ別統計行（ViewModel） */
@@ -42,12 +58,3 @@ export type AdvancedStatsViewModel = {
   trend: TrendStatItem[];
   pareto: ParetoStatItem[];
 };
-
-/** OpenAPI DTO 再 export（Mapper 入力用） */
-export type {
-  AdvancedStatsData,
-  CategoryStatRow,
-  MonthlyStatsData,
-  ParetoRow,
-  TrendRow,
-} from '../api/generated';
