@@ -15,7 +15,7 @@ import { PieChart } from 'react-native-chart-kit';
 import { categoryApi, receiptApi, statsApi } from '../api';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
-import { theme } from '../theme';
+import { theme, screenLayout, cardStyles } from '../theme';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
@@ -121,14 +121,14 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
   const chartWidth = isWide ? 400 : windowWidth - 60;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={screenLayout.container}>
+      <View style={screenLayout.header}>
         <AppBackButton onPress={onBack} />
-        <Text style={styles.headerTitle}>家計分析レポート</Text>
+        <Text style={screenLayout.headerTitle}>家計分析レポート</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenLayout.scrollContent}>
         <View style={styles.topInfo}>
           <Text style={styles.headerSubtitle}>{currentMemberId === 1 ? 'PERSONAL REPORT' : 'FAMILY REPORT'}</Text>
           <View style={[styles.monthPickerContainer, isWide ? styles.monthPickerContainerWide : styles.monthPickerContainerMobile]}>
@@ -146,7 +146,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
         ) : (
           <View style={isWide ? styles.dashboardGrid : null}>
             <View style={isWide ? styles.leftColumn : null}>
-              <View style={styles.summaryCard}>
+              <View style={cardStyles.summaryCard}>
                 <Text style={styles.summaryLabel}>当月合計支出（税込）</Text>
                 <Text style={styles.totalValue}>
                   ¥{Math.round(Number(data?.totalAmount) || 0).toLocaleString()}
@@ -159,9 +159,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 </View>
               </View>
 
-              <View style={styles.section}>
+              <View style={cardStyles.section}>
                 <Text style={styles.sectionTitle}>支出内訳</Text>
-                <View style={styles.chartCard}>
+                <View style={cardStyles.chartCard}>
                   {chartData.length > 0 ? (
                     <PieChart
                       data={chartData}
@@ -177,7 +177,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 </View>
               </View>
 
-              <View style={styles.section}>
+              <View style={cardStyles.section}>
                 <Text style={styles.sectionTitle}>最新の解析レシート</Text>
                 {data?.latestReceipt?.imagePath && latestReceiptImageSource ? (
                   <TouchableOpacity style={styles.receiptPreviewCard} onPress={() => setMainModalVisible(true)}>
@@ -202,7 +202,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
             </View>
 
             <View style={isWide ? styles.rightColumn : null}>
-              <View style={styles.section}>
+              <View style={cardStyles.section}>
                 <Text style={styles.sectionTitle}>月次推移 (MoM Trend)</Text>
                 <View style={styles.statsCard}>
                   {advancedData?.trend.map((t, i) => {
@@ -220,7 +220,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
                 </View>
               </View>
 
-              <View style={styles.section}>
+              <View style={cardStyles.section}>
                 <Text style={styles.sectionTitle}>費目別分析 (Pareto 80/20)</Text>
                 <View style={styles.statsCard}>
                   {advancedData?.pareto.map((p, i) => (
@@ -266,10 +266,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  scrollContent: { padding: 20 },
   topInfo: { marginBottom: 15 },
   headerSubtitle: { fontSize: 10, color: theme.colors.text.muted, letterSpacing: 1 },
   monthPickerContainer: { marginTop: 8, justifyContent: 'center' },
@@ -278,13 +274,11 @@ const styles = StyleSheet.create({
   dashboardGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   leftColumn: { flex: 1.2, marginRight: 20 },
   rightColumn: { flex: 1 },
-  summaryCard: { backgroundColor: theme.colors.surface, padding: 20, borderRadius: 15, marginBottom: 25, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, elevation: 3 },
   summaryLabel: { fontSize: 12, color: theme.colors.text.muted },
   totalValue: { fontSize: 36, fontWeight: 'bold', color: theme.colors.primary, marginVertical: 4 },
   comparisonRow: { flexDirection: 'row', alignItems: 'center' },
   comparisonLabel: { fontSize: 12, marginRight: 8 },
   diffValue: { fontWeight: '700', fontSize: 16 },
-  section: { marginBottom: 25 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, borderLeftWidth: 4, borderLeftColor: theme.colors.primary, paddingLeft: 8 },
   statsCard: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, borderWidth: 1, borderColor: theme.colors.border },
   trendRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.background },
@@ -298,7 +292,6 @@ const styles = StyleSheet.create({
   paretoBarContainer: { height: 16, backgroundColor: theme.colors.semantic.chart.barBg, borderRadius: 8, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   paretoBar: { height: '100%' },
   cumText: { fontSize: 10, position: 'absolute', right: 8, fontWeight: '700', color: theme.colors.text.main },
-  chartCard: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, minHeight: 220, justifyContent: 'center' },
   noDataText: { fontSize: 12, color: theme.colors.text.muted },
   receiptPreviewCard: { backgroundColor: theme.colors.surface, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border },
   receiptImage: { width: '100%', height: 160, backgroundColor: theme.colors.border },
