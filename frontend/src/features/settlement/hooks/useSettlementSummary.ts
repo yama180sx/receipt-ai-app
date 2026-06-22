@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { statsApi } from '../../../api/statsApi';
 import { getCurrentYearMonth, getRecentYearMonths } from '../../../utils/monthSelectOptions';
+import { showApiErrorAlert } from '../../../utils/apiError';
 import { showAlert } from '../../../utils/alertMessage';
 import { showConfirmDialog } from '../../../utils/confirmDialog';
 import { BUTTON_LABELS } from '../../../constants/buttonLabels';
@@ -66,8 +67,7 @@ export function useSettlementSummary() {
         setTransferList(res.data?.transfers ?? []);
       }
     } catch (err) {
-      console.error('精算サマリーの取得失敗:', err);
-      showAlert('エラー', '精算サマリーの取得に失敗しました。');
+      showApiErrorAlert('エラー', err, '精算サマリーの取得に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -120,8 +120,7 @@ export function useSettlementSummary() {
         await loadSettlementData();
       }
     } catch (err) {
-      console.error('送金記録エラー', err);
-      showAlert('エラー', '送金記録の登録に失敗しました。');
+      showApiErrorAlert('エラー', err, '送金記録の登録に失敗しました。');
     } finally {
       setIsSubmitting(false);
     }
@@ -149,9 +148,9 @@ export function useSettlementSummary() {
           await loadSettlementData({ silent: true });
         }
       } catch (err) {
-        console.error('送金取消エラー', err);
-        showAlert(
+        showApiErrorAlert(
           'エラー',
+          err,
           `${fromName} → ${toName} ¥${transfer.amount.toLocaleString()} の取消に失敗しました。`
         );
       } finally {

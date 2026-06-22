@@ -3,7 +3,7 @@ import { categoryApi, receiptApi } from '../../../api';
 import { useIsWideLayout } from '../../../hooks/useIsWideLayout';
 import type { CategorySummary, ReceiptDetail } from '../../../types/receipt';
 import type { FamilyMemberSummary } from '../../../types/settlement';
-import { showAlert } from '../../../utils/alertMessage';
+import { showApiErrorAlert } from '../../../utils/apiError';
 import { getRecentYearMonths, useMonthSelectOptions } from '../../../utils/monthSelectOptions';
 
 type UseReceiptHistoryOptions = {
@@ -42,7 +42,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         setCategories(res.data);
       }
     } catch (err) {
-      console.error('カテゴリー取得失敗', err);
+      showApiErrorAlert('エラー', err, 'カテゴリーの取得に失敗しました。');
     }
   }, []);
 
@@ -53,7 +53,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         setMembers(res.data);
       }
     } catch (err) {
-      console.error('世帯メンバー取得失敗', err);
+      showApiErrorAlert('エラー', err, '世帯メンバーの取得に失敗しました。');
     }
   }, []);
 
@@ -76,8 +76,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         }
       }
     } catch (err) {
-      console.error('履歴取得失敗', err);
-      showAlert('エラー', '履歴の取得に失敗しました');
+      showApiErrorAlert('エラー', err, '履歴の取得に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -112,8 +111,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         if (selectedReceipt) setSelectedReceipt((prev) => (prev ? mapper(prev) : null));
       }
     } catch (err) {
-      console.error('カテゴリー更新失敗', err);
-      showAlert('エラー', 'カテゴリーの更新に失敗しました');
+      showApiErrorAlert('エラー', err, 'カテゴリーの更新に失敗しました。');
     }
   };
 
