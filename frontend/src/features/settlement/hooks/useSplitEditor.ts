@@ -6,34 +6,23 @@ import {
   calcItemTotal,
 } from '../../../utils/splitEditorSplits';
 import { deriveInitialActiveMembers } from '../utils/splitEditorInit';
+import {
+  addMemberToAllItems,
+  applyCascadePercentToItems,
+  buildInitialSplits,
+  calcReceiptTotalAmount,
+  parseNonNegativeInt,
+  parsePercentInt,
+  removeMemberFromAllItems,
+  splitAmountEqually,
+  sumMemberAmountsAcrossItems,
+  updateItemAmount,
+  updateItemPercent,
+} from '../utils/splitEditorMutations';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,
 } from '../../../types/settlement';
-
-function buildInitialSplits(
-  receipt: ReceiptForSplitEditor,
-  targetMembers: FamilyMemberSummary[]
-): Record<number, Record<number, number>> {
-  const initialData: Record<number, Record<number, number>> = {};
-  receipt.items.forEach((item) => {
-    initialData[item.id] = {};
-    const itemTotal = calcItemTotal(item);
-
-    if (item.splits && item.splits.length > 0) {
-      targetMembers.forEach((m) => {
-        const split = item.splits!.find((s) => s.familyMemberId === m.id);
-        initialData[item.id][m.id] = split ? split.amount : 0;
-      });
-    } else {
-      targetMembers.forEach((m) => {
-        initialData[item.id][m.id] =
-          m.id === receipt.memberId ? itemTotal : 0;
-      });
-    }
-  });
-  return initialData;
-}
 
 export function useSplitEditor(
   receipt: ReceiptForSplitEditor,
@@ -46,6 +35,12 @@ export function useSplitEditor(
   const [editSplits, setEditSplits] = useState<
     Record<number, Record<number, number>>
   >({});
+
+  const memberIds = useMemo(
+    () => activeMembers.map((m) => m.id),
+    [activeMembers]
+  );
+  const remainderMemberId = activeMembers[0]?.id;
 
   useEffect(() => {
     const init = async () => {
@@ -68,19 +63,13 @@ export function useSplitEditor(
   }, [receipt]);
 
   const receiptTotalAmount = useMemo(
-    () =>
-      receipt.items.reduce((sum, item) => sum + calcItemTotal(item), 0),
+    () => calcReceiptTotalAmount(receipt.items),
     [receipt.items]
   );
 
   const getMemberTotalAmount = useCallback(
-    (memberId: number) => {
-      let sum = 0;
-      receipt.items.forEach((item) => {
-        sum += editSplits[item.id]?.[memberId] || 0;
-      });
-      return sum;
-    },
+    (memberId: number) =>
+      sumMemberAmountsAcrossItems(receipt.items, editSplits, memberId),
     [editSplits, receipt.items]
   );
 
@@ -90,15 +79,8 @@ export function useSplitEditor(
       const memberToAdd = allMembers.find((m) => m.id === memberId);
       if (!memberToAdd) return;
 
-      const newActive = [...activeMembers, memberToAdd];
-      setActiveMembers(newActive);
-      setEditSplits((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((itemId) => {
-          next[Number(itemId)] = { ...next[Number(itemId)], [memberId]: 0 };
-        });
-        return next;
-      });
+      setActiveMembers((prev) => [...prev, memberToAdd]);
+      setEditSplits((prev) => addMemberToAllItems(prev, memberId));
     },
     [activeMembers, allMembers]
   );
@@ -110,121 +92,76 @@ export function useSplitEditor(
         return;
       }
       setActiveMembers((prev) => prev.filter((m) => m.id !== memberId));
-      setEditSplits((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((itemId) => {
-          const nId = Number(itemId);
-          const newData = { ...next[nId] };
-          delete newData[memberId];
-          next[nId] = newData;
-        });
-        return next;
-      });
+      setEditSplits((prev) => removeMemberFromAllItems(prev, memberId));
     },
     [activeMembers.length]
   );
 
-  const applyRemainderToFirst = useCallback(
-    (
-      newData: Record<number, number>,
-      itemTotal: number,
-      firstMemberId: number
-    ) => {
-      let sumOthers = 0;
-      activeMembers.forEach((m) => {
-        if (m.id !== firstMemberId) {
-          sumOthers += newData[m.id] || 0;
-        }
-      });
-      newData[firstMemberId] = Math.max(0, itemTotal - sumOthers);
-    },
-    [activeMembers]
-  );
-
   const handleAmountChange = useCallback(
     (itemId: number, memberId: number, value: string, itemTotal: number) => {
-      const numericValue = value.replace(/[^0-9]/g, '');
-      let valToSet = numericValue === '' ? 0 : parseInt(numericValue, 10);
-      if (valToSet > itemTotal) valToSet = itemTotal;
-
-      const newData = { ...editSplits[itemId] };
-      newData[memberId] = valToSet;
-
-      const firstMemberId = activeMembers[0]?.id;
-      if (firstMemberId && memberId !== firstMemberId) {
-        applyRemainderToFirst(newData, itemTotal, firstMemberId);
-      }
-
-      setEditSplits((prev) => ({ ...prev, [itemId]: newData }));
+      setEditSplits((prev) => ({
+        ...prev,
+        [itemId]: updateItemAmount(
+          prev[itemId] ?? {},
+          memberId,
+          value,
+          itemTotal,
+          remainderMemberId,
+          memberIds
+        ),
+      }));
     },
-    [activeMembers, applyRemainderToFirst, editSplits]
+    [memberIds, remainderMemberId]
   );
 
   const handlePercentChange = useCallback(
     (itemId: number, memberId: number, value: string, itemTotal: number) => {
-      const numericValue = value.replace(/[^0-9]/g, '');
-      let percent = numericValue === '' ? 0 : parseInt(numericValue, 10);
-      if (percent > 100) percent = 100;
-
-      const calculatedAmount = Math.round(itemTotal * (percent / 100));
-      const newData = { ...editSplits[itemId] };
-      newData[memberId] = calculatedAmount;
-
-      const firstMemberId = activeMembers[0]?.id;
-      if (firstMemberId && memberId !== firstMemberId) {
-        applyRemainderToFirst(newData, itemTotal, firstMemberId);
-      }
-
-      setEditSplits((prev) => ({ ...prev, [itemId]: newData }));
+      setEditSplits((prev) => ({
+        ...prev,
+        [itemId]: updateItemPercent(
+          prev[itemId] ?? {},
+          memberId,
+          value,
+          itemTotal,
+          remainderMemberId,
+          memberIds
+        ),
+      }));
     },
-    [activeMembers, applyRemainderToFirst, editSplits]
+    [memberIds, remainderMemberId]
   );
 
   const splitItemEqually = useCallback(
     (itemId: number, itemTotal: number) => {
-      const memberCount = activeMembers.length;
-      if (memberCount === 0) return;
-
-      const baseAmount = Math.floor(itemTotal / memberCount);
-      const newData = { ...editSplits[itemId] };
-      activeMembers.forEach((m, idx) => {
-        newData[m.id] =
-          idx === 0 ? itemTotal - baseAmount * (memberCount - 1) : baseAmount;
-      });
-
-      setEditSplits((prev) => ({ ...prev, [itemId]: newData }));
+      if (memberIds.length === 0) return;
+      setEditSplits((prev) => ({
+        ...prev,
+        [itemId]: splitAmountEqually(itemTotal, memberIds),
+      }));
     },
-    [activeMembers, editSplits]
+    [memberIds]
   );
 
   const applyCascadePercent = useCallback(
     (memberId: number, percent: number) => {
-      if (activeMembers.length <= 1 || percent < 0 || percent > 100) return;
-
-      const firstMemberId = activeMembers[0].id;
-      if (memberId === firstMemberId) return;
-
-      setEditSplits((prev) => {
-        const next = { ...prev };
-        receipt.items.forEach((item) => {
-          const itemTotal = calcItemTotal(item);
-          const newData = { ...next[item.id] };
-          newData[memberId] = Math.round(itemTotal * (percent / 100));
-          applyRemainderToFirst(newData, itemTotal, firstMemberId);
-          next[item.id] = newData;
-        });
-        return next;
-      });
+      if (!remainderMemberId) return;
+      setEditSplits((prev) =>
+        applyCascadePercentToItems(
+          prev,
+          receipt.items,
+          memberId,
+          percent,
+          remainderMemberId,
+          memberIds
+        )
+      );
     },
-    [activeMembers, applyRemainderToFirst, receipt.items]
+    [memberIds, receipt.items, remainderMemberId]
   );
 
   const handleTotalAmountChange = useCallback(
     (memberId: number, value: string) => {
-      const numericValue = value.replace(/[^0-9]/g, '');
-      let valToSet = numericValue === '' ? 0 : parseInt(numericValue, 10);
-      if (valToSet > receiptTotalAmount) valToSet = receiptTotalAmount;
-
+      const valToSet = parseNonNegativeInt(value, receiptTotalAmount);
       const percent =
         receiptTotalAmount > 0 ? (valToSet / receiptTotalAmount) * 100 : 0;
       applyCascadePercent(memberId, percent);
@@ -234,9 +171,7 @@ export function useSplitEditor(
 
   const handleTotalPercentChange = useCallback(
     (memberId: number, value: string) => {
-      const numericValue = value.replace(/[^0-9]/g, '');
-      const percent = numericValue === '' ? 0 : parseInt(numericValue, 10);
-      applyCascadePercent(memberId, percent);
+      applyCascadePercent(memberId, parsePercentInt(value));
     },
     [applyCascadePercent]
   );
@@ -253,7 +188,7 @@ export function useSplitEditor(
       return;
     }
 
-    const remainderMemberId = activeMembers[0].id;
+    const saveRemainderMemberId = activeMembers[0].id;
     setSaving(true);
     try {
       const savePromises = receipt.items.map(async (item) => {
@@ -261,7 +196,7 @@ export function useSplitEditor(
         const payloadSplits = buildItemSplitSavePayload(
           activeMembers,
           amounts,
-          remainderMemberId
+          saveRemainderMemberId
         );
         return receiptApi.saveItemSplits(item.id, payloadSplits);
       });
