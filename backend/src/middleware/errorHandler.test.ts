@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/appError';
 import { errorHandler } from '../middleware/errorHandler';
@@ -47,6 +48,28 @@ describe('errorHandler', () => {
     expect(res.body).toEqual({
       success: false,
       message: '入力内容に不備があります',
+    });
+
+    process.env.NODE_ENV = prev;
+  });
+
+  it('formats ZodError with validation details in production', () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    const schema = z.object({ memberId: z.number() });
+    const parsed = schema.safeParse({ memberId: 'x' });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+
+    const res = createMockRes();
+    errorHandler(parsed.error, req, res, next);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({
+      success: false,
+      message: '入力内容に不備があります',
+      details: [{ field: 'memberId', message: expect.any(String) }],
     });
 
     process.env.NODE_ENV = prev;

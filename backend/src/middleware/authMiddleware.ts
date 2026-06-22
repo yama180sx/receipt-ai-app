@@ -77,6 +77,6 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction) =
     next();
   } catch (error) {
     logger.error(`[AUTH] Admin Check Error:`, error);
-    res.status(500).json({ success: false, message: '権限の確認中にエラーが発生しました' });
+    next(error);
   }
 };

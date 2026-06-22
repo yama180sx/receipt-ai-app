@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import path from 'path';
+import sharp from 'sharp';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
 import { findCategoriesByFamilyGroup } from '../repositories/categoryRepository';
@@ -10,6 +11,8 @@ import {
 import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
 import { sendMessage, sendSuccess } from '../utils/sendApiResponse';
+import { asyncHandler } from '../utils/asyncHandler';
+import logger from '../utils/logger';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
 import {
   mapAdvancedStatsToApi,
@@ -39,230 +42,180 @@ import {
 } from '../services/receipt/receiptStatsService';
 import { SplitInput } from '../utils/itemSplitAllocation';
 
-export const getJobStatus = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
-    if (!job) throw new AppError('ジョブが見つかりません。', 404);
+export const getJobStatus = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
+  if (!job) throw new AppError('ジョブが見つかりません。', 404);
 
-    const jobFamilyGroupId = Number(job.data?.familyGroupId);
-    if (!jobFamilyGroupId || jobFamilyGroupId !== familyGroupId) {
-      throw new AppError('ジョブが見つかりません。', 404);
-    }
-
-    const state = await job.getState();
-    const data = await enrichCompletedJobPayload(
-      job,
-      familyGroupId,
-      mapJobToStatus(job, state)
-    );
-
-    sendSuccess(res, data);
-  } catch (error) {
-    next(error);
+  const jobFamilyGroupId = Number(job.data?.familyGroupId);
+  if (!jobFamilyGroupId || jobFamilyGroupId !== familyGroupId) {
+    throw new AppError('ジョブが見つかりません。', 404);
   }
-};
 
-export const getReceiptJobs = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const ctx = requireTenantContext();
-    const jobs = await listReceiptJobsForMember(ctx.familyGroupId, ctx.memberId);
-    sendSuccess(res, jobs);
-  } catch (error) {
-    next(error);
-  }
-};
+  const state = await job.getState();
+  const data = await enrichCompletedJobPayload(
+    job,
+    familyGroupId,
+    mapJobToStatus(job, state)
+  );
 
-export const discardReceiptJob = async (req: Request<{ jobId: string }>, res: Response, next: NextFunction) => {
-  try {
-    const ctx = requireTenantContext();
-    await discardReceiptJobForMember(getRouteParam(req, 'jobId'), ctx.familyGroupId, ctx.memberId);
-    sendMessage(res, 'Discarded');
-  } catch (error) {
-    next(error);
-  }
-};
+  sendSuccess(res, data);
+});
 
-export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const categories = await findCategoriesByFamilyGroup(familyGroupId);
-    sendSuccess(res, mapCategoriesToSummary(categories));
-  } catch (error) {
-    next(error);
-  }
-};
+export const getReceiptJobs = asyncHandler(async (_req, res) => {
+  const ctx = requireTenantContext();
+  const jobs = await listReceiptJobsForMember(ctx.familyGroupId, ctx.memberId);
+  sendSuccess(res, jobs);
+});
 
-export const uploadReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const ctx = requireTenantContext();
-    const imagePath = req.file?.path;
+export const discardReceiptJob = asyncHandler(async (req, res) => {
+  const ctx = requireTenantContext();
+  await discardReceiptJobForMember(getRouteParam(req, 'jobId'), ctx.familyGroupId, ctx.memberId);
+  sendMessage(res, 'Discarded');
+});
 
-    if (!imagePath) throw new AppError('画像がアップロードされていません。', 400);
+export const getCategories = asyncHandler(async (_req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const categories = await findCategoriesByFamilyGroup(familyGroupId);
+  sendSuccess(res, mapCategoriesToSummary(categories));
+});
 
-    const job = await receiptQueue.add('analyze-receipt', {
-      memberId: ctx.memberId,
-      familyGroupId: ctx.familyGroupId,
-      imagePath,
-    });
+export const uploadReceipt = asyncHandler(async (req, res) => {
+  const file = req.file as Express.Multer.File | undefined;
+  if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
-    sendSuccess(res, mapUploadJobResponse(job.id), 202);
-  } catch (error) {
-    next(error);
-  }
-};
+  const ctx = requireTenantContext();
+  const { familyGroupId, memberId } = ctx;
 
-export const commitReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const ctx = requireTenantContext();
-    const { parsedData, imagePath, validation, jobId } = req.body;
+  const timestamp = Date.now();
+  const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
+  const uploadDir = 'uploads';
+  const imagePath = path.join(uploadDir, `${baseFileName}.webp`);
 
-    if (!parsedData || !imagePath) throw new AppError('必要なデータが不足しています。', 400);
+  await sharp(file.buffer)
+    .rotate()
+    .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 75, effort: 6 })
+    .toFile(imagePath);
 
-    const result = await commitReceiptService({
-      ctx,
-      parsedData: parsedData as ReceiptCommitPayload,
-      imagePath,
-      isSuspicious: validation?.isSuspicious || false,
-      warnings: validation?.warnings || [],
-      jobId,
-    });
+  const job = await receiptQueue.add('analyze-receipt', {
+    memberId,
+    familyGroupId,
+    imagePath,
+  });
 
-    sendSuccess(res, mapReceiptToDetail(result), 201);
-  } catch (error) {
-    next(error);
-  }
-};
+  logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 
-export const createReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const ctx = requireTenantContext();
-    const { date, storeName, items, imagePath } = req.body;
+  sendSuccess(res, { ...mapUploadJobResponse(job.id), status: 'queued' }, 202);
+});
 
-    const newReceipt = await createManualReceipt(ctx, {
-      date,
-      storeName,
-      items: items as ReceiptCreateItemInput[],
-      imagePath,
-    });
+export const commitReceipt = asyncHandler(async (req, res) => {
+  const ctx = requireTenantContext();
+  const { parsedData, imagePath, validation, jobId } = req.body;
 
-    sendSuccess(res, mapReceiptToDetail(newReceipt)!, 201);
-  } catch (error) {
-    next(error);
-  }
-};
+  if (!parsedData || !imagePath) throw new AppError('必要なデータが不足しています。', 400);
 
-export const updateReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const id = getRouteParam(req, 'id');
-    const { date, storeName, items } = req.body;
+  const result = await commitReceiptService({
+    ctx,
+    parsedData: parsedData as ReceiptCommitPayload,
+    imagePath,
+    isSuspicious: validation?.isSuspicious || false,
+    warnings: validation?.warnings || [],
+    jobId,
+  });
 
-    const result = await updateReceiptById(Number(id), familyGroupId, {
-      date,
-      storeName,
-      items: items as ReceiptCreateItemInput[],
-    });
+  sendSuccess(res, mapReceiptToDetail(result), 201);
+});
 
-    sendSuccess(res, mapReceiptToDetail(result)!);
-  } catch (error) {
-    next(error);
-  }
-};
+export const createReceipt = asyncHandler(async (req, res) => {
+  const ctx = requireTenantContext();
+  const { date, storeName, items, imagePath } = req.body;
 
-export const updateItemCategory = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const id = getRouteParam(req, 'id');
-    const { categoryId } = req.body;
+  const newReceipt = await createManualReceipt(ctx, {
+    date,
+    storeName,
+    items: items as ReceiptCreateItemInput[],
+    imagePath,
+  });
 
-    const result = await updateItemCategoryById(Number(id), familyGroupId, categoryId);
-    sendSuccess(res, mapReceiptItemToDetail(result));
-  } catch (error) {
-    next(error);
-  }
-};
+  sendSuccess(res, mapReceiptToDetail(newReceipt)!, 201);
+});
 
-export const getReceipts = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const { month, memberId } = req.query;
-    const receipts = await listReceipts({
-      familyGroupId,
-      memberId: typeof memberId === 'string' ? memberId : undefined,
-      month: typeof month === 'string' ? month : undefined,
-    });
-    sendSuccess(res, mapReceiptList(receipts));
-  } catch (error) {
-    next(error);
-  }
-};
+export const updateReceipt = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const id = getRouteParam(req, 'id');
+  const { date, storeName, items } = req.body;
 
-export const getLatestReceipt = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const receipt = await fetchLatestReceipt(familyGroupId);
-    sendSuccess(res, mapReceiptToDetail(receipt));
-  } catch (error) {
-    next(error);
-  }
-};
+  const result = await updateReceiptById(Number(id), familyGroupId, {
+    date,
+    storeName,
+    items: items as ReceiptCreateItemInput[],
+  });
 
-export const deleteReceipt = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    await deleteReceiptById(Number(getRouteParam(req, 'id')), familyGroupId);
-    sendMessage(res, 'Deleted');
-  } catch (error) {
-    next(error);
-  }
-};
+  sendSuccess(res, mapReceiptToDetail(result)!);
+});
 
-export const getMonthlyStats = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
-    const data = await fetchMonthlyStats(familyGroupId, month);
-    sendSuccess(res, mapMonthlyStatsToApi(data));
-  } catch (error) {
-    next(error);
-  }
-};
+export const updateItemCategory = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const id = getRouteParam(req, 'id');
+  const { categoryId } = req.body;
 
-export const getAdvancedStats = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const data = await fetchAdvancedStats(familyGroupId);
-    sendSuccess(res, mapAdvancedStatsToApi(data));
-  } catch (error) {
-    next(error);
-  }
-};
+  const result = await updateItemCategoryById(Number(id), familyGroupId, categoryId);
+  sendSuccess(res, mapReceiptItemToDetail(result));
+});
 
-export const getFamilyMembers = async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const members = await listFamilyMembers(familyGroupId);
-    sendSuccess(res, mapFamilyMembersToSummary(members));
-  } catch (error) {
-    next(error);
-  }
-};
+export const getReceipts = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const { month, memberId } = req.query;
+  const receipts = await listReceipts({
+    familyGroupId,
+    memberId: typeof memberId === 'string' ? memberId : undefined,
+    month: typeof month === 'string' ? month : undefined,
+  });
+  sendSuccess(res, mapReceiptList(receipts));
+});
 
-export const updateItemSplits = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { familyGroupId } = requireTenantContext();
-    const itemId = getRouteParam(req, 'itemId');
-    const { splits } = req.body;
+export const getLatestReceipt = asyncHandler(async (_req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const receipt = await fetchLatestReceipt(familyGroupId);
+  sendSuccess(res, mapReceiptToDetail(receipt));
+});
 
-    const result = await updateItemSplitsById(
-      Number(itemId),
-      familyGroupId,
-      splits as SplitInput[] | undefined
-    );
+export const deleteReceipt = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  await deleteReceiptById(Number(getRouteParam(req, 'id')), familyGroupId);
+  sendMessage(res, 'Deleted');
+});
 
-    sendSuccess(res, mapItemSplitsUpdateResult(result));
-  } catch (error) {
-    next(error);
-  }
-};
+export const getMonthlyStats = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+  const data = await fetchMonthlyStats(familyGroupId, month);
+  sendSuccess(res, mapMonthlyStatsToApi(data));
+});
+
+export const getAdvancedStats = asyncHandler(async (_req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const data = await fetchAdvancedStats(familyGroupId);
+  sendSuccess(res, mapAdvancedStatsToApi(data));
+});
+
+export const getFamilyMembers = asyncHandler(async (_req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const members = await listFamilyMembers(familyGroupId);
+  sendSuccess(res, mapFamilyMembersToSummary(members));
+});
+
+export const updateItemSplits = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const itemId = getRouteParam(req, 'itemId');
+  const { splits } = req.body;
+
+  const result = await updateItemSplitsById(
+    Number(itemId),
+    familyGroupId,
+    splits as SplitInput[] | undefined
+  );
+
+  sendSuccess(res, mapItemSplitsUpdateResult(result));
+});

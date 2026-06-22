@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request } from 'express';
 import { JWTPayload } from '../utils/auth';
 import {
   confirmTotpSetupForMember,
@@ -10,22 +10,18 @@ import {
   verifyTotpForMember,
 } from '../services/authService';
 import { getRouteParam } from '../utils/routeParams';
+import { asyncHandler } from '../utils/asyncHandler';
+import { sendSuccess } from '../utils/sendApiResponse';
 
 type AuthUser = JWTPayload;
-
-const ok = <T>(res: Response, data: T) => res.status(200).json({ success: true, data });
 
 const getAuthUser = (req: Request): AuthUser => (req as Request & { user: AuthUser }).user;
 
 const handle =
-  (fn: (req: Request, res: Response) => Promise<unknown>) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      ok(res, await fn(req, res));
-    } catch (error) {
-      next(error);
-    }
-  };
+  <T>(fn: (req: Request) => Promise<T>) =>
+  asyncHandler(async (req, res) => {
+    sendSuccess(res, await fn(req));
+  });
 
 export const resolveFamily = handle(async (req) => {
   const { inviteCode } = req.body;
