@@ -1,7 +1,7 @@
 # アーキテクチャ概要（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423)  
-子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439)  
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459)  
+子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461)  
 計画: [plan.md](../refactor/plan.md)
 
 本ドキュメントは **実装準拠（as-built）** で記述する。コード・テスト済み挙動を正とし、詳細なドメイン・API・画面仕様は後続の設計資料を参照する。
@@ -13,6 +13,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) /
 | [api-spec.md](./api-spec.md) | API 仕様（#90-3） |
 | [ai-pipeline.md](./ai-pipeline.md) | 3層正規化・AI パイプライン（#90-4） |
 | [frontend-screens.md](./frontend-screens.md) | 画面遷移・フロント（#90-5） |
+| [frontend-conventions.md](./frontend-conventions.md) | FE 実装規約・AI プロンプト（#101-7） |
 | [operations.md](./operations.md) | 運用・障害対応（#90-6） |
 
 ---
@@ -310,7 +311,7 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 
 ### 6.2 レイヤールール（AI プロンプト転用用）
 
-以下は **新規実装・レビュー時の必須ルール**（[plan.md](../refactor/plan.md) Epic #100 方針）。
+詳細・行数上限・プロンプトテンプレートは **[frontend-conventions.md](./frontend-conventions.md)**（#101-7）を正本とする。以下は層の要約（[plan.md](../refactor/plan.md) Epic #100 / #101 方針）。
 
 | 層 | 場所 | 許可 | 禁止 |
 |----|------|------|------|

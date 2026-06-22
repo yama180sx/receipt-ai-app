@@ -1,14 +1,15 @@
 # 画面遷移 & フロント設計（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423)  
-子 Issue: [#296 Issue #90-5](https://github.com/yama180sx/receipt-ai-app/issues/296) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439)  
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459)  
+子 Issue: [#296 Issue #90-5](https://github.com/yama180sx/receipt-ai-app/issues/296) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461)  
 計画: [plan.md](../refactor/plan.md)
 
-本ドキュメントは **実装準拠（as-built）** で記述する。`frontend/app/`（Expo Router）と各 Screen / `features/` の挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）、API は [api-spec.md](./api-spec.md)（#90-3）、層ルールは [architecture.md](./architecture.md) §6 を参照する。
+本ドキュメントは **実装準拠（as-built）** で記述する。`frontend/app/`（Expo Router）と各 Screen / `features/` の挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）、API は [api-spec.md](./api-spec.md)（#90-3）、層ルールは [architecture.md](./architecture.md) §6、[実装規約](./frontend-conventions.md) を参照する。
 
 | 資料 | 内容 |
 |------|------|
 | [architecture.md](./architecture.md) §6 | フロントエンド概要（#90-1） |
+| [frontend-conventions.md](./frontend-conventions.md) | 実装規約・行数上限・AI プロンプト（#101-7） |
 | [domain-model.md](./domain-model.md) §4–5 | 按分・精算の業務ルール（#90-2） |
 | [api-spec.md](./api-spec.md) §7 | 精算・按分 API（#90-3） |
 | [docs/reviews/issue-87/](../reviews/issue-87/README.md) | 精算ドメイン LLM レビュー資材 |
