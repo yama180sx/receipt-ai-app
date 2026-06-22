@@ -296,10 +296,136 @@ Epic: [#459 Epic #101](https://github.com/yama180sx/receipt-ai-app/issues/459)
 
 ### 8.7 後続 Epic（Phase 5、本 Epic スコープ外）
 
+| Epic | GitHub | テーマ | plan 正本 |
+|------|--------|--------|-----------|
+| #102 | [#468](https://github.com/yama180sx/receipt-ai-app/issues/468) | API 契約型 SSOT（OpenAPI drift CI、FE/BE 型整合） | **§9** |
+| #103 | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | Backend 層境界（Response Mapper、errorHandler 一本化） | §10（#103-0 完了後） |
+
+## 9. Epic #102 — API 契約型 SSOT（Phase 5）
+
+Epic: [#468 Epic #102](https://github.com/yama180sx/receipt-ai-app/issues/468)
+
+[ChatGPT レビュー 20260622](../specs/chatgpt/ChatGPT_レビュー_20260622.txt) 優先度 **C-2** の対応 Epic。Epic #101（Phase 4）完了後、**API 契約を OpenAPI 一点に集約**し、FE/BE 型の分散と spec↔実装の drift を解消する。
+
+### 9.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | ChatGPT レビュー C-2 + #401 / #402 成果物 + コード突合 |
+| 契約 SSOT | `docs/openapi/openapi.yaml`（機械可読正本） |
+| FE 方針 | DTO は `frontend/src/api/generated`（`npm run generate:api`）。ViewModel のみ `frontend/src/types/` |
+| BE 方針 | API レスポンス形は OpenAPI schema に整合。ドメイン内部型（`ParsedReceipt` 等）は Service 層に残す |
+| CI 方針 | `check:api`（generated diff）+ ルート一覧突合（#102-1） |
+| スコープ外 | `packages/shared-types` monorepo、BE からの OpenAPI 自動生成 |
+
+### 9.2 型境界図
+
+```mermaid
+flowchart LR
+  subgraph ssot [契約 SSOT]
+    OAS[docs/openapi/openapi.yaml]
+  end
+
+  subgraph fe [Frontend]
+    GEN[api/generated/schema.ts]
+    FET[types/*.ts ViewModel]
+    MAP[mappers/]
+    HOOK[features/*/hooks]
+  end
+
+  subgraph be [Backend]
+    BET[types/*.ts Domain]
+    SVC[Service / Repository]
+    CTRL[Controller / Routes]
+  end
+
+  OAS -->|openapi-typescript| GEN
+  GEN -->|re-export| FET
+  GEN --> MAP
+  MAP --> HOOK
+  OAS -.->|整合目標| CTRL
+  BET --> SVC
+  SVC --> CTRL
+  CTRL -.->|レスポンス形| OAS
+```
+
+**データの流れ（読み取り）**: OpenAPI → FE generated 型 → Mapper → ViewModel → UI。BE は Controller が OpenAPI 準拠の JSON を返し、Service 内部は Prisma / Gemini 由来のドメイン型を使用する。
+
+### 9.3 型の正本と各層の責務
+
+| 種別 | 正本 | 配置 | 責務 | 禁止 |
+|------|------|------|------|------|
+| API 契約（DTO） | `docs/openapi/openapi.yaml` | — | 公開 API の request/response schema、paths | 手動で FE/BE に DTO を二重定義 |
+| FE 生成型 | OpenAPI codegen | `frontend/src/api/generated/` | `schema.ts` + ドメイン別エイリアス（`index.ts`） | Hook / Screen から `schema.ts` を直接 import（`generated/index` または `types/` 経由） |
+| FE ViewModel | 画面・フロー固有 | `frontend/src/types/` | `ParsedReceiptData`、`ReceiptForSplitEditor` 等 OpenAPI 非該当型 | API レスポンスと同一 shape の手動 interface |
+| FE Mapper | DTO → ViewModel | `frontend/src/mappers/` | 表示用変換（#100-4 成果） | API 呼び出し |
+| BE ドメイン型 | Gemini / commit 経路 | `backend/src/types/` | `ParsedReceipt`、`ParsedItem` 等内部モデル | HTTP レスポンス型の手動二重管理（OpenAPI と乖離） |
+| BE Express 拡張 | ミドルウェア | `backend/src/types/express.d.ts` | `req.user` 等リクエストコンテキスト | — |
+| DB モデル | Prisma schema | `backend/prisma/schema.prisma` | 永続化。API DTO とは別層 | OpenAPI に DB 型を直書き |
+
+### 9.4 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #102 Epic | [#468](https://github.com/yama180sx/receipt-ai-app/issues/468) | — | — |
+| #102-0 | [#470](https://github.com/yama180sx/receipt-ai-app/issues/470) | Must | 0.5 人日 |
+| #102-1 | [#471](https://github.com/yama180sx/receipt-ai-app/issues/471) | Must | 1〜1.5 人日 |
+| #102-2 | [#472](https://github.com/yama180sx/receipt-ai-app/issues/472) | Should | 1〜2 人日 |
+| #102-3 | [#473](https://github.com/yama180sx/receipt-ai-app/issues/473) | Should | 2〜3 人日 |
+| #102-4 | [#474](https://github.com/yama180sx/receipt-ai-app/issues/474) | Must | 0.5 人日 |
+
+### 9.5 #401 / #402 との差分（残タスクの明確化）
+
+| 項目 | #401 / #402（#98-8-9 / #98-8-10）で **完了** | Epic #102 で **追加** |
+|------|-----------------------------------------------|------------------------|
+| OpenAPI YAML 正本 | `docs/openapi/openapi.yaml`（全公開 API） | 維持・拡張時も YAML 先 |
+| FE 型生成 | `npm run generate:api` → `api/generated/schema.ts` | 手動 DTO の監査・generated 移行（#102-2） |
+| generated diff CI | `npm run check:api` を `test.yml` に組込済み | ルート一覧 ↔ paths 突合テスト（#102-1） |
+| FE エイリアス | `api/generated/index.ts` でドメイン別 re-export | `types/*.ts` の ViewModel 境界明確化（#102-2） |
+| BE 型 | `backend/src/types/receipt.ts` 等（ドメイン中心） | レスポンス形の OpenAPI 整合（#102-3） |
+| 運用ルール | `api-spec.md` に OpenAPI 正本記載 | 新 API 追加手順・AI チェックリスト（#102-4） |
+| FE/BE 完全共有 | —（対象外） | **Won't fix** — OpenAPI + codegen で十分 |
+
+**Epic #102 が解消するレビュー指摘**: 「API 契約型を完全共有できていない」（型定義 22/25 減点要因）。FE は generated へ、BE はレスポンス整合へ寄せ、**契約の SSOT は OpenAPI のみ**とする。
+
+### 9.6 #101 との関係
+
+| #101 で実施済み | #102 で追加する理由 |
+|----------------|---------------------|
+| `frontend-conventions.md` に DTO / ViewModel 方針の概要 | 型境界の **as-built 図・残タスク表** を plan 正本化 |
+| `getApiErrorMessage` / `showApiErrorAlert` 統一 | API **契約型** の統一（エラー処理とは別軸） |
+| BE middleware `any` 除去（#101-3） | Controller レスポンス形の OpenAPI 整合（#102-3） |
+
+層境界の **Response Mapper 全面導入** は Epic [#103](https://github.com/yama180sx/receipt-ai-app/issues/469)（C-4）へ委譲。
+
+### 9.7 Won't fix / Later（記録）
+
+| 項目 | 判定 | 理由 |
+|------|------|------|
+| `packages/shared-types` monorepo 共有パッケージ | **Won't fix** | OpenAPI + `openapi-typescript` で FE/BE 契約は足りる |
+| BE から OpenAPI を自動生成（tsoa / zod-to-openapi 等） | **Won't fix** | YAML 正本 + CI drift 検知で運用。導入コスト対効果が低い |
+| Prisma モデルを OpenAPI に直結 | **Won't fix** | DB 層と API 契約は分離（#102-3 はレスポンス JSON のみ） |
+| BE 層 Mapper 全面整理 | **Later → Epic #103** | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) |
+
+### 9.8 推奨着手順
+
+```
+#470（#102-0 plan）→ #471（drift CI）→ #474（運用ルール）
+  → #472 / #473（並行可）
+  → Epic #103（#103-0 plan 以降）
+```
+
+**既存コマンド（参照）**
+
+| コマンド | 用途 |
+|----------|------|
+| `npm run generate:api`（frontend） | OpenAPI → `schema.ts` 再生成 |
+| `npm run check:api`（frontend） | 生成物 diff 検証（CI 済み） |
+
+### 9.9 後続 Epic（Phase 5、本 Epic スコープ外）
+
 | Epic | GitHub | テーマ |
 |------|--------|--------|
-| #102 | [#468](https://github.com/yama180sx/receipt-ai-app/issues/468) | API 契約型 SSOT（OpenAPI drift CI、FE/BE 型整合） |
 | #103 | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | Backend 層境界（Response Mapper、errorHandler 一本化） |
 
-詳細は各 Epic の #102-0 / #103-0（plan 追記 Issue）で正本化する。
-
+詳細は #103-0（[#475](https://github.com/yama180sx/receipt-ai-app/issues/475)）で §10 として正本化する。
