@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { borderRadius, spacing } from '../../../theme';
+import { borderRadius } from '../../../theme/radii';
+import { spacing } from '../../../theme/spacing';
 
 /** Issue #100-7 (#431): ログイン画面の共通スタイル（theme token + formStyles 準拠） */
 export const authScreenStyles = StyleSheet.create({

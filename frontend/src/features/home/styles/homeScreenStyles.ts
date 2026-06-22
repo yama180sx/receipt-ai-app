@@ -1,5 +1,9 @@
 import { StyleSheet } from 'react-native';
-import { screenLayout, spacing, theme } from '../../../theme';
+import { colors } from '../../../theme/colors';
+import { borderRadius } from '../../../theme/radii';
+import { screenLayout } from '../../../theme/screenLayout';
+import { spacing } from '../../../theme/spacing';
+import { typography } from '../../../theme/typography';
 
 /** Issue #100-9 (#433): ホーム画面の固有スタイル（screenLayout / cardStyles 準拠） */
 export const homeScreenStyles = StyleSheet.create({
@@ -18,19 +22,19 @@ export const homeScreenStyles = StyleSheet.create({
     paddingLeft: spacing.sm,
   },
   headerSubtitle: {
-    ...theme.typography.caption,
-    color: theme.colors.text.muted,
+    ...typography.caption,
+    color: colors.text.muted,
     letterSpacing: 0.5,
   },
   headerTitle: {
-    ...theme.typography.h1,
-    color: theme.colors.text.main,
+    ...typography.h1,
+    color: colors.text.main,
     marginTop: spacing.xs,
   },
   summaryCard: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.xl,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
     marginBottom: spacing.lg,
     elevation: 4,
   },
@@ -45,13 +49,13 @@ export const homeScreenStyles = StyleSheet.create({
     marginTop: 5,
   },
   summarySymbol: {
-    color: theme.colors.text.inverse,
+    color: colors.text.inverse,
     fontSize: 20,
     marginRight: spacing.xs,
     fontWeight: 'bold',
   },
   summaryAmount: {
-    color: theme.colors.text.inverse,
+    color: colors.text.inverse,
     fontSize: 36,
     fontWeight: 'bold',
   },
@@ -67,32 +71,32 @@ export const homeScreenStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.7)',
   },
   summaryLinkText: {
-    color: theme.colors.text.inverse,
+    color: colors.text.inverse,
     fontSize: 14,
     fontWeight: '600',
   },
   acceptanceBanner: {
-    backgroundColor: theme.colors.semantic.surplus.bg,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: colors.semantic.surplus.bg,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: theme.colors.semantic.surplus.border,
+    borderColor: colors.semantic.surplus.border,
   },
   acceptanceBannerText: {
-    color: theme.colors.semantic.surplus.text,
+    color: colors.semantic.surplus.text,
     fontSize: 14,
     fontWeight: '600',
   },
   captureButton: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     borderStyle: 'dashed',
   },
   captureButtonBody: {
@@ -102,41 +106,41 @@ export const homeScreenStyles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
   },
   captureButtonText: {
-    ...theme.typography.h2,
-    color: theme.colors.primary,
+    ...typography.h2,
+    color: colors.primary,
   },
   captureSubText: {
     fontSize: 12,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
     marginTop: spacing.xs,
   },
   captureCountBadge: {
     minWidth: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
   },
   captureCountBadgeText: {
-    color: theme.colors.text.inverse,
+    color: colors.text.inverse,
     fontSize: 12,
     fontWeight: '700',
   },
   traySection: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   traySectionHeader: {
     flexDirection: 'row',
@@ -145,7 +149,7 @@ export const homeScreenStyles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   trayOpenLink: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -153,13 +157,13 @@ export const homeScreenStyles = StyleSheet.create({
     minWidth: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
   gridCountBadgeText: {
-    color: theme.colors.text.inverse,
+    color: colors.text.inverse,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -181,15 +185,15 @@ export const homeScreenStyles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   sectionTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text.main,
+    ...typography.h2,
+    color: colors.text.main,
     marginBottom: spacing.sm,
   },
   settingsIconWrapper: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -202,13 +206,13 @@ export const homeScreenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   amountText: {
-    ...theme.typography.h2,
-    color: theme.colors.primary,
+    ...typography.h2,
+    color: colors.primary,
     fontWeight: 'bold',
   },
   dateText: {
-    ...theme.typography.caption,
-    color: theme.colors.text.muted,
+    ...typography.caption,
+    color: colors.text.muted,
   },
   sourcePickerActions: {
     gap: 10,
@@ -218,6 +222,6 @@ export const homeScreenStyles = StyleSheet.create({
     marginTop: 10,
   },
   adminListItem: {
-    backgroundColor: theme.colors.semantic.icon.adminSettings,
+    backgroundColor: colors.semantic.icon.adminSettings,
   },
 });

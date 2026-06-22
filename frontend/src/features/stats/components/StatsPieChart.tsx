@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
-import { cardStyles } from '../../../theme';
+import { cardStyles } from '../../../theme/cardStyles';
 import type { StatsChartSlice } from '../hooks/useStatistics';
 import { statsScreenStyles } from '../styles/statsScreenStyles';
 
