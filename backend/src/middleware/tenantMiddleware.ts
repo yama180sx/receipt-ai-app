@@ -12,7 +12,7 @@ import logger from '../utils/logger';
 export const tenantMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // authMiddleware (JWT) からの情報を取得
-    const user = (req as any).user;
+    const user = req.user;
     
     // JWTがない場合のフォールバック（移行期間用）
     const rawMemberId = user?.id || req.headers['x-member-id'];
