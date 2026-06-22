@@ -1,0 +1,45 @@
+---
+description: Git ブランチ・PR のマージ先は develop（積み上げ）/ main（リリース）を厳守
+alwaysApply: true
+---
+
+# Git / PR ワークフロー
+
+## ブランチの役割
+
+| ブランチ | 用途 |
+|----------|------|
+| `develop` | **日常開発の積み上げ先**。feature ブランチのベース・PR のマージ先 |
+| `main` | **リリース / デプロイ先**（`deploy.yml`）。通常の Issue 作業では PR を作らない |
+
+CI（`test.yml`）は **`develop` 向け PR** で実行される。
+
+## 作業開始時（必須）
+
+```bash
+git fetch origin develop
+git checkout develop
+git pull origin develop
+git checkout -b feature/issue-XXX-short-name
+```
+
+`main` から feature ブランチを切らない（`develop` が正本）。
+
+## PR 作成時（必須）
+
+```bash
+gh pr create --base develop --title "..." --body "..."
+```
+
+- **`--base develop` を必ず明示**する（省略すると GitHub デフォルトの `main` になる）
+- `gh pr create` の前に `git log origin/develop..HEAD` で差分が意図どおりか確認する
+
+## マージ先の確認
+
+- ユーザーが PR をマージした後: `git pull origin develop` で更新する
+- `main` にのみ入っているコミットがないか: `git log origin/develop..origin/main`（空であること）
+
+## 禁止
+
+- Issue 作業の PR を `--base main` にしない（リリース同期 PR を除く）
+- `develop` と `main` がずれたまま別ブランチから作業を続けない。ずれを見つけたら先に `develop` を `main` へ FF 同期するか、ユーザーに確認する
