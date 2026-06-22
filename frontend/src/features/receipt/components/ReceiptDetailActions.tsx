@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { AppButton } from '../../../components/ui';
 import { BUTTON_LABELS } from '../../../constants/buttonLabels';
 import type { ReceiptDetail } from '../../../types/receipt';
