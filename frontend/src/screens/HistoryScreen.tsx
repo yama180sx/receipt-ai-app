@@ -155,7 +155,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
 
     return (
       <TouchableOpacity 
-        style={[cardStyles.chartCard, styles.listCard, isSelected && isWide && styles.activeCard]} 
+        style={[cardStyles.listCard, styles.listCardExtra, isSelected && isWide && styles.activeCard]} 
         onPress={() => setSelectedReceipt(item)}
         activeOpacity={0.7}
       >
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   fullPane: { flex: 1 },
   detailPane: { flex: 1, height: '100%', backgroundColor: colors.background },
   list: { padding: spacing.md },
-  listCard: { minHeight: undefined, alignItems: 'stretch', marginBottom: 10, justifyContent: 'flex-start' },
+  listCardExtra: { marginBottom: 10 },
   activeCard: { borderColor: colors.primary, backgroundColor: colors.semantic.active.bg, elevation: 0 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   date: { fontSize: 12, color: colors.text.muted },
