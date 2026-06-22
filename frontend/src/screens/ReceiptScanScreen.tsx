@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,8 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { receiptApi } from '../api/receiptApi';
 import { AppBackButton, AppButton, AppFormField, AppSelect, AppTextInput } from '../components/ui';
+import { useReceiptScan } from '../features/receipt';
 import { modalStyles } from '../theme/modalStyles';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -20,11 +20,7 @@ import { borderRadius } from '../theme/radii';
 import { cardStyles } from '../theme/cardStyles';
 import { screenLayout } from '../theme/screenLayout';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { useReceiptImageSource } from '../utils/receiptImageSource';
-import { showAlert } from '../utils/alertMessage';
-import { getApiErrorMessage, getApiErrorResponseData } from '../utils/apiError';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
-import type { ParsedReceiptItemInput } from '../types/receipt';
 
 const c = colors;
 const s = colors.semantic.scan;
@@ -37,10 +33,7 @@ interface ReceiptScanScreenProps {
 }
 
 /**
- * [Issue #67 / #71 / #63] レシート解析結果の確認・編集画面
- * - 外税(taxAmount)の編集・合算に対応
- * - 単価・数量の小数点入力対応
- * - 解析コスト紐付け用 usageLogId のポストに対応
+ * [Issue #67 / #71 / #100-14] レシート解析結果の確認・編集画面 — Hook + UI
  */
 export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   initialData,
@@ -48,93 +41,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   onSuccess,
   onCancel,
 }) => {
-  const [loading, setLoading] = useState(false);
-  // 初期値に taxAmount がない場合へのフォールバック
-  const [receiptData, setReceiptData] = useState({
-    ...initialData.parsedData,
-    taxAmount: initialData.parsedData.taxAmount ?? '0',
-  });
-
-  const categorySelectOptions = useMemo(
-    () => categories.map((c) => ({ label: c.name, value: c.id })),
-    [categories]
-  );
-
-  const imageSource = useReceiptImageSource(initialData.imagePath);
-
-  // 合計金額の計算（明細合計 + 外税）
-  const calculatedTotal = useMemo(() => {
-    const itemsTotal = receiptData.items.reduce((sum, item) => {
-      const p = parseFloat(String(item.price)) || 0;
-      const q = parseFloat(String(item.quantity)) || 0;
-      return sum + (p * q);
-    }, 0);
-    
-    const tax = parseFloat(String(receiptData.taxAmount)) || 0;
-    // 日本円のため最終的な支払額は四捨五入して整数化
-    return Math.round(itemsTotal + tax);
-  }, [receiptData.items, receiptData.taxAmount]);
-
-  const updateItem = (index: number, key: keyof ParsedReceiptItemInput, value: ParsedReceiptItemInput[keyof ParsedReceiptItemInput]) => {
-    const newItems = [...receiptData.items];
-    newItems[index] = { ...newItems[index], [key]: value };
-    setReceiptData({ ...receiptData, items: newItems });
-  };
-
-  const removeItem = (index: number) => {
-    const newItems = receiptData.items.filter((_, i) => i !== index);
-    setReceiptData({ ...receiptData, items: newItems });
-  };
-
-  const addItem = () => {
-    const newItems = [...receiptData.items, { name: '', price: 0, quantity: 1, categoryId: null }];
-    setReceiptData({ ...receiptData, items: newItems });
-  };
-
-  const handleCommit = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const payload = {
-        jobId: initialData.jobId,
-        parsedData: { 
-          ...receiptData, 
-          totalAmount: calculatedTotal,
-          taxAmount: parseFloat(String(receiptData.taxAmount)) || 0,
-          items: receiptData.items.map(item => ({
-            ...item,
-            price: parseFloat(String(item.price)) || 0,
-            quantity: parseFloat(String(item.quantity)) || 0,
-            categoryId: item.categoryId ? Number(item.categoryId) : null
-          }))
-        },
-        imagePath: initialData.imagePath,
-        validation: initialData.validation
-      };
-      
-      const res = await receiptApi.commitReceipt(payload);
-      if (res.success) {
-        showAlert('成功', 'レシートを保存しました。', { onOk: onSuccess });
-        return;
-      }
-    } catch (err: unknown) {
-      const apiError = getApiErrorResponseData(err);
-      const message = getApiErrorMessage(err, '保存に失敗しました。');
-
-      if (message === 'DUPLICATE') {
-        const duplicateMessage = initialData.warnedDuplicateFromTray
-          ? '確認トレイで重複の疑いが表示されていました。同じ内容のレシートは保存できません。トレイから破棄するか、履歴で既存レシートを確認してください。'
-          : '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。';
-        showAlert('既に登録済みです', duplicateMessage, { onOk: onCancel });
-        return;
-      }
-
-      console.error('Commit error:', apiError || message);
-      showAlert('エラー', message || '保存に失敗しました。');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const scan = useReceiptScan({ initialData, categories, onSuccess, onCancel });
 
   return (
     <SafeAreaView style={[screenLayout.container, styles.containerScan]}>
@@ -144,9 +51,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
           <Text style={[screenLayout.headerTitle, styles.headerTitleScan]}>解析結果の確認</Text>
           <AppButton
             title={BUTTON_LABELS.save}
-            onPress={handleCommit}
-            loading={loading}
-            disabled={loading}
+            onPress={scan.handleCommit}
+            loading={scan.loading}
+            disabled={scan.loading}
             size="sm"
           />
         </View>
@@ -165,9 +72,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
             </View>
           ) : null}
 
-          {imageSource && (
+          {scan.imageSource && (
             <View style={styles.imageContainer}>
-              <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
+              <Image source={scan.imageSource} style={styles.receiptImage} resizeMode="contain" />
               <View style={styles.imageLabel}><Text style={styles.imageLabelText}>加工済みプレビュー</Text></View>
             </View>
           )}
@@ -176,15 +83,15 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
             <Text style={styles.sectionLabel}>基本情報</Text>
             <AppFormField label="店舗名">
               <AppTextInput
-                value={receiptData.storeName}
-                onChangeText={(val) => setReceiptData({ ...receiptData, storeName: val })}
+                value={scan.receiptData.storeName}
+                onChangeText={(val) => scan.setReceiptData({ ...scan.receiptData, storeName: val })}
                 placeholder="店舗名"
               />
             </AppFormField>
             <AppFormField label="購入日時">
               <AppTextInput
-                value={receiptData.purchaseDate}
-                onChangeText={(val) => setReceiptData({ ...receiptData, purchaseDate: val })}
+                value={scan.receiptData.purchaseDate}
+                onChangeText={(val) => scan.setReceiptData({ ...scan.receiptData, purchaseDate: val })}
                 placeholder="YYYY-MM-DD HH:mm"
               />
             </AppFormField>
@@ -193,9 +100,9 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
               <View style={modalStyles.inputWithUnit}>
                 <AppTextInput
                   variant="inline"
-                  value={String(receiptData.taxAmount)}
+                  value={String(scan.receiptData.taxAmount)}
                   keyboardType="decimal-pad"
-                  onChangeText={(val) => setReceiptData({ ...receiptData, taxAmount: val })}
+                  onChangeText={(val) => scan.setReceiptData({ ...scan.receiptData, taxAmount: val })}
                 />
                 <Text style={modalStyles.unitSuffix}>円</Text>
               </View>
@@ -203,41 +110,41 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
 
             <View style={styles.totalDisplay}>
               <Text style={styles.totalLabel}>支払合計 (税込)</Text>
-              <Text style={styles.totalValue}>¥ {calculatedTotal.toLocaleString()}</Text>
+              <Text style={styles.totalValue}>¥ {scan.calculatedTotal.toLocaleString()}</Text>
             </View>
           </View>
 
           <View style={styles.itemsHeader}>
-            <Text style={styles.sectionLabel}>商品明細 ({receiptData.items.length})</Text>
+            <Text style={styles.sectionLabel}>商品明細 ({scan.receiptData.items.length})</Text>
             <AppButton
               title={`+ ${BUTTON_LABELS.add}`}
-              onPress={addItem}
+              onPress={scan.addItem}
               variant="outline"
               size="sm"
             />
           </View>
 
-          {receiptData.items.map((item, idx) => (
+          {scan.receiptData.items.map((item, idx) => (
             <View key={idx} style={[cardStyles.chartCard, styles.itemCard]}>
               <View style={styles.itemHeaderRow}>
                 <AppTextInput
                   style={styles.itemNameInput}
                   value={item.name}
-                  onChangeText={(val) => updateItem(idx, 'name', val)}
+                  onChangeText={(val) => scan.updateItem(idx, 'name', val)}
                   placeholder="商品名"
                 />
-                <TouchableOpacity onPress={() => removeItem(idx)}>
+                <TouchableOpacity onPress={() => scan.removeItem(idx)}>
                   <Text style={styles.deleteIcon}>🗑️</Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.itemDetailRow}>
                 <View style={styles.itemSubGroup}>
                   <Text style={styles.subLabel}>単価 (¥)</Text>
                   <AppTextInput
                     value={String(item.price)}
                     keyboardType="decimal-pad"
-                    onChangeText={(val) => updateItem(idx, 'price', val)}
+                    onChangeText={(val) => scan.updateItem(idx, 'price', val)}
                   />
                 </View>
                 <View style={[styles.itemSubGroup, { flex: 0.6 }]}>
@@ -245,7 +152,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
                   <AppTextInput
                     value={String(item.quantity)}
                     keyboardType="decimal-pad"
-                    onChangeText={(val) => updateItem(idx, 'quantity', val)}
+                    onChangeText={(val) => scan.updateItem(idx, 'quantity', val)}
                   />
                 </View>
                 <View style={[styles.itemSubGroup, { alignItems: 'flex-end' }]}>
@@ -259,8 +166,8 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
               <AppFormField label="カテゴリ">
                 <AppSelect<number | null>
                   selectedValue={item.categoryId}
-                  onValueChange={(val) => updateItem(idx, 'categoryId', val)}
-                  options={categorySelectOptions}
+                  onValueChange={(val) => scan.updateItem(idx, 'categoryId', val)}
+                  options={scan.categorySelectOptions}
                   placeholder="未選択"
                 />
               </AppFormField>
