@@ -4,7 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackButton } from '../components/ui';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { useReceiptTray } from '../contexts/ReceiptTrayContext';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import { screenLayout } from '../theme/screenLayout';
 
 type Props = {
   onBack: () => void;
@@ -23,8 +26,8 @@ export function ReceiptTrayScreen({ onBack }: Props) {
   } = useReceiptTray();
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <View style={styles.header}>
+    <SafeAreaView style={screenLayout.container} edges={['left', 'right', 'bottom']}>
+      <View style={[screenLayout.header, styles.headerTray]}>
         <AppBackButton onPress={onBack} />
         <View style={styles.headerText}>
           <Text style={styles.title}>確認トレイ</Text>
@@ -42,13 +45,13 @@ export function ReceiptTrayScreen({ onBack }: Props) {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[screenLayout.scrollContent, styles.scrollContentTray]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void refresh({ userInitiated: true })}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
           />
         }
       >
@@ -68,33 +71,25 @@ export function ReceiptTrayScreen({ onBack }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+  headerTray: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
   },
   headerText: { flex: 1 },
-  title: { ...theme.typography.h1, color: theme.colors.text.main, fontSize: 22 },
-  subtitle: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: 2 },
+  title: { ...typography.h1, color: colors.text.main, fontSize: 22 },
+  subtitle: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
   countBadge: {
     minWidth: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
-  countBadgeText: { color: theme.colors.text.inverse, fontWeight: '700' },
+  countBadgeText: { color: colors.text.inverse, fontWeight: '700' },
   headerSpacer: { width: 32 },
-  scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
-  },
+  scrollContentTray: { paddingBottom: spacing.xl },
 });

@@ -5,7 +5,9 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { screenLayout } from '../theme/screenLayout';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import {
   useSettlementSummary,
@@ -42,7 +44,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenLayout.container}>
       <SettlementSummaryHeader
         isWide={isWide}
         selectedMonth={settlement.selectedMonth}
@@ -54,12 +56,12 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 
       {settlement.loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <ScrollView
           style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[screenLayout.scrollContent, styles.scrollContentSettlement]}
         >
           <SettlementMemberCards
             summaryData={settlement.summaryData}
@@ -98,8 +100,7 @@ export const SettlementSummaryScreen: React.FC<SettlementSummaryScreenProps> = (
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContainer: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContentSettlement: { paddingBottom: 40 },
 });
