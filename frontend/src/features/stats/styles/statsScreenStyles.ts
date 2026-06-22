@@ -1,5 +1,7 @@
 import { StyleSheet } from 'react-native';
-import { borderRadius, spacing, theme } from '../../../theme';
+import { colors } from '../../../theme/colors';
+import { borderRadius } from '../../../theme/radii';
+import { spacing } from '../../../theme/spacing';
 
 /** Issue #100-8 (#432): 統計画面の固有スタイル（screenLayout / cardStyles 準拠） */
 export const statsScreenStyles = StyleSheet.create({
@@ -8,7 +10,7 @@ export const statsScreenStyles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 10,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
     letterSpacing: 1,
   },
   monthPickerContainer: {
@@ -38,17 +40,17 @@ export const statsScreenStyles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: theme.colors.primary,
+    borderLeftColor: colors.primary,
     paddingLeft: spacing.sm,
   },
   summaryLabel: {
     fontSize: 12,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
   },
   totalValue: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: colors.primary,
     marginVertical: spacing.xs,
   },
   comparisonRow: {
@@ -64,18 +66,18 @@ export const statsScreenStyles = StyleSheet.create({
     fontSize: 16,
   },
   statsCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   trendRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.background,
+    borderBottomColor: colors.background,
   },
   trendPeriod: {
     flex: 1,
@@ -105,11 +107,11 @@ export const statsScreenStyles = StyleSheet.create({
   },
   paretoValue: {
     fontSize: 12,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
   },
   paretoBarContainer: {
     height: 16,
-    backgroundColor: theme.colors.semantic.chart.barBg,
+    backgroundColor: colors.semantic.chart.barBg,
     borderRadius: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
@@ -123,23 +125,23 @@ export const statsScreenStyles = StyleSheet.create({
     position: 'absolute',
     right: spacing.sm,
     fontWeight: '700',
-    color: theme.colors.text.main,
+    color: colors.text.main,
   },
   noDataText: {
     fontSize: 12,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
   },
   receiptPreviewCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   receiptImage: {
     width: '100%',
     height: 160,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   receiptInfoOverlay: {
     padding: spacing.md,
@@ -150,23 +152,23 @@ export const statsScreenStyles = StyleSheet.create({
   },
   receiptStoreName: {
     fontWeight: '700',
-    color: theme.colors.text.main,
+    color: colors.text.main,
   },
   receiptAmount: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: colors.primary,
     minWidth: 80,
     textAlign: 'right',
   },
   taxSubText: {
     fontSize: 11,
-    color: theme.colors.text.muted,
+    color: colors.text.muted,
     marginTop: 2,
   },
   noImageBox: {
     height: 100,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
