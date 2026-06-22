@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
   ScrollView,
 } from 'react-native';
 import { AppBackButton } from '../components/ui';
-import { theme, tableStyles } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { borderRadius } from '../theme/radii';
+import { shadows } from '../theme/shadows';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
+import { tableStyles } from '../theme/tableStyles';
 import { adminApi, type AdminCostStatRow } from '../api';
 import { getApiErrorMessage } from '../utils/apiError';
 
@@ -15,11 +21,13 @@ interface AdminStatsScreenProps {
   onBack: () => void;
 }
 
+const adm = colors.semantic.admin;
+
 export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminCostStatRow[]>([]);
   const [totalCost, setTotalCost] = useState(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // ★ 追加: エラー状態管理
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -42,22 +50,21 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[screenLayout.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[screenLayout.container, styles.containerAdmin]}>
+      <View style={[screenLayout.header, styles.headerAdmin]}>
         <AppBackButton onPress={onBack} />
-        <Text style={styles.headerTitle}>AIコスト統計</Text>
+        <Text style={screenLayout.headerTitle}>AIコスト統計</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* ★ エラーが存在する場合は赤帯のコンテナを表示して処理をブロック */}
+      <ScrollView contentContainerStyle={[screenLayout.scrollContent, styles.content]}>
         {errorMsg ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorTitle}>アクセス権限エラー</Text>
@@ -65,40 +72,42 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
           </View>
         ) : (
           <>
-            <View style={styles.summaryCard}>
+            <View style={[cardStyles.summaryCard, styles.primarySummaryCard]}>
               <Text style={styles.summaryLabel}>累計利用コスト (概算)</Text>
               <Text style={styles.summaryAmount}>¥{totalCost.toFixed(2)}</Text>
               <Text style={styles.summaryNote}>※為替レート150円/$、Gemini 2.0 Flashでの算出</Text>
             </View>
 
-            <View style={tableStyles.wrapper}>
-              <View style={[tableStyles.row, tableStyles.headerRow]}>
-                <Text style={[tableStyles.cell, styles.colMonth, tableStyles.headerText]}>年月</Text>
-                <Text style={[tableStyles.cell, styles.colTokens, tableStyles.headerText]}>In / Out (Tokens)</Text>
-                <Text style={[tableStyles.cell, styles.colCost, tableStyles.headerText]}>概算(円)</Text>
-              </View>
-
-              {stats.length === 0 ? (
-                <View style={[tableStyles.row, styles.emptyRow]}>
-                  <Text style={[tableStyles.cell, tableStyles.bodyText]}>データがありません</Text>
+            <View style={cardStyles.section}>
+              <View style={tableStyles.wrapper}>
+                <View style={[tableStyles.row, tableStyles.headerRow]}>
+                  <Text style={[tableStyles.cell, styles.colMonth, tableStyles.headerText]}>年月</Text>
+                  <Text style={[tableStyles.cell, styles.colTokens, tableStyles.headerText]}>In / Out (Tokens)</Text>
+                  <Text style={[tableStyles.cell, styles.colCost, tableStyles.headerText]}>概算(円)</Text>
                 </View>
-              ) : (
-                stats.map((item, index) => (
-                  <View key={`${item.month}-${item.modelId}-${index}`} style={tableStyles.row}>
-                    <View style={[tableStyles.cell, styles.colMonth]}>
-                      <Text style={tableStyles.bodyText}>{item.month}</Text>
-                      <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
-                    </View>
-                    <View style={[tableStyles.cell, styles.colTokens]}>
-                      <Text style={tableStyles.bodyText}>{item.totalPromptTokens.toLocaleString()}</Text>
-                      <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
-                    </View>
-                    <Text style={[tableStyles.cell, styles.colCost, tableStyles.bodyText, tableStyles.boldText]}>
-                      ¥{item.estimatedCostJpy.toFixed(2)}
-                    </Text>
+
+                {stats.length === 0 ? (
+                  <View style={[tableStyles.row, styles.emptyRow]}>
+                    <Text style={[tableStyles.cell, tableStyles.bodyText]}>データがありません</Text>
                   </View>
-                ))
-              )}
+                ) : (
+                  stats.map((item, index) => (
+                    <View key={`${item.month}-${item.modelId}-${index}`} style={tableStyles.row}>
+                      <View style={[tableStyles.cell, styles.colMonth]}>
+                        <Text style={tableStyles.bodyText}>{item.month}</Text>
+                        <Text style={styles.cellSubText} numberOfLines={1}>{item.modelId}</Text>
+                      </View>
+                      <View style={[tableStyles.cell, styles.colTokens]}>
+                        <Text style={tableStyles.bodyText}>{item.totalPromptTokens.toLocaleString()}</Text>
+                        <Text style={styles.cellSubText}>{item.totalCandidatesTokens.toLocaleString()}</Text>
+                      </View>
+                      <Text style={[tableStyles.cell, styles.colCost, tableStyles.bodyText, tableStyles.boldText]}>
+                        ¥{item.estimatedCostJpy.toFixed(2)}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
             </View>
           </>
         )}
@@ -107,32 +116,18 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
   );
 };
 
-const adm = theme.colors.semantic.admin;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: adm.background },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: adm.surface,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: adm.border,
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text.main },
-  content: { padding: 16, paddingBottom: 40 },
-  
+  containerAdmin: { backgroundColor: adm.background },
+  loadingContainer: { justifyContent: 'center', alignItems: 'center' },
+  headerAdmin: { backgroundColor: adm.surface, borderBottomColor: adm.border },
+  content: { paddingBottom: 40 },
   errorContainer: {
     backgroundColor: adm.errorBg,
-    padding: 16,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: adm.errorBorder,
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   errorTitle: {
     color: adm.errorText,
@@ -144,20 +139,17 @@ const styles = StyleSheet.create({
     color: adm.errorText,
     fontSize: 14,
   },
-
-  summaryCard: {
-    backgroundColor: theme.colors.primary,
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 24,
-    ...theme.shadows.md,
+  primarySummaryCard: {
+    backgroundColor: colors.primary,
+    alignItems: 'flex-start',
+    ...shadows.md,
   },
-  summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
-  summaryAmount: { color: theme.colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
-  summaryNote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 8 },
+  summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: spacing.sm },
+  summaryAmount: { color: colors.text.inverse, fontSize: 36, fontWeight: 'bold' },
+  summaryNote: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: spacing.sm },
   colMonth: { flex: 1.5 },
   colTokens: { flex: 2 },
   colCost: { flex: 1.5, textAlign: 'right' },
-  cellSubText: { fontSize: 12, color: theme.colors.text.muted, marginTop: 4 },
-  emptyRow: { justifyContent: 'center', paddingVertical: 24 },
+  cellSubText: { fontSize: 12, color: colors.text.muted, marginTop: 4 },
+  emptyRow: { justifyContent: 'center', paddingVertical: spacing.lg },
 });

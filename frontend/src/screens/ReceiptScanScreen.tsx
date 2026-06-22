@@ -13,17 +13,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { receiptApi } from '../api/receiptApi';
 import { AppBackButton, AppButton, AppFormField, AppSelect, AppTextInput } from '../components/ui';
-import { modalStyles } from '../theme';
+import { modalStyles } from '../theme/modalStyles';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { borderRadius } from '../theme/radii';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
-import { theme } from '../theme';
 import { useReceiptImageSource } from '../utils/receiptImageSource';
 import { showAlert } from '../utils/alertMessage';
 import { getApiErrorMessage, getApiErrorResponseData } from '../utils/apiError';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
 import type { ParsedReceiptItemInput } from '../types/receipt';
 
-const c = theme.colors;
-const s = theme.colors.semantic.scan;
+const c = colors;
+const s = colors.semantic.scan;
 
 interface ReceiptScanScreenProps {
   initialData: ReceiptScanInitialData;
@@ -133,11 +137,11 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[screenLayout.container, styles.containerScan]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <View style={styles.header}>
+        <View style={[screenLayout.header, styles.headerScan]}>
           <AppBackButton onPress={onCancel} style={styles.headerBack} />
-          <Text style={styles.headerTitle}>解析結果の確認</Text>
+          <Text style={[screenLayout.headerTitle, styles.headerTitleScan]}>解析結果の確認</Text>
           <AppButton
             title={BUTTON_LABELS.save}
             onPress={handleCommit}
@@ -168,7 +172,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
             </View>
           )}
 
-          <View style={styles.card}>
+          <View style={[cardStyles.chartCard, styles.card]}>
             <Text style={styles.sectionLabel}>基本情報</Text>
             <AppFormField label="店舗名">
               <AppTextInput
@@ -214,7 +218,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
           </View>
 
           {receiptData.items.map((item, idx) => (
-            <View key={idx} style={styles.itemCard}>
+            <View key={idx} style={[cardStyles.chartCard, styles.itemCard]}>
               <View style={styles.itemHeaderRow}>
                 <AppTextInput
                   style={styles.itemNameInput}
@@ -270,51 +274,51 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: s.background },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: c.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: s.borderLight,
-  },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: s.textTitle },
+  containerScan: { backgroundColor: s.background },
+  headerScan: { backgroundColor: c.surface, borderBottomColor: s.borderLight },
+  headerTitleScan: { fontSize: 17, color: s.textTitle },
   headerBack: { minWidth: 50 },
   duplicateBanner: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.semantic.warning.bg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.semantic.warning.bg,
     borderWidth: 1,
-    borderColor: theme.colors.semantic.warning.border,
+    borderColor: colors.semantic.warning.border,
   },
   duplicateBannerTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.semantic.warning.text,
+    color: colors.semantic.warning.text,
     marginBottom: 4,
   },
   duplicateBannerText: {
     fontSize: 13,
-    color: theme.colors.semantic.warning.text,
+    color: colors.semantic.warning.text,
     lineHeight: 20,
   },
   scrollView: { flex: 1 },
-  imageContainer: { width: '100%', height: 260, backgroundColor: s.imageBg, marginBottom: theme.spacing.md, position: 'relative' },
+  imageContainer: { width: '100%', height: 260, backgroundColor: s.imageBg, marginBottom: spacing.md, position: 'relative' },
   receiptImage: { width: '100%', height: '100%' },
-  imageLabel: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.borderRadius.sm },
+  imageLabel: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: borderRadius.sm },
   imageLabelText: { color: c.text.inverse, fontSize: 10, fontWeight: 'bold' },
-  card: { backgroundColor: c.surface, margin: theme.spacing.md, marginTop: 0, borderRadius: theme.spacing.md, padding: theme.spacing.md, elevation: 2 },
+  card: { minHeight: undefined, alignItems: 'stretch', margin: spacing.md, marginTop: 0, elevation: 2 },
   sectionLabel: { fontSize: 12, fontWeight: 'bold', color: s.textMuted, textTransform: 'uppercase', marginBottom: 12 },
-  totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: theme.spacing.md, borderTopWidth: 1, borderTopColor: s.borderInput },
+  totalDisplay: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: s.borderInput },
   totalLabel: { fontSize: 14, color: s.textSecondary },
   totalValue: { fontSize: 24, fontWeight: 'bold', color: c.primary },
-  itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: theme.spacing.md, marginBottom: 12 },
-  itemCard: { backgroundColor: c.surface, marginHorizontal: theme.spacing.md, marginBottom: 12, borderRadius: theme.spacing.md, padding: theme.spacing.md, borderLeftWidth: 4, borderLeftColor: c.primary, elevation: 1 },
+  itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.md, marginBottom: 12 },
+  itemCard: {
+    minHeight: undefined,
+    alignItems: 'stretch',
+    marginHorizontal: spacing.md,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: c.primary,
+    elevation: 1,
+  },
   itemHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   itemNameInput: { flex: 1, marginRight: 8 },
   deleteIcon: { fontSize: 18, color: s.deleteIcon },

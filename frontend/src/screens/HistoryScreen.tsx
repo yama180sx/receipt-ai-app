@@ -13,7 +13,10 @@ import { categoryApi, receiptApi } from '../api';
 import { getRecentYearMonths, useMonthSelectOptions } from '../utils/monthSelectOptions';
 // Issue #66: BREAKPOINTS 参照
 import { AppBackButton, AppModal, AppSelect } from '../components/ui';
-import { theme } from '../theme';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { cardStyles } from '../theme/cardStyles';
+import { screenLayout } from '../theme/screenLayout';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 import type { CategorySummary, ReceiptDetail } from '../types/receipt';
@@ -152,7 +155,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
 
     return (
       <TouchableOpacity 
-        style={[styles.card, isSelected && isWide && styles.activeCard]} 
+        style={[cardStyles.listCard, styles.listCardExtra, isSelected && isWide && styles.activeCard]} 
         onPress={() => setSelectedReceipt(item)}
         activeOpacity={0.7}
       >
@@ -160,7 +163,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
           <Text style={styles.date}>
             {item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '日付不明'}
           </Text>
-          <Text style={[styles.store, isSelected && isWide && { color: theme.colors.primary }]} numberOfLines={1}>
+          <Text style={[styles.store, isSelected && isWide && { color: colors.primary }]} numberOfLines={1}>
             {item.storeName || '店名不明'}
           </Text>
         </View>
@@ -177,11 +180,11 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenLayout.container}>
       <View style={styles.mainWrapper}>
-        <View style={styles.header}>
+        <View style={screenLayout.header}>
           <AppBackButton onPress={onBack} />
-          <Text style={styles.title}>レシート履歴</Text>
+          <Text style={screenLayout.headerTitle}>レシート履歴</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -210,7 +213,7 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
           <View style={isWide ? styles.masterPane : styles.fullPane}>
             {loading ? (
               <View style={styles.centerLoading}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : (
               <FlatList
@@ -271,31 +274,28 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
   mainWrapper: { flex: 1, width: '100%', alignSelf: 'stretch', paddingTop: Platform.OS === 'ios' ? 60 : 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
-  title: { ...theme.typography.h2, color: theme.colors.text.main },
-  filterContainer: { paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.md, gap: 8 },
+  filterContainer: { paddingHorizontal: spacing.md, marginBottom: spacing.md, gap: 8 },
   filterContainerMobile: { flexDirection: 'column' },
   filterContainerWide: { flexDirection: 'row', justifyContent: 'flex-start' },
   filterSelectWrap: { width: '100%', justifyContent: 'center' },
   filterSelectWrapWide: { flex: 1, width: undefined, minWidth: 160, maxWidth: 220 },
   mainContentMobile: { flex: 1 },
-  mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.colors.border },
-  masterPane: { width: 350, height: '100%', backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border },
+  mainContentWide: { flex: 1, flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border },
+  masterPane: { width: 350, height: '100%', backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border },
   fullPane: { flex: 1 },
-  detailPane: { flex: 1, height: '100%', backgroundColor: theme.colors.background },
-  list: { padding: theme.spacing.md },
-  card: { backgroundColor: theme.colors.surface, borderRadius: 12, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border },
-  activeCard: { borderColor: theme.colors.primary, backgroundColor: theme.colors.semantic.active.bg, elevation: 0 },
+  detailPane: { flex: 1, height: '100%', backgroundColor: colors.background },
+  list: { padding: spacing.md },
+  listCardExtra: { marginBottom: 10 },
+  activeCard: { borderColor: colors.primary, backgroundColor: colors.semantic.active.bg, elevation: 0 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  date: { fontSize: 12, color: theme.colors.text.muted },
-  store: { fontWeight: '700', color: theme.colors.text.main, flex: 1, marginLeft: 10, textAlign: 'right' },
+  date: { fontSize: 12, color: colors.text.muted },
+  store: { fontWeight: '700', color: colors.text.main, flex: 1, marginLeft: 10, textAlign: 'right' },
   cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  amount: { fontSize: 18, fontWeight: 'bold', color: theme.colors.primary },
-  itemCountBadge: { backgroundColor: theme.colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  itemCountText: { fontSize: 10, color: theme.colors.secondary },
-  empty: { textAlign: 'center', marginTop: 50, color: theme.colors.text.muted },
+  amount: { fontSize: 18, fontWeight: 'bold', color: colors.primary },
+  itemCountBadge: { backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  itemCountText: { fontSize: 10, color: colors.secondary },
+  empty: { textAlign: 'center', marginTop: 50, color: colors.text.muted },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+  emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

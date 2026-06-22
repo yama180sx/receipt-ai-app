@@ -37,4 +37,17 @@ export const cardStyles = StyleSheet.create({
     minHeight: 220,
     justifyContent: 'center',
   },
+  /** 一覧行用 — chartCard と異なり minHeight なし */
+  listCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...Platform.select({
+      web: { paddingVertical: spacing.sm },
+      default: {},
+    }),
+  },
 });
