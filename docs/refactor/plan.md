@@ -223,3 +223,83 @@ Epic: [#423 Epic #100](https://github.com/yama180sx/receipt-ai-app/issues/423)
 
 （#98-8 と並行: #393, #394, #397, #399, #400, #401）
 ```
+
+## 8. Epic #101 — ChatGPT レビュー 20260622 フォローアップ（Phase 4）
+
+Epic: [#459 Epic #101](https://github.com/yama180sx/receipt-ai-app/issues/459)
+
+[ChatGPT レビュー 20260622](../specs/chatgpt/ChatGPT_レビュー_20260622.txt)（**79/100点**）のフォローアップ。Epic #100 完了後も残る **画面肥大・画像処理/UI 混在・backend any 残存・API エラー処理散在** を解消し、AI 駆動開発向けの **フロント実装規約** も整備する。
+
+### 8.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | ChatGPT レビュー 20260622 + コード突合 + Epic #99 / #100 成功パターン |
+| FE 方針 | Screen = hook + 子コンポーネント（**150行以内**）。#387 / #431 と同型 |
+| BE 方針 | 残存 `any` / `as any` を Express 型拡張・`unknown` で撲滅（局所修正） |
+| エラー方針 | FE: `getApiErrorMessage` / `showApiErrorAlert` に統一。BE: #101-3 は middleware 層中心 |
+| AI 駆動 | #101-7 で規約 + プロンプトテンプレートを正本化し、以降の実装 Issue で参照 |
+| スコープ外 | React Hook Form、Context 新規追加、big-bang 一括 PR |
+
+### 8.2 レビュー減点と対応マッピング
+
+| 観点 | 点数 | 主な対応 Issue |
+|------|------|----------------|
+| DRY / 共通化 | 18/25 | #101-6 |
+| 責務分割 | 20/25 | #101-1, #101-2, #101-4, #101-5 |
+| 型定義 | 22/25 | #101-3 |
+| 保守性 | 19/25 | #101-7 + 上記 |
+
+### 8.3 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #101 Epic | [#459](https://github.com/yama180sx/receipt-ai-app/issues/459) | — | — |
+| #101-0 | [#460](https://github.com/yama180sx/receipt-ai-app/issues/460) | Must | 0.5 人日 |
+| #101-1 | [#465](https://github.com/yama180sx/receipt-ai-app/issues/465) | Must | 1 人日 |
+| #101-2 | [#466](https://github.com/yama180sx/receipt-ai-app/issues/466) | Must | 1 人日 |
+| #101-3 | [#467](https://github.com/yama180sx/receipt-ai-app/issues/467) | Must | 0.5〜1 人日 |
+| #101-4 | [#462](https://github.com/yama180sx/receipt-ai-app/issues/462) | Should | 1 人日 |
+| #101-5 | [#463](https://github.com/yama180sx/receipt-ai-app/issues/463) | Should | 1 人日 |
+| #101-6 | [#464](https://github.com/yama180sx/receipt-ai-app/issues/464) | Should | 0.5〜1 人日 |
+| #101-7 | [#461](https://github.com/yama180sx/receipt-ai-app/issues/461) | Must | 0.5 人日 |
+
+### 8.4 #100 との関係（重複しないスコープ）
+
+| #100 で実施済み | #101 で追加する理由 |
+|----------------|---------------------|
+| Login / Home / Statistics 等の Screen 分解 | **PromptEditorScreen**（355行）・**ReceiptImageCropModal**（287行）・**SplitEditorItemTable**（292行）が未対応 |
+| BE Repository / authService 本実装 | middleware 層の残存 `any`（`authMiddleware` / `validate` 等）が未対応 |
+| `getApiErrorMessage` 導入・Alert 統一 | Hook 層での `console.error` + 固定メッセージが残存（ProductMaster 等） |
+| architecture.md as-built（#100-15） | AI 駆動向け **実装規約・プロンプトテンプレート** は未整備 |
+
+**重複しないことの確認**: #101 は #100 で触っていないファイル・運用ルールに限定する。層境界の全面整理（Mapper / OpenAPI drift CI）は **Epic #102 / #103**（Phase 5）へ委譲。
+
+### 8.5 Won't fix / Later（記録）
+
+| 項目 | 判定 | 対応 |
+|------|------|------|
+| React Hook Form 導入 | **Won't fix** | hook 分割で十分（#101-1） |
+| Context 新規追加 | **Won't fix** | #101-7 で既存 Context のみと明文化 |
+| frontend/backend 型の完全共有（C-2） | **Later → Epic #102** | [#468](https://github.com/yama180sx/receipt-ai-app/issues/468) |
+| API 層 DTO / 変換 / エラー完全分離（C-4） | **Later → Epic #103** | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) |
+
+### 8.6 推奨着手順
+
+```
+#460（#101-0 plan）→ #461（#101-7 規約）→ #465 → #466 → #467
+  → #462 / #463（並行可）→ #464
+  → Epic #102 / #103（#101 完了後）
+```
+
+**Screen 分解の参考パターン**: Epic #99 [#387](https://github.com/yama180sx/receipt-ai-app/issues/387)（SplitEditorScreen 588→146行）、Epic #100 [#431](https://github.com/yama180sx/receipt-ai-app/issues/431)（LoginScreen + useLoginFlow）。
+
+### 8.7 後続 Epic（Phase 5、本 Epic スコープ外）
+
+| Epic | GitHub | テーマ |
+|------|--------|--------|
+| #102 | [#468](https://github.com/yama180sx/receipt-ai-app/issues/468) | API 契約型 SSOT（OpenAPI drift CI、FE/BE 型整合） |
+| #103 | [#469](https://github.com/yama180sx/receipt-ai-app/issues/469) | Backend 層境界（Response Mapper、errorHandler 一本化） |
+
+詳細は各 Epic の #102-0 / #103-0（plan 追記 Issue）で正本化する。
+
