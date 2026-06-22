@@ -73,10 +73,11 @@ export type SettlementTransferRecord = {
   fromMemberId: number;
   toMemberId: number;
   amount: number;
+  month: string;
   settledAt: Date;
 };
 
-export type SettlementStatusData = {
+export type SettlementStatusDomain = {
   month: string;
   members: ReturnType<typeof computeSettlementMemberSummaries>;
   transfers: SettlementTransferRecord[];
@@ -86,7 +87,7 @@ export type SettlementStatusData = {
 export async function getSettlementStatusData(
   ctx: TenantContext,
   month?: string
-): Promise<SettlementStatusData> {
+): Promise<SettlementStatusDomain> {
   const { familyGroupId } = ctx;
   const targetMonth = normalizeYearMonth(month) ?? getCurrentYearMonthLocal();
   const { start: startDate, end: endDate } = getLocalMonthDateRange(targetMonth);

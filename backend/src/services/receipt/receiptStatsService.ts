@@ -15,10 +15,7 @@ export async function getMonthlyStats(familyGroupId: number, month: string) {
   return {
     month,
     totalAmount,
-    stats: categoryStats.map((s) => ({
-      ...s,
-      categoryName: s.categoryName || '未分類',
-    })),
+    stats: categoryStats,
     latestReceipt,
   };
 }
