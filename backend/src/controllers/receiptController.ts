@@ -9,8 +9,20 @@ import {
 } from '../services/receiptJobService';
 import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
+import { sendMessage, sendSuccess } from '../utils/sendApiResponse';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
-import type { ReceiptJobStatus } from '../types/apiSchemas';
+import {
+  mapAdvancedStatsToApi,
+  mapCategoriesToSummary,
+  mapFamilyMembersToSummary,
+  mapItemSplitsUpdateResult,
+  mapJobToStatus,
+  mapMonthlyStatsToApi,
+  mapReceiptItemToDetail,
+  mapReceiptList,
+  mapReceiptToDetail,
+  mapUploadJobResponse,
+} from '../mappers/receiptMapper';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
 import { createManualReceipt } from '../services/receipt/receiptUpdateService';
 import {
@@ -39,18 +51,13 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
     }
 
     const state = await job.getState();
-    let data: ReceiptJobStatus = {
-      id: String(job.id),
-      state,
-      result:
-        job.returnvalue && typeof job.returnvalue === 'object'
-          ? (job.returnvalue as Record<string, unknown>)
-          : undefined,
-      error: job.failedReason ?? undefined,
-    };
-    data = await enrichCompletedJobPayload(job, familyGroupId, data);
+    const data = await enrichCompletedJobPayload(
+      job,
+      familyGroupId,
+      mapJobToStatus(job, state)
+    );
 
-    res.status(200).json({ success: true, data });
+    sendSuccess(res, data);
   } catch (error) {
     next(error);
   }
@@ -60,7 +67,7 @@ export const getReceiptJobs = async (_req: Request, res: Response, next: NextFun
   try {
     const ctx = requireTenantContext();
     const jobs = await listReceiptJobsForMember(ctx.familyGroupId, ctx.memberId);
-    res.status(200).json({ success: true, data: jobs });
+    sendSuccess(res, jobs);
   } catch (error) {
     next(error);
   }
@@ -70,7 +77,7 @@ export const discardReceiptJob = async (req: Request<{ jobId: string }>, res: Re
   try {
     const ctx = requireTenantContext();
     await discardReceiptJobForMember(getRouteParam(req, 'jobId'), ctx.familyGroupId, ctx.memberId);
-    res.status(200).json({ success: true, message: 'Discarded' });
+    sendMessage(res, 'Discarded');
   } catch (error) {
     next(error);
   }
@@ -80,7 +87,7 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
   try {
     const { familyGroupId } = requireTenantContext();
     const categories = await findCategoriesByFamilyGroup(familyGroupId);
-    res.json({ success: true, data: categories });
+    sendSuccess(res, mapCategoriesToSummary(categories));
   } catch (error) {
     next(error);
   }
@@ -99,7 +106,7 @@ export const uploadReceipt = async (req: Request, res: Response, next: NextFunct
       imagePath,
     });
 
-    res.status(202).json({ success: true, data: { jobId: job.id } });
+    sendSuccess(res, mapUploadJobResponse(job.id), 202);
   } catch (error) {
     next(error);
   }
@@ -121,7 +128,7 @@ export const commitReceipt = async (req: Request, res: Response, next: NextFunct
       jobId,
     });
 
-    res.status(201).json({ success: true, data: result });
+    sendSuccess(res, mapReceiptToDetail(result), 201);
   } catch (error) {
     next(error);
   }
@@ -139,7 +146,7 @@ export const createReceipt = async (req: Request, res: Response, next: NextFunct
       imagePath,
     });
 
-    res.status(201).json({ success: true, data: newReceipt });
+    sendSuccess(res, mapReceiptToDetail(newReceipt)!, 201);
   } catch (error) {
     next(error);
   }
@@ -157,7 +164,7 @@ export const updateReceipt = async (req: Request, res: Response, next: NextFunct
       items: items as ReceiptCreateItemInput[],
     });
 
-    res.json({ success: true, data: result });
+    sendSuccess(res, mapReceiptToDetail(result)!);
   } catch (error) {
     next(error);
   }
@@ -170,7 +177,7 @@ export const updateItemCategory = async (req: Request, res: Response, next: Next
     const { categoryId } = req.body;
 
     const result = await updateItemCategoryById(Number(id), familyGroupId, categoryId);
-    res.json({ success: true, data: result });
+    sendSuccess(res, mapReceiptItemToDetail(result));
   } catch (error) {
     next(error);
   }
@@ -185,7 +192,7 @@ export const getReceipts = async (req: Request, res: Response, next: NextFunctio
       memberId: typeof memberId === 'string' ? memberId : undefined,
       month: typeof month === 'string' ? month : undefined,
     });
-    res.json({ success: true, data: receipts });
+    sendSuccess(res, mapReceiptList(receipts));
   } catch (error) {
     next(error);
   }
@@ -195,7 +202,7 @@ export const getLatestReceipt = async (_req: Request, res: Response, next: NextF
   try {
     const { familyGroupId } = requireTenantContext();
     const receipt = await fetchLatestReceipt(familyGroupId);
-    res.json({ success: true, data: receipt });
+    sendSuccess(res, mapReceiptToDetail(receipt));
   } catch (error) {
     next(error);
   }
@@ -205,7 +212,7 @@ export const deleteReceipt = async (req: Request, res: Response, next: NextFunct
   try {
     const { familyGroupId } = requireTenantContext();
     await deleteReceiptById(Number(getRouteParam(req, 'id')), familyGroupId);
-    res.json({ success: true, message: 'Deleted' });
+    sendMessage(res, 'Deleted');
   } catch (error) {
     next(error);
   }
@@ -216,7 +223,7 @@ export const getMonthlyStats = async (req: Request, res: Response, next: NextFun
     const { familyGroupId } = requireTenantContext();
     const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
     const data = await fetchMonthlyStats(familyGroupId, month);
-    res.json({ success: true, data });
+    sendSuccess(res, mapMonthlyStatsToApi(data));
   } catch (error) {
     next(error);
   }
@@ -226,7 +233,7 @@ export const getAdvancedStats = async (_req: Request, res: Response, next: NextF
   try {
     const { familyGroupId } = requireTenantContext();
     const data = await fetchAdvancedStats(familyGroupId);
-    res.json({ success: true, data });
+    sendSuccess(res, mapAdvancedStatsToApi(data));
   } catch (error) {
     next(error);
   }
@@ -236,7 +243,7 @@ export const getFamilyMembers = async (_req: Request, res: Response, next: NextF
   try {
     const { familyGroupId } = requireTenantContext();
     const members = await listFamilyMembers(familyGroupId);
-    res.json({ success: true, data: members });
+    sendSuccess(res, mapFamilyMembersToSummary(members));
   } catch (error) {
     next(error);
   }
@@ -254,7 +261,7 @@ export const updateItemSplits = async (req: Request, res: Response, next: NextFu
       splits as SplitInput[] | undefined
     );
 
-    res.json({ success: true, data: result });
+    sendSuccess(res, mapItemSplitsUpdateResult(result));
   } catch (error) {
     next(error);
   }
