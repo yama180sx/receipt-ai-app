@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import { productMasterApi, type ProductMaster } from '../api';
 import { showAlert } from '../utils/alertMessage';
+import { showApiErrorAlert } from '../utils/apiError';
 import { showConfirmDialog } from '../utils/confirmDialog';
 import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
@@ -32,7 +33,7 @@ export const ProductMasterScreen = ({
       });
       setMasters(res.data ?? []);
     } catch (err) {
-      console.error('Fetch Masters Error:', err);
+      showApiErrorAlert('エラー', err, '学習マスタの取得に失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -54,8 +55,8 @@ export const ProductMasterScreen = ({
           try {
             await productMasterApi.deleteProductMaster(id);
             fetchMasters();
-          } catch {
-            showAlert('エラー', '削除に失敗しました');
+          } catch (err) {
+            showApiErrorAlert('エラー', err, '削除に失敗しました。');
           }
         },
       },
@@ -88,8 +89,8 @@ export const ProductMasterScreen = ({
                         });
                         showAlert('完了', '統合完了しました');
                         fetchMasters();
-                      } catch {
-                        showAlert('エラー', '統合失敗');
+                      } catch (err) {
+                        showApiErrorAlert('エラー', err, '統合に失敗しました。');
                       }
                     },
                   },

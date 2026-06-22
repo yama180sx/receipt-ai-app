@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { showAlert } from './alertMessage';
 
 function readStringField(data: unknown, key: 'error' | 'message'): string | undefined {
   if (!data || typeof data !== 'object') return undefined;
@@ -39,4 +40,14 @@ export function getApiErrorMessage(
   }
 
   return fallback;
+}
+
+/** API エラーをログ出力し、抽出メッセージでユーザーに通知する */
+export function showApiErrorAlert(
+  title: string,
+  error: unknown,
+  fallback = '通信エラーが発生しました。'
+): void {
+  console.error(`[API Error] ${title}:`, error);
+  showAlert(title, getApiErrorMessage(error, fallback));
 }

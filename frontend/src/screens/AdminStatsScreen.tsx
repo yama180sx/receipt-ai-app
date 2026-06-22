@@ -41,7 +41,6 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
       const total = rows.reduce((sum, item) => sum + item.estimatedCostJpy, 0);
       setTotalCost(total);
     } catch (error: unknown) {
-      console.error('Stats Fetch Error:', error);
       setErrorMsg(getApiErrorMessage(error, 'コスト統計の取得に失敗しました。'));
     } finally {
       setLoading(false);

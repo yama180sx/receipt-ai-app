@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { receiptApi } from '../../../api/receiptApi';
+import { showApiErrorAlert } from '../../../utils/apiError';
 import { showAlert } from '../../../utils/alertMessage';
 import {
   buildItemSplitSavePayload,
@@ -53,8 +54,7 @@ export function useSplitEditor(
           setEditSplits(buildInitialSplits(receipt, initialActive));
         }
       } catch (err) {
-        console.error('メンバー取得失敗', err);
-        showAlert('エラー', 'メンバー情報の取得に失敗しました。');
+        showApiErrorAlert('エラー', err, 'メンバー情報の取得に失敗しました。');
       } finally {
         setLoading(false);
       }
@@ -204,8 +204,7 @@ export function useSplitEditor(
       await Promise.all(savePromises);
       showAlert('保存完了', '割り勘設定を保存しました。', { onOk: onBack });
     } catch (err) {
-      console.error('保存エラー', err);
-      showAlert('エラー', '保存に失敗しました。');
+      showApiErrorAlert('エラー', err, '保存に失敗しました。');
     } finally {
       setSaving(false);
     }
