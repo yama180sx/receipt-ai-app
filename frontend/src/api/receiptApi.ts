@@ -1,10 +1,10 @@
 import apiClient from '../utils/apiClient';
 import type { ParsedReceiptData } from '../types/receipt';
-import type { ItemSplitSavePayload } from '../types/settlement';
 import type {
   ApiMessageResponse,
   ApiSuccessResponse,
   FamilyMemberSummary,
+  ItemSplitInput,
   ItemSplitSummary,
   ReceiptDetail,
   ReceiptItemDetail,
@@ -22,10 +22,6 @@ export type CommitReceiptPayload = {
   parsedData: ParsedReceiptData & { totalAmount: number; taxAmount: number };
   imagePath: string;
   validation: { isSuspicious: boolean; warnings: string[] };
-};
-
-export type ItemSplitSaveRequest = ItemSplitSavePayload & {
-  ratio?: number;
 };
 
 export type ReceiptJobStatusResponse = ApiSuccessResponse<ReceiptJobStatus>;
@@ -95,7 +91,7 @@ export const receiptApi = {
 
   async saveItemSplits(
     itemId: number,
-    splits: ItemSplitSaveRequest[]
+    splits: ItemSplitInput[]
   ): Promise<ApiSuccessResponse<ItemSplitSummary[] | { message: string }>> {
     const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
     return res.data;

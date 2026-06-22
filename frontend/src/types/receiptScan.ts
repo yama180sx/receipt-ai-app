@@ -1,5 +1,24 @@
+/**
+ * レシートスキャン（解析結果確認）型
+ *
+ * - ViewModel のみ（OpenAPI 非該当）
+ * - 入力の ReceiptJobStatus（DTO）は api/generated を使用
+ */
+
+import type { ReceiptJobStatus } from '../api/generated';
 import type { ParsedReceiptData } from './receipt';
 
+/** 解析完了ジョブの result 内部 shape（ViewModel — OpenAPI result は汎用 object） */
+export type ReceiptJobCompletedResult = {
+  parsedData?: ParsedReceiptData;
+  imagePath?: string;
+  validation?: {
+    isSuspicious: boolean;
+    warnings: string[];
+  };
+};
+
+/** スキャン画面の初期データ（ViewModel） */
 export type ReceiptScanInitialData = {
   parsedData: ParsedReceiptData;
   imagePath: string;
@@ -13,29 +32,26 @@ export type ReceiptScanInitialData = {
   warnedDuplicateFromTray?: boolean;
 };
 
-type JobStatusResponse = {
-  state: string;
-  result?: {
-    parsedData?: ParsedReceiptData;
-    imagePath?: string;
-    validation?: ReceiptScanInitialData['validation'];
-  };
-  duplicateSuspected?: boolean;
-  existingReceiptId?: number | null;
-};
+function parseJobResult(
+  result: ReceiptJobStatus['result']
+): ReceiptJobCompletedResult | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  return result as ReceiptJobCompletedResult;
+}
 
 export function buildScanInitialDataFromJobStatus(
   jobId: string,
-  payload: JobStatusResponse
+  payload: ReceiptJobStatus
 ): ReceiptScanInitialData | null {
-  if (payload.state !== 'completed' || !payload.result?.parsedData || !payload.result.imagePath) {
+  const result = parseJobResult(payload.result);
+  if (payload.state !== 'completed' || !result?.parsedData || !result.imagePath) {
     return null;
   }
 
   return {
-    parsedData: payload.result.parsedData,
-    imagePath: payload.result.imagePath,
-    validation: payload.result.validation ?? { isSuspicious: false, warnings: [] },
+    parsedData: result.parsedData,
+    imagePath: result.imagePath,
+    validation: result.validation ?? { isSuspicious: false, warnings: [] },
     jobId,
     duplicateSuspected: Boolean(payload.duplicateSuspected),
     existingReceiptId: payload.existingReceiptId ?? null,
