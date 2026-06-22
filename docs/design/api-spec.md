@@ -1,8 +1,8 @@
 # API 仕様書（As-built）
 
 Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)  
-子 Issue: [#294 Issue #90-3](https://github.com/yama180sx/receipt-ai-app/issues/294)  
-計画: [plan.md](./plan.md)
+子 Issue: [#294 Issue #90-3](https://github.com/yama180sx/receipt-ai-app/issues/294) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474)  
+計画: [plan.md](../refactor/plan.md) §9
 
 本ドキュメントは **実装準拠（as-built）** で記述する。Express ルート・ミドルウェア・コントローラの挙動を正とし、ドメインルールは [domain-model.md](./domain-model.md)（#90-2）を参照する。
 
@@ -12,7 +12,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 |------|------|
 | [architecture.md](./architecture.md) | システム構成・ミドルウェア概要（#90-1） |
 | [domain-model.md](./domain-model.md) | 按分・精算の業務ルール（#90-2） |
-| [plan.md](./plan.md) §8 | API ドキュメント化スコープ（本書で詳細化） |
+| [plan.md](../refactor/plan.md) §9 | Epic #102 API 契約型 SSOT |
 
 ---
 
@@ -661,7 +661,81 @@ npm run test:integration
 
 ---
 
-## 9. 関連資料
+## 9. 新 API 追加手順（Epic #102 / #102-4）
+
+新規エンドポイント追加時は **OpenAPI を先に更新** し、FE/BE の型分散を防ぐ。契約の正本は [../openapi/openapi.yaml](../openapi/openapi.yaml)（[plan.md](../refactor/plan.md) §9）。
+
+### 9.1 原則
+
+| ルール | 内容 |
+|--------|------|
+| OpenAPI first | `docs/openapi/openapi.yaml` に path・request/response schema を先に書く |
+| DTO は generated | FE は `frontend/src/api/generated` を正とする（手動 interface で API レスポンスを再定義しない） |
+| BE は契約に追随 | Controller の JSON 形は OpenAPI schema と一致させる（ドメイン内部型は `backend/src/types/` に残してよい） |
+| drift 検知 | PR で `check:api` と `check:openapi` がグリーンであること |
+
+### 9.2 実装チェックリスト（人間・AI 共通）
+
+```
+1. [ ] docs/openapi/openapi.yaml に paths / components/schemas を追加・更新
+2. [ ] frontend で npm run generate:api を実行し schema.ts を更新
+3. [ ] 必要なら frontend/src/api/generated/index.ts にドメイン別エイリアスを追加
+4. [ ] backend: routes → controller → service を実装（レスポンス envelope は §2.2 準拠）
+5. [ ] frontend: src/api/* ラッパー → features/*/hooks から呼び出し
+6. [ ] ViewModel が必要なら frontend/src/types/ に追加（DTO 重複禁止）
+7. [ ] Mapper が必要なら frontend/src/mappers/ に追加
+8. [ ] 本書（api-spec.md）にエンドポイント説明を as-built 追記
+9. [ ] npm run check:api（frontend）がパス
+10. [ ] npm run check:openapi（backend）がパス
+11. [ ] npm test（frontend / backend）がパス
+```
+
+### 9.3 CI コマンド
+
+| コマンド | 実行場所 | 検証内容 |
+|----------|----------|----------|
+| `npm run generate:api` | `frontend/` | OpenAPI → `api/generated/schema.ts` 再生成 |
+| `npm run check:api` | `frontend/` | 生成物がコミット済みか（OpenAPI 変更の未反映を検知） |
+| `npm run check:openapi` | `backend/` | Express ルートと OpenAPI paths の突合（#102-1） |
+
+いずれも `.github/workflows/test.yml` の PR チェックに含まれる。
+
+### 9.4 型の置き場所（FE / BE）
+
+| 種別 | 正本 | 配置 |
+|------|------|------|
+| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` → FE `api/generated/` |
+| FE ViewModel | 画面・フロー固有 | `frontend/src/types/`（generated の re-export + 拡張のみ） |
+| BE ドメイン型 | Gemini / commit 内部 | `backend/src/types/`（HTTP レスポンス型の二重定義は禁止） |
+
+詳細は [frontend-conventions.md](./frontend-conventions.md) §4.3、[architecture.md](./architecture.md) §4.5 を参照。
+
+### 9.5 AI プロンプト用チェックリスト
+
+```markdown
+## タスク
+{新 API / 既存 API 拡張の概要}
+
+## 契約（必須・OpenAPI first）
+- [ ] docs/openapi/openapi.yaml を先に更新した
+- [ ] npm run generate:api で FE 型を再生成した
+- [ ] FE DTO は api/generated のみ（types/ に API レスポンスの手動 interface を書いていない）
+- [ ] BE レスポンス JSON が OpenAPI schema と一致する
+
+## 実装
+- [ ] backend: routes → controller → service（envelope: success + data）
+- [ ] frontend: api/* ラッパー → features/*/hooks（Screen から api 直 import 禁止）
+- [ ] エラーは showApiErrorAlert / getApiErrorMessage（[frontend-conventions.md](docs/design/frontend-conventions.md)）
+
+## 完了条件
+- [ ] npm run check:api && npm run check:openapi がパス
+- [ ] npm test（frontend / backend）がパス
+- [ ] docs/design/api-spec.md に as-built 追記
+```
+
+---
+
+## 10. 関連資料
 
 - [domain-model.md](./domain-model.md) — 按分・精算ドメイン（#90-2）
 - [architecture.md](./architecture.md) — ミドルウェア・リクエストフロー（#90-1）

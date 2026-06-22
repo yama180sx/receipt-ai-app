@@ -1,7 +1,7 @@
 # アーキテクチャ概要（As-built）
 
-Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459)  
-子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461)  
+Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468)  
+子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474)  
 計画: [plan.md](../refactor/plan.md)
 
 本ドキュメントは **実装準拠（as-built）** で記述する。コード・テスト済み挙動を正とし、詳細なドメイン・API・画面仕様は後続の設計資料を参照する。
@@ -10,7 +10,8 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) /
 |------|------|
 | [database-schema.md](./database-schema.md) | DB 列定義・制約 |
 | [domain-model.md](./domain-model.md) | ドメインモデル・業務ルール（#90-2） |
-| [api-spec.md](./api-spec.md) | API 仕様（#90-3） |
+| [api-spec.md](./api-spec.md) | API 仕様・**新 API 追加手順**（#90-3 / #102-4） |
+| [openapi.yaml](../openapi/openapi.yaml) | API 契約 SSOT（機械可読、#102） |
 | [ai-pipeline.md](./ai-pipeline.md) | 3層正規化・AI パイプライン（#90-4） |
 | [frontend-screens.md](./frontend-screens.md) | 画面遷移・フロント（#90-5） |
 | [frontend-conventions.md](./frontend-conventions.md) | FE 実装規約・AI プロンプト（#101-7） |
@@ -195,6 +196,36 @@ Prisma への直接アクセスは **Repository に集約** する。Service は
 
 テナントスコープは Prisma Client Extension（`$extends`）で Repository 内部から適用する。UseCase 物理層（`usecases/` フォルダ）は設けず、**Service メソッド = Application 操作** とする（[plan.md](../refactor/plan.md) §7）。
 
+### 4.5 API 契約型（OpenAPI SSOT / #102）
+
+Epic [#468 #102](https://github.com/yama180sx/receipt-ai-app/issues/468) に基づき、**公開 API の契約は OpenAPI YAML のみを正本** とする。FE/BE で手動に DTO を二重定義しない。
+
+```mermaid
+flowchart LR
+  OAS[docs/openapi/openapi.yaml]
+  GEN[frontend/api/generated]
+  FET[frontend/types ViewModel]
+  MAP[frontend/mappers]
+  CTRL[backend/controllers]
+  DOM[backend/types Domain]
+
+  OAS -->|openapi-typescript| GEN
+  GEN --> FET
+  GEN --> MAP
+  OAS -.->|整合| CTRL
+  DOM --> CTRL
+```
+
+| 層 | 正本 | 配置 | 備考 |
+|----|------|------|------|
+| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` | FE 型は `npm run generate:api` で生成 |
+| FE ViewModel | 画面固有 | `frontend/src/types/` | generated の re-export + 拡張のみ |
+| FE Mapper | DTO → 表示用 | `frontend/src/mappers/` | — |
+| BE ドメイン型 | 内部モデル | `backend/src/types/` | `ParsedReceipt` 等。HTTP 形は OpenAPI に合わせる |
+| DB | Prisma | `backend/prisma/schema.prisma` | API DTO とは別層 |
+
+**新 API 追加**: [api-spec.md](./api-spec.md) **§9**（チェックリスト・CI コマンド・AI プロンプト）を正本とする。PR では `check:api`（FE generated diff）と `check:openapi`（BE ルート突合）が必須。
+
 ---
 
 ## 5. リクエストフロー
@@ -288,7 +319,7 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 
 **状態管理**: `AppSessionProvider`（`features/app`）+ `ReceiptTrayProvider` + 各 Hook のローカル state。Redux / Zustand は未使用。
 
-**API 接続**: `frontend/src/api/*`（型付きラッパー）→ `apiClient.ts`（認証ヘッダ注入・403 通知）。Screen / Hook から `categoryApi` / `receiptApi` / `statsApi` を直接 import しない（#100-14）。
+**API 接続**: `frontend/src/api/*`（型付きラッパー）→ `apiClient.ts`（認証ヘッダ注入・403 通知）。DTO は [openapi.yaml](../openapi/openapi.yaml) 由来の `api/generated`（[api-spec.md](./api-spec.md) §9）。Screen / Hook から `categoryApi` / `receiptApi` / `statsApi` を直接 import しない（#100-14）。
 
 **Mapper**: API 生レスポンスの画面向け整形は `frontend/src/mappers/`（例: `statsMapper.ts`）。
 
