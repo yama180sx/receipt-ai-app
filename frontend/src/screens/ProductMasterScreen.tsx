@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import { productMasterApi, type ProductMaster } from '../api';
+import { showAlert } from '../utils/alertMessage';
+import { showConfirmDialog } from '../utils/confirmDialog';
 import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { colors } from '../theme/colors';
@@ -43,7 +45,7 @@ export const ProductMasterScreen = ({
   }, [fetchMasters, currentMemberId]);
 
   const handleDelete = (id: number) => {
-    Alert.alert('確認', 'この学習データを削除しますか？', [
+    showConfirmDialog('確認', 'この学習データを削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '削除',
@@ -53,7 +55,7 @@ export const ProductMasterScreen = ({
             await productMasterApi.deleteProductMaster(id);
             fetchMasters();
           } catch {
-            Alert.alert('エラー', '削除に失敗しました');
+            showAlert('エラー', '削除に失敗しました');
           }
         },
       },
@@ -84,10 +86,10 @@ export const ProductMasterScreen = ({
                           sourceStoreName: source,
                           targetStoreName: target,
                         });
-                        Alert.alert('完了', '統合完了しました');
+                        showAlert('完了', '統合完了しました');
                         fetchMasters();
                       } catch {
-                        Alert.alert('エラー', '統合失敗');
+                        showAlert('エラー', '統合失敗');
                       }
                     },
                   },
@@ -98,7 +100,7 @@ export const ProductMasterScreen = ({
         ]
       );
     } else {
-      Alert.alert('通知', '店舗統合機能は現在iOSのみの対応です。');
+      showAlert('通知', '店舗統合機能は現在iOSのみの対応です。');
     }
   };
 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import { spacing } from '../theme/spacing';
 import { borderRadius } from '../theme/radii';
 import { cardStyles } from '../theme/cardStyles';
 import { screenLayout } from '../theme/screenLayout';
+import { showAlert } from '../utils/alertMessage';
 
 type Props = {
   totpEnabled: boolean;
@@ -33,7 +33,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       setSecret(setup.secret);
       setCode('');
     } catch (e: unknown) {
-      Alert.alert('エラー', e instanceof Error ? e.message : 'セットアップに失敗しました。');
+      showAlert('エラー', e instanceof Error ? e.message : 'セットアップに失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
 
   const handleConfirmEnable = async () => {
     if (!code.trim()) {
-      Alert.alert('入力エラー', '6桁コードを入力してください。');
+      showAlert('入力エラー', '6桁コードを入力してください。');
       return;
     }
     setLoading(true);
@@ -50,9 +50,9 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
       setSecret(null);
       setCode('');
       onChanged(true);
-      Alert.alert('完了', '二要素認証を有効にしました。');
+      showAlert('完了', '二要素認証を有効にしました。');
     } catch (e: unknown) {
-      Alert.alert('エラー', e instanceof Error ? e.message : '有効化に失敗しました。');
+      showAlert('エラー', e instanceof Error ? e.message : '有効化に失敗しました。');
     } finally {
       setLoading(false);
     }
