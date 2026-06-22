@@ -224,6 +224,7 @@ flowchart LR
 | FE ViewModel | 画面固有 | `frontend/src/types/` | generated の re-export + 拡張のみ |
 | FE Mapper | DTO → 表示用 | `frontend/src/mappers/` | — |
 | BE API DTO | OpenAPI 契約ミラー | `backend/src/types/apiSchemas.ts` | `apiSchemas.test.ts` で schema 名を検証（#102-3） |
+| BE Response Mapper | Prisma / ドメイン → API DTO | `backend/src/mappers/` | Controller が Service 戻り値を `apiSchemas` 形に変換（#103-1〜3） |
 | BE ドメイン型 | 内部モデル | `backend/src/types/receipt.ts` 等 | `ParsedReceipt` 等。HTTP レスポンスは apiSchemas を使用 |
 | BE Express 拡張 | リクエストコンテキスト | `backend/src/types/express.d.ts` | `req.user` 等 |
 | DB | Prisma | `backend/prisma/schema.prisma` | API DTO とは別層 |
@@ -325,7 +326,7 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 
 **API 接続**: `frontend/src/api/*`（型付きラッパー）→ `apiClient.ts`（認証ヘッダ注入・403 通知）。DTO は [openapi.yaml](../openapi/openapi.yaml) 由来の `api/generated`（[api-spec.md](./api-spec.md) §9）。Screen / Hook から `categoryApi` / `receiptApi` / `statsApi` を直接 import しない（#100-14）。
 
-**Mapper**: API 生レスポンスの画面向け整形は `frontend/src/mappers/`（例: `statsMapper.ts`）。
+**Mapper**: API 生レスポンスの画面向け整形は `frontend/src/mappers/`（例: `statsMapper.ts`）。**BE** の `backend/src/mappers/statsMapper.ts` / `settlementMapper.ts` は Prisma・集計ドメイン → OpenAPI DTO への変換であり、FE Mapper とは責務が逆方向（DTO → ViewModel）である。統計画面では FE が `statsMapper.mapMonthlyStatsResponse` で表示用に正規化し、精算画面は API DTO をそのまま利用する箇所が多い（#103-3）。
 
 詳細は [frontend-screens.md](./frontend-screens.md)（#90-5 / #100-15）を参照。
 

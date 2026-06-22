@@ -3,6 +3,11 @@ import { getRouteParam } from '../utils/routeParams';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/sendApiResponse';
 import {
+  mapDeletedSettlementTransferToApi,
+  mapSettlementStatusToApi,
+  mapSettlementTransferToApi,
+} from '../mappers/settlementMapper';
+import {
   createSettlementTransfer,
   deleteSettlementTransfer as removeSettlementTransfer,
   getSettlementStatusData,
@@ -11,7 +16,7 @@ import {
 export const getSettlementStatus = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
   const data = await getSettlementStatusData(ctx, req.query.month as string | undefined);
-  sendSuccess(res, data);
+  sendSuccess(res, mapSettlementStatusToApi(data));
 });
 
 export const addSettlementTransfer = asyncHandler(async (req, res) => {
@@ -23,11 +28,11 @@ export const addSettlementTransfer = asyncHandler(async (req, res) => {
     toMemberId,
     amount,
   });
-  sendSuccess(res, newTransfer, 201);
+  sendSuccess(res, mapSettlementTransferToApi(newTransfer), 201);
 });
 
 export const deleteSettlementTransfer = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
   const data = await removeSettlementTransfer(ctx, Number(getRouteParam(req, 'id')));
-  sendSuccess(res, data);
+  sendSuccess(res, mapDeletedSettlementTransferToApi(data.id));
 });

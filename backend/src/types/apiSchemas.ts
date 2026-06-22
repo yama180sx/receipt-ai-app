@@ -159,21 +159,25 @@ export type AdvancedStatsData = {
 export type SettlementMemberSummary = {
   memberId: number;
   name: string;
-  paidAmount: number;
-  owedAmount: number;
+  totalPaid: number;
+  totalOwed: number;
+  baseBalance: number;
+  transferredOut: number;
+  transferredIn: number;
   balance: number;
 };
 
 export type SettlementTransfer = {
   id: number;
-  month: string;
   fromMemberId: number;
   toMemberId: number;
   amount: number;
+  month?: string;
   settledAt: string;
 };
 
 export type SettlementStatusData = {
+  month: string;
   members: SettlementMemberSummary[];
   transfers: SettlementTransfer[];
 };

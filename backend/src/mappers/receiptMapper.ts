@@ -2,12 +2,9 @@ import type { Job } from 'bullmq';
 import type { Category, ItemSplit } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type {
-  AdvancedStatsData,
-  CategoryStatRow,
   CategorySummary,
   FamilyMemberSummary,
   ItemSplitSummary,
-  MonthlyStatsData,
   ReceiptDetail,
   ReceiptItemDetail,
   ReceiptJobListItem,
@@ -46,18 +43,6 @@ type AnalyzeJobReturn = {
   };
   imagePath?: string;
   validation?: { isSuspicious: boolean; warnings: string[] };
-};
-
-type MonthlyStatsDomain = {
-  month: string;
-  totalAmount: number;
-  stats: CategoryStatRow[];
-  latestReceipt: ReceiptWithItemsCategory | null;
-};
-
-type AdvancedStatsDomain = {
-  trend: AdvancedStatsData['trend'];
-  pareto: AdvancedStatsData['pareto'];
 };
 
 function toIsoDateString(date: Date | string | null | undefined): string | undefined {
@@ -156,19 +141,6 @@ export function mapItemSplitsUpdateResult(
     return mapItemSplitsToSummary(result);
   }
   return result;
-}
-
-export function mapMonthlyStatsToApi(domain: MonthlyStatsDomain): MonthlyStatsData {
-  return {
-    month: domain.month,
-    totalAmount: domain.totalAmount,
-    stats: domain.stats,
-    latestReceipt: mapReceiptToDetail(domain.latestReceipt),
-  };
-}
-
-export function mapAdvancedStatsToApi(domain: AdvancedStatsDomain): AdvancedStatsData {
-  return domain;
 }
 
 function summarizeParsedData(parsedData: AnalyzeJobReturn['parsedData']) {

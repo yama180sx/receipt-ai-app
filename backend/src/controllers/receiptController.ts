@@ -15,17 +15,16 @@ import { asyncHandler } from '../utils/asyncHandler';
 import logger from '../utils/logger';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
 import {
-  mapAdvancedStatsToApi,
   mapCategoriesToSummary,
   mapFamilyMembersToSummary,
   mapItemSplitsUpdateResult,
   mapJobToStatus,
-  mapMonthlyStatsToApi,
   mapReceiptItemToDetail,
   mapReceiptList,
   mapReceiptToDetail,
   mapUploadJobResponse,
 } from '../mappers/receiptMapper';
+import { mapAdvancedStatsToApi, mapMonthlyStatsToApi } from '../mappers/statsMapper';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
 import { createManualReceipt } from '../services/receipt/receiptUpdateService';
 import {

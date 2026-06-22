@@ -48,6 +48,7 @@ export async function findSettlementTransfersByMonth(familyGroupId: number, mont
       fromMemberId: true,
       toMemberId: true,
       amount: true,
+      month: true,
       settledAt: true,
     },
   });
