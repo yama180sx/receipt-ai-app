@@ -2,32 +2,12 @@ import type { Job } from 'bullmq';
 import fs from 'fs/promises';
 import path from 'path';
 import { receiptQueue } from '../queues/receiptQueue';
+import type { ReceiptJobListItem, ReceiptJobStatus } from '../types/apiSchemas';
 import { checkDuplicateReceipt } from './duplicateReceiptService';
 import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
 import { AppError } from '../utils/appError';
 
 const LIST_JOB_STATES = ['waiting', 'active', 'completed', 'failed', 'delayed', 'paused'] as const;
-
-export type ReceiptJobListItem = {
-  id: string;
-  state: string;
-  imagePath: string | null;
-  createdAt: number;
-  failedReason?: string | null;
-  parsedData?: {
-    storeName: string;
-    purchaseDate: string;
-    totalAmount: number;
-    taxAmount?: number;
-    itemCount: number;
-  };
-  validation?: {
-    isSuspicious: boolean;
-    warnings: string[];
-  };
-  duplicateSuspected?: boolean;
-  existingReceiptId?: number;
-};
 
 type AnalyzeJobReturn = {
   parsedData?: {
@@ -121,9 +101,9 @@ export async function listReceiptJobsForMember(
 export async function enrichCompletedJobPayload(
   job: Job,
   familyGroupId: number,
-  payload: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const state = payload.state as string;
+  payload: ReceiptJobStatus
+): Promise<ReceiptJobStatus> {
+  const state = payload.state;
   if (state !== 'completed' || !job.returnvalue) {
     return payload;
   }
@@ -142,7 +122,7 @@ export async function enrichCompletedJobPayload(
   return {
     ...payload,
     duplicateSuspected: duplicate.duplicateSuspected,
-    existingReceiptId: duplicate.existingReceiptId,
+    existingReceiptId: duplicate.existingReceiptId ?? null,
   };
 }
 

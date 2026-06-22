@@ -10,6 +10,7 @@ import {
 import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
+import type { ReceiptJobStatus } from '../types/apiSchemas';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
 import { createManualReceipt } from '../services/receipt/receiptUpdateService';
 import {
@@ -38,11 +39,14 @@ export const getJobStatus = async (req: Request<{ jobId: string }>, res: Respons
     }
 
     const state = await job.getState();
-    let data: Record<string, unknown> = {
-      id: job.id,
+    let data: ReceiptJobStatus = {
+      id: String(job.id),
       state,
-      result: job.returnvalue,
-      error: job.failedReason,
+      result:
+        job.returnvalue && typeof job.returnvalue === 'object'
+          ? (job.returnvalue as Record<string, unknown>)
+          : undefined,
+      error: job.failedReason ?? undefined,
     };
     data = await enrichCompletedJobPayload(job, familyGroupId, data);
 

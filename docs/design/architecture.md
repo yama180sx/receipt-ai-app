@@ -1,7 +1,7 @@
 # アーキテクチャ概要（As-built）
 
 Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) / [#423 Issue #100](https://github.com/yama180sx/receipt-ai-app/issues/423) / [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468)  
-子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474)  
+子 Issue: [#292 Issue #90-1](https://github.com/yama180sx/receipt-ai-app/issues/292) / [#439 Issue #100-15](https://github.com/yama180sx/receipt-ai-app/issues/439) / [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474) / [#473 Issue #102-3](https://github.com/yama180sx/receipt-ai-app/issues/473)  
 計画: [plan.md](../refactor/plan.md)
 
 本ドキュメントは **実装準拠（as-built）** で記述する。コード・テスト済み挙動を正とし、詳細なドメイン・API・画面仕様は後続の設計資料を参照する。
@@ -206,22 +206,26 @@ flowchart LR
   GEN[frontend/api/generated]
   FET[frontend/types ViewModel]
   MAP[frontend/mappers]
+  APISCH[backend/types/apiSchemas]
   CTRL[backend/controllers]
-  DOM[backend/types Domain]
+  DOM[backend/types/receipt]
 
   OAS -->|openapi-typescript| GEN
   GEN --> FET
   GEN --> MAP
-  OAS -.->|整合| CTRL
+  OAS -.->|手動同期| APISCH
+  APISCH --> CTRL
   DOM --> CTRL
 ```
 
 | 層 | 正本 | 配置 | 備考 |
 |----|------|------|------|
-| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` | FE 型は `npm run generate:api` で生成 |
+| API 契約（DTO） | OpenAPI | `docs/openapi/openapi.yaml` | FE: `generate:api` / BE: `types/apiSchemas.ts` |
 | FE ViewModel | 画面固有 | `frontend/src/types/` | generated の re-export + 拡張のみ |
 | FE Mapper | DTO → 表示用 | `frontend/src/mappers/` | — |
-| BE ドメイン型 | 内部モデル | `backend/src/types/` | `ParsedReceipt` 等。HTTP 形は OpenAPI に合わせる |
+| BE API DTO | OpenAPI 契約ミラー | `backend/src/types/apiSchemas.ts` | `apiSchemas.test.ts` で schema 名を検証（#102-3） |
+| BE ドメイン型 | 内部モデル | `backend/src/types/receipt.ts` 等 | `ParsedReceipt` 等。HTTP レスポンスは apiSchemas を使用 |
+| BE Express 拡張 | リクエストコンテキスト | `backend/src/types/express.d.ts` | `req.user` 等 |
 | DB | Prisma | `backend/prisma/schema.prisma` | API DTO とは別層 |
 
 **新 API 追加**: [api-spec.md](./api-spec.md) **§9**（チェックリスト・CI コマンド・AI プロンプト）を正本とする。PR では `check:api`（FE generated diff）と `check:openapi`（BE ルート突合）が必須。
