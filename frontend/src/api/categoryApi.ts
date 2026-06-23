@@ -1,4 +1,5 @@
-import apiClient from '../utils/apiClient';
+import { openapiClient } from './openapiClient';
+import { unwrapOpenApiResponse } from './openapiHttpError';
 import type {
   ApiMessageResponse,
   ApiSuccessResponse,
@@ -7,26 +8,30 @@ import type {
   OptimizeCategoryResponse,
 } from './generated';
 
-/** カテゴリ API（/api/categories） */
+/** カテゴリ API（/api/categories）— openapi-fetch + generated paths（#105-5 PoC） */
 export const categoryApi = {
   async listCategories(): Promise<ApiSuccessResponse<Category[]>> {
-    const res = await apiClient.get('/categories');
-    return res.data;
+    return (await unwrapOpenApiResponse(
+      openapiClient.GET('/categories')
+    )) as ApiSuccessResponse<Category[]>;
   },
 
   async createCategory(input: CreateCategoryRequest): Promise<ApiSuccessResponse<Category>> {
-    const res = await apiClient.post('/categories', input);
-    return res.data;
+    return (await unwrapOpenApiResponse(
+      openapiClient.POST('/categories', { body: input })
+    )) as ApiSuccessResponse<Category>;
   },
 
   async deleteCategory(id: number): Promise<ApiMessageResponse> {
-    const res = await apiClient.delete(`/categories/${id}`);
-    return res.data;
+    return (await unwrapOpenApiResponse(
+      openapiClient.DELETE('/categories/{id}', { params: { path: { id } } })
+    )) as ApiMessageResponse;
   },
 
   async optimizeCategories(): Promise<ApiSuccessResponse<OptimizeCategoryResponse>> {
-    const res = await apiClient.post('/categories/optimize', {});
-    return res.data;
+    return (await unwrapOpenApiResponse(
+      openapiClient.POST('/categories/optimize')
+    )) as ApiSuccessResponse<OptimizeCategoryResponse>;
   },
 };
 

@@ -1,9 +1,7 @@
 import { Platform } from 'react-native';
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showAlert } from './alertMessage';
-import { AUTH_STORAGE_KEYS } from '../services/authService';
+import { buildAuthHeaders } from './apiAuth';
 
 /**
  * 401エラー時にセッション Context / ルート側でログアウト処理を発火させるためのハンドラ
@@ -13,6 +11,10 @@ let onUnauthorizedHandler: (() => void) | null = null;
 export const setOnUnauthorized = (handler: () => void) => {
   onUnauthorizedHandler = handler;
 };
+
+export function notifyUnauthorized(): void {
+  onUnauthorizedHandler?.();
+}
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 if (!API_BASE) {
@@ -28,37 +30,14 @@ const apiClient = axios.create({
 });
 
 /**
- * ストレージから値を安全に取得するユーティリティ
+ * ストレージから値を安全に取得するユーティリティ — @deprecated use apiAuth.getUserRole
  */
-const getStorageItem = async (key: string): Promise<string | null> => {
-  try {
-    return Platform.OS === 'web'
-      ? await AsyncStorage.getItem(key)
-      : await SecureStore.getItemAsync(key);
-  } catch (error) {
-    console.error(`[API-AUTH] Storage retrieval failed for key: ${key}`, error);
-    return null;
-  }
-};
-
-/**
- * [Issue #73] 現在ログイン中のユーザーの Role を取得するユーティリティ
- */
-export const getUserRole = async (): Promise<string | null> => {
-  return await getStorageItem(AUTH_STORAGE_KEYS.ROLE);
-};
+export { getUserRole } from './apiAuth';
 
 // --- リクエストインターセプター：送信前に認証情報を自動注入 ---
 apiClient.interceptors.request.use(async (config) => {
-  const token = await getStorageItem(AUTH_STORAGE_KEYS.TOKEN);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  const memberId = await getStorageItem(AUTH_STORAGE_KEYS.MEMBER_ID);
-  if (memberId) {
-    config.headers['x-member-id'] = memberId;
-  }
+  const authHeaders = await buildAuthHeaders();
+  Object.assign(config.headers, authHeaders);
 
   const isFormData =
     typeof FormData !== 'undefined' &&
