@@ -227,8 +227,8 @@ if (item.splits.length > 0) {
 | バリデーション | 重複 memberId 禁止、負数禁止、合計 ≠ 小計は 400 エラー |
 | テナント検証 | 全 `familyMemberId` が同一 `familyGroupId` 所属であること |
 
-実装: `backend/src/utils/itemSplitAllocation.ts`  
-保存: `backend/src/services/receipt/receiptSplitService.ts` — `updateItemSplitsById()`
+実装: `backend/src/services/settlement/itemSplitAllocation.ts` — `allocateItemSplits()`  
+保存: `backend/src/services/settlement/itemSplitService.ts` — `updateItemSplitsById()`
 
 #### 端数ルール（最後のメンバーに残額）
 
@@ -245,7 +245,7 @@ if (item.splits.length > 0) {
 ```
 
 > **T-ref-01**（[findings.md](../testing/findings.md)）: 按分端数は配列末尾メンバーに残額  
-> テスト: `backend/src/utils/itemSplitAllocation.test.ts`（#91-2）
+> テスト: `backend/src/services/settlement/itemSplitAllocation.test.ts`（#91-2）
 
 ### 4.4 Frontend ↔ Backend の配列順序
 

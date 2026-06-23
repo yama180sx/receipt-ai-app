@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppError } from './appError';
+import { AppError } from '../../utils/appError';
 import { allocateItemSplits } from './itemSplitAllocation';
 
 describe('allocateItemSplits', () => {
