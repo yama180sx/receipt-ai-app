@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { loginService } from '../services/loginService';
+import { useTotpSettings } from '../features/auth';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { borderRadius } from '../theme/radii';
 import { cardStyles } from '../theme/cardStyles';
 import { screenLayout } from '../theme/screenLayout';
-import { showAlert } from '../utils/alertMessage';
 
 type Props = {
   totpEnabled: boolean;
@@ -22,41 +21,7 @@ type Props = {
 };
 
 export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
-  const [secret, setSecret] = useState<string | null>(null);
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleStartEnable = async () => {
-    setLoading(true);
-    try {
-      const setup = await loginService.startTotpSetupForUser();
-      setSecret(setup.secret);
-      setCode('');
-    } catch (e: unknown) {
-      showAlert('エラー', e instanceof Error ? e.message : 'セットアップに失敗しました。');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmEnable = async () => {
-    if (!code.trim()) {
-      showAlert('入力エラー', '6桁コードを入力してください。');
-      return;
-    }
-    setLoading(true);
-    try {
-      await loginService.enableTotpForUser(code);
-      setSecret(null);
-      setCode('');
-      onChanged(true);
-      showAlert('完了', '二要素認証を有効にしました。');
-    } catch (e: unknown) {
-      showAlert('エラー', e instanceof Error ? e.message : '有効化に失敗しました。');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const totp = useTotpSettings({ onChanged });
 
   return (
     <View style={[screenLayout.container, styles.content]}>
@@ -72,12 +37,12 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
             二要素認証は全メンバー必須のため、無効にできません。
           </Text>
         </>
-      ) : secret ? (
+      ) : totp.secret ? (
         <>
           <Text style={styles.subtitle}>認証アプリに以下のキーを登録してください</Text>
           <View style={[cardStyles.listCard, styles.secretBox]}>
             <Text style={styles.secret} selectable>
-              {secret}
+              {totp.secret}
             </Text>
           </View>
           <TextInput
@@ -85,15 +50,15 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
             placeholder="6桁コード"
             keyboardType="number-pad"
             maxLength={6}
-            value={code}
-            onChangeText={setCode}
+            value={totp.code}
+            onChangeText={totp.setCode}
           />
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleConfirmEnable}
-            disabled={loading}
+            onPress={totp.handleConfirmEnable}
+            disabled={totp.loading}
           >
-            {loading ? (
+            {totp.loading ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.primaryButtonText}>有効化</Text>
@@ -105,10 +70,10 @@ export function TotpSettingsScreen({ totpEnabled, onBack, onChanged }: Props) {
           <Text style={styles.subtitle}>ログイン時に認証コードの入力が必要になります。</Text>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleStartEnable}
-            disabled={loading}
+            onPress={totp.handleStartEnable}
+            disabled={totp.loading}
           >
-            {loading ? (
+            {totp.loading ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.primaryButtonText}>セットアップを開始</Text>
