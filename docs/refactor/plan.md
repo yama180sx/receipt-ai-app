@@ -614,3 +614,14 @@ Epic: [#502 Epic #104](https://github.com/yama180sx/receipt-ai-app/issues/502)
 ```
 
 **Screen 分解の参考パターン**: `useReceiptHistory`（HistoryScreen）、Epic #99 [#387](https://github.com/yama180sx/receipt-ai-app/issues/387)、Epic #100 [#431](https://github.com/yama180sx/receipt-ai-app/issues/431)。
+
+### 11.7 #104-3 実施記録（feature 横断依存の監査）
+
+| 項目 | 監査結果（#104-3 時点） | 対応 |
+|------|-------------------------|------|
+| `features/*` 間の直接 import | **違反なし** | 規約を `frontend-conventions.md` §1.1 に明文化 |
+| 按分業務ルールの所在 | `utils/splitEditorSplits` 等に分散 | `domain/settlement/` へ集約 |
+| `ReceiptTrayContext` 肥大 | 202行 | `useReceiptTrayController` へ抽出（Context は配布のみ） |
+| FE Mapper 利用 | 統計のみ Mapper 経由 | 方針を `frontend-conventions.md` §4.3 に追記 |
+
+**Later（本 Issue スコープ外）**: `useSplitEditor` 再分割、全 API の Mapper 統一、`domain/receipt/` への金額計算移行。

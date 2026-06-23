@@ -464,6 +464,12 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 | `features/stats` | `useStatistics` | 月次統計・グラフ |
 | `features/settlement` | `useSettlementSummary`, `useSplitEditor` | 精算・按分 |
 | `features/category` | `useCategoryManagement` | カテゴリ CRUD |
+| `features/productMaster` | `useProductMaster` | 学習マスタ |
+| `features/admin` | `usePromptEditor`, `useAdminStats` | プロンプト編集・コスト統計 |
+
+**domain/（#104-3）**: `domain/settlement/` に按分保存 payload 構築・明細小計・初期メンバー選定などの純関数を配置。Hook は domain を呼び出す。
+
+**Context 薄型化（#104-3）**: `ReceiptTrayProvider` のロジックは `hooks/useReceiptTrayController.ts`、Context は配布のみ。
 
 各 feature は `hooks/`, `components/`, `styles/`（任意）, `index.ts`（バレル）で構成する。
 
@@ -475,6 +481,7 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 |----|------|------|------|
 | Presentation | `screens/`, `features/*/components` | JSX・スタイル・Hook 呼び出し | `prisma` / `categoryApi` 等の直 import（Screen） |
 | Application | `features/*/hooks`, `services/` | 複数 API の編成・UI 向け state | Prisma 直叩き（FE） |
+| Domain（FE） | `src/domain/<area>/` | 按分計算・端数ルール等の純関数（#104-3） | React import、API 呼び出し、副作用 |
 | API Client | `src/api/*`, `apiClient.ts` | HTTP・認証ヘッダ | ビジネスロジック |
 | Mapper（FE） | `src/mappers/*` | DTO → ViewModel 変換 | API 呼び出し |
 | Controller（BE） | `backend/controllers` | Service 呼び出し + Mapper + `sendSuccess` | Prisma 直叩き、DTO 整形の複雑ロジック |
