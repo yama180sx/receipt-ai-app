@@ -155,6 +155,8 @@ erDiagram
 
 ## 4. 按分（ItemSplit）業務ルール
 
+> **変更時:** [settlement-change-guide.md](./settlement-change-guide.md) — 触るファイル一覧と作業順序
+
 ### 4.1 明細小計の算出
 
 明細行の税込小計は **整数円に四捨五入** する。
@@ -188,13 +190,15 @@ itemLineTotal = Math.round(price × quantity)
 | 按分クリア（空配列 POST） | 既存 ItemSplit を全削除 → 暗黙デフォルトに戻る |
 
 ```typescript
-// statsController.ts — 精算集計の分岐
+// settlementAggregation.ts — aggregateReceiptsIntoStats()
 if (item.splits.length > 0) {
   // 明示按分: 各 split.amount を totalOwed に加算
 } else {
   // 暗黙デフォルト: receipt.memberId に itemLineTotal を加算
 }
 ```
+
+> 実装: `backend/src/services/settlement/settlementAggregation.ts` — `aggregateReceiptsIntoStats()`
 
 > **T-ref-02**（[findings.md](../testing/findings.md)）: ItemSplit 0 件 = 登録者全額負担（暗黙）
 
@@ -223,7 +227,8 @@ if (item.splits.length > 0) {
 | バリデーション | 重複 memberId 禁止、負数禁止、合計 ≠ 小計は 400 エラー |
 | テナント検証 | 全 `familyMemberId` が同一 `familyGroupId` 所属であること |
 
-実装: `backend/src/utils/itemSplitAllocation.ts`
+実装: `backend/src/utils/itemSplitAllocation.ts`  
+保存: `backend/src/services/receipt/receiptSplitService.ts` — `updateItemSplitsById()`
 
 #### 端数ルール（最後のメンバーに残額）
 
@@ -261,6 +266,8 @@ UI 上の端数負担者（先頭） → payload では末尾 → Backend の al
 
 ## 5. 精算サマリー — 概念モデル
 
+> **変更時:** [settlement-change-guide.md](./settlement-change-guide.md) §2.4
+
 月次精算（`GET /api/stats/settlement`）は、対象月の全レシートと送金記録から **メンバーごとの残額** を算出する。
 
 ### 5.1 集計フロー
@@ -277,7 +284,13 @@ flowchart TD
     G --> H[balance を算出]
 ```
 
-実装: `backend/src/controllers/statsController.ts` — `getSettlementStatus()`
+実装:
+
+| レイヤー | ファイル |
+|----------|----------|
+| 集計（純粋関数） | `backend/src/services/settlement/settlementAggregation.ts` — `computeSettlementMemberSummaries()` |
+| データ取得 | `backend/src/services/settlement/settlementService.ts` — `getSettlementStatusData()` |
+| HTTP | `backend/src/controllers/statsController.ts` — `getSettlementStatus()` |
 
 ### 5.2 メンバーごとの指標
 
@@ -384,6 +397,7 @@ A が B へ 100 円送金を記録（`SettlementTransfer`）すると:
 
 ## 9. 関連資料
 
+- [settlement-change-guide.md](./settlement-change-guide.md) — 按分・精算ルール変更時のファイル一覧・作業順序（#105-3）
 - [domain-model.md](./domain-model.md) — 業務ルール・精算
 - [database-schema.md](./database-schema.md) — DB 列定義
 - [architecture.md](./architecture.md) — システム構成（#90-1）
