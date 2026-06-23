@@ -5,8 +5,8 @@ import { showAlert } from '../../../utils/alertMessage';
 import {
   buildItemSplitSavePayload,
   calcItemTotal,
-} from '../../../utils/splitEditorSplits';
-import { deriveInitialActiveMembers } from '../utils/splitEditorInit';
+  deriveInitialActiveMembers,
+} from '../../../domain/settlement';
 import {
   addMemberToAllItems,
   applyCascadePercentToItems,

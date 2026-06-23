@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
 import { tableStyles } from '../../../theme';
-import { calcItemTotal } from '../../../utils/splitEditorSplits';
+import { calcItemTotal } from '../../../domain/settlement';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,

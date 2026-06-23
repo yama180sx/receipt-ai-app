@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
-import { productMasterApi, type ProductMaster } from '../api';
-import { showAlert } from '../utils/alertMessage';
-import { showApiErrorAlert } from '../utils/apiError';
-import { showConfirmDialog } from '../utils/confirmDialog';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { AppBackButton, AppButton, AppListItem, AppTextInput } from '../components/ui';
+import { useProductMaster } from '../features/productMaster';
 import { BUTTON_LABELS } from '../constants/buttonLabels';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -17,102 +14,16 @@ export const ProductMasterScreen = ({
   onBack: () => void;
   currentMemberId: number | null;
 }) => {
-  const [masters, setMasters] = useState<ProductMaster[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [storeFilter, setStoreFilter] = useState('');
+  const pm = useProductMaster({ currentMemberId });
 
-  const fetchMasters = useCallback(async () => {
-    if (!currentMemberId) return;
-
-    try {
-      setLoading(true);
-      const res = await productMasterApi.listProductMasters({
-        q: searchQuery,
-        store: storeFilter,
-      });
-      setMasters(res.data ?? []);
-    } catch (err) {
-      showApiErrorAlert('エラー', err, '学習マスタの取得に失敗しました。');
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery, storeFilter, currentMemberId]);
-
-  useEffect(() => {
-    if (currentMemberId) {
-      fetchMasters();
-    }
-  }, [fetchMasters, currentMemberId]);
-
-  const handleDelete = (id: number) => {
-    showConfirmDialog('確認', 'この学習データを削除しますか？', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await productMasterApi.deleteProductMaster(id);
-            fetchMasters();
-          } catch (err) {
-            showApiErrorAlert('エラー', err, '削除に失敗しました。');
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleMergeStores = () => {
-    if (Platform.OS === 'ios') {
-      Alert.prompt(
-        '店舗名の統合',
-        '統合元の店舗名を入力（例: ｾﾌﾞﾝ）',
-        [
-          { text: 'キャンセル', style: 'cancel' },
-          {
-            text: '次へ',
-            onPress: (source: string | undefined) => {
-              if (!source) return;
-              Alert.prompt(
-                '統合先名称',
-                `${source} をどの名称に統合しますか？`,
-                [
-                  {
-                    text: '実行',
-                    onPress: async (target: string | undefined) => {
-                      if (!target) return;
-                      try {
-                        await productMasterApi.mergeStoreNames({
-                          sourceStoreName: source,
-                          targetStoreName: target,
-                        });
-                        showAlert('完了', '統合完了しました');
-                        fetchMasters();
-                      } catch (err) {
-                        showApiErrorAlert('エラー', err, '統合に失敗しました。');
-                      }
-                    },
-                  },
-                ]
-              );
-            },
-          },
-        ]
-      );
-    } else {
-      showAlert('通知', '店舗統合機能は現在iOSのみの対応です。');
-    }
-  };
-
-  const renderItem = ({ item }: { item: ProductMaster }) => (
+  const renderItem = ({ item }: { item: (typeof pm.masters)[number] }) => (
     <AppListItem
       title={item.name}
       subtitle={`店舗: ${item.storeName || '共通'}`}
       right={
         <AppButton
           title={BUTTON_LABELS.delete}
-          onPress={() => handleDelete(item.id)}
+          onPress={() => pm.handleDelete(item.id)}
           variant="dangerFilled"
           size="sm"
         />
@@ -136,31 +47,31 @@ export const ProductMasterScreen = ({
         <Text style={[screenLayout.headerTitle, styles.titleProduct]}>
           学習マスタ ({currentMemberId === 1 ? '個人' : 'その他'})
         </Text>
-        <AppButton title="店舗統合" onPress={handleMergeStores} variant="ghost" size="sm" />
+        <AppButton title="店舗統合" onPress={pm.handleMergeStores} variant="ghost" size="sm" />
       </View>
 
       <View style={styles.searchBar}>
         <AppTextInput
           placeholder="品名検索..."
           style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+          value={pm.searchQuery}
+          onChangeText={pm.setSearchQuery}
         />
         <AppTextInput
           placeholder="店舗名..."
           style={styles.searchInput}
-          value={storeFilter}
-          onChangeText={setStoreFilter}
+          value={pm.storeFilter}
+          onChangeText={pm.setStoreFilter}
         />
       </View>
 
       {!currentMemberId ? (
         <Text style={styles.empty}>メンバーを選択してください</Text>
-      ) : loading ? (
+      ) : pm.loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
       ) : (
         <FlatList
-          data={masters}
+          data={pm.masters}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}

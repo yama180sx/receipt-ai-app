@@ -9,7 +9,8 @@
 
 ## 関連
 
-- リファクタ計画: [docs/refactor/plan.md](../refactor/plan.md)（Issue #98）
+- リファクタ計画: [docs/refactor/plan.md](../refactor/plan.md)（Issue #98 / Epic #104 §11）
+- 品質監査（最新）: [ChatGPT_レビュー_20260623.txt](./chatgpt/ChatGPT_レビュー_20260623.txt)（88/100点 → Epic [#502 #104](https://github.com/yama180sx/receipt-ai-app/issues/502)）
 
 ## 正本への導線
 

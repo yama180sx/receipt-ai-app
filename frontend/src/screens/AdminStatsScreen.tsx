@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { AppBackButton } from '../components/ui';
+import { useAdminStats } from '../features/admin';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { borderRadius } from '../theme/radii';
@@ -14,8 +15,6 @@ import { shadows } from '../theme/shadows';
 import { cardStyles } from '../theme/cardStyles';
 import { screenLayout } from '../theme/screenLayout';
 import { tableStyles } from '../theme/tableStyles';
-import { adminApi, type AdminCostStatRow } from '../api';
-import { getApiErrorMessage } from '../utils/apiError';
 
 interface AdminStatsScreenProps {
   onBack: () => void;
@@ -24,30 +23,9 @@ interface AdminStatsScreenProps {
 const adm = colors.semantic.admin;
 
 export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) => {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<AdminCostStatRow[]>([]);
-  const [totalCost, setTotalCost] = useState(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const stats = useAdminStats();
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const res = await adminApi.getCostStats();
-      const rows = res.data ?? [];
-      setStats(rows);
-      const total = rows.reduce((sum, item) => sum + item.estimatedCostJpy, 0);
-      setTotalCost(total);
-    } catch (error: unknown) {
-      setErrorMsg(getApiErrorMessage(error, 'コスト統計の取得に失敗しました。'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (stats.loading) {
     return (
       <View style={[screenLayout.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -64,16 +42,16 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
       </View>
 
       <ScrollView contentContainerStyle={[screenLayout.scrollContent, styles.content]}>
-        {errorMsg ? (
+        {stats.errorMessage ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorTitle}>アクセス権限エラー</Text>
-            <Text style={styles.errorSubText}>{errorMsg}</Text>
+            <Text style={styles.errorSubText}>{stats.errorMessage}</Text>
           </View>
         ) : (
           <>
             <View style={[cardStyles.summaryCard, styles.primarySummaryCard]}>
               <Text style={styles.summaryLabel}>累計利用コスト (概算)</Text>
-              <Text style={styles.summaryAmount}>¥{totalCost.toFixed(2)}</Text>
+              <Text style={styles.summaryAmount}>¥{stats.totalCost.toFixed(2)}</Text>
               <Text style={styles.summaryNote}>※為替レート150円/$、Gemini 2.0 Flashでの算出</Text>
             </View>
 
@@ -85,12 +63,12 @@ export const AdminStatsScreen: React.FC<AdminStatsScreenProps> = ({ onBack }) =>
                   <Text style={[tableStyles.cell, styles.colCost, tableStyles.headerText]}>概算(円)</Text>
                 </View>
 
-                {stats.length === 0 ? (
+                {stats.stats.length === 0 ? (
                   <View style={[tableStyles.row, styles.emptyRow]}>
                     <Text style={[tableStyles.cell, tableStyles.bodyText]}>データがありません</Text>
                   </View>
                 ) : (
-                  stats.map((item, index) => (
+                  stats.stats.map((item, index) => (
                     <View key={`${item.month}-${item.modelId}-${index}`} style={tableStyles.row}>
                       <View style={[tableStyles.cell, styles.colMonth]}>
                         <Text style={tableStyles.bodyText}>{item.month}</Text>

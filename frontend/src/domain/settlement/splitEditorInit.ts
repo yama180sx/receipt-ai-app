@@ -1,7 +1,4 @@
-import type {
-  FamilyMemberSummary,
-  ReceiptForSplitEditor,
-} from '../types/settlement';
+import type { FamilyMemberSummary, ReceiptForSplitEditor } from '../../types/settlement';
 
 /** 割勘エディタ起動時の対象メンバー初期集合を決定する */
 export function deriveInitialActiveMembers(

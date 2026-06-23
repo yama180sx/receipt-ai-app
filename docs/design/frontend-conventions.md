@@ -1,8 +1,8 @@
 # フロントエンド実装規約 & AI プロンプトテンプレート
 
-Epic: [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468)  
-子 Issue: [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474)  
-計画: [plan.md](../refactor/plan.md) §8
+Epic: [#459 Issue #101](https://github.com/yama180sx/receipt-ai-app/issues/459) / [#468 Issue #102](https://github.com/yama180sx/receipt-ai-app/issues/468) / [#502 Issue #104](https://github.com/yama180sx/receipt-ai-app/issues/502)  
+子 Issue: [#461 Issue #101-7](https://github.com/yama180sx/receipt-ai-app/issues/461) / [#474 Issue #102-4](https://github.com/yama180sx/receipt-ai-app/issues/474) / [#506 Issue #104-3](https://github.com/yama180sx/receipt-ai-app/issues/506)  
+計画: [plan.md](../refactor/plan.md) §8 / §11
 
 本ドキュメントは **新規実装・AI 駆動開発・コードレビュー** の正本とする。層の全体像は [architecture.md](./architecture.md) §6、画面一覧は [frontend-screens.md](./frontend-screens.md) を参照。
 
@@ -31,6 +31,7 @@ frontend/
 │   ├── components/         # 横断 UI（ui/, モーダル等）
 │   ├── api/                # HTTP ラッパー（Hook から呼ぶ）
 │   ├── mappers/            # API DTO → ViewModel
+│   ├── domain/<area>/    # 業務ルール純関数（React import 禁止）— #104-3
 │   ├── types/              # ViewModel・画面固有型（DTO は generated）
 │   ├── utils/              # 横断ユーティリティ
 │   ├── hooks/              # 横断 hook（レイアウト等）
@@ -81,7 +82,19 @@ export const ExampleScreen = (props: Props) => {
 - [ ] `features/<domain>/components/` に UI を分割した
 - [ ] `features/<domain>/index.ts` から export した
 - [ ] Screen は 150 行以内
-- [ ] 計算ロジックは `utils/` に純関数として抽出（必要ならテスト追加）
+- [ ] 計算ロジックは `domain/` または feature `utils/` の純関数に抽出（必要ならテスト追加）
+
+### 1.1 feature 間依存ルール（#104-3）
+
+| 依存元 | 依存先 | ルール |
+|--------|--------|--------|
+| `screens/` | `features/<domain>/index.ts` | **バレル経由のみ**。`features/*/hooks/useXxx.ts` 等の内部パス直 import 禁止 |
+| `features/<A>/` | `features/<B>/` | **原則禁止**。共通処理は `domain/`・`types/`・`utils/`・`api/` へ昇格 |
+| `features/*/hooks` | `domain/` | 業務ルール（按分計算等）は domain 純関数を呼ぶ。hook 内に直書きしない |
+| `domain/` | `features/`・`screens/` | **禁止**（下位層から上位層へ依存しない） |
+| `screens/` | `screens/` | **禁止** |
+
+**Context**: ロジックは `hooks/useXxxController.ts` に抽出し、Context は Provider + `useContext` の配布のみ（`ReceiptTrayProvider` 参照 #104-3）。
 
 ---
 
@@ -140,6 +153,12 @@ try {
 | API 契約（DTO） | OpenAPI | `frontend/src/api/generated`（[openapi.yaml](../openapi/openapi.yaml)） |
 | ViewModel | 手動定義 | `frontend/src/types/`（generated の再 export + 画面拡張） |
 | 変換 | Mapper | `frontend/src/mappers/` |
+
+**Mapper 利用方針（#104-3）**
+
+- DTO と ViewModel が **同一 shape** の場合: Hook が `api/generated` 型を直接利用してよい
+- 表示用に **フィールド追加・正規化・集計** が必要な場合: `mappers/` に純関数を置き、Hook は Mapper 経由で ViewModel を得る
+- 新規・変更 API で表示変換が発生したら、まず Mapper 追加を検討する（全 API 一括 Adapter 化は不要）
 
 **新 API 追加時（#102-4）**
 
