@@ -1,4 +1,4 @@
-import { calcItemTotal } from '../../../utils/splitEditorSplits';
+import { calcItemTotal } from '../../../domain/settlement';
 import type {
   FamilyMemberSummary,
   ReceiptForSplitEditor,

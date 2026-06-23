@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveInitialActiveMembers } from './splitEditorInit';
-import type { ReceiptForSplitEditor } from '../types/settlement';
+import type { ReceiptForSplitEditor } from '../../types/settlement';
 
 const members = [
   { id: 1, name: 'A' },

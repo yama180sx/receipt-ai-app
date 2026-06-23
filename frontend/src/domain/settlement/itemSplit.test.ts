@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildItemSplitSavePayload, calcItemTotal } from './splitEditorSplits';
+import { buildItemSplitSavePayload, calcItemTotal } from './itemSplit';
 
 describe('calcItemTotal', () => {
   it('matches backend calcItemLineTotal rounding', () => {

@@ -1,4 +1,4 @@
-import type { ItemSplitInput } from '../api/generated';
+import type { ItemSplitInput } from '../../api/generated';
 
 /** 明細の税込小計（Backend の calcItemLineTotal と同じ丸め） */
 export function calcItemTotal(item: {
