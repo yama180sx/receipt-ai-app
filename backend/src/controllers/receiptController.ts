@@ -34,12 +34,12 @@ import {
   listFamilyMembers,
 } from '../services/receipt/receiptQueryService';
 import { updateReceiptById, updateItemCategoryById } from '../services/receipt/receiptUpdateService';
-import { updateItemSplitsById } from '../services/receipt/receiptSplitService';
+import { updateItemSplitsById } from '../services/settlement/itemSplitService';
 import {
   getMonthlyStats as fetchMonthlyStats,
   getAdvancedStats as fetchAdvancedStats,
 } from '../services/receipt/receiptStatsService';
-import { SplitInput } from '../utils/itemSplitAllocation';
+import { SplitInput } from '../services/settlement/itemSplitAllocation';
 
 export const getJobStatus = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();

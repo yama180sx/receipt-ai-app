@@ -1,4 +1,4 @@
-import { AppError } from './appError';
+import { AppError } from '../../utils/appError';
 
 export type SplitInput = {
   familyMemberId: number;

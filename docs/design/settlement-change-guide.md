@@ -28,7 +28,7 @@ flowchart LR
 
   subgraph be [Backend]
     Routes["routes/receiptRoutes, statsRoutes"]
-    Services["receiptSplitService<br/>settlementService"]
+    Services["itemSplitService<br/>settlementService"]
     Utils["itemLineTotal<br/>itemSplitAllocation"]
     Agg["settlementAggregation"]
   end
@@ -65,9 +65,9 @@ flowchart LR
 
 | 順序 | 触る場所 | 役割 |
 |------|----------|------|
-| 1 | `backend/src/utils/itemSplitAllocation.ts` | 端数・ratio/amount ルールの **SSOT** |
-| 2 | `backend/src/utils/itemSplitAllocation.test.ts` | 単体テスト（T-ref-01 等） |
-| 3 | `backend/src/services/receipt/receiptSplitService.ts` | 保存オーケストレーション（`calcItemLineTotal` → `allocateItemSplits` → DB） |
+| 1 | `backend/src/services/settlement/itemSplitAllocation.ts` | 端数・ratio/amount ルールの **SSOT** |
+| 2 | `backend/src/services/settlement/itemSplitAllocation.test.ts` | 単体テスト（T-ref-01 等） |
+| 3 | `backend/src/services/settlement/itemSplitService.ts` | 保存オーケストレーション（`calcItemLineTotal` → `allocateItemSplits` → DB） |
 | 4 | `frontend/src/domain/settlement/itemSplit.ts` | `buildItemSplitSavePayload()` — 端数負担者を配列末尾へ |
 | 5 | `frontend/src/domain/settlement/itemSplit.test.ts` | payload 順序テスト（T-ref-03） |
 | 6 | `frontend/src/features/settlement/utils/splitEditorMutations.ts` | UI 編集時の percent / amount 計算 |
@@ -87,7 +87,7 @@ flowchart LR
 
 | 順序 | 触る場所 | 役割 |
 |------|----------|------|
-| 1 | `backend/src/services/receipt/receiptSplitService.ts` | 空配列 POST → ItemSplit 全削除 |
+| 1 | `backend/src/services/settlement/itemSplitService.ts` | 空配列 POST → ItemSplit 全削除 |
 | 2 | `backend/src/services/settlement/settlementAggregation.ts` | `aggregateReceiptsIntoStats()` — splits 0 件時の totalOwed |
 | 3 | `backend/src/services/settlement/settlementAggregation.test.ts` | 集計単体テスト |
 | 4 | `frontend/src/domain/settlement/splitEditorInit.ts` | 編集画面の初期 active members |
@@ -143,8 +143,8 @@ flowchart LR
 | パス | 責務 |
 |------|------|
 | `backend/src/utils/itemLineTotal.ts` | 明細小計 SSOT |
-| `backend/src/utils/itemSplitAllocation.ts` | 按分 allocate SSOT |
-| `backend/src/services/receipt/receiptSplitService.ts` | ItemSplit 保存 |
+| `backend/src/services/settlement/itemSplitAllocation.ts` | 按分 allocate SSOT |
+| `backend/src/services/settlement/itemSplitService.ts` | ItemSplit 保存 |
 | `backend/src/services/settlement/settlementAggregation.ts` | 精算集計（純粋関数） |
 | `backend/src/services/settlement/settlementService.ts` | 精算データ取得・送金 CRUD |
 | `backend/src/mappers/settlementMapper.ts` | API レスポンス整形 |
@@ -158,7 +158,7 @@ flowchart LR
 | パス | 責務 |
 |------|------|
 | `docs/testing/fixtures/itemLineTotal-vectors.json` | 小計 FE/BE contract |
-| `backend/src/utils/itemSplitAllocation.test.ts` | 按分 allocate |
+| `backend/src/services/settlement/itemSplitAllocation.test.ts` | 按分 allocate |
 | `backend/src/services/settlement/settlementAggregation.test.ts` | 精算集計 |
 | `backend/src/services/settlement/settlementService.test.ts` | サービス層 |
 | `docs/testing/findings.md` | T-ref-01〜03 確定挙動 |
@@ -181,11 +181,11 @@ flowchart LR
 
 ## 5. スコープ外（別 Issue）
 
-| 内容 | Issue |
-|------|-------|
-| BE settlement 物理集約（`services/settlement/` へのファイル移動） | #105-6 |
-| DTO / Domain / Mapper フロー図 | #105-4 |
-| API generated 移行 PoC | #105-5 |
+| 内容 | Issue | 状態 |
+|------|-------|------|
+| ~~BE settlement 物理集約~~ | #105-6 | ✅ 完了 — `services/settlement/` に集約 |
+| DTO / Domain / Mapper フロー図 | #105-4 | ✅ 完了 |
+| API generated 移行 PoC | #105-5 | ✅ 完了 — `categoryApi` |
 
 ---
 

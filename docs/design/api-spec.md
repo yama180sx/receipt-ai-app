@@ -656,7 +656,7 @@ npm run test:integration
 | 認証 | `backend/src/middleware/authMiddleware.ts`, `pendingAuthMiddleware.ts` |
 | テナント | `backend/src/middleware/tenantMiddleware.ts`, `utils/context.ts` |
 | エラー | `backend/src/utils/appError.ts`, `middleware/errorHandler.ts` |
-| 按分 | `backend/src/utils/itemSplitAllocation.ts` |
+| 按分 | `backend/src/services/settlement/itemSplitAllocation.ts`, `itemSplitService.ts` |
 | 精算 | `backend/src/controllers/statsController.ts` |
 
 ---
