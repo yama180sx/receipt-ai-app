@@ -625,3 +625,77 @@ Epic: [#502 Epic #104](https://github.com/yama180sx/receipt-ai-app/issues/502)
 | FE Mapper 利用 | 統計のみ Mapper 経由 | 方針を `frontend-conventions.md` §4.3 に追記 |
 
 **Later（本 Issue スコープ外）**: `useSplitEditor` 再分割、全 API の Mapper 統一、`domain/receipt/` への金額計算移行。
+
+## 12. Epic #105 — 品質ガバナンスレビュー（AI時代版）20260624 フォローアップ（Phase 7）
+
+Epic: [#512 Epic #105](https://github.com/yama180sx/receipt-ai-app/issues/512)
+
+[RecAIpt 品質ガバナンスレビュー（AI時代版）結果_20260624](../specs/chatgpt/RecAIpt%20品質ガバナンスレビュー（AI時代版）結果_20260624.txt)（**88/100点**）のフォローアップ。Epic #104 完了後も残る **FE/BE 業務ルール同期・型残存・API 入口複数** を解消し、90点台到達を目指す。
+
+評価基準正本: [RecAIpt 品質ガバナンスレビュー（AI時代版）.pdf](../specs/chatgpt/RecAIpt%20品質ガバナンスレビュー（AI時代版）.pdf)
+
+### 12.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | AI時代版レビュー 20260624 + コード突合 + Epic #104 成果 |
+| 最大減点 | FE/BE 同一計算のコメント同期（`calcItemTotal` / `calcItemLineTotal`） |
+| SSOT 方針 | 計算正本 = BE `itemLineTotal.ts`、FE は contract test で一致保証（#105-1） |
+| スコープ外 | FE preview API 化、全 API 一括 generated 化、`packages/shared-types` monorepo |
+| 進め方 | **1 Issue ずつ** PR マージ後に次 Issue へ |
+
+### 12.2 レビュー減点と対応マッピング
+
+**入力ソース（正本）**: [RecAIpt 品質ガバナンスレビュー（AI時代版）結果_20260624.txt](../specs/chatgpt/RecAIpt%20品質ガバナンスレビュー（AI時代版）結果_20260624.txt)
+
+| 観点 | 点数 | 減点 | 主な対応 Issue |
+|------|------|------|----------------|
+| 業務ルール一元管理 | 21/25 | -4 | #105-1, #105-3, #105-6 |
+| AI・人間双方の理解容易性 | 23/25 | -2 | #105-3, #105-4, #105-5 |
+| 型安全性・契約の明確性 | 22/25 | -3 | #105-2, #105-5 |
+| 変更影響範囲の局所性 | 22/25 | -3 | #105-3, #105-5, #105-6 |
+| **合計** | **88/100** | **-12** | — |
+
+**参考評価（採点外）**: AI修正成功率 **A**、人間引継ぎ容易性 **A**
+
+### 12.3 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #105 Epic | [#512](https://github.com/yama180sx/receipt-ai-app/issues/512) | — | — |
+| #105-0 | [#513](https://github.com/yama180sx/receipt-ai-app/issues/513) | Must | 0.5 人日 |
+| #105-1 | [#514](https://github.com/yama180sx/receipt-ai-app/issues/514) | Must | 1〜1.5 人日 |
+| #105-2 | [#515](https://github.com/yama180sx/receipt-ai-app/issues/515) | Must | 0.5 人日 |
+| #105-3 | [#516](https://github.com/yama180sx/receipt-ai-app/issues/516) | Should | 0.5〜1 人日 |
+| #105-4 | [#517](https://github.com/yama180sx/receipt-ai-app/issues/517) | Should | 0.5 人日 |
+| #105-5 | [#518](https://github.com/yama180sx/receipt-ai-app/issues/518) | Later | 1.5〜2 人日 |
+| #105-6 | [#519](https://github.com/yama180sx/receipt-ai-app/issues/519) | Later | 2〜3 人日 |
+
+### 12.4 #104 / #102 との関係
+
+| 既存 Epic | #105 との関係 |
+|-----------|--------------|
+| #104（Phase 6） | FE `domain/settlement/` 導入済み。#105 は **FE/BE 同期** と **BE 型残存** を補完 |
+| #102（OpenAPI SSOT） | #105-5 は generated 移行 PoC。#102 契約正本は維持 |
+| #103（BE Mapper） | #105-6 は settlement サービス物理集約（BE 内部） |
+
+**重複しないことの確認**: #105 は業務ルール SSOT・ドキュメント・BE 型の残件に限定。Screen 分割は #104 完了済み。
+
+### 12.5 Won't fix / Later（記録）
+
+| 項目 | 判定 | 理由 |
+|------|------|------|
+| FE 表示計算の BE API 化 | **Won't fix** | レイテンシ・オフライン編集コスト |
+| `packages/shared-calc` monorepo | **Later** | #105-1 contract test で十分なら見送り |
+| テストの `expect.any()` | **Won't fix** | Vitest/Jest 慣用法 |
+| 手書き API 全面 generated 化 | **Later → #105-5** | 1 API PoC から段階移行 |
+| BE settlement 物理集約 | **Later → #105-6** | #105-3 ガイド後 |
+
+### 12.6 推奨着手順
+
+```
+#513（#105-0 plan）→ #514（#105-1）→ #515（#105-2）→ #516（#105-3）→ #517（#105-4）
+  → #518 / #519（Later、別タイミング可）
+```
+
+**推定スコア**: Must+Should 完了で **88 → 93〜94**。Later 含むと **95前後**。
