@@ -15,6 +15,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) /
 | [ai-pipeline.md](./ai-pipeline.md) | 3層正規化・AI パイプライン（#90-4） |
 | [frontend-screens.md](./frontend-screens.md) | 画面遷移・フロント（#90-5） |
 | [frontend-conventions.md](./frontend-conventions.md) | FE 実装規約・AI プロンプト（#101-7） |
+| [settlement-change-guide.md](./settlement-change-guide.md) | 按分・精算ルール変更ガイド（#105-3） |
 | [operations.md](./operations.md) | 運用・障害対応（#90-6） |
 
 ---
@@ -495,6 +496,144 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 1. **1 エンドポイント = 1 Service メソッド**（Controller は薄く保つ）
 2. **1 画面の主要操作 = 1 Hook**（fetch・保存・フィルタ変更などを Screen 内に直書きしない）
 3. **ユーザー通知**は `showAlert` / `showConfirmDialog` に統一（Web 対応 #100-13）
+
+### 6.3 FE データフロー（DTO / ViewModel / Mapper / domain）— #105-4
+
+全スタックの型境界（OpenAPI SSOT・BE Mapper）は **§4.6** を正本とする。本節は **Frontend 内** で DTO が Hook / UI に届くまでの読み取り経路を 1 枚で示す。
+
+```mermaid
+flowchart TB
+  subgraph contract [契約 SSOT — Epic #102]
+    OAS["docs/openapi/openapi.yaml"]
+    GEN["frontend/src/api/generated"]
+    OAS -->|"npm run generate:api"| GEN
+  end
+
+  subgraph apiLayer [API Client 層]
+    API["frontend/src/api/*Api.ts"]
+    CLIENT["frontend/src/utils/apiClient.ts"]
+    GEN --> API
+    API --> CLIENT
+  end
+
+  subgraph transform [変換・型の整理]
+    TYPES["frontend/src/types/"]
+    MAP["frontend/src/mappers/"]
+    GEN --> TYPES
+    GEN --> MAP
+    MAP --> TYPES
+  end
+
+  subgraph app [Application / Presentation]
+    HOOK["features/*/hooks/useXxx.ts"]
+    DOMAIN["frontend/src/domain/<area>/"]
+    UI["screens/ + features/*/components/"]
+    HOOK --> UI
+    DOMAIN --> HOOK
+  end
+
+  CLIENT -->|"HTTP GET/POST"| BE["Backend API"]
+  HOOK --> API
+  HOOK --> MAP
+  HOOK --> TYPES
+```
+
+| 層 | 配置 | 責務 | 禁止 |
+|----|------|------|------|
+| DTO（契約型） | `api/generated` | OpenAPI から自動生成。Hook / Mapper の **入力型** | 手動編集、画面 state への直代入のみ |
+| `*Api.ts` | `api/statsApi.ts` 等 | `apiClient` 経由の HTTP。戻り値は `ApiSuccessResponse<GeneratedDto>` | ビジネスロジック、DTO 手書き定義 |
+| ViewModel | `types/` | generated の **re-export** + 画面固有型（編集中 state 等） | API レスポンスの手動二重定義 |
+| Mapper | `mappers/` | DTO → ViewModel（正規化・旧 API 互換・表示用集計） | API 呼び出し |
+| domain | `domain/<area>/` | 業務ルール **純関数**（按分計算・payload 生成等） | React import、API 呼び出し、副作用 |
+| Hook | `features/*/hooks/` | API 編成・Mapper 呼び出し・UI state | Screen 内へのロジック直書き |
+| UI | `screens/`, `components/` | 表示・イベントを Hook に委譲 | `*Api` / `apiClient` の直 import |
+
+**`domain/` の位置**: DTO / ViewModel とは別軸。HTTP レスポンスを変換するのではなく、**保存前の業務計算**（例: 明細小計、按分 payload 末尾配置）を Hook から呼ぶ。詳細は [settlement-change-guide.md](./settlement-change-guide.md)。
+
+#### 6.3.1 手書き `*Api.ts` の位置づけ
+
+`statsApi.ts` / `receiptApi.ts` 等は **generated 型を使う薄いラッパー** である。
+
+```typescript
+// statsApi.ts — 典型パターン
+async getSettlementStatus(month: string): Promise<ApiSuccessResponse<SettlementStatusData>> {
+  const res = await apiClient.get('/stats/settlement', { params: { month } });
+  return res.data; // envelope ごと DTO 型
+}
+```
+
+| 役割 | 内容 |
+|------|------|
+| 型 | 引数・戻り値は `api/generated` の DTO / `ApiSuccessResponse<T>` |
+| 認証 | `apiClient` が JWT ヘッダ注入・403 通知を担当 |
+| 将来 | Epic #105-5 で OpenAPI 由来の generated HTTP client へ段階移行可能（`*Api.ts` を adapter 化） |
+
+Hook は `features/*/index.ts` 経由で Screen から使う。**Screen から `*Api` を直接 import しない**（#100-14）。
+
+#### 6.3.2 具体例 A — 統計画面（Mapper 経由）
+
+DTO と画面表示 shape が一致しない、または旧 API 互換が必要な場合に Mapper を挟む。
+
+```mermaid
+sequenceDiagram
+  participant UI as StatisticsScreen
+  participant Hook as useStatistics
+  participant API as statsApi
+  participant MAP as statsMapper
+  participant VM as types/stats
+
+  UI->>Hook: 月選択
+  Hook->>API: getMonthlyStats(month)
+  API-->>Hook: ApiSuccessResponse MonthlyStatsData
+  Hook->>MAP: mapMonthlyStatsResponse(data, month)
+  MAP-->>Hook: MonthlyStatsViewModel
+  Hook->>VM: setState(ViewModel)
+  Hook-->>UI: data, chartSlices, ...
+```
+
+| 段階 | ファイル | 型 |
+|------|----------|-----|
+| HTTP | `statsApi.getMonthlyStats` | `MonthlyStatsData`（generated DTO） |
+| 変換 | `mappers/statsMapper.mapMonthlyStatsResponse` | `MonthlyStatsViewModel` |
+| 表示 | `features/stats/components/*` | ViewModel を props / Hook 戻り値で受け取る |
+
+旧 API の `total` フィールド等の互換吸収は **Mapper に閉じ込める**（Hook に散らさない）。
+
+#### 6.3.3 具体例 B — 精算サマリー（DTO 直利用）
+
+DTO shape がそのまま UI に使える場合、Mapper を省略してよい（[frontend-conventions.md](./frontend-conventions.md) §4.3）。
+
+```mermaid
+sequenceDiagram
+  participant UI as SettlementSummaryScreen
+  participant Hook as useSettlementSummary
+  participant API as statsApi
+  participant T as types/settlement
+
+  UI->>Hook: 月選択 / 送金登録
+  Hook->>API: getSettlementStatus(month)
+  API-->>Hook: SettlementStatusData
+  Hook->>T: members / transfers を state に格納
+  Note over Hook,T: types/settlement は generated の re-export
+  Hook-->>UI: summaryData, transferList
+```
+
+| 段階 | ファイル | 型 |
+|------|----------|-----|
+| HTTP | `statsApi.getSettlementStatus` | `SettlementStatusData` |
+| 型整理 | `types/settlement.ts` | `SettlementMemberSummary` 等 = generated re-export |
+| 表示 | `SettlementMemberCards` 等 | DTO と同一 shape をそのまま描画 |
+
+按分編集（`useSplitEditor`）は API DTO に加え **`domain/settlement/`**（`calcItemTotal`, `buildItemSplitSavePayload`）を Hook から呼ぶパターン。DTO 変換ではなく **保存前の業務ルール** が domain の責務。
+
+#### 6.3.4 §4.6 型境界図との関係
+
+| 資料 | スコープ |
+|------|----------|
+| **§4.6** | OpenAPI → FE generated / BE `apiSchemas` → BE Mapper → Controller の **契約・型正本** |
+| **§6.3（本節）** | FE 内の **実行時データフロー**（`*Api` → Mapper? → Hook → UI、`domain/` の横断） |
+
+両者は矛盾しない。§4.6 が「何を正本とするか」、§6.3 が「初見開発者がコードを辿る順序」を示す。
 
 ---
 
