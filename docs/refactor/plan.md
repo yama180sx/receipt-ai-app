@@ -550,3 +550,67 @@ flowchart TB
 3. Controller は `sendSuccess(res, mapper.toXxx(dto))` 程度に留める
 4. 新規 DTO フィールドは先に `openapi.yaml` + `apiSchemas.ts` を更新（#102-4 手順）
 5. `npm run check:openapi` と integration test がパスすること
+
+## 11. Epic #104 — ChatGPT レビュー 20260623 フォローアップ（Phase 6）
+
+Epic: [#502 Epic #104](https://github.com/yama180sx/receipt-ai-app/issues/502)
+
+[ChatGPT レビュー 20260623](../specs/chatgpt/ChatGPT_レビュー_20260623.txt)（**88/100点**）のフォローアップ。Epic #101 完了後も残る **規約違反 Screen・ReceiptScanScreen 肥大・FE 保守性** を解消し、90点台到達を目指す。
+
+### 11.1 方針サマリー
+
+| 項目 | 決定内容 |
+|------|----------|
+| 入力ソース | ChatGPT レビュー 20260623 + コード突合 + Epic #99 / #100 / #101 成功パターン |
+| FE 方針 | Screen = hook + 子コンポーネント（**150行以内**）。`useReceiptHistory` / #387 / #431 と同型 |
+| スコープ外 | React Hook Form、Context 新規追加、Alert 3関数の統合、全 API FE Adapter 一括化 |
+| 子 Issue | #104-3 は子 Issue なし（1 Issue で完結） |
+
+### 11.2 レビュー減点と対応マッピング
+
+**入力ソース（正本）**: [ChatGPT_レビュー_20260623.txt](../specs/chatgpt/ChatGPT_レビュー_20260623.txt)
+
+| 観点 | #101 後（6/22） | #104 着手時（6/23） | 主な対応 Issue |
+|------|-----------------|---------------------|----------------|
+| DRY / 共通化 | 18/25 | 21/25 | #104-1 |
+| 責務分割 | 20/25 | 22/25 | #104-1, #104-2 |
+| 型定義 | 22/25 | 24/25 | 本 Epic スコープ外（FE は `any` ゼロ済み） |
+| 保守性 | 19/25 | 21/25 | #104-3 |
+| **合計** | **79/100** | **88/100** | — |
+
+### 11.3 子 Issue 対応表
+
+| 命名 | GitHub | 優先度 | 見積（AI 補助） |
+|------|--------|--------|----------------|
+| #104 Epic | [#502](https://github.com/yama180sx/receipt-ai-app/issues/502) | — | — |
+| #104-0 | [#503](https://github.com/yama180sx/receipt-ai-app/issues/503) | Must | 0.5 人日 |
+| #104-1 | [#504](https://github.com/yama180sx/receipt-ai-app/issues/504) | Must | 1.5〜2.5 人日 |
+| #104-2 | [#505](https://github.com/yama180sx/receipt-ai-app/issues/505) | Should | 1〜2 人日 |
+| #104-3 | [#506](https://github.com/yama180sx/receipt-ai-app/issues/506) | Should | 2.5〜3.5 人日 |
+
+### 11.4 #101 / #102 との関係
+
+| 既存 Epic | #104 との関係 |
+|-----------|--------------|
+| #101（Phase 4） | #101 で未対応だった ProductMaster / AdminStats / Totp / ReceiptScan UI を補完 |
+| #102（OpenAPI SSOT） | #104-3 は mapper **利用方針** の追記のみ。契約正本は #102 維持 |
+| #103（BE Mapper） | FE domain 層とは独立 |
+
+**重複しないことの確認**: #104 は FE Screen 残件と FE 保守性に限定。BE 層・OpenAPI 契約の再整理は触らない。
+
+### 11.5 Won't fix / Later（記録）
+
+| 項目 | 判定 | 理由 |
+|------|------|------|
+| `useAsyncScreen` 横断 hook | **Later** | #104-1 完了後に必要性を再評価 |
+| Alert 3関数の統合 | **Won't fix** | `frontend-conventions.md` §4.2 の役割分担で十分 |
+| 全 API FE Adapter 統一 | **Later** | Epic #102 成果の段階適用で十分 |
+| `useSplitEditor` 再分割 | **Later** | 別 Issue 可 |
+
+### 11.6 推奨着手順
+
+```
+#503（#104-0 plan）→ #504（#104-1）→ #505（#104-2）→ #506（#104-3）
+```
+
+**Screen 分解の参考パターン**: `useReceiptHistory`（HistoryScreen）、Epic #99 [#387](https://github.com/yama180sx/receipt-ai-app/issues/387)、Epic #100 [#431](https://github.com/yama180sx/receipt-ai-app/issues/431)。
