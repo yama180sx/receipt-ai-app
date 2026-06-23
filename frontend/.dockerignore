@@ -1,0 +1,16 @@
+node_modules
+dist
+.expo
+.expo-shared
+web-build
+coverage
+*.log
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+**/*.test.ts
+**/*.test.tsx
+.vscode
+.cursor

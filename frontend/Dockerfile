@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Expo CLIをグローバルにインストール
-RUN npm install -g expo-cli
+RUN npm config set fetch-retries 5 \
+  && npm config set fetch-retry-mintimeout 20000 \
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && npm install -g expo-cli
 
 WORKDIR /app
 
