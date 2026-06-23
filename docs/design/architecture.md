@@ -552,7 +552,7 @@ flowchart TB
 
 #### 6.3.1 手書き `*Api.ts` の位置づけ
 
-`statsApi.ts` / `receiptApi.ts` 等は **generated 型を使う薄いラッパー** である。
+`statsApi.ts` / `receiptApi.ts` 等は **generated 型を使う薄いラッパー** である。`categoryApi.ts` は **#105-5 PoC として openapi-fetch 移行済み**（`openapiClient` + generated paths）。その他は従来どおり axios `apiClient`。
 
 ```typescript
 // statsApi.ts — 典型パターン
