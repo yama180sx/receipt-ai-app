@@ -125,3 +125,5 @@ export function useReceiptScan({
     handleCommit,
   };
 }
+
+export type ReceiptScanFlow = ReturnType<typeof useReceiptScan>;
