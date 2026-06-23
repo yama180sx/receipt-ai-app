@@ -656,7 +656,7 @@ npm run test:integration
 | 認証 | `backend/src/middleware/authMiddleware.ts`, `pendingAuthMiddleware.ts` |
 | テナント | `backend/src/middleware/tenantMiddleware.ts`, `utils/context.ts` |
 | エラー | `backend/src/utils/appError.ts`, `middleware/errorHandler.ts` |
-| 按分 | `backend/src/utils/itemSplitAllocation.ts` |
+| 按分 | `backend/src/services/settlement/itemSplitAllocation.ts`, `itemSplitService.ts` |
 | 精算 | `backend/src/controllers/statsController.ts` |
 
 ---
@@ -732,6 +732,43 @@ npm run test:integration
 - [ ] npm test（frontend / backend）がパス
 - [ ] docs/design/api-spec.md に as-built 追記
 ```
+
+### 9.6 手書き `*Api.ts` → openapi-fetch 移行（#105-5 PoC）
+
+Epic #105-5 以降、ドメイン単位で `axios` 手書きラッパーを **OpenAPI paths 型付きクライアント**（`openapi-fetch`）へ段階移行する。PoC 完了: **`categoryApi.ts`**。
+
+#### 前提
+
+| 項目 | 内容 |
+|------|------|
+| 契約 SSOT | `docs/openapi/openapi.yaml`（変更なし） |
+| 型生成 | 既存 `npm run generate:api` → `api/generated/schema.ts` |
+| 認証 | `utils/apiAuth.ts` — JWT / `x-member-id`（axios / openapi 共通） |
+| 外部 API | Hook は引き続き `api/index.ts` 経由（`categoryApi` 等の export 名は維持） |
+
+#### 移行チェックリスト（1 ドメインあたり）
+
+```
+1. [ ] openapi.yaml に path / operation が定義済みであることを確認
+2. [ ] categoryApi と同様、openapiClient.GET/POST/... で path を呼ぶ
+3. [ ] 戻り値は unwrapOpenApiResponse() で envelope を unwrap（失敗時 OpenApiHttpError）
+4. [ ] Hook / Screen の import パスは変更しない（api/index.ts 経由）
+5. [ ] apiError.ts が OpenApiHttpError を解釈することを確認（getApiErrorMessage 等）
+6. [ ] npm test（frontend）がパス
+7. [ ] 残り *Api.ts は axios のまま（一括移行しない）
+```
+
+#### 配置（as-built）
+
+| ファイル | 役割 |
+|----------|------|
+| `frontend/src/api/openapiClient.ts` | `createClient<paths>` + 認証 middleware |
+| `frontend/src/api/openapiHttpError.ts` | `unwrapOpenApiResponse`, `OpenApiHttpError` |
+| `frontend/src/utils/apiAuth.ts` | 認証ヘッダ構築（`apiClient` / `openapiClient` 共通） |
+| `frontend/src/api/categoryApi.ts` | **移行済 PoC** — generated paths 経由 |
+| `frontend/src/api/receiptApi.ts` 等 | 未移行 — 従来 axios `apiClient` |
+
+データフロー詳細: [architecture.md](./architecture.md) §6.3。
 
 ---
 

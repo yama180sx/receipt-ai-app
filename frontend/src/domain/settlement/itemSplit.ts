@@ -1,6 +1,12 @@
 import type { ItemSplitInput } from '../../api/generated';
 
-/** 明細の税込小計（Backend の calcItemLineTotal と同じ丸め） */
+/**
+ * 明細行の税込小計（UI プレビュー用ミラー）。
+ * 正本（SSOT）: `backend/src/utils/itemLineTotal.ts` — `calcItemLineTotal`
+ * Contract test: `docs/testing/fixtures/itemLineTotal-vectors.json`
+ *
+ * @see docs/design/domain-model.md §4.1
+ */
 export function calcItemTotal(item: {
   price?: unknown;
   quantity?: unknown;

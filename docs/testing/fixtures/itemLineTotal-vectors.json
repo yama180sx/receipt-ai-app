@@ -1,0 +1,47 @@
+{
+  "description": "明細行税込小計（itemLineTotal）の FE/BE contract test ベクトル。正本は backend/src/utils/itemLineTotal.ts（calcItemLineTotal）。",
+  "ssot": "backend/src/utils/itemLineTotal.ts",
+  "feMirror": "frontend/src/domain/settlement/itemSplit.ts",
+  "vectors": [
+    {
+      "id": "round-half-up",
+      "price": 99.5,
+      "quantity": 2,
+      "expected": 199
+    },
+    {
+      "id": "string-price-quantity",
+      "price": "108",
+      "quantity": "3",
+      "expected": 324
+    },
+    {
+      "id": "default-quantity",
+      "price": 498,
+      "expected": 498
+    },
+    {
+      "id": "invalid-quantity-falls-back-to-one",
+      "price": 100,
+      "quantity": "abc",
+      "expected": 100
+    },
+    {
+      "id": "zero-price",
+      "price": 0,
+      "quantity": 5,
+      "expected": 0
+    },
+    {
+      "id": "api-string-values",
+      "price": "250",
+      "quantity": "2",
+      "expected": 500
+    },
+    {
+      "id": "integer-unit-price-only",
+      "price": 108,
+      "expected": 108
+    }
+  ]
+}

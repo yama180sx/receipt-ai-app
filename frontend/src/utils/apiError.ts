@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { OpenApiHttpError } from '../api/openapiHttpError';
 import { showAlert } from './alertMessage';
 
 function readStringField(data: unknown, key: 'error' | 'message'): string | undefined {
@@ -9,6 +10,9 @@ function readStringField(data: unknown, key: 'error' | 'message'): string | unde
 
 /** Axios レスポンス body（存在する場合） */
 export function getApiErrorResponseData(error: unknown): unknown {
+  if (error instanceof OpenApiHttpError) {
+    return error.data;
+  }
   if (axios.isAxiosError(error)) {
     return error.response?.data;
   }
@@ -17,6 +21,9 @@ export function getApiErrorResponseData(error: unknown): unknown {
 
 /** HTTP ステータス（Axios エラー時） */
 export function getApiErrorStatus(error: unknown): number | undefined {
+  if (error instanceof OpenApiHttpError) {
+    return error.status;
+  }
   if (axios.isAxiosError(error)) {
     return error.response?.status;
   }

@@ -1,24 +1,32 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { calcItemLineTotal } from './itemLineTotal';
 
-describe('calcItemLineTotal', () => {
-  it('rounds price × quantity to integer yen', () => {
-    expect(calcItemLineTotal(99.5, 2)).toBe(199);
-  });
+type ItemLineTotalVector = {
+  id: string;
+  price: unknown;
+  quantity?: unknown;
+  expected: number;
+};
 
-  it('parses string price and quantity', () => {
-    expect(calcItemLineTotal('108', '3')).toBe(324);
-  });
+type ItemLineTotalFixture = {
+  vectors: ItemLineTotalVector[];
+};
 
-  it('defaults quantity to 1', () => {
-    expect(calcItemLineTotal(498)).toBe(498);
-  });
+const fixturePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../docs/testing/fixtures/itemLineTotal-vectors.json'
+);
+const fixture = JSON.parse(readFileSync(fixturePath, 'utf-8')) as ItemLineTotalFixture;
 
-  it('treats invalid quantity as 1', () => {
-    expect(calcItemLineTotal(100, 'abc')).toBe(100);
-  });
-
-  it('returns 0 for zero price', () => {
-    expect(calcItemLineTotal(0, 5)).toBe(0);
+describe('calcItemLineTotal contract (itemLineTotal-vectors.json)', () => {
+  it.each(fixture.vectors)('$id', ({ price, quantity, expected }) => {
+    if (quantity === undefined) {
+      expect(calcItemLineTotal(price)).toBe(expected);
+      return;
+    }
+    expect(calcItemLineTotal(price, quantity)).toBe(expected);
   });
 });

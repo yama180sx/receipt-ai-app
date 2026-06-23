@@ -1,0 +1,308 @@
+添付したRecAIpt 品質ガバナンスレビュー（AI時代版）.pdfの内容のレビューを行ってください。なおZIPファイル内のファイル全てを確認してください。ファイルを確認せずに推測などは行わないでください。
+
+ZIPを展開し、446ファイルを対象に構成・型定義・ドメイン層・API層・主要サービス・フロントエンド機能構成を確認したうえで、添付PDFの評価基準に従ってレビューします。
+
+※前回レビューは参照していません。今回ZIPのみを根拠としています。
+※未確認事項は明示します。
+
+総合評価
+評価項目	配点	得点	減点
+業務ルール一元管理	25	21	-4
+AI・人間双方の理解容易性	25	23	-2
+型安全性・契約の明確性	25	22	-3
+変更影響範囲の局所性	25	22	-3
+合計	100	88	-12
+1. 業務ルール一元管理（21/25）
+確認できた事実
+
+Backend
+
+services配下で業務処理を集約
+repositories配下でDBアクセス分離
+controllers → services → repositories 構造
+
+Frontend
+
+domain/settlement 配下に割り勘ロジックを配置
+features単位で機能分割
+減点事項
+-2点
+
+frontend/src/domain/settlement/itemSplit.ts
+
+/** Backend の calcItemLineTotal と同じ丸め */
+
+というコメントが存在。
+
+実際に
+
+calcItemTotal()
+
+がFrontend側に実装されている。
+
+Backend側には
+
+calcItemLineTotal
+
+が別実装として存在。
+
+業務ルールそのものが共有ライブラリ化されておらず、
+
+「Backendと同じ計算をする」
+
+という運用で維持している。
+
+将来的なルール変更時に二重修正リスクあり。
+
+-2点
+
+割り勘関連ロジックは比較的集約されているが、
+
+frontend/domain/settlement
+backend/services/receipt
+backend/utils
+
+に跨っている。
+
+完全一元化までは到達していない。
+
+2. AI・人間双方の理解容易性（23/25）
+確認できた事実
+
+Frontend
+
+features/
+  auth
+  receipt
+  settlement
+  category
+  history
+  stats
+
+機能単位で整理。
+
+Backend
+
+controllers
+services
+repositories
+routes
+schemas
+middleware
+
+責務分離が明確。
+
+良い点
+
+AIに
+
+「割り勘を修正して」
+
+と依頼した場合、
+
+候補ディレクトリをかなり絞り込める。
+
+減点事項
+-1点
+
+以下が混在。
+
+api
+generated
+services
+mappers
+types
+domain
+
+責務境界は概ね良いが、
+
+初見開発者は
+
+API DTO
+Domain
+Mapper
+
+の流れを理解する必要がある。
+
+-1点
+
+一部 legacy API が残存。
+
+例
+
+frontend/src/api/receiptApi.ts
+
+OpenAPI generated client と併存している。
+
+入口が複数ある。
+
+3. 型安全性・契約の明確性（22/25）
+確認できた事実
+
+OpenAPIあり
+
+docs/openapi/openapi.yaml
+
+存在確認。
+
+Frontend
+
+src/api/generated
+
+存在確認。
+
+契約駆動開発を意識した構成。
+
+良い点
+
+DTO管理を生成コードへ寄せている。
+
+型安全性は比較的高い。
+
+減点事項
+-2点
+
+確認できた any 使用
+
+params as any
+
+receiptApi.ts
+
+-1点
+
+any使用箇所が複数存在。
+
+確認できたもの
+
+backend/scripts/test-admin-api.ts
+backend/src/api/receiptApi.ts
+backend/src/__tests__/integration/auth.integration.test.ts
+backend/src/middleware/errorHandler.test.ts
+test-gemini.ts
+
+件数は少ないがゼロではない。
+
+未確認
+
+OpenAPIから全APIが100%生成されているかは【未確認】
+
+4. 変更影響範囲の局所性（22/25）
+確認できた事実
+
+Backend
+
+Controller
+ ↓
+Service
+ ↓
+Repository
+
+構造。
+
+機能単位で閉じている箇所が多い。
+
+良い点
+
+Receipt系
+
+services/receipt
+repositories/receipt
+
+でまとまっている。
+
+Category系
+
+ProductMaster系
+
+Admin系
+
+も同様。
+
+減点事項
+-2点
+
+割り勘機能変更時
+
+変更候補が
+
+frontend/domain/settlement
+frontend/features/settlement
+
+backend/services/receipt
+backend/utils
+
+へ広がる。
+
+単一箇所変更では済まない。
+
+-1点
+
+OpenAPI generated と手書きAPIが併存。
+
+API変更時の影響範囲が若干広い。
+
+減点理由一覧
+減点	根拠
+-2	FrontendとBackendで同等計算ロジック維持
+-2	割り勘ロジックが複数層に分散
+-1	DTO/Domain/Mapper理解コスト
+-1	手書きAPIとGenerated API併存
+-2	as any 使用
+-1	any 使用箇所残存
+-2	割り勘変更時に複数モジュール修正
+-1	API変更時の入口複数
+改善優先順位
+High
+Frontend/Backend重複計算ロジック解消
+手書きAPI層のOpenAPI統合
+any完全排除
+Medium
+割り勘ドメインの更なる集約
+DTO→Domain変換経路の整理
+Low
+ディレクトリ説明ドキュメント追加
+Mapper命名統一
+AI修正成功率
+
+A
+
+理由
+
+機能単位ディレクトリが明確
+OpenAPIあり
+Repository分離あり
+
+ただし
+
+割り勘ルール変更
+金額計算変更
+
+は Frontend/Backend双方確認が必要。
+
+S評価には届かない。
+
+人間引継ぎ容易性
+
+A
+
+理由
+
+構造が比較的オーソドックス
+レイヤ分離が明確
+Feature単位で追跡可能
+
+新任開発者でも比較的短期間で把握可能。
+
+最終スコア
+
+88 / 100
+
+今回のZIPを根拠にすると、以前の「動けばよい」レベルではなく、AI協働開発をかなり意識した構成になっています。
+
+最大の減点要因はコード量ではなく、
+
+「同一業務ルールをFrontendとBackendで同期維持している箇所が残っていること」
+
+です。ここを解消できると90点台前半〜中盤が狙える構成でした。
+
+
