@@ -154,6 +154,8 @@ try {
 | ViewModel | 手動定義 | `frontend/src/types/`（generated の再 export + 画面拡張） |
 | 変換 | Mapper | `frontend/src/mappers/` |
 
+**データフロー図（DTO → UI）**: [architecture.md](./architecture.md) **§6.3** — mermaid 図と統計 / 精算の具体例（#105-4）
+
 **Mapper 利用方針（#104-3）**
 
 - DTO と ViewModel が **同一 shape** の場合: Hook が `api/generated` 型を直接利用してよい

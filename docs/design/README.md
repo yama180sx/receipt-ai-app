@@ -15,6 +15,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | DB 列定義・制約 | [database-schema.md](./database-schema.md) |
 | 精算・按分の業務ルール | [domain-model.md](./domain-model.md) |
 | **按分・精算ルールを変更するとき** | [settlement-change-guide.md](./settlement-change-guide.md) |
+| **FE の DTO → UI の流れ** | [architecture.md](./architecture.md) §6.3 |
 | API 連携 | [api-spec.md](./api-spec.md) |
 | レシート AI 解析 | [ai-pipeline.md](./ai-pipeline.md) |
 | 画面・UX | [frontend-screens.md](./frontend-screens.md) |
@@ -31,7 +32,8 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | [architecture.md](./architecture.md) | アーキテクチャ・デプロイ | #90-1 |
 | [database-schema.md](./database-schema.md) | DB 列定義・制約（Prisma 準拠） | 統合（ChatGPT Phase1 突合） |
 | [domain-model.md](./domain-model.md) | ドメイン意味・精算・按分 | #90-2 |
-| [settlement-change-guide.md](./settlement-change-guide.md) | 按分・精算ルール変更時の触るファイル・順序 | #105-3 |
+| [settlement-change-guide.md](./settlement-change-guide.md) | 按分・精算ルール変更ガイド | #105-3 |
+| [architecture.md](./architecture.md) §6.3 | FE DTO / Mapper / domain データフロー図 | #105-4 |
 | [api-spec.md](./api-spec.md) | API 仕様 | #90-3 |
 | [ai-pipeline.md](./ai-pipeline.md) | 3層正規化・AI パイプライン | #90-4 |
 | [frontend-screens.md](./frontend-screens.md) | 画面遷移・フロント | #90-5 |
