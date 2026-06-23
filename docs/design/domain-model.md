@@ -163,12 +163,20 @@ erDiagram
 itemLineTotal = Math.round(price × quantity)
 ```
 
-| 実装 | ファイル |
+| 役割 | ファイル |
 |------|----------|
-| Backend | `backend/src/utils/itemLineTotal.ts` — `calcItemLineTotal()` |
-| Frontend | `frontend/src/utils/splitEditorSplits.ts` — `calcItemTotal()` |
+| **SSOT（正本）** | `backend/src/utils/itemLineTotal.ts` — `calcItemLineTotal()` |
+| FE ミラー（UI プレビュー） | `frontend/src/domain/settlement/itemSplit.ts` — `calcItemTotal()` |
+| Contract test | `docs/testing/fixtures/itemLineTotal-vectors.json` — BE/FE 同一ベクトル |
 
-Frontend / Backend で同一式を使用する（テスト [#91-2](https://github.com/yama180sx/receipt-ai-app/issues/279) で検証）。
+**ルール変更手順（#105-1）**
+
+1. `itemLineTotal.ts`（SSOT）を更新
+2. `itemLineTotal-vectors.json` にケースを追加
+3. `calcItemTotal`（FE ミラー）を同期
+4. `npm test`（frontend / backend）で contract test がパスすること
+
+保存・精算の正は Backend のみ。FE の `calcItemTotal` は編集中プレビュー用。
 
 ### 4.2 暗黙的デフォルト（splits 0 件）
 
@@ -244,8 +252,8 @@ UI 上の端数負担者（先頭） → payload では末尾 → Backend の al
 
 | 実装 | ファイル |
 |------|----------|
-| payload 生成 | `frontend/src/utils/splitEditorSplits.ts` — `buildItemSplitSavePayload()` |
-| テスト | `frontend/src/utils/splitEditorSplits.test.ts` |
+| payload 生成 | `frontend/src/domain/settlement/itemSplit.ts` — `buildItemSplitSavePayload()` |
+| テスト | `frontend/src/domain/settlement/itemSplit.test.ts` |
 
 > **T-ref-03**（[findings.md](../testing/findings.md)）: Frontend payload 末尾配置と Backend allocate 一致
 

@@ -1,17 +1,31 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildItemSplitSavePayload, calcItemTotal } from './itemSplit';
 
-describe('calcItemTotal', () => {
-  it('matches backend calcItemLineTotal rounding', () => {
-    expect(calcItemTotal({ price: 99.5, quantity: 2 })).toBe(199);
-  });
+type ItemLineTotalVector = {
+  id: string;
+  price: unknown;
+  quantity?: unknown;
+  expected: number;
+};
 
-  it('defaults quantity to 1', () => {
-    expect(calcItemTotal({ price: 108 })).toBe(108);
-  });
+type ItemLineTotalFixture = {
+  vectors: ItemLineTotalVector[];
+};
 
-  it('handles string-like values from API', () => {
-    expect(calcItemTotal({ price: '250', quantity: '2' })).toBe(500);
+const fixturePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../docs/testing/fixtures/itemLineTotal-vectors.json'
+);
+const fixture = JSON.parse(readFileSync(fixturePath, 'utf-8')) as ItemLineTotalFixture;
+
+describe('calcItemTotal contract (itemLineTotal-vectors.json)', () => {
+  it.each(fixture.vectors)('$id', ({ price, quantity, expected }) => {
+    const item =
+      quantity === undefined ? { price } : { price, quantity };
+    expect(calcItemTotal(item)).toBe(expected);
   });
 });
 
