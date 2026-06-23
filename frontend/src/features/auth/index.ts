@@ -1,4 +1,5 @@
 export { useLoginFlow } from './hooks/useLoginFlow';
+export { useTotpSettings } from './hooks/useTotpSettings';
 export type { LoginFlow } from './hooks/useLoginFlow';
 export type { LoginStep } from './types';
 export { InviteCodeStep } from './components/InviteCodeStep';
