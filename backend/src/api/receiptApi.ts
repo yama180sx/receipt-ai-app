@@ -44,9 +44,16 @@ export const updateItemCategory = async (itemId: number, categoryId: number): Pr
  * レシート一覧を取得
  * @param params { memberId?: number, month?: string }
  */
-export const fetchReceipts = async (params: { memberId?: number, month?: string } = {}) => {
-  const query = new URLSearchParams(params as any).toString();
-  const response = await fetch(`${BASE_URL}/receipts?${query}`);
+export const fetchReceipts = async (params: { memberId?: number; month?: string } = {}) => {
+  const search = new URLSearchParams();
+  if (params.memberId !== undefined) {
+    search.set('memberId', String(params.memberId));
+  }
+  if (params.month !== undefined) {
+    search.set('month', params.month);
+  }
+  const query = search.toString();
+  const response = await fetch(`${BASE_URL}/receipts${query ? `?${query}` : ''}`);
   if (!response.ok) throw new Error('Failed to fetch receipts');
   return response.json();
 };
