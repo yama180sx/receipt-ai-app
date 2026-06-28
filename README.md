@@ -1,4 +1,3 @@
-<img width="1080" height="2520" alt="Screenshot (2026_06_26 6_23_59)" src="https://github.com/user-attachments/assets/6e3b2079-cb4c-4811-9aff-d34dc7caea85" />
 # RecAIpt
 
 AIによるレシート解析と世帯単位の家計管理を実現する個人開発アプリです。
