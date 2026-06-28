@@ -26,36 +26,25 @@ RecAIptは、家族や同居人との共有支出管理を効率化するため�
 ### レシート各種画面（Android/iPhone/web）
 
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_26_31)" src="https://github.com/user-attachments/assets/43bff239-7cdb-4acf-9444-736a025facae" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_26_47)" src="https://github.com/user-attachments/assets/fede47a2-2b1d-4250-b0ce-dfaaa5e52a22" />
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_30_51)" src="https://github.com/user-attachments/assets/c550a9a7-1685-4f00-ab9e-9f602171a905" />
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_32_39)" src="https://github.com/user-attachments/assets/7552f7c3-b6fa-4da5-bcf0-fbaa3c28e4a0" />
 <img width="135" height="315" alt="Screenshot (2026_06_29 7_57_35)" src="https://github.com/user-attachments/assets/fc3d04e8-1837-40d5-b121-172addf7f564" />
-<img width="135" height="315" alt="Screenshot (2026_06_29 7_57_52)" src="https://github.com/user-attachments/assets/a6f9bda1-2863-44bd-9cc1-e83c10d6fa2f" />
 <img width="135" height="315" alt="Screenshot (2026_06_29 7_58_13)" src="https://github.com/user-attachments/assets/6a9f422c-609b-405d-9217-deee32d5d671" />
 
 ### レシート各種画面（web）
 
 <img width="420" height="315" alt="スクリーンショット02" src="https://github.com/user-attachments/assets/c3a84c39-d80d-4a21-a10c-c2afd245b3fb" />
-<img width="420" height="315" alt="スクリーンショット03" src="https://github.com/user-attachments/assets/67616d6d-6535-4d9a-956c-fbbcf41ab809" />
-<img width="420" height="315" alt="スクリーンショット04" src="https://github.com/user-attachments/assets/c4184e97-bfe5-4c07-8680-a96e2b461bef" />
-<img width="420" height="315" alt="スクリーンショット05" src="https://github.com/user-attachments/assets/8eb1d910-3d25-45a8-a35d-1ff562cf0d19" />
 <img width="420" height="315" alt="スクリーンショット06" src="https://github.com/user-attachments/assets/745b8961-52a8-4875-af95-e0eb781c0966" />
 
 ### 管理画面（Android/iPhone/web）
 
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_29_26)" src="https://github.com/user-attachments/assets/5ac35c22-4e67-451b-bf4e-2171fd585907" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_29_38)" src="https://github.com/user-attachments/assets/6cf5ce8a-af13-4421-9903-135254bb1791" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_29_50)" src="https://github.com/user-attachments/assets/01d1166e-bbba-480d-95b5-985988f6a0c8" />
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_30_06)" src="https://github.com/user-attachments/assets/82440cd6-bb3c-4d08-ac83-363de7545e61" />
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_30_18)" src="https://github.com/user-attachments/assets/419bed48-e0a2-4f1e-8b03-464147e28ffa" />
 
 ### ログイン（Android/iPhone/web）
 
 <img width="135" height="315" alt="Screenshot (2026_06_26 6_23_37)" src="https://github.com/user-attachments/assets/92b6ed2d-5247-4e81-b20a-0daff6a74639" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_23_59)" src="https://github.com/user-attachments/assets/1a5e50dd-6796-4377-b192-92f559eb97ff" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_24_21)" src="https://github.com/user-attachments/assets/7392f8b7-95cf-4f55-8795-66b31ea28530" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_24_45)" src="https://github.com/user-attachments/assets/7c448bf8-1265-453f-b0fd-93d463bda4c5" />
-<img width="135" height="315" alt="Screenshot (2026_06_26 6_25_25)" src="https://github.com/user-attachments/assets/e2927c45-cbb2-42c6-9f8b-6d0ceb36400e" />
 
 ---
 
