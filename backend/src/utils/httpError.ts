@@ -14,9 +14,22 @@ export function getHttpStatusFromError(error: unknown): number | undefined {
   return undefined;
 }
 
+/** Gemini 日次無料枠（RPD）切れ — リトライしても当日は回復しない */
+export function isGeminiDailyQuotaError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return (
+    message.includes('GenerateRequestsPerDay') ||
+    message.includes('PerDayPerProjectPerModel') ||
+    /generate_content_free_tier_requests/i.test(message)
+  );
+}
+
 export function isRetryableHttpError(error: unknown): boolean {
   const status = getHttpStatusFromError(error);
-  return status === 429 || (status !== undefined && status >= 500);
+  if (status === 429) {
+    return !isGeminiDailyQuotaError(error);
+  }
+  return status !== undefined && status >= 500;
 }
 
 export function getErrorMessage(error: unknown): string {
