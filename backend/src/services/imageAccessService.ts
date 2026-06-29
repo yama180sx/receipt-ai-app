@@ -11,7 +11,7 @@ async function hasQueueJobForImage(
   imagePath: string
 ): Promise<boolean> {
   const jobs = await receiptQueue.getJobs(
-    ['completed', 'waiting', 'active', 'delayed', 'paused'],
+    ['completed', 'waiting', 'active', 'delayed', 'paused', 'failed'],
     0,
     200,
     true
@@ -27,7 +27,7 @@ async function hasQueueJobForImage(
 /**
  * 自世帯が参照可能なレシート画像か判定する。
  * - DB に保存済み Receipt
- * - 解析ジョブ投入済み（保存前プレビュー用）
+ * - 解析ジョブ投入済み（保存前プレビュー用。failed 含む — 解析失敗時もサムネイル表示）
  */
 export async function canAccessReceiptImage(
   familyGroupId: number,
