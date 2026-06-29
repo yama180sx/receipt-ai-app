@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { receiptApi } from '../api/receiptApi';
 import { showApiErrorAlert } from '../utils/apiError';
 import { countActiveReceiptJobs } from '../utils/receiptJobDisplay';
 import type { ReceiptJobListItem } from '../types/receiptJob';
 
-const POLL_INTERVAL_MS = 2000;
-
 type RefreshOptions = {
   userInitiated?: boolean;
 };
 
+/**
+ * 確認トレイ用ジョブ一覧。
+ * 自動ポーリングは行わず、呼び出し元が refresh のタイミングを制御する（Issue #106-0）。
+ */
 export function useReceiptJobs(enabled: boolean) {
   const [jobs, setJobs] = useState<ReceiptJobListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const jobsRef = useRef(jobs);
-  jobsRef.current = jobs;
 
   const refresh = useCallback(
     async (options?: RefreshOptions) => {
@@ -39,6 +39,7 @@ export function useReceiptJobs(enabled: boolean) {
     [enabled]
   );
 
+  /** アプリ起動（Provider 有効化）時に 1 回取得 */
   useEffect(() => {
     if (!enabled) {
       setJobs([]);
@@ -46,18 +47,6 @@ export function useReceiptJobs(enabled: boolean) {
     }
 
     void refresh();
-  }, [enabled, refresh]);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const interval = setInterval(() => {
-      if (countActiveReceiptJobs(jobsRef.current) > 0) {
-        void refresh();
-      }
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(interval);
   }, [enabled, refresh]);
 
   const activeCount = countActiveReceiptJobs(jobs);

@@ -1,7 +1,8 @@
-import React from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppBackButton } from '../components/ui';
+import { AppBackButton, AppButton } from '../components/ui';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
 import { useReceiptTray } from '../contexts/ReceiptTrayContext';
 import { colors } from '../theme/colors';
@@ -25,6 +26,13 @@ export function ReceiptTrayScreen({ onBack }: Props) {
     canDiscardTrayItem,
   } = useReceiptTray();
 
+  /** 解析一覧表示のたびに 1 回取得（自動ポーリングはしない） */
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh])
+  );
+
   return (
     <SafeAreaView style={screenLayout.container} edges={['left', 'right', 'bottom']}>
       <View style={[screenLayout.header, styles.headerTray]}>
@@ -35,13 +43,20 @@ export function ReceiptTrayScreen({ onBack }: Props) {
             {trayItemCount > 0 ? `${trayItemCount} 件の受付` : '受付中のレシートはありません'}
           </Text>
         </View>
-        {trayItemCount > 0 ? (
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{trayItemCount}</Text>
-          </View>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        <View style={styles.headerActions}>
+          <AppButton
+            title="状態を更新"
+            variant="outline"
+            size="sm"
+            loading={refreshing}
+            onPress={() => void refresh({ userInitiated: true })}
+          />
+          {trayItemCount > 0 ? (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{trayItemCount}</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <ScrollView
@@ -90,6 +105,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   countBadgeText: { color: colors.text.inverse, fontWeight: '700' },
-  headerSpacer: { width: 32 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   scrollContentTray: { paddingBottom: spacing.xl },
 });
