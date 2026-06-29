@@ -1,10 +1,10 @@
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { redisConnection } from '../config/redis';
 import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
 import { analyzeOnly } from '../services/receiptService'; 
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
-import { getErrorMessage } from '../utils/httpError';
+import { getErrorMessage, isRetryableHttpError } from '../utils/httpError';
 
 /**
  * [Issue #49-8 / #71]
@@ -33,9 +33,13 @@ const receiptWorker = new Worker(
         return result;
 
       } catch (error: unknown) {
-        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${getErrorMessage(error)}`);
-        
-        // ジョブを失敗状態 (failed) にし、必要に応じて BullMQ のリトライ機能に委ねる
+        const message = getErrorMessage(error);
+        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${message}`);
+
+        // 日次枠切れなど、BullMQ 再試行しても回復しないエラーは即 failed にする
+        if (!isRetryableHttpError(error)) {
+          throw new UnrecoverableError(message);
+        }
         throw error;
       }
     });
