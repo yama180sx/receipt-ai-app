@@ -13,6 +13,10 @@ export type PromptEditorFormState = {
   domainHints: string;
 };
 
+function isDomainHints(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 const emptyForm = (): PromptEditorFormState => ({
   name: '',
   description: '',
@@ -120,10 +124,15 @@ export function usePromptEditor() {
       return;
     }
 
-    let parsedHints: unknown = null;
+    let parsedHints: Record<string, unknown> | null = null;
     if (form.domainHints.trim()) {
       try {
-        parsedHints = JSON.parse(form.domainHints);
+        const parsed = JSON.parse(form.domainHints) as unknown;
+        if (!isDomainHints(parsed)) {
+          showAlert('JSONエラー', 'Domain Hints はJSONオブジェクトで指定してください。');
+          return;
+        }
+        parsedHints = parsed;
       } catch {
         showAlert('JSONエラー', 'Domain Hints の JSON 形式が不正です。');
         return;
@@ -140,7 +149,7 @@ export function usePromptEditor() {
           name: form.name,
           description: form.description,
           systemPrompt: form.systemPrompt,
-          domainHints: parsedHints,
+          domainHints: parsedHints ?? undefined,
           isActive: false,
         });
         showAlert('作成完了', '新しいプロンプトを作成しました。');
@@ -149,7 +158,7 @@ export function usePromptEditor() {
           name: form.name,
           description: form.description,
           systemPrompt: form.systemPrompt,
-          domainHints: parsedHints,
+          domainHints: parsedHints ?? undefined,
         });
         showAlert('更新完了', 'プロンプトを更新しました。');
       } else {

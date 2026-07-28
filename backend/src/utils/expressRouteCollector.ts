@@ -35,6 +35,10 @@ function joinPaths(prefix: string, segment: string): string {
   return combined.replace(/\/+/g, '/') || '/';
 }
 
+function getLayerPath(layer: RouterLayer): string | undefined {
+  return layer.path;
+}
+
 function resolveMountPrefix(
   layer: RouterLayer,
   prefix: string,
@@ -50,10 +54,10 @@ function resolveMountPrefix(
         : fullProbe;
 
     layer.path = undefined;
-    if (layer.match(relativeProbe) && layer.path) {
-      if (layer.path.length > longest.length) {
-        longest = layer.path;
-      }
+    if (!layer.match(relativeProbe)) continue;
+    const matchedPath = getLayerPath(layer);
+    if (typeof matchedPath === 'string' && matchedPath.length > longest.length) {
+      longest = matchedPath;
     }
   }
   return longest;
