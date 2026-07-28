@@ -3,7 +3,7 @@ import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { tenantMiddleware } from '../middleware/tenantMiddleware';
 import { validate } from '../middleware/validate';
-import { uploadReceiptSchema } from '../schemas/receiptSchema';
+import { productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
 
 import {
   getReceipts,
@@ -12,6 +12,7 @@ import {
   deleteReceipt,
   getLatestReceipt,
   updateItemCategory,
+  updateItemProductClassification,
   getMonthlyStats,
   getJobStatus,
   getReceiptJobs,
@@ -56,6 +57,11 @@ router.post('/receipts', createReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 router.patch('/receipts/:id', updateReceipt);
 router.patch('/receipts/items/:id', updateItemCategory);
+router.patch(
+  '/receipts/items/:itemId/product-classification',
+  validate(productClassificationCorrectionSchema),
+  updateItemProductClassification
+);
 router.post('/receipts/items/:itemId/splits', updateItemSplits);
 router.post('/receipts/commit', commitReceipt);
 

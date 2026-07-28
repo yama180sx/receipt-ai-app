@@ -34,6 +34,7 @@ import {
   listFamilyMembers,
 } from '../services/receipt/receiptQueryService';
 import { updateReceiptById, updateItemCategoryById } from '../services/receipt/receiptUpdateService';
+import { correctItemProductClassification } from '../services/productClassification/productClassificationCorrectionService';
 import { updateItemSplitsById } from '../services/settlement/itemSplitService';
 import {
   getMonthlyStats as fetchMonthlyStats,
@@ -160,6 +161,13 @@ export const updateItemCategory = asyncHandler(async (req, res) => {
   const { categoryId } = req.body;
 
   const result = await updateItemCategoryById(Number(id), familyGroupId, categoryId);
+  sendSuccess(res, mapReceiptItemToDetail(result));
+});
+
+export const updateItemProductClassification = asyncHandler(async (req, res) => {
+  const { familyGroupId, memberId } = requireTenantContext();
+  const itemId = getRouteParam(req, 'itemId');
+  const result = await correctItemProductClassification(Number(itemId), familyGroupId, memberId, req.body);
   sendSuccess(res, mapReceiptItemToDetail(result));
 });
 

@@ -720,6 +720,50 @@ export interface paths {
         };
         trace?: never;
     };
+    "/receipts/items/{itemId}/product-classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 明細商品種別修正 */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateItemProductClassificationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ReceiptItemDetail"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/receipts/items/{itemId}/splits": {
         parameters: {
             query?: never;
@@ -1400,7 +1444,9 @@ export interface components {
         /** @enum {string} */
         ProductTypeStatus: "classified" | "needs_review" | "unclassified" | "outside_initial_scope" | "not_applicable";
         /** @enum {string} */
-        ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "ai";
+        ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "similarity" | "ai" | "manual";
+        /** @enum {string} */
+        ClassificationCorrectionScope: "item_only" | "same_ocr_name" | "same_classification_name";
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";
         ItemSplitSummary: {
@@ -1518,6 +1564,12 @@ export interface components {
         };
         UpdateItemCategoryRequest: {
             categoryId: number;
+        };
+        UpdateItemProductClassificationRequest: {
+            productTypeId: number;
+            scope: components["schemas"]["ClassificationCorrectionScope"];
+            /** @description scope が same_classification_name の場合は必須 */
+            classificationName?: string;
         };
         SaveItemSplitsRequest: {
             splits: components["schemas"]["ItemSplitInput"][];

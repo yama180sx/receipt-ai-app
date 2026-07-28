@@ -60,9 +60,26 @@ export type ProductTypeStatus =
   | 'outside_initial_scope'
   | 'not_applicable';
 
-export type ClassificationSource = 'history' | 'household_dictionary' | 'standard_dictionary' | 'ai';
+export type ClassificationSource =
+  | 'history'
+  | 'household_dictionary'
+  | 'standard_dictionary'
+  | 'similarity'
+  | 'ai'
+  | 'manual';
 
 export type ClassificationConfidence = 'high' | 'medium' | 'low';
+
+export type ClassificationCorrectionScope =
+  | 'item_only'
+  | 'same_ocr_name'
+  | 'same_classification_name';
+
+export type UpdateItemProductClassificationRequest = {
+  productTypeId: number;
+  scope: ClassificationCorrectionScope;
+  classificationName?: string;
+};
 
 export type ItemSplitSummary = {
   id: number;
@@ -254,6 +271,8 @@ export const API_SCHEMA_EXPORTS = [
   'ProductTypeStatus',
   'ClassificationSource',
   'ClassificationConfidence',
+  'ClassificationCorrectionScope',
+  'UpdateItemProductClassificationRequest',
   'ItemSplitSummary',
   'ReceiptItemDetail',
   'ReceiptDetail',
