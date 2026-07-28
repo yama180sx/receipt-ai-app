@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ProductTypeStatus } from '@prisma/client';
 import {
   mapCategoriesToSummary,
   mapFamilyMembersToSummary,
@@ -34,6 +35,11 @@ describe('receiptMapper', () => {
         id: 100,
         receiptId: 10,
         categoryId: 1,
+        standardCategoryId: null,
+        productTypeId: null,
+        productTypeStatus: ProductTypeStatus.UNCLASSIFIED,
+        classificationSource: null,
+        classificationConfidence: null,
         name: 'りんご',
         price: 120,
         quantity: 10,
@@ -93,6 +99,11 @@ describe('receiptMapper', () => {
       id: 101,
       receiptId: 10,
       categoryId: null,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: ProductTypeStatus.UNCLASSIFIED,
+      classificationSource: null,
+      classificationConfidence: null,
       name: '牛乳',
       price: 200,
       quantity: 1,
