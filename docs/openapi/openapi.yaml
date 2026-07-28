@@ -3,7 +3,7 @@ info:
   title: Receipt AI App API
   description: |
     OpenAPI 正本（全公開 API）。
-    Phase 1: auth / receipt / stats — Phase 2 (#98-8-10): category / productMaster / admin / upload / health。
+    Phase 1: auth / receipt / stats — Phase 2 (#98-8-10): category / admin / upload / health。
     詳細な as-built 仕様は docs/design/api-spec.md を参照。
   version: 1.1.0
 
@@ -18,7 +18,6 @@ tags:
   - name: receipt
   - name: stats
   - name: category
-  - name: productMaster
   - name: admin
   - name: upload
   - name: health
@@ -718,129 +717,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiMessageEnvelope'
-
-  /categories/optimize:
-    post:
-      tags: [category]
-      summary: ProductMaster からキーワード最適化
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/OptimizeCategoryResponse'
-
-  /product-master:
-    get:
-      tags: [productMaster]
-      summary: 学習マスタ一覧
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-        - name: store
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/ProductMaster'
-
-  /product-master/{id}:
-    patch:
-      tags: [productMaster]
-      summary: マスタ個別更新
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProductMasterRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/ProductMaster'
-    delete:
-      tags: [productMaster]
-      summary: マスタ削除
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiMessageEnvelope'
-
-  /product-master/merge-stores:
-    post:
-      tags: [productMaster]
-      summary: 店舗名統合
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MergeStoreNamesRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/MergeStoreNamesResponse'
 
   /uploads/{filename}:
     get:
@@ -1589,61 +1465,6 @@ components:
         color:
           type: string
           nullable: true
-
-    OptimizeCategoryResponse:
-      type: object
-      required: [addedCount, message]
-      properties:
-        addedCount:
-          type: integer
-        message:
-          type: string
-
-    ProductMaster:
-      type: object
-      required: [id, name, storeName, categoryId]
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        storeName:
-          type: string
-        categoryId:
-          type: integer
-        category:
-          $ref: '#/components/schemas/CategorySummary'
-        updatedAt:
-          type: string
-          format: date-time
-
-    UpdateProductMasterRequest:
-      type: object
-      properties:
-        name:
-          type: string
-        storeName:
-          type: string
-        categoryId:
-          type: integer
-
-    MergeStoreNamesRequest:
-      type: object
-      required: [sourceStoreName, targetStoreName]
-      properties:
-        sourceStoreName:
-          type: string
-        targetStoreName:
-          type: string
-
-    MergeStoreNamesResponse:
-      type: object
-      required: [message, count]
-      properties:
-        message:
-          type: string
-        count:
-          type: integer
 
     PromptTemplate:
       type: object

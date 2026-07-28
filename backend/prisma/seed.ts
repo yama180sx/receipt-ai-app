@@ -166,7 +166,6 @@ async function main() {
   await prisma.productType.deleteMany();
   await prisma.standardCategory.deleteMany();
   await prisma.settlementTransfer.deleteMany();
-  await prisma.productMaster.deleteMany();
   await prisma.receipt.deleteMany();
   await prisma.familyMember.deleteMany();
   await prisma.promptTemplate.deleteMany();
@@ -198,15 +197,6 @@ async function main() {
   // 明示 id 投入後はシーケンスを進めないと第2世帯の auto-increment が id=1 で衝突する
   await syncPostgresIdSequence(prisma, 'Category');
   console.log('📂 Masters seeded (山本家).');
-
-  await prisma.productMaster.create({
-    data: {
-      familyGroupId: familyGroup.id,
-      name: 'サッポロ生ビール',
-      storeName: 'セイコーマート',
-      categoryId: 1,
-    },
-  });
 
   await prisma.receipt.create({
     data: {

@@ -1,5 +1,5 @@
 import logger from '../../utils/logger';
-import { normalizeStoreName, getCleanText } from '../../utils/normalizer';
+import { normalizeStoreName } from '../../utils/normalizer';
 import { runReceiptCommitTransaction } from '../../utils/prismaTransaction';
 import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptService';
 import type { ReceiptCommitPayload } from '../../types/receipt';
@@ -24,7 +24,6 @@ export async function saveParsedReceipt(
   warnings: string[]
 ) {
   const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
-  const cleanStore = getCleanText(officialStoreName);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
 
   const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
@@ -56,7 +55,6 @@ export async function saveParsedReceipt(
       familyGroupId,
       parsedData,
       officialStoreName,
-      cleanStore,
       jstDate,
       totalAmount,
       taxAmount,

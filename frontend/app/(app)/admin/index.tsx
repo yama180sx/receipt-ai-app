@@ -12,7 +12,6 @@ export default function AdminMenuRoute() {
       <AdminMenuScreen
         onBack={goHome}
         onGoToCategories={() => router.push('/admin/categories')}
-        onGoToProductMaster={() => router.push('/admin/product-master')}
         onGoToPromptEditor={() => router.push('/admin/prompts')}
         onGoToAdminStats={() => router.push('/admin/stats')}
       />

@@ -13,7 +13,6 @@ export function useCategoryManagement({ currentMemberId }: UseCategoryManagement
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [optimizing, setOptimizing] = useState(false);
 
   const fetchCategories = useCallback(async () => {
     if (!currentMemberId) return;
@@ -75,39 +74,12 @@ export function useCategoryManagement({ currentMemberId }: UseCategoryManagement
     ]);
   };
 
-  const handleOptimize = () => {
-    showConfirmDialog(
-      'マスタ最適化',
-      'ProductMasterの統計に基づき、カテゴリーのキーワードを自動補強します。よろしいですか？',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '実行',
-          onPress: async () => {
-            setOptimizing(true);
-            try {
-              const res = await categoryApi.optimizeCategories();
-              showAlert('完了', res.data?.message ?? '最適化が完了しました。');
-              await fetchCategories();
-            } catch {
-              showAlert('エラー', '最適化処理に失敗しました。');
-            } finally {
-              setOptimizing(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   return {
     categories,
     newName,
     setNewName,
     loading,
-    optimizing,
     addCategory,
     deleteCategory,
-    handleOptimize,
   };
 }

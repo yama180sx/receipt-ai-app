@@ -8,8 +8,6 @@ import {
   findCategoriesByFamilyGroup,
   findCategoryByIdAndFamilyGroup,
   findCategoryColorsByFamilyGroup,
-  groupProductMasterStatsByCategory,
-  updateCategoryKeywords,
 } from '../../repositories/categoryRepository';
 
 export async function listCategories(ctx: TenantContext) {
@@ -66,36 +64,4 @@ export async function deleteCategory(ctx: TenantContext, categoryId: number) {
     }
     throw error;
   }
-}
-
-/** ProductMaster 統計から Category キーワードを補強（当該世帯の Category のみ更新） */
-export async function optimizeCategoryKeywords(ctx: TenantContext) {
-  const stats = await groupProductMasterStatsByCategory(ctx.familyGroupId);
-  const categories = await findCategoriesByFamilyGroup(ctx.familyGroupId);
-  let totalAdded = 0;
-
-  for (const category of categories) {
-    const currentKeywords = Array.isArray(category.keywords)
-      ? (category.keywords as string[])
-      : [];
-
-    const candidates = stats
-      .filter((s) => s.categoryId === category.id)
-      .map((s) => s.name);
-
-    const newEntries = candidates.filter(
-      (name) => name && name.length >= 2 && !currentKeywords.includes(name)
-    );
-
-    if (newEntries.length > 0) {
-      await updateCategoryKeywords(category.id, [...currentKeywords, ...newEntries]);
-      totalAdded += newEntries.length;
-      logger.info(`[OPTIMIZE] Category:${category.name} added ${newEntries.length} keywords.`);
-    }
-  }
-
-  return {
-    addedCount: totalAdded,
-    message: `${totalAdded} 件のキーワードを最適化しました。`,
-  };
 }

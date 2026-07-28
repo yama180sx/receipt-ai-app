@@ -13,7 +13,7 @@ import {
   updateReceiptInTx as patchReceiptInTx,
 } from '../../repositories/receiptRepository';
 import { saveParsedReceipt } from './receiptPersistenceService';
-import { upsertProductMasterCategory } from './receiptProductMasterLearning';
+import { classifyItemByExactMatch } from '../productClassification/productClassificationService';
 
 export type ManualReceiptInput = {
   date: string;
@@ -78,28 +78,20 @@ async function applyFullReceiptUpdateInTx(
   await deleteItemsByReceiptIdInTx(tx, receiptId);
 
   if (itemList.length > 0) {
-    await createItemsInTx(
-      tx,
-      itemList.map((i) => ({
+    const classifiedItems = await Promise.all(
+      itemList.map(async (item) => ({
         receiptId,
-        name: i.name,
-        price: parseFloat(String(i.price)) || 0,
-        quantity: parseFloat(String(i.quantity)) || 0,
-        categoryId: i.categoryId ? Number(i.categoryId) : null,
+        name: item.name,
+        price: parseFloat(String(item.price)) || 0,
+        quantity: parseFloat(String(item.quantity)) || 0,
+        ...(await classifyItemByExactMatch(tx, {
+          familyGroupId,
+          itemName: item.name,
+          categoryId: item.categoryId ? Number(item.categoryId) : null,
+        })),
       }))
     );
-
-    const resolvedStoreName = storeName || existing.storeName;
-    for (const item of itemList) {
-      if (item.categoryId) {
-        await upsertProductMasterCategory(tx, {
-          itemName: item.name,
-          storeName: resolvedStoreName,
-          familyGroupId,
-          categoryId: Number(item.categoryId),
-        });
-      }
-    }
+    await createItemsInTx(tx, classifiedItems);
   }
 
   return findReceiptByIdInTx(tx, receiptId);
@@ -131,20 +123,12 @@ async function updateItemCategoryInTxHandler(
     if (!category) throw new AppError('CategoryNotFound', 404);
   }
 
-  const updatedItem = await updateItemCategoryInTx(
-    tx,
-    itemId,
-    categoryId ? Number(categoryId) : null
-  );
-
-  if (categoryId) {
-    await upsertProductMasterCategory(tx, {
-      itemName: currentItem.name,
-      storeName: currentItem.receipt.storeName,
-      familyGroupId,
-      categoryId: Number(categoryId),
-    });
-  }
+  const classification = await classifyItemByExactMatch(tx, {
+    familyGroupId,
+    itemName: currentItem.name,
+    categoryId: categoryId ? Number(categoryId) : null,
+  });
+  const updatedItem = await updateItemCategoryInTx(tx, itemId, classification);
 
   return updatedItem;
 }
