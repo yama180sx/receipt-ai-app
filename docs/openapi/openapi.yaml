@@ -473,6 +473,37 @@ paths:
                       data:
                         $ref: '#/components/schemas/ReceiptItemDetail'
 
+  /receipts/items/{itemId}/product-classification:
+    patch:
+      tags: [receipt]
+      summary: 明細商品種別修正
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemProductClassificationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptItemDetail'
+
   /receipts/items/{itemId}/splits:
     post:
       tags: [receipt]
@@ -996,7 +1027,11 @@ components:
 
     ClassificationSource:
       type: string
-      enum: [history, household_dictionary, standard_dictionary, ai]
+      enum: [history, household_dictionary, standard_dictionary, similarity, ai, manual]
+
+    ClassificationCorrectionScope:
+      type: string
+      enum: [item_only, same_ocr_name, same_classification_name]
 
     ClassificationConfidence:
       type: string
@@ -1273,6 +1308,18 @@ components:
       properties:
         categoryId:
           type: integer
+
+    UpdateItemProductClassificationRequest:
+      type: object
+      required: [productTypeId, scope]
+      properties:
+        productTypeId:
+          type: integer
+        scope:
+          $ref: '#/components/schemas/ClassificationCorrectionScope'
+        classificationName:
+          type: string
+          description: scope が same_classification_name の場合は必須
 
     SaveItemSplitsRequest:
       type: object

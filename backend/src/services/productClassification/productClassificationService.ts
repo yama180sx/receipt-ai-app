@@ -41,20 +41,27 @@ async function findMatchedProductType(
         where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
         include: { productType: { include: productTypeInclude } },
       });
-  const standard = history || dictionary
+  const alias = history || dictionary
+    ? null
+    : await tx.productClassificationAlias.findUnique({
+        where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
+        include: { productType: { include: productTypeInclude } },
+      });
+  const standard = history || dictionary || alias
     ? null
     : await tx.standardProductDictionary.findUnique({
         where: { normalizedName },
         include: { standardCategory: { include: { parent: true } }, productType: true },
       });
 
-  if (history || dictionary) {
-    const record = history ?? dictionary!;
+  if (history || dictionary || alias) {
+    const record = history ?? dictionary ?? alias!;
     const category = record.productType.standardCategory;
     return {
       productTypeId: record.productTypeId,
       standardCategoryId: category.id,
       rootCategoryName: category.parent?.name ?? category.name,
+      // 別名も世帯内の辞書学習として API では household_dictionary に集約する。
       source: history ? ClassificationSource.HISTORY : ClassificationSource.HOUSEHOLD_DICTIONARY,
     };
   }

@@ -20,6 +20,22 @@ export const uploadReceiptSchema = z.object({
   // ここには定義しない、もしくは .optional() にします
 });
 
+export const productClassificationCorrectionSchema = z
+  .object({
+    productTypeId: z.coerce.number().int().positive(),
+    scope: z.enum(['item_only', 'same_ocr_name', 'same_classification_name']),
+    classificationName: z.string().trim().min(1).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.scope === 'same_classification_name' && !input.classificationName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['classificationName'],
+        message: '分類用名称は必須です',
+      });
+    }
+  });
+
 /**
  * 3. 最終的な保存・更新用のバリデーション
  * DB保存時に整合性をチェックするために使用
