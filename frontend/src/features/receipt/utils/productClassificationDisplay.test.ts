@@ -23,4 +23,15 @@ describe('getProductClassificationDisplay', () => {
       })
     ).toEqual({ label: '初期分類の対象外' });
   });
+
+  it('shows a manually corrected product type separately from category status', () => {
+    expect(
+      getProductClassificationDisplay({
+        productType: { id: 11, code: 'milk', name: '牛乳', standardCategoryId: 4 },
+        productTypeStatus: 'classified',
+        classificationSource: 'manual',
+        classificationConfidence: 'high',
+      })
+    ).toEqual({ label: '牛乳', detail: '手動修正' });
+  });
 });

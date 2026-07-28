@@ -10,6 +10,7 @@ import receiptRoutes from './routes/receiptRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import adminRoutes from './routes/adminRoutes';
 import statsRoutes from './routes/statsRoutes';
+import productTypeRoutes from './routes/productTypeRoutes';
 import { AppError } from './utils/appError';
 import { errorHandler } from './middleware/errorHandler';
 import logger from './utils/logger';
@@ -73,6 +74,7 @@ export function createApp() {
   protectedApi.use(tenantMiddleware);
   protectedApi.use('/', receiptRoutes);
   protectedApi.use('/categories', categoryRoutes);
+  protectedApi.use('/product-types', productTypeRoutes);
   protectedApi.use('/stats', statsRoutes);
 
   app.use('/api', protectedApi);

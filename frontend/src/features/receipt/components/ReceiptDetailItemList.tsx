@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { AppSelect, AppTextInput } from '../../../components/ui';
+import { AppButton, AppSelect, AppTextInput } from '../../../components/ui';
 import type { ReceiptDetail, ReceiptItemDetail } from '../../../types/receipt';
 import { receiptDetailStyles as styles } from '../styles/receiptDetailStyles';
 import { getProductClassificationDisplay } from '../utils/productClassificationDisplay';
@@ -19,6 +19,7 @@ type Props = {
     value: ReceiptItemDetail[keyof ReceiptItemDetail] | string
   ) => void;
   onUpdateField: (key: keyof ReceiptDetail, value: ReceiptDetail[keyof ReceiptDetail] | string) => void;
+  onEditProductClassification: (item: ReceiptItemDetail) => void;
 };
 
 export const ReceiptDetailItemList: React.FC<Props> = ({
@@ -29,6 +30,7 @@ export const ReceiptDetailItemList: React.FC<Props> = ({
   onCategoryChange,
   onUpdateItem,
   onUpdateField,
+  onEditProductClassification,
 }) => (
   <View style={styles.itemsSection}>
     <Text style={styles.itemsSectionTitle}>明細・カテゴリ設定</Text>
@@ -84,6 +86,7 @@ export const ReceiptDetailItemList: React.FC<Props> = ({
           </View>
 
           <View style={styles.detailItemBottom}>
+            <Text style={styles.categoryLabel}>家計簿カテゴリ</Text>
             <AppSelect<number | null>
               selectedValue={item.categoryId ?? null}
               onValueChange={(val) =>
@@ -100,6 +103,15 @@ export const ReceiptDetailItemList: React.FC<Props> = ({
                 <Text style={styles.productTypeDetail}>（{classification.detail}）</Text>
               ) : null}
             </View>
+            {!isEditing ? (
+              <AppButton
+                title="商品種別を修正"
+                size="sm"
+                variant="outline"
+                style={styles.productTypeEditButton}
+                onPress={() => onEditProductClassification(item)}
+              />
+            ) : null}
           </View>
         </View>
       );

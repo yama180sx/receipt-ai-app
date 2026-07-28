@@ -21,7 +21,11 @@ export function getProductClassificationDisplay(
             ? '標準辞書'
             : item.classificationSource === 'ai'
               ? 'AI候補'
-              : undefined;
+              : item.classificationSource === 'manual'
+                ? '手動修正'
+                : item.classificationSource === 'similarity'
+                  ? '類似候補'
+                  : undefined;
     return { label: item.productType.name, detail: source };
   }
 

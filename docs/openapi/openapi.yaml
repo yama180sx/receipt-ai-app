@@ -23,6 +23,27 @@ tags:
   - name: health
 
 paths:
+  /product-types:
+    get:
+      tags: [product-classification]
+      summary: 有効な商品種別一覧取得
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductTypeSummary'
+
   /auth/resolve-family:
     post:
       tags: [auth]

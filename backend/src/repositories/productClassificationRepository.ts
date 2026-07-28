@@ -1,4 +1,5 @@
 import type { ClassificationCorrectionScope } from '@prisma/client';
+import { prisma } from '../utils/prismaClient';
 import type { PrismaTx } from '../utils/prismaTransaction';
 
 export async function findActiveProductTypeWithCategoryInTx(tx: PrismaTx, productTypeId: number) {
@@ -9,6 +10,13 @@ export async function findActiveProductTypeWithCategoryInTx(tx: PrismaTx, produc
       standardCategory: { isActive: true },
     },
     include: { standardCategory: { include: { parent: true } } },
+  });
+}
+
+export async function findActiveProductTypes() {
+  return prisma.productType.findMany({
+    where: { isActive: true, standardCategory: { isActive: true } },
+    orderBy: [{ standardCategory: { displayOrder: 'asc' } }, { displayOrder: 'asc' }],
   });
 }
 
