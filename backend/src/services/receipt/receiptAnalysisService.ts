@@ -1,10 +1,8 @@
 import logger from '../../utils/logger';
-import { getCleanText } from '../../utils/normalizer';
 import { getReceiptAnalysisProvider } from '../../ai';
 import { estimateCategoryId } from '../categoryService';
 import { validateReceiptItems } from '../validationService';
 import type { TenantContext } from '../../utils/context';
-import { findProductMasterByCompositeKey } from '../../repositories/productMasterRepository';
 
 /**
  * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
@@ -15,18 +13,12 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId}, 世帯: ${familyGroupId})`);
 
   const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(imagePath, memberId);
-  const cleanStore = getCleanText(parsedData.storeName || '');
-
   const itemsWithCategories = await Promise.all(
     parsedData.items.map(async (item) => {
-      const cleanName = getCleanText(item.name);
       let initialCategoryId = null;
 
       if (familyGroupId) {
-        const mastered = await findProductMasterByCompositeKey(cleanName, cleanStore, familyGroupId);
-        initialCategoryId = mastered
-          ? mastered.categoryId
-          : await estimateCategoryId(cleanName, cleanStore, familyGroupId);
+        initialCategoryId = await estimateCategoryId(item.name, parsedData.storeName || '', familyGroupId);
       }
 
       return {

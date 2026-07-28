@@ -49,7 +49,6 @@ model FamilyGroup {
   inviteCode                String                         @unique @default(cuid()) // 家族招待用のコード
   members                   FamilyMember[]
   receipts                  Receipt[]
-  productMasters            ProductMaster[]
   categories                Category[]
   stores                    Store[]
   promptTemplates           PromptTemplate[]
@@ -86,14 +85,13 @@ model FamilyMember {
 
 // 費目カテゴリー (世帯別マスタ — Issue #93-4)
 model Category {
-  id             Int             @id @default(autoincrement())
-  name           String
-  familyGroupId  Int
-  familyGroup    FamilyGroup     @relation(fields: [familyGroupId], references: [id])
-  color          String?
-  keywords       Json            @default("[]")
-  items          Item[]
-  productMasters ProductMaster[]
+  id            Int         @id @default(autoincrement())
+  name          String
+  familyGroupId Int
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  color         String?
+  keywords      Json        @default("[]")
+  items         Item[]
 
   @@unique([name, familyGroupId])
   @@index([familyGroupId])
@@ -314,20 +312,6 @@ model SettlementTransfer {
   @@index([fromMemberId])
   @@index([toMemberId])
   @@index([familyGroupId])
-}
-
-// 学習マスタ (世帯ごとに学習結果を分離)
-model ProductMaster {
-  id            Int    @id @default(autoincrement())
-  name          String
-  storeName     String
-  categoryId    Int
-  familyGroupId Int
-
-  familyGroup FamilyGroup @relation(fields: [familyGroupId], references: [id])
-  category    Category    @relation(fields: [categoryId], references: [id])
-
-  @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
 }
 
 // [Issue #59] Gemini API トークン使用量トラッキング

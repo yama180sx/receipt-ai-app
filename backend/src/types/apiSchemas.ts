@@ -190,24 +190,6 @@ export type Category = {
   keywords: string[];
 };
 
-export type OptimizeCategoryResponse = {
-  message: string;
-  updatedCount?: number;
-};
-
-// --- productMaster ---
-export type ProductMaster = {
-  id: number;
-  name: string;
-  storeName: string | null;
-  categoryId: number | null;
-  category?: CategorySummary | null;
-};
-
-export type MergeStoreNamesResponse = {
-  updatedCount: number;
-};
-
 // --- admin ---
 export type PromptTemplate = {
   id: number;
@@ -262,9 +244,6 @@ export const API_SCHEMA_EXPORTS = [
   'SettlementTransfer',
   'SettlementStatusData',
   'Category',
-  'OptimizeCategoryResponse',
-  'ProductMaster',
-  'MergeStoreNamesResponse',
   'PromptTemplate',
   'AdminCostStatRow',
   'HealthResponse',

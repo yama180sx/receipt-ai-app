@@ -2,8 +2,7 @@ import express from 'express';
 import { 
   getCategories, 
   createCategory, 
-  deleteCategory, 
-  optimizeKeywords // [Issue #48] 追加
+  deleteCategory,
 } from '../controllers/categoryController';
 
 const router = express.Router();
@@ -16,11 +15,5 @@ router.post('/', createCategory);
 
 // DELETE /api/categories/:id (カテゴリー削除)
 router.delete('/:id', deleteCategory);
-
-/**
- * [Issue #48] カテゴリーキーワードの統計的最適化
- * POST /api/categories/optimize
- */
-router.post('/optimize', optimizeKeywords);
 
 export default router;

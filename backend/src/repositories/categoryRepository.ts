@@ -33,22 +33,6 @@ export async function deleteCategoryById(categoryId: number) {
   return prisma.category.delete({ where: { id: categoryId } });
 }
 
-export async function groupProductMasterStatsByCategory(familyGroupId: number) {
-  return prisma.productMaster.groupBy({
-    by: ['name', 'categoryId'],
-    where: { familyGroupId },
-    _count: { name: true },
-    having: { name: { _count: { gte: 5 } } },
-  });
-}
-
-export async function updateCategoryKeywords(categoryId: number, keywords: string[]) {
-  return prisma.category.update({
-    where: { id: categoryId },
-    data: { keywords },
-  });
-}
-
 export async function findCategoryIdByKeywordInTx(
   tx: PrismaTx,
   familyGroupId: number,

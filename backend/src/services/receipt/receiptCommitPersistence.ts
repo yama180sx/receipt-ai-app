@@ -1,12 +1,11 @@
 import logger from '../../utils/logger';
-import { getCleanText } from '../../utils/normalizer';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import type { ParsedItem, ReceiptCommitPayload } from '../../types/receipt';
 import {
   createReceiptInTx,
   linkApiUsageLogToReceiptInTx,
 } from '../../repositories/receiptRepository';
-import { upsertProductMasterCategory } from './receiptProductMasterLearning';
+import { classifyItemByExactMatch } from '../productClassification/productClassificationService';
 
 /** commit トランザクション内で永続化するための準備済み入力 */
 export type ReceiptCommitTxInput = {
@@ -14,7 +13,6 @@ export type ReceiptCommitTxInput = {
   familyGroupId: number;
   parsedData: ReceiptCommitPayload;
   officialStoreName: string;
-  cleanStore: string;
   jstDate: Date;
   totalAmount: number;
   taxAmount: number;
@@ -26,7 +24,7 @@ export type ReceiptCommitTxInput = {
 
 /**
  * レシート commit の DB 書込（tx は呼び出し元が開始）
- * ProductMaster 学習 → Receipt 作成 → ApiUsageLog 紐付け
+ * 商品完全一致分類 → Receipt 作成 → ApiUsageLog 紐付け
  */
 export async function persistReceiptCommitInTx(
   tx: PrismaTx,
@@ -37,7 +35,6 @@ export async function persistReceiptCommitInTx(
     familyGroupId,
     parsedData,
     officialStoreName,
-    cleanStore,
     jstDate,
     totalAmount,
     taxAmount,
@@ -49,23 +46,17 @@ export async function persistReceiptCommitInTx(
 
   const itemsToCreate = await Promise.all(
     parsedData.items.map(async (item: ParsedItem) => {
-      const cleanName = getCleanText(item.name);
-      const finalCategoryId = item.categoryId ? Number(item.categoryId) : null;
-
-      if (finalCategoryId) {
-        await upsertProductMasterCategory(tx, {
-          itemName: cleanName,
-          storeName: cleanStore,
-          familyGroupId,
-          categoryId: finalCategoryId,
-        });
-      }
+      const classification = await classifyItemByExactMatch(tx, {
+        familyGroupId,
+        itemName: item.name,
+        categoryId: item.categoryId ? Number(item.categoryId) : null,
+      });
 
       return {
         name: item.name,
         price: parseFloat(String(item.price || 0)),
         quantity: parseFloat(String(item.quantity || 1)),
-        categoryId: finalCategoryId,
+        ...classification,
       };
     })
   );

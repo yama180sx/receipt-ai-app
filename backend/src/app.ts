@@ -7,7 +7,6 @@ import { authMiddleware } from './middleware/authMiddleware';
 import { tenantMiddleware } from './middleware/tenantMiddleware';
 import authRoutes from './routes/authRoutes';
 import receiptRoutes from './routes/receiptRoutes';
-import productMasterRoutes from './routes/productMasterRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import adminRoutes from './routes/adminRoutes';
 import statsRoutes from './routes/statsRoutes';
@@ -74,7 +73,6 @@ export function createApp() {
   protectedApi.use(tenantMiddleware);
   protectedApi.use('/', receiptRoutes);
   protectedApi.use('/categories', categoryRoutes);
-  protectedApi.use('/product-master', productMasterRoutes);
   protectedApi.use('/stats', statsRoutes);
 
   app.use('/api', protectedApi);

@@ -35,16 +35,6 @@ export const CategoryManagementScreen = ({
         <AppButton title={BUTTON_LABELS.add} onPress={category.addCategory} size="md" />
       </View>
 
-      <AppButton
-        title="🪄 キーワード自動最適化"
-        onPress={category.handleOptimize}
-        loading={category.optimizing}
-        disabled={category.optimizing}
-        fullWidth
-        size="md"
-        style={{ backgroundColor: colors.semantic.category.optimize, marginBottom: spacing.lg }}
-      />
-
       {!currentMemberId ? (
         <Text style={styles.emptyText}>メンバーを選択してください</Text>
       ) : category.loading ? (

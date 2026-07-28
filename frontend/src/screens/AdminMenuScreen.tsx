@@ -9,7 +9,6 @@ import { screenLayout } from '../theme/screenLayout';
 interface AdminMenuScreenProps {
   onBack: () => void;
   onGoToCategories: () => void;
-  onGoToProductMaster: () => void;
   onGoToPromptEditor: () => void;
   onGoToAdminStats: () => void;
 }
@@ -19,7 +18,6 @@ const adm = colors.semantic.admin;
 export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onBack,
   onGoToCategories,
-  onGoToProductMaster,
   onGoToPromptEditor,
   onGoToAdminStats,
 }) => {
@@ -47,17 +45,6 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
             }
           />
 
-          <AppListItem
-            variant="nav"
-            onPress={onGoToProductMaster}
-            title="学習マスタ管理"
-            subtitle="商品名からの自動カテゴリ分類の修正"
-            left={
-              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.product }]}>
-                <Text>🧠</Text>
-              </View>
-            }
-          />
         </View>
 
         <View style={cardStyles.section}>

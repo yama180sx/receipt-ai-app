@@ -5,7 +5,6 @@ import type {
   ApiSuccessResponse,
   Category,
   CreateCategoryRequest,
-  OptimizeCategoryResponse,
 } from './generated';
 
 /** カテゴリ API（/api/categories）— openapi-fetch + generated paths（#105-5 PoC） */
@@ -28,11 +27,6 @@ export const categoryApi = {
     )) as ApiMessageResponse;
   },
 
-  async optimizeCategories(): Promise<ApiSuccessResponse<OptimizeCategoryResponse>> {
-    return (await unwrapOpenApiResponse(
-      openapiClient.POST('/categories/optimize')
-    )) as ApiSuccessResponse<OptimizeCategoryResponse>;
-  },
 };
 
-export type { Category, CreateCategoryRequest, OptimizeCategoryResponse } from './generated';
+export type { Category, CreateCategoryRequest } from './generated';

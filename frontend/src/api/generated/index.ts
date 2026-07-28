@@ -48,13 +48,6 @@ export type CreateSettlementTransferRequest = Schemas['CreateSettlementTransferR
 // --- category ---
 export type Category = Schemas['Category'];
 export type CreateCategoryRequest = Schemas['CreateCategoryRequest'];
-export type OptimizeCategoryResponse = Schemas['OptimizeCategoryResponse'];
-
-// --- productMaster ---
-export type ProductMaster = Schemas['ProductMaster'];
-export type UpdateProductMasterRequest = Schemas['UpdateProductMasterRequest'];
-export type MergeStoreNamesRequest = Schemas['MergeStoreNamesRequest'];
-export type MergeStoreNamesResponse = Schemas['MergeStoreNamesResponse'];
 
 // --- admin ---
 export type PromptTemplate = Schemas['PromptTemplate'];

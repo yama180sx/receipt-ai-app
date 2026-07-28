@@ -13,6 +13,11 @@ export interface ParsedItem {
   inferredCategory?: string;
   /** analyzeOnly 後に付与 */
   categoryId?: number | null;
+  standardCategoryId?: number | null;
+  productTypeId?: number | null;
+  productTypeStatus?: string;
+  classificationSource?: string | null;
+  classificationConfidence?: string | null;
   /** validationService 用（Gemini 生出力の category キー） */
   category?: string;
   /** 行合計（OCR 由来、任意） */

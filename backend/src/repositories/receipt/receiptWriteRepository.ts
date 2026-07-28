@@ -1,4 +1,5 @@
 import { prisma } from '../../utils/prismaClient';
+import type { ClassificationConfidence, ClassificationSource, ProductTypeStatus } from '@prisma/client';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
 
@@ -24,6 +25,11 @@ export type ReceiptCreateWithItemsInput = {
     price: number;
     quantity: number;
     categoryId: number | null;
+    standardCategoryId: number | null;
+    productTypeId: number | null;
+    productTypeStatus: ProductTypeStatus;
+    classificationSource: ClassificationSource | null;
+    classificationConfidence: ClassificationConfidence | null;
   }>;
 };
 
@@ -89,6 +95,11 @@ export type ItemCreateInput = {
   price: number;
   quantity: number;
   categoryId: number | null;
+  standardCategoryId: number | null;
+  productTypeId: number | null;
+  productTypeStatus: ProductTypeStatus;
+  classificationSource: ClassificationSource | null;
+  classificationConfidence: ClassificationConfidence | null;
 };
 
 export async function deleteItemsByReceiptIdInTx(tx: PrismaTx, receiptId: number) {
@@ -103,11 +114,19 @@ export async function createItemsInTx(tx: PrismaTx, items: ItemCreateInput[]) {
 export async function updateItemCategoryInTx(
   tx: PrismaTx,
   itemId: number,
-  categoryId: number | null
+  data: Pick<
+    ItemCreateInput,
+    | 'categoryId'
+    | 'standardCategoryId'
+    | 'productTypeId'
+    | 'productTypeStatus'
+    | 'classificationSource'
+    | 'classificationConfidence'
+  >
 ) {
   return tx.item.update({
     where: { id: itemId },
-    data: { categoryId },
+    data,
     include: { category: true },
   });
 }
