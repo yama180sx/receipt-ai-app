@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import { getProductClassificationDisplay } from './productClassificationDisplay';
+
+describe('getProductClassificationDisplay', () => {
+  it('shows the classified product type and source', () => {
+    expect(
+      getProductClassificationDisplay({
+        productType: { id: 11, code: 'milk', name: '牛乳', standardCategoryId: 4 },
+        productTypeStatus: 'classified',
+        classificationSource: 'standard_dictionary',
+        classificationConfidence: 'high',
+      })
+    ).toEqual({ label: '牛乳', detail: '標準辞書' });
+  });
+
+  it('distinguishes an item outside the initial scope', () => {
+    expect(
+      getProductClassificationDisplay({
+        productType: null,
+        productTypeStatus: 'outside_initial_scope',
+        classificationSource: null,
+        classificationConfidence: null,
+      })
+    ).toEqual({ label: '初期分類の対象外' });
+  });
+});

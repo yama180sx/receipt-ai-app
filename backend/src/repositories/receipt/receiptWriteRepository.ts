@@ -127,7 +127,7 @@ export async function updateItemCategoryInTx(
   return tx.item.update({
     where: { id: itemId },
     data,
-    include: { category: true },
+    include: { category: true, productType: true },
   });
 }
 

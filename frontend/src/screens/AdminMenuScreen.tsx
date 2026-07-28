@@ -8,7 +8,6 @@ import { screenLayout } from '../theme/screenLayout';
 
 interface AdminMenuScreenProps {
   onBack: () => void;
-  onGoToCategories: () => void;
   onGoToPromptEditor: () => void;
   onGoToAdminStats: () => void;
 }
@@ -17,7 +16,6 @@ const adm = colors.semantic.admin;
 
 export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onBack,
-  onGoToCategories,
   onGoToPromptEditor,
   onGoToAdminStats,
 }) => {
@@ -30,23 +28,6 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
       </View>
 
       <ScrollView contentContainerStyle={screenLayout.scrollContent}>
-        <View style={cardStyles.section}>
-          <Text style={styles.sectionTitle}>マスタデータ管理</Text>
-
-          <AppListItem
-            variant="nav"
-            onPress={onGoToCategories}
-            title="カテゴリー設定"
-            subtitle="支出カテゴリの追加・編集・色変更"
-            left={
-              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.settings }]}>
-                <Text>⚙️</Text>
-              </View>
-            }
-          />
-
-        </View>
-
         <View style={cardStyles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
 

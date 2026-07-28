@@ -674,50 +674,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Category'
-    post:
-      tags: [category]
-      summary: カテゴリ新規作成
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateCategoryRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/Category'
-
-  /categories/{id}:
-    delete:
-      tags: [category]
-      summary: カテゴリ削除
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiMessageEnvelope'
-
   /uploads/{filename}:
     get:
       tags: [upload]
@@ -1021,6 +977,31 @@ components:
           type: string
           nullable: true
 
+    ProductTypeSummary:
+      type: object
+      required: [id, code, name, standardCategoryId]
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        standardCategoryId:
+          type: integer
+
+    ProductTypeStatus:
+      type: string
+      enum: [classified, needs_review, unclassified, outside_initial_scope, not_applicable]
+
+    ClassificationSource:
+      type: string
+      enum: [history, household_dictionary, standard_dictionary, ai]
+
+    ClassificationConfidence:
+      type: string
+      enum: [high, medium, low]
+
     ItemSplitSummary:
       type: object
       required: [id, itemId, familyMemberId, amount]
@@ -1036,7 +1017,9 @@ components:
 
     ReceiptItemDetail:
       type: object
-      required: [id, name, price, quantity, categoryId]
+      required:
+        [id, name, price, quantity, categoryId, standardCategoryId, productTypeId, productType,
+         productTypeStatus, classificationSource, classificationConfidence]
       properties:
         id:
           type: integer
@@ -1052,6 +1035,26 @@ components:
         category:
           oneOf:
             - $ref: '#/components/schemas/CategorySummary'
+            - type: 'null'
+        standardCategoryId:
+          type: integer
+          nullable: true
+        productTypeId:
+          type: integer
+          nullable: true
+        productType:
+          oneOf:
+            - $ref: '#/components/schemas/ProductTypeSummary'
+            - type: 'null'
+        productTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        classificationSource:
+          oneOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+            - type: 'null'
+        classificationConfidence:
+          oneOf:
+            - $ref: '#/components/schemas/ClassificationConfidence'
             - type: 'null'
         splits:
           type: array
@@ -1455,16 +1458,6 @@ components:
           type: array
           items:
             type: string
-
-    CreateCategoryRequest:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-        color:
-          type: string
-          nullable: true
 
     PromptTemplate:
       type: object

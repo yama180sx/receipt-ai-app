@@ -72,6 +72,10 @@ export const receiptDetailStyles = StyleSheet.create({
   currencySymbol: { fontSize: 14, color: colors.text.muted },
   multiplier: { fontSize: 14, color: colors.text.muted },
   categorySelect: { marginTop: spacing.xs },
+  productTypeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  productTypeLabel: { fontSize: 12, color: colors.text.muted, marginRight: spacing.sm },
+  productTypeValue: { fontSize: 13, color: colors.text.main, fontWeight: '600' },
+  productTypeDetail: { fontSize: 12, color: colors.text.muted },
   taxSection: {
     marginTop: spacing.lg,
     paddingVertical: 15,

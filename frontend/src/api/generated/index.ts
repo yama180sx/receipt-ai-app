@@ -24,6 +24,10 @@ export type LoginRequest = Schemas['LoginRequest'];
 
 // --- receipt ---
 export type CategorySummary = Schemas['CategorySummary'];
+export type ProductTypeSummary = Schemas['ProductTypeSummary'];
+export type ProductTypeStatus = Schemas['ProductTypeStatus'];
+export type ClassificationSource = Schemas['ClassificationSource'];
+export type ClassificationConfidence = Schemas['ClassificationConfidence'];
 export type ItemSplitSummary = Schemas['ItemSplitSummary'];
 export type ReceiptItemDetail = Schemas['ReceiptItemDetail'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];
@@ -47,7 +51,6 @@ export type CreateSettlementTransferRequest = Schemas['CreateSettlementTransferR
 
 // --- category ---
 export type Category = Schemas['Category'];
-export type CreateCategoryRequest = Schemas['CreateCategoryRequest'];
 
 // --- admin ---
 export type PromptTemplate = Schemas['PromptTemplate'];

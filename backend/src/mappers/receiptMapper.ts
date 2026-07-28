@@ -1,14 +1,18 @@
 import type { Job } from 'bullmq';
-import type { Category, ItemSplit } from '@prisma/client';
+import type { Category, ItemSplit, ProductType } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type {
   CategorySummary,
+  ClassificationConfidence,
+  ClassificationSource,
   FamilyMemberSummary,
   ItemSplitSummary,
   ReceiptDetail,
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
+  ProductTypeStatus,
+  ProductTypeSummary,
   UploadJobResponse,
 } from '../types/apiSchemas';
 import {
@@ -26,12 +30,40 @@ export type ReceiptWithItemsCategory = Prisma.ReceiptGetPayload<{
 }>;
 
 export type ReceiptItemWithCategory = Prisma.ItemGetPayload<{
-  include: { category: true };
+  include: { category: true; productType: true };
 }>;
 
 export type ReceiptItemWithCategorySplits = Prisma.ItemGetPayload<{
-  include: { category: true; splits: true };
+  include: { category: true; productType: true; splits: true };
 }>;
+
+type ReceiptItemForDetail = {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  categoryId: number | null;
+  standardCategoryId: number | null;
+  productTypeId: number | null;
+  productTypeStatus: string;
+  classificationSource: string | null;
+  classificationConfidence: string | null;
+  category?: Category | null;
+  productType?: ProductType | null;
+  splits?: ItemSplit[];
+};
+
+type ReceiptForDetail = {
+  id: number;
+  storeName: string;
+  date: Date | string | null;
+  totalAmount: number;
+  taxAmount: number | null;
+  imagePath: string | null;
+  memberId: number;
+  familyGroupId: number;
+  items: ReceiptItemForDetail[];
+};
 
 type AnalyzeJobReturn = {
   parsedData?: {
@@ -68,6 +100,22 @@ export function mapCategoriesToSummary(categories: Category[]): CategorySummary[
   }));
 }
 
+export function mapProductTypeToSummary(
+  productType: ProductType | null | undefined
+): ProductTypeSummary | null {
+  if (!productType) return null;
+  return {
+    id: productType.id,
+    code: productType.code,
+    name: productType.name,
+    standardCategoryId: productType.standardCategoryId,
+  };
+}
+
+function toApiEnum<T extends string>(value: T | null | undefined): Lowercase<T> | null {
+  return value ? (value.toLowerCase() as Lowercase<T>) : null;
+}
+
 export function mapItemSplitToSummary(split: ItemSplit): ItemSplitSummary {
   return {
     id: split.id,
@@ -82,7 +130,7 @@ export function mapItemSplitsToSummary(splits: ItemSplit[]): ItemSplitSummary[] 
 }
 
 export function mapReceiptItemToDetail(
-  item: ReceiptItemWithCategory | ReceiptItemWithCategorySplits
+  item: ReceiptItemForDetail
 ): ReceiptItemDetail {
   const splits = 'splits' in item && Array.isArray(item.splits) ? item.splits : undefined;
   return {
@@ -92,12 +140,18 @@ export function mapReceiptItemToDetail(
     quantity: item.quantity,
     categoryId: item.categoryId,
     category: mapCategoryToSummary(item.category),
+    standardCategoryId: item.standardCategoryId,
+    productTypeId: item.productTypeId,
+    productType: mapProductTypeToSummary(item.productType),
+    productTypeStatus: toApiEnum(item.productTypeStatus) as ProductTypeStatus,
+    classificationSource: toApiEnum(item.classificationSource) as ClassificationSource | null,
+    classificationConfidence: toApiEnum(item.classificationConfidence) as ClassificationConfidence | null,
     splits: splits ? mapItemSplitsToSummary(splits) : undefined,
   };
 }
 
 export function mapReceiptToDetail(
-  receipt: ReceiptWithItemsCategorySplits | ReceiptWithItemsCategory | null | undefined
+  receipt: ReceiptForDetail | null | undefined
 ): ReceiptDetail | null {
   if (!receipt) return null;
 
@@ -106,7 +160,7 @@ export function mapReceiptToDetail(
     storeName: receipt.storeName,
     date: toIsoDateString(receipt.date),
     totalAmount: receipt.totalAmount,
-    taxAmount: receipt.taxAmount,
+    taxAmount: receipt.taxAmount ?? undefined,
     imagePath: receipt.imagePath,
     memberId: receipt.memberId,
     familyGroupId: receipt.familyGroupId,
@@ -115,7 +169,7 @@ export function mapReceiptToDetail(
 }
 
 export function mapReceiptList(
-  receipts: ReceiptWithItemsCategorySplits[] | ReceiptWithItemsCategory[]
+  receipts: ReceiptForDetail[]
 ): ReceiptDetail[] {
   return receipts.map((receipt) => mapReceiptToDetail(receipt)!);
 }
