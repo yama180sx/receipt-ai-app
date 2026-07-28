@@ -4,12 +4,13 @@ import { buildScanInitialDataFromJobStatus } from '../types/receiptScan';
 describe('buildScanInitialDataFromJobStatus', () => {
   it('returns null for non-completed jobs', () => {
     expect(
-      buildScanInitialDataFromJobStatus('job-1', { state: 'active' })
+      buildScanInitialDataFromJobStatus('job-1', { id: 'job-1', state: 'active' })
     ).toBeNull();
   });
 
   it('maps completed job result to scan initial data', () => {
     const data = buildScanInitialDataFromJobStatus('job-1', {
+      id: 'job-1',
       state: 'completed',
       duplicateSuspected: true,
       existingReceiptId: 99,

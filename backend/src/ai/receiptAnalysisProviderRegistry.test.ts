@@ -17,7 +17,7 @@ describe('receiptAnalysisProviderRegistry', () => {
   it('allows injecting a mock provider for tests', async () => {
     const mockParsed: ParsedReceipt = {
       storeName: 'Mock Store',
-      date: '2026-06-01',
+      purchaseDate: '2026-06-01',
       totalAmount: 100,
       items: [{ name: 'Item', price: 100, quantity: 1 }],
     };

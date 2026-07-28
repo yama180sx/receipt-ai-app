@@ -36,13 +36,20 @@ function mapStatRow(row: CategoryStatRow): MonthlyStatItem {
   };
 }
 
+function isLegacyMonthlyStatsRow(
+  dto: MonthlyStatsData | LegacyMonthlyStatsRow
+): dto is LegacyMonthlyStatsRow {
+  return 'total' in dto || 'prevTotal' in dto || 'diffAmount' in dto || 'diffPercentage' in dto;
+}
+
 function mapMonthlyStatsDto(dto: MonthlyStatsData | LegacyMonthlyStatsRow): MonthlyStatsViewModel {
+  const legacy = isLegacyMonthlyStatsRow(dto);
   return {
     month: dto.month ?? '',
-    totalAmount: toNumber('totalAmount' in dto && dto.totalAmount != null ? dto.totalAmount : dto.total),
-    prevTotal: toNumber(dto.prevTotal),
-    diffAmount: toNumber(dto.diffAmount),
-    diffPercentage: toNumber(dto.diffPercentage),
+    totalAmount: toNumber(dto.totalAmount ?? (legacy ? dto.total : undefined)),
+    prevTotal: toNumber(legacy ? dto.prevTotal : undefined),
+    diffAmount: toNumber(legacy ? dto.diffAmount : undefined),
+    diffPercentage: toNumber(legacy ? dto.diffPercentage : undefined),
     stats: (dto.stats ?? []).map(mapStatRow),
     latestReceipt: dto.latestReceipt ?? null,
   };

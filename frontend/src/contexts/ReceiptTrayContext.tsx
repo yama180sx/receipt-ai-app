@@ -11,7 +11,7 @@ type ReceiptTrayProviderProps = {
   children: React.ReactNode;
   enabled: boolean;
   onOpenScan: (data: ReceiptScanInitialData) => void;
-  onRegisterRefresh?: (refresh: () => Promise<void>) => void;
+  onRegisterRefresh?: (refresh: (options?: { userInitiated?: boolean }) => Promise<void>) => void;
 };
 
 export function ReceiptTrayProvider({

@@ -28,3 +28,13 @@ export type LocalFailedReceiptJob = {
 
 /** トレイ一覧の行（DTO またはローカル失敗 ViewModel） */
 export type ReceiptTrayItem = import('../api/generated').ReceiptJobListItem | LocalFailedReceiptJob;
+
+export function isLocalFailedReceiptJob(item: ReceiptTrayItem): item is LocalFailedReceiptJob {
+  return 'localOnly' in item && item.localOnly;
+}
+
+export function isReceiptJobListItem(
+  item: ReceiptTrayItem
+): item is import('../api/generated').ReceiptJobListItem {
+  return !isLocalFailedReceiptJob(item);
+}

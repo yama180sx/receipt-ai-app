@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  const familyGroups = await prisma.familyGroup.findMany({ orderBy: { id: 'asc' } });
+  if (familyGroups.length === 0) {
+    throw new Error('PromptTemplateを作成するFamilyGroupがありません。先に世帯を作成してください。');
+  }
+
   const analysisPrompt = {
     key: "RECEIPT_ANALYSIS",
     description: "レシート画像から店舗名、日付、品目、税額を抽出するための基本プロンプト",
@@ -39,11 +44,18 @@ async function main() {
     version: 1
   };
 
-  await prisma.promptTemplate.upsert({
-    where: { key: analysisPrompt.key },
-    update: analysisPrompt,
-    create: analysisPrompt,
-  });
+  for (const familyGroup of familyGroups) {
+    const existing = await prisma.promptTemplate.findFirst({
+      where: { familyGroupId: familyGroup.id, key: analysisPrompt.key },
+      orderBy: { id: 'asc' },
+    });
+
+    if (existing) {
+      await prisma.promptTemplate.update({ where: { id: existing.id }, data: analysisPrompt });
+    } else {
+      await prisma.promptTemplate.create({ data: { ...analysisPrompt, familyGroupId: familyGroup.id } });
+    }
+  }
 
   console.log('✅ PromptTemplate initial seed completed with optimized Tax logic.');
 }

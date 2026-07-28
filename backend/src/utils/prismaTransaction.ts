@@ -1,8 +1,11 @@
-import { Prisma } from '@prisma/client';
 import { prisma } from './prismaClient';
 
 /** Prisma インタラクティブトランザクションのクライアント型 */
-export type PrismaTx = Prisma.TransactionClient;
+type PrismaTransactionCallback = Extract<
+  Parameters<typeof prisma.$transaction>[0],
+  (tx: never) => Promise<unknown>
+>;
+export type PrismaTx = Parameters<PrismaTransactionCallback>[0];
 
 type TransactionOptions = {
   timeout?: number;
@@ -14,9 +17,9 @@ export async function runInTransaction<T>(
   options?: TransactionOptions
 ): Promise<T> {
   if (options?.timeout) {
-    return prisma.$transaction(fn, { timeout: options.timeout });
+    return prisma.$transaction((tx) => fn(tx), { timeout: options.timeout });
   }
-  return prisma.$transaction(fn);
+  return prisma.$transaction((tx) => fn(tx));
 }
 
 /**

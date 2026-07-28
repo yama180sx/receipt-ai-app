@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useReceiptJobs } from './useReceiptJobs';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
-import type { LocalFailedReceiptJob, ReceiptJobListItem, ReceiptTrayItem } from '../types/receiptJob';
+import {
+  isLocalFailedReceiptJob,
+  type LocalFailedReceiptJob,
+  type ReceiptJobListItem,
+  type ReceiptTrayItem,
+} from '../types/receiptJob';
 import { showAlert } from '../utils/alertMessage';
 import { showConfirmDialog } from '../utils/confirmDialog';
 import { discardReceiptJob, fetchReceiptScanInitialData } from '../utils/receiptJobActions';
@@ -29,7 +34,7 @@ export type ReceiptTrayContextValue = {
 type UseReceiptTrayControllerOptions = {
   enabled: boolean;
   onOpenScan: (data: ReceiptScanInitialData) => void;
-  onRegisterRefresh?: (refresh: () => Promise<void>) => void;
+  onRegisterRefresh?: (refresh: (options?: { userInitiated?: boolean }) => Promise<void>) => void;
 };
 
 export function useReceiptTrayController({
@@ -61,11 +66,11 @@ export function useReceiptTrayController({
   const trayItemCount = countReceiptTrayItems(trayItems);
 
   useEffect(() => {
-    onRegisterRefresh?.((options) => refresh(options));
+    onRegisterRefresh?.(refresh);
   }, [onRegisterRefresh, refresh]);
 
   const canOpenTrayItem = useCallback((item: ReceiptTrayItem): boolean => {
-    if ('localOnly' in item && item.localOnly) return false;
+    if (isLocalFailedReceiptJob(item)) return false;
     const display = resolveReceiptTrayItemDisplay(item);
     return !display.isActive && display.kind !== 'failed';
   }, []);
@@ -93,7 +98,7 @@ export function useReceiptTrayController({
 
   const openTrayItem = useCallback(
     async (item: ReceiptTrayItem) => {
-      if ('localOnly' in item && item.localOnly) return;
+      if (isLocalFailedReceiptJob(item)) return;
 
       const display = resolveReceiptTrayItemDisplay(item);
       if (display.isActive) {
@@ -129,7 +134,7 @@ export function useReceiptTrayController({
   const discardTrayItem = useCallback(
     async (item: ReceiptTrayItem) => {
       const runDiscard = async () => {
-        if ('localOnly' in item && item.localOnly) {
+        if (isLocalFailedReceiptJob(item)) {
           setLocalFailedJobs((prev) => prev.filter((job) => job.id !== item.id));
           return;
         }

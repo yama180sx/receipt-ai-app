@@ -1,4 +1,8 @@
-import type { ReceiptJobListItem, ReceiptJobState, ReceiptTrayItem } from '../types/receiptJob';
+import {
+  isLocalFailedReceiptJob,
+  type ReceiptJobListItem,
+  type ReceiptTrayItem,
+} from '../types/receiptJob';
 
 export type ReceiptJobDisplayKind =
   | 'queued'
@@ -13,14 +17,18 @@ export type ReceiptJobDisplay = {
   isActive: boolean;
 };
 
-const ACTIVE_STATES: ReceiptJobState[] = ['waiting', 'active', 'delayed', 'paused'];
+const ACTIVE_STATES = ['waiting', 'active', 'delayed', 'paused'] as const;
+
+function isActiveState(state: string): state is (typeof ACTIVE_STATES)[number] {
+  return (ACTIVE_STATES as readonly string[]).includes(state);
+}
 
 export function getReceiptJobDisplay(job: ReceiptJobListItem): ReceiptJobDisplay {
   if (job.state === 'failed') {
     return { kind: 'failed', label: '失敗', isActive: false };
   }
 
-  if (ACTIVE_STATES.includes(job.state)) {
+  if (isActiveState(job.state)) {
     const label = job.state === 'active' ? '解析中' : '待機中';
     return { kind: job.state === 'active' ? 'processing' : 'queued', label, isActive: true };
   }
@@ -33,19 +41,19 @@ export function getReceiptJobDisplay(job: ReceiptJobListItem): ReceiptJobDisplay
 }
 
 export function getReceiptTrayItemTitle(item: ReceiptTrayItem): string {
-  if ('localOnly' in item && item.localOnly) {
+  if (isLocalFailedReceiptJob(item)) {
     return 'アップロード失敗';
   }
 
   const storeName = item.parsedData?.storeName?.trim();
   if (storeName) return storeName;
   if (item.state === 'failed') return '解析失敗';
-  if (ACTIVE_STATES.includes(item.state)) return '解析中…';
+  if (isActiveState(item.state)) return '解析中…';
   return 'レシート';
 }
 
 export function countActiveReceiptJobs(jobs: ReceiptJobListItem[]): number {
-  return jobs.filter((job) => ACTIVE_STATES.includes(job.state)).length;
+  return jobs.filter((job) => isActiveState(job.state)).length;
 }
 
 export function sortReceiptTrayItems(items: ReceiptTrayItem[]): ReceiptTrayItem[] {
@@ -62,7 +70,7 @@ export function formatReceiptTrayDateTime(createdAt: number): string {
 }
 
 export function getReceiptTrayItemSubtitle(item: ReceiptTrayItem): string {
-  if ('localOnly' in item && item.localOnly) {
+  if (isLocalFailedReceiptJob(item)) {
     return item.failedReason;
   }
 
@@ -84,7 +92,7 @@ export function getReceiptTrayItemSubtitle(item: ReceiptTrayItem): string {
 }
 
 export function resolveReceiptTrayItemDisplay(item: ReceiptTrayItem): ReceiptJobDisplay {
-  if ('localOnly' in item && item.localOnly) {
+  if (isLocalFailedReceiptJob(item)) {
     return { kind: 'failed', label: '失敗', isActive: false };
   }
   return getReceiptJobDisplay(item);
