@@ -4,6 +4,11 @@ import process from 'node:process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { syncAllSeedTableSequences, syncPostgresIdSequence } from './syncSequences';
+import {
+  INITIAL_PRODUCT_TYPES,
+  INITIAL_STANDARD_PRODUCT_DICTIONARY,
+  STANDARD_CATEGORIES,
+} from './standardProductClassificationSeed';
 
 const prisma = new PrismaClient();
 
@@ -88,6 +93,64 @@ async function seedMastersForFamily(
   });
 }
 
+async function seedStandardProductClassificationMasters() {
+  const categoryIdByCode = new Map<string, number>();
+
+  for (const category of STANDARD_CATEGORIES) {
+    const parentId = category.parentCode
+      ? categoryIdByCode.get(category.parentCode)
+      : undefined;
+
+    if (category.parentCode && !parentId) {
+      throw new Error(`StandardCategory parent is missing: ${category.parentCode}`);
+    }
+
+    const created = await prisma.standardCategory.create({
+      data: {
+        code: category.code,
+        name: category.name,
+        parentId,
+        displayOrder: category.displayOrder,
+      },
+    });
+    categoryIdByCode.set(category.code, created.id);
+  }
+
+  const productTypeIdByCode = new Map<string, number>();
+  for (const productType of INITIAL_PRODUCT_TYPES) {
+    const standardCategoryId = categoryIdByCode.get(productType.standardCategoryCode);
+    if (!standardCategoryId) {
+      throw new Error(`ProductType category is missing: ${productType.standardCategoryCode}`);
+    }
+
+    const created = await prisma.productType.create({
+      data: {
+        code: productType.code,
+        name: productType.name,
+        standardCategoryId,
+        displayOrder: productType.displayOrder,
+      },
+    });
+    productTypeIdByCode.set(productType.code, created.id);
+  }
+
+  for (const entry of INITIAL_STANDARD_PRODUCT_DICTIONARY) {
+    const standardCategoryId = categoryIdByCode.get(entry.standardCategoryCode);
+    const productTypeId = productTypeIdByCode.get(entry.productTypeCode);
+    if (!standardCategoryId || !productTypeId) {
+      throw new Error(`StandardProductDictionary reference is missing: ${entry.normalizedName}`);
+    }
+
+    await prisma.standardProductDictionary.create({
+      data: {
+        normalizedName: entry.normalizedName,
+        standardCategoryId,
+        productTypeId,
+      },
+    });
+  }
+}
+
 async function main() {
   console.log('--- 🚀 Seeding Start (Multi-Tenancy Architecture) ---');
 
@@ -95,6 +158,13 @@ async function main() {
   const password_hash = await bcrypt.hash(devPassword, 10);
 
   await prisma.item.deleteMany();
+  await prisma.classificationCorrection.deleteMany();
+  await prisma.productClassificationAlias.deleteMany();
+  await prisma.productClassificationHistory.deleteMany();
+  await prisma.householdProductDictionary.deleteMany();
+  await prisma.standardProductDictionary.deleteMany();
+  await prisma.productType.deleteMany();
+  await prisma.standardCategory.deleteMany();
   await prisma.settlementTransfer.deleteMany();
   await prisma.productMaster.deleteMany();
   await prisma.receipt.deleteMany();
@@ -105,6 +175,9 @@ async function main() {
   await prisma.familyGroup.deleteMany();
 
   console.log('🗑️ Existing data cleared.');
+
+  await seedStandardProductClassificationMasters();
+  console.log('🗂️ Standard product classification masters seeded.');
 
   const familyGroup = await prisma.familyGroup.create({
     data: { id: 1, name: '山本家', inviteCode: 'YAMAMOTO-2026' },
