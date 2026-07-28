@@ -37,7 +37,7 @@ export async function saveParsedReceipt(
     if (existingByImage) {
       logger.info(`[Idempotent] imagePath 一致のため既存レシートを返却: ID ${existingByImage.id}`);
       return {
-        ...JSON.parse(JSON.stringify(existingByImage)),
+        ...existingByImage,
         isSuspicious,
         warnings,
       };
@@ -66,8 +66,11 @@ export async function saveParsedReceipt(
   );
 
   const final = await findReceiptById(savedId);
+  if (!final) {
+    throw new Error(`保存したレシートが取得できません: ${savedId}`);
+  }
 
-  return { ...JSON.parse(JSON.stringify(final)), isSuspicious, warnings };
+  return { ...final, isSuspicious, warnings };
 }
 
 /** ユーザー確認済みデータの永続化 */

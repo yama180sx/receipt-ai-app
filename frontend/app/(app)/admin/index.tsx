@@ -11,7 +11,6 @@ export default function AdminMenuRoute() {
     <AppScreenShell fullWidth>
       <AdminMenuScreen
         onBack={goHome}
-        onGoToCategories={() => router.push('/admin/categories')}
         onGoToPromptEditor={() => router.push('/admin/prompts')}
         onGoToAdminStats={() => router.push('/admin/stats')}
       />

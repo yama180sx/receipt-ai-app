@@ -4,7 +4,7 @@ export { receiptApi } from './receiptApi';
 export type { CommitReceiptPayload, ListReceiptsParams } from './receiptApi';
 export type { ItemSplitInput } from './generated';
 export { categoryApi } from './categoryApi';
-export type { Category, CreateCategoryRequest } from './categoryApi';
+export type { Category } from './categoryApi';
 export { adminApi } from './adminApi';
 export type { AdminCostStatRow, PromptTemplate } from './adminApi';
 export { statsApi } from './statsApi';

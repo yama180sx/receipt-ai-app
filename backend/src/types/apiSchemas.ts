@@ -46,6 +46,24 @@ export type CategorySummary = {
   color?: string | null;
 };
 
+export type ProductTypeSummary = {
+  id: number;
+  code: string;
+  name: string;
+  standardCategoryId: number;
+};
+
+export type ProductTypeStatus =
+  | 'classified'
+  | 'needs_review'
+  | 'unclassified'
+  | 'outside_initial_scope'
+  | 'not_applicable';
+
+export type ClassificationSource = 'history' | 'household_dictionary' | 'standard_dictionary' | 'ai';
+
+export type ClassificationConfidence = 'high' | 'medium' | 'low';
+
 export type ItemSplitSummary = {
   id: number;
   itemId: number;
@@ -60,6 +78,12 @@ export type ReceiptItemDetail = {
   quantity: number;
   categoryId: number | null;
   category?: CategorySummary | null;
+  standardCategoryId: number | null;
+  productTypeId: number | null;
+  productType?: ProductTypeSummary | null;
+  productTypeStatus: ProductTypeStatus;
+  classificationSource: ClassificationSource | null;
+  classificationConfidence: ClassificationConfidence | null;
   splits?: ItemSplitSummary[];
 };
 
@@ -226,6 +250,10 @@ export const API_SCHEMA_EXPORTS = [
   'LoginResponse',
   'TotpSetupInfo',
   'CategorySummary',
+  'ProductTypeSummary',
+  'ProductTypeStatus',
+  'ClassificationSource',
+  'ClassificationConfidence',
   'ItemSplitSummary',
   'ReceiptItemDetail',
   'ReceiptDetail',

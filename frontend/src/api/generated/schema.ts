@@ -1037,72 +1037,8 @@ export interface paths {
             };
         };
         put?: never;
-        /** カテゴリ新規作成 */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateCategoryRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["Category"];
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/categories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         post?: never;
-        /** カテゴリ削除 */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiMessageEnvelope"];
-                    };
-                };
-            };
-        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1455,6 +1391,18 @@ export interface components {
             name: string;
             color?: string | null;
         };
+        ProductTypeSummary: {
+            id: number;
+            code: string;
+            name: string;
+            standardCategoryId: number;
+        };
+        /** @enum {string} */
+        ProductTypeStatus: "classified" | "needs_review" | "unclassified" | "outside_initial_scope" | "not_applicable";
+        /** @enum {string} */
+        ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "ai";
+        /** @enum {string} */
+        ClassificationConfidence: "high" | "medium" | "low";
         ItemSplitSummary: {
             id: number;
             itemId: number;
@@ -1468,6 +1416,12 @@ export interface components {
             quantity: number;
             categoryId: number | null;
             category?: components["schemas"]["CategorySummary"] | null;
+            standardCategoryId: number | null;
+            productTypeId: number | null;
+            productType: components["schemas"]["ProductTypeSummary"] | null;
+            productTypeStatus: components["schemas"]["ProductTypeStatus"];
+            classificationSource: components["schemas"]["ClassificationSource"] | null;
+            classificationConfidence: components["schemas"]["ClassificationConfidence"] | null;
             splits?: components["schemas"]["ItemSplitSummary"][];
         };
         ReceiptDetail: {
@@ -1640,10 +1594,6 @@ export interface components {
             color?: string | null;
             familyGroupId?: number;
             keywords?: string[];
-        };
-        CreateCategoryRequest: {
-            name: string;
-            color?: string | null;
         };
         PromptTemplate: {
             id: number;
