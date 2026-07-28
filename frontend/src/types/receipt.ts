@@ -24,6 +24,7 @@ export interface ReceiptInput {
 /** OpenAPI DTO（receipt API） */
 export type {
   CategorySummary,
+  ProductTypeSummary,
   ItemSplitSummary,
   ReceiptItemDetail,
   ReceiptDetail,

@@ -10,6 +10,7 @@ import type {
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
+  ProductTypeSummary,
 } from './generated';
 
 export type ListReceiptsParams = {
@@ -25,6 +26,16 @@ export type CommitReceiptPayload = {
 };
 
 export type ReceiptJobStatusResponse = ApiSuccessResponse<ReceiptJobStatus>;
+export type ProductClassificationCorrectionScope =
+  | 'item_only'
+  | 'same_ocr_name'
+  | 'same_classification_name';
+
+export type ProductClassificationCorrectionPayload = {
+  productTypeId: number;
+  scope: ProductClassificationCorrectionScope;
+  classificationName?: string;
+};
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
 export const receiptApi = {
@@ -51,6 +62,19 @@ export const receiptApi = {
     categoryId: number
   ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
     const res = await apiClient.patch(`/receipts/items/${itemId}`, { categoryId });
+    return res.data;
+  },
+
+  async listProductTypes(): Promise<ApiSuccessResponse<ProductTypeSummary[]>> {
+    const res = await apiClient.get('/product-types');
+    return res.data;
+  },
+
+  async updateItemProductClassification(
+    itemId: number,
+    payload: ProductClassificationCorrectionPayload
+  ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
+    const res = await apiClient.patch(`/receipts/items/${itemId}/product-classification`, payload);
     return res.data;
   },
 

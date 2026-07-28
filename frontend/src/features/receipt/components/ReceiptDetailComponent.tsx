@@ -7,6 +7,7 @@ import { ReceiptDetailActions } from './ReceiptDetailActions';
 import { ReceiptDetailHeader } from './ReceiptDetailHeader';
 import { ReceiptDetailImagePanel } from './ReceiptDetailImagePanel';
 import { ReceiptDetailItemList } from './ReceiptDetailItemList';
+import { ProductClassificationCorrectionModal } from './ProductClassificationCorrectionModal';
 import { receiptDetailStyles as styles } from '../styles/receiptDetailStyles';
 
 export interface ReceiptDetailComponentProps {
@@ -80,9 +81,23 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
             onCategoryChange={onCategoryChange}
             onUpdateItem={detail.updateEditItem}
             onUpdateField={detail.updateEditField}
+            onEditProductClassification={(item) => void detail.openProductClassificationCorrection(item)}
           />
         </View>
       </View>
+      <ProductClassificationCorrectionModal
+        item={detail.correctionItem}
+        productTypes={detail.productTypes}
+        selectedProductTypeId={detail.correctionProductTypeId}
+        scope={detail.correctionScope}
+        classificationName={detail.classificationName}
+        loading={detail.correctionLoading}
+        onClose={detail.closeProductClassificationCorrection}
+        onProductTypeChange={detail.setCorrectionProductTypeId}
+        onScopeChange={detail.setCorrectionScope}
+        onClassificationNameChange={detail.setClassificationName}
+        onSave={() => void detail.saveProductClassificationCorrection()}
+      />
       <View style={styles.scrollFooter} />
     </ScrollView>
   );
