@@ -1,5 +1,10 @@
 import { prisma } from '../../utils/prismaClient';
-import type { ClassificationConfidence, ClassificationSource, ProductTypeStatus } from '@prisma/client';
+import type {
+  ClassificationConfidence,
+  ClassificationSource,
+  ProductClassificationCandidateSource,
+  ProductTypeStatus,
+} from '@prisma/client';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
 import { getCleanText } from '../../utils/normalizer';
@@ -33,6 +38,13 @@ export type ReceiptCreateWithItemsInput = {
     productTypeStatus: ProductTypeStatus;
     classificationSource: ClassificationSource | null;
     classificationConfidence: ClassificationConfidence | null;
+    productClassificationCandidates?: Array<{
+      productTypeId: number;
+      source: ProductClassificationCandidateSource;
+      matchedNormalizedName: string;
+      similarity: number;
+      rank: number;
+    }>;
   }>;
 };
 
@@ -48,7 +60,14 @@ export async function createReceiptInTx(tx: PrismaTx, input: ReceiptCreateWithIt
       totalAmount: input.totalAmount,
       taxAmount: input.taxAmount,
       imagePath: input.imagePath,
-      items: { create: input.items },
+      items: {
+        create: input.items.map(({ productClassificationCandidates = [], ...item }) => ({
+          ...item,
+          productClassificationCandidates: productClassificationCandidates.length
+            ? { create: productClassificationCandidates }
+            : undefined,
+        })),
+      },
       rawText: input.rawText,
     },
     select: { id: true },
@@ -106,6 +125,13 @@ export type ItemCreateInput = {
   productTypeStatus: ProductTypeStatus;
   classificationSource: ClassificationSource | null;
   classificationConfidence: ClassificationConfidence | null;
+  productClassificationCandidates?: Array<{
+    productTypeId: number;
+    source: ProductClassificationCandidateSource;
+    matchedNormalizedName: string;
+    similarity: number;
+    rank: number;
+  }>;
 };
 
 export async function deleteItemsByReceiptIdInTx(tx: PrismaTx, receiptId: number) {
@@ -114,7 +140,18 @@ export async function deleteItemsByReceiptIdInTx(tx: PrismaTx, receiptId: number
 
 export async function createItemsInTx(tx: PrismaTx, items: ItemCreateInput[]) {
   if (items.length === 0) return;
-  return tx.item.createMany({ data: items });
+  return Promise.all(
+    items.map(({ productClassificationCandidates = [], ...item }) =>
+      tx.item.create({
+        data: {
+          ...item,
+          productClassificationCandidates: productClassificationCandidates.length
+            ? { create: productClassificationCandidates }
+            : undefined,
+        },
+      })
+    )
+  );
 }
 
 export async function updateItemCategoryInTx(

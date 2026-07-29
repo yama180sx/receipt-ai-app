@@ -6,7 +6,10 @@ import {
   createReceiptInTx,
   linkApiUsageLogToReceiptInTx,
 } from '../../repositories/receiptRepository';
-import { classifyItemByExactMatch } from '../productClassification/productClassificationService';
+import {
+  classifyItemWithSimilarityCandidates,
+  toProductClassificationCandidateInputs,
+} from '../productClassification/productClassificationService';
 
 /** commit トランザクション内で永続化するための準備済み入力 */
 export type ReceiptCommitTxInput = {
@@ -47,7 +50,7 @@ export async function persistReceiptCommitInTx(
 
   const itemsToCreate = await Promise.all(
     parsedData.items.map(async (item: ParsedItem) => {
-      const classification = await classifyItemByExactMatch(tx, {
+      const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
         familyGroupId,
         itemName: item.name,
         categoryId: item.categoryId ? Number(item.categoryId) : null,
@@ -59,6 +62,7 @@ export async function persistReceiptCommitInTx(
         price: parseFloat(String(item.price || 0)),
         quantity: parseFloat(String(item.quantity || 1)),
         ...classification,
+        productClassificationCandidates: toProductClassificationCandidateInputs(candidates),
       };
     })
   );

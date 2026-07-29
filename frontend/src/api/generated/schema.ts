@@ -802,6 +802,53 @@ export interface paths {
         };
         trace?: never;
     };
+    "/receipts/items/{itemId}/product-classification-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 明細の商品分類候補取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationCandidateSummary"][];
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receipts/items/{itemId}/splits": {
         parameters: {
             query?: never;
@@ -1485,6 +1532,16 @@ export interface components {
         ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "similarity" | "ai" | "manual";
         /** @enum {string} */
         ClassificationCorrectionScope: "item_only" | "same_ocr_name" | "same_classification_name";
+        /** @enum {string} */
+        ProductClassificationCandidateSource: "history" | "household_dictionary" | "alias" | "standard_dictionary";
+        ProductClassificationCandidateSummary: {
+            productType: components["schemas"]["ProductTypeSummary"];
+            source: components["schemas"]["ProductClassificationCandidateSource"];
+            matchedNormalizedName: string;
+            /** Format: float */
+            similarity: number;
+            rank: number;
+        };
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";
         ItemSplitSummary: {

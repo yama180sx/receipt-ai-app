@@ -145,6 +145,25 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 `normalizedStoreName` と `normalizedName` は、商品分類の類似候補検索および将来の履歴検索で共有する検索キーである。既存データはmigrationで小文字化・空白整理を行い、新規・更新データはアプリケーションの `getCleanText` で保存する。
 
+### ProductClassificationCandidate
+
+類似検索で得た商品種別候補を、明細ごとに保持する。候補レコードは商品種別の確定を意味しない。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| itemId | Int | No | — | — | Item.id | 複合 | 複合 |
+| productTypeId | Int | No | — | — | ProductType.id | 複合 | Yes |
+| source | ProductClassificationCandidateSource | No | — | — | — | — | — |
+| matchedNormalizedName | String | No | — | — | — | — | — |
+| similarity | Float | No | — | — | — | — | — |
+| rank | Int | No | — | — | 複合 | 複合 | — |
+| createdAt | DateTime | No | now() | — | — | — | — |
+
+**FK:** `itemId` → `Item.id` (**onDelete: Cascade**), `productTypeId` → `ProductType.id`
+**Unique:** `(itemId, productTypeId)`, `(itemId, rank)`
+**Index:** `productTypeId`
+
 ---
 
 ### ItemSplit

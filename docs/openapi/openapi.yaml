@@ -525,6 +525,35 @@ paths:
                       data:
                         $ref: '#/components/schemas/ReceiptItemDetail'
 
+  /receipts/items/{itemId}/product-classification-candidates:
+    get:
+      tags: [receipt]
+      summary: 明細の商品分類候補取得
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationCandidateSummary'
+        '404':
+          description: Not Found
+
   /receipts/items/{itemId}/splits:
     post:
       tags: [receipt]
@@ -1053,6 +1082,26 @@ components:
     ClassificationCorrectionScope:
       type: string
       enum: [item_only, same_ocr_name, same_classification_name]
+
+    ProductClassificationCandidateSource:
+      type: string
+      enum: [history, household_dictionary, alias, standard_dictionary]
+
+    ProductClassificationCandidateSummary:
+      type: object
+      required: [productType, source, matchedNormalizedName, similarity, rank]
+      properties:
+        productType:
+          $ref: '#/components/schemas/ProductTypeSummary'
+        source:
+          $ref: '#/components/schemas/ProductClassificationCandidateSource'
+        matchedNormalizedName:
+          type: string
+        similarity:
+          type: number
+          format: float
+        rank:
+          type: integer
 
     ClassificationConfidence:
       type: string

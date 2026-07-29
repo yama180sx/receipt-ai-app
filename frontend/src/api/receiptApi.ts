@@ -11,6 +11,7 @@ import type {
   ReceiptJobListItem,
   ReceiptJobStatus,
   ProductTypeSummary,
+  ProductClassificationCandidateSummary,
 } from './generated';
 
 export type ListReceiptsParams = {
@@ -75,6 +76,13 @@ export const receiptApi = {
     payload: ProductClassificationCorrectionPayload
   ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
     const res = await apiClient.patch(`/receipts/items/${itemId}/product-classification`, payload);
+    return res.data;
+  },
+
+  async getItemProductClassificationCandidates(
+    itemId: number
+  ): Promise<ApiSuccessResponse<ProductClassificationCandidateSummary[]>> {
+    const res = await apiClient.get(`/receipts/items/${itemId}/product-classification-candidates`);
     return res.data;
   },
 

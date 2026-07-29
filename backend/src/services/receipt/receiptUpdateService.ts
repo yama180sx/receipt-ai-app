@@ -14,7 +14,11 @@ import {
   updateReceiptInTx as patchReceiptInTx,
 } from '../../repositories/receiptRepository';
 import { saveParsedReceipt } from './receiptPersistenceService';
-import { classifyItemByExactMatch } from '../productClassification/productClassificationService';
+import {
+  classifyItemWithSimilarityCandidates,
+  toProductClassificationCandidateInputs,
+} from '../productClassification/productClassificationService';
+import { replaceProductClassificationCandidatesInTx } from '../../repositories/productClassificationRepository';
 
 export type ManualReceiptInput = {
   date: string;
@@ -81,18 +85,22 @@ async function applyFullReceiptUpdateInTx(
 
   if (itemList.length > 0) {
     const classifiedItems = await Promise.all(
-      itemList.map(async (item) => ({
-        receiptId,
-        name: item.name,
-        normalizedName: getCleanText(item.name),
-        price: parseFloat(String(item.price)) || 0,
-        quantity: parseFloat(String(item.quantity)) || 0,
-        ...(await classifyItemByExactMatch(tx, {
+      itemList.map(async (item) => {
+        const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
           familyGroupId,
           itemName: item.name,
           categoryId: item.categoryId ? Number(item.categoryId) : null,
-        })),
-      }))
+        });
+        return {
+          receiptId,
+          name: item.name,
+          normalizedName: getCleanText(item.name),
+          price: parseFloat(String(item.price)) || 0,
+          quantity: parseFloat(String(item.quantity)) || 0,
+          ...classification,
+          productClassificationCandidates: toProductClassificationCandidateInputs(candidates),
+        };
+      })
     );
     await createItemsInTx(tx, classifiedItems);
   }
@@ -126,12 +134,17 @@ async function updateItemCategoryInTxHandler(
     if (!category) throw new AppError('CategoryNotFound', 404);
   }
 
-  const classification = await classifyItemByExactMatch(tx, {
+  const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
     familyGroupId,
     itemName: currentItem.name,
     categoryId: categoryId ? Number(categoryId) : null,
   });
   const updatedItem = await updateItemCategoryInTx(tx, itemId, classification);
+  await replaceProductClassificationCandidatesInTx(
+    tx,
+    itemId,
+    toProductClassificationCandidateInputs(candidates)
+  );
 
   return updatedItem;
 }

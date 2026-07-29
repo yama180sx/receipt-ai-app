@@ -75,6 +75,20 @@ export type ClassificationCorrectionScope =
   | 'same_ocr_name'
   | 'same_classification_name';
 
+export type ProductClassificationCandidateSource =
+  | 'history'
+  | 'household_dictionary'
+  | 'alias'
+  | 'standard_dictionary';
+
+export type ProductClassificationCandidateSummary = {
+  productType: ProductTypeSummary;
+  source: ProductClassificationCandidateSource;
+  matchedNormalizedName: string;
+  similarity: number;
+  rank: number;
+};
+
 export type UpdateItemProductClassificationRequest = {
   productTypeId: number;
   scope: ClassificationCorrectionScope;
@@ -272,6 +286,8 @@ export const API_SCHEMA_EXPORTS = [
   'ClassificationSource',
   'ClassificationConfidence',
   'ClassificationCorrectionScope',
+  'ProductClassificationCandidateSource',
+  'ProductClassificationCandidateSummary',
   'UpdateItemProductClassificationRequest',
   'ItemSplitSummary',
   'ReceiptItemDetail',

@@ -9,6 +9,7 @@ import { getCleanText } from '../../utils/normalizer';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import {
   createClassificationCorrectionInTx,
+  deleteProductClassificationCandidatesInTx,
   findActiveProductTypeWithCategoryInTx,
   findCategoryForProductTypeInTx,
   upsertHouseholdProductDictionaryInTx,
@@ -58,6 +59,7 @@ async function correctItemProductClassificationInTx(
     nextProductTypeId: productType.id,
     scope: input.scope,
   });
+  await deleteProductClassificationCandidatesInTx(tx, itemId);
 
   if (input.scope === ClassificationCorrectionScope.SAME_OCR_NAME) {
     const normalizedName = getCleanText(item.name);

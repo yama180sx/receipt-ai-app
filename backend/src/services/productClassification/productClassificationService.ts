@@ -1,10 +1,13 @@
 import {
   ClassificationConfidence,
+  ProductClassificationCandidateSource,
   ClassificationSource,
   ProductTypeStatus,
 } from '@prisma/client';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { getCleanText } from '../../utils/normalizer';
+import { findProductSimilarityCandidates } from './productSimilaritySearchService';
+import type { ProductSimilarityCandidate } from '../../repositories/productClassificationRepository';
 
 export type ProductClassificationResult = {
   categoryId: number | null;
@@ -13,6 +16,11 @@ export type ProductClassificationResult = {
   productTypeStatus: ProductTypeStatus;
   classificationSource: ClassificationSource | null;
   classificationConfidence: ClassificationConfidence | null;
+};
+
+export type ProductClassificationWithCandidatesResult = {
+  classification: ProductClassificationResult;
+  candidates: ProductSimilarityCandidate[];
 };
 
 type MatchedProductType = {
@@ -123,9 +131,59 @@ export async function classifyItemByExactMatch(
     standardCategoryId: null,
     productTypeId: null,
     productTypeStatus: isInitialTarget
-      ? ProductTypeStatus.OUTSIDE_INITIAL_SCOPE
+      ? ProductTypeStatus.UNCLASSIFIED
       : ProductTypeStatus.NOT_APPLICABLE,
     classificationSource: null,
     classificationConfidence: null,
   };
+}
+
+const candidateSourceMap: Record<
+  ProductSimilarityCandidate['source'],
+  ProductClassificationCandidateSource
+> = {
+  history: ProductClassificationCandidateSource.HISTORY,
+  household_dictionary: ProductClassificationCandidateSource.HOUSEHOLD_DICTIONARY,
+  alias: ProductClassificationCandidateSource.ALIAS,
+  standard_dictionary: ProductClassificationCandidateSource.STANDARD_DICTIONARY,
+};
+
+/**
+ * 完全一致で未解決の明細へ類似候補を付与する。
+ * 類似候補はProductTypeを確定せず、needs_reviewとして保持するだけである。
+ */
+export async function classifyItemWithSimilarityCandidates(
+  tx: PrismaTx,
+  input: { familyGroupId: number; itemName: string; categoryId?: number | null }
+): Promise<ProductClassificationWithCandidatesResult> {
+  const classification = await classifyItemByExactMatch(tx, input);
+  if (classification.productTypeStatus !== ProductTypeStatus.UNCLASSIFIED) {
+    return { classification, candidates: [] };
+  }
+
+  const candidates = await findProductSimilarityCandidates(tx, {
+    familyGroupId: input.familyGroupId,
+    itemName: input.itemName,
+  });
+  if (candidates.length === 0) return { classification, candidates };
+
+  return {
+    classification: {
+      ...classification,
+      productTypeStatus: ProductTypeStatus.NEEDS_REVIEW,
+      classificationSource: ClassificationSource.SIMILARITY,
+      classificationConfidence: ClassificationConfidence.MEDIUM,
+    },
+    candidates,
+  };
+}
+
+export function toProductClassificationCandidateInputs(candidates: ProductSimilarityCandidate[]) {
+  return candidates.map((candidate, index) => ({
+    productTypeId: candidate.productTypeId,
+    source: candidateSourceMap[candidate.source],
+    matchedNormalizedName: candidate.normalizedName,
+    similarity: candidate.similarity,
+    rank: index + 1,
+  }));
 }
