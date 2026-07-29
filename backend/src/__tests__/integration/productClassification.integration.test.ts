@@ -1,10 +1,11 @@
 import '../../test/mockReceiptQueue';
 
-import { ClassificationCorrectionScope } from '@prisma/client';
+import { ClassificationCorrectionScope, ClassificationSource } from '@prisma/client';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';
 import { prisma } from '../../utils/prismaClient';
+import { getCleanText } from '../../utils/normalizer';
 import { classifyItemByExactMatch } from '../../services/productClassification/productClassificationService';
 import {
   ensureTestMemberPassword,
@@ -78,7 +79,9 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     ).resolves.toMatchObject({ familyGroupId, actorMemberId: memberId, nextProductTypeId: milkId });
     await expect(
       prisma.householdProductDictionary.findUnique({
-        where: { familyGroupId_normalizedName: { familyGroupId, normalizedName: item.name } },
+        where: {
+          familyGroupId_normalizedName: { familyGroupId, normalizedName: getCleanText(item.name) },
+        },
       })
     ).resolves.toBeNull();
   });
@@ -96,12 +99,17 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     expect(res.status).toBe(200);
     await expect(
       prisma.householdProductDictionary.findUnique({
-        where: { familyGroupId_normalizedName: { familyGroupId, normalizedName: item.name } },
+        where: {
+          familyGroupId_normalizedName: { familyGroupId, normalizedName: getCleanText(item.name) },
+        },
       })
     ).resolves.toMatchObject({ productTypeId: milkId });
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: item.name })
-    ).resolves.toMatchObject({ productTypeId: milkId, classificationSource: 'household_dictionary' });
+    ).resolves.toMatchObject({
+      productTypeId: milkId,
+      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
+    });
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId: 2, itemName: item.name })
     ).resolves.toMatchObject({ productTypeId: null, classificationSource: null });
@@ -129,7 +137,10 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     ).resolves.toMatchObject({ productTypeId: milkId });
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '分類回帰別名' })
-    ).resolves.toMatchObject({ productTypeId: milkId, classificationSource: 'household_dictionary' });
+    ).resolves.toMatchObject({
+      productTypeId: milkId,
+      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
+    });
   });
 
   it('applies the learning priority and rejects cross-household item corrections', async () => {
@@ -149,17 +160,23 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
 
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '牛乳' })
-    ).resolves.toMatchObject({ productTypeId: milkId, classificationSource: 'history' });
+    ).resolves.toMatchObject({ productTypeId: milkId, classificationSource: ClassificationSource.HISTORY });
 
     await prisma.productClassificationHistory.deleteMany({ where: { familyGroupId, normalizedName: '牛乳' } });
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '牛乳' })
-    ).resolves.toMatchObject({ productTypeId: tissueId, classificationSource: 'household_dictionary' });
+    ).resolves.toMatchObject({
+      productTypeId: tissueId,
+      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
+    });
 
     await prisma.householdProductDictionary.deleteMany({ where: { familyGroupId, normalizedName: '牛乳' } });
     await expect(
       classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '牛乳' })
-    ).resolves.toMatchObject({ productTypeId: chipsId, classificationSource: 'household_dictionary' });
+    ).resolves.toMatchObject({
+      productTypeId: chipsId,
+      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
+    });
 
     const token = await loginAsTestMember(app, memberId);
     const tenantBItemId = await getTenantBItemId();
