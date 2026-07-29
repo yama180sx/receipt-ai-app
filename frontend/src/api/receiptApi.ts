@@ -12,11 +12,22 @@ import type {
   ReceiptJobStatus,
   ProductTypeSummary,
   ProductClassificationCandidateSummary,
+  ProductClassificationReviewPage,
+  ProductTypeStatus,
 } from './generated';
 
 export type ListReceiptsParams = {
   month?: string;
   memberId?: string;
+};
+
+export type ListProductClassificationReviewParams = {
+  status?: Exclude<ProductTypeStatus, 'classified' | 'not_applicable'>;
+  categoryId?: number;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type CommitReceiptPayload = {
@@ -83,6 +94,13 @@ export const receiptApi = {
     itemId: number
   ): Promise<ApiSuccessResponse<ProductClassificationCandidateSummary[]>> {
     const res = await apiClient.get(`/receipts/items/${itemId}/product-classification-candidates`);
+    return res.data;
+  },
+
+  async listProductClassificationReviewItems(
+    params: ListProductClassificationReviewParams = {}
+  ): Promise<ApiSuccessResponse<ProductClassificationReviewPage>> {
+    const res = await apiClient.get('/receipts/product-classification-review', { params });
     return res.data;
   },
 

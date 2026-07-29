@@ -22,6 +22,7 @@ import {
   mapReceiptItemToDetail,
   mapReceiptList,
   mapReceiptToDetail,
+  mapProductClassificationReviewPage,
   mapUploadJobResponse,
 } from '../mappers/receiptMapper';
 import { mapAdvancedStatsToApi, mapMonthlyStatsToApi } from '../mappers/statsMapper';
@@ -32,6 +33,7 @@ import {
   getLatestReceipt as fetchLatestReceipt,
   deleteReceiptById,
   listFamilyMembers,
+  listProductClassificationReviewItems,
 } from '../services/receipt/receiptQueryService';
 import { updateReceiptById, updateItemCategoryById } from '../services/receipt/receiptUpdateService';
 import { correctItemProductClassification } from '../services/productClassification/productClassificationCorrectionService';
@@ -189,6 +191,25 @@ export const getReceipts = asyncHandler(async (req, res) => {
     month: typeof month === 'string' ? month : undefined,
   });
   sendSuccess(res, mapReceiptList(receipts));
+});
+
+export const getProductClassificationReviewItems = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const statusValues = Array.isArray(req.query.status)
+    ? req.query.status
+    : typeof req.query.status === 'string'
+      ? req.query.status.split(',')
+      : [];
+  const result = await listProductClassificationReviewItems({
+    familyGroupId,
+    statuses: statusValues.filter((status): status is string => typeof status === 'string'),
+    categoryId: typeof req.query.categoryId === 'string' ? req.query.categoryId : undefined,
+    from: typeof req.query.from === 'string' ? req.query.from : undefined,
+    to: typeof req.query.to === 'string' ? req.query.to : undefined,
+    page: typeof req.query.page === 'string' ? req.query.page : undefined,
+    limit: typeof req.query.limit === 'string' ? req.query.limit : undefined,
+  });
+  sendSuccess(res, mapProductClassificationReviewPage(result));
 });
 
 export const getLatestReceipt = asyncHandler(async (_req, res) => {

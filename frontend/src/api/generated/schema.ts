@@ -552,6 +552,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receipts/product-classification-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 要確認・未分類明細一覧 */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description 複数指定可能。省略時は要確認・未分類・初期範囲外を対象とする */
+                    status?: ("needs_review" | "unclassified" | "outside_initial_scope")[];
+                    categoryId?: number;
+                    from?: string;
+                    to?: string;
+                    page?: number;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationReviewPage"];
+                        };
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receipts/upload": {
         parameters: {
             query?: never;
@@ -1541,6 +1594,22 @@ export interface components {
             /** Format: float */
             similarity: number;
             rank: number;
+        };
+        ProductClassificationReviewItem: components["schemas"]["ReceiptItemDetail"] & {
+            receipt: {
+                id: number;
+                storeName: string;
+                /** Format: date-time */
+                date?: string;
+            };
+            candidates: components["schemas"]["ProductClassificationCandidateSummary"][];
+        };
+        ProductClassificationReviewPage: {
+            items: components["schemas"]["ProductClassificationReviewItem"][];
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
         };
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";

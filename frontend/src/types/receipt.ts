@@ -28,6 +28,8 @@ export type {
   ItemSplitSummary,
   ReceiptItemDetail,
   ReceiptDetail,
+  ProductClassificationReviewItem,
+  ProductClassificationReviewPage,
 } from '../api/generated';
 
 /** commit 前の編集用明細（ViewModel — UI 入力中は string 許容） */

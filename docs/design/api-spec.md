@@ -258,6 +258,7 @@ sequenceDiagram
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/receipts` | JWT + tenant | レシート一覧 |
+| GET | `/receipts/product-classification-review` | JWT + tenant | 要確認・未分類・初期分類範囲外の明細一覧 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
 | GET | `/receipts/latest` | JWT + tenant | 最新レシート 1 件 |
@@ -268,6 +269,8 @@ sequenceDiagram
 | DELETE | `/receipts/:id` | JWT + tenant | レシート削除 |
 | PATCH | `/receipts/:id` | JWT + tenant | レシート全体編集 |
 | PATCH | `/receipts/items/:id` | JWT + tenant | 明細カテゴリ更新 + 学習マスタ反映 |
+| PATCH | `/receipts/items/:itemId/product-classification` | JWT + tenant | 商品種別の手動修正・適用範囲に応じた世帯内学習 |
+| GET | `/receipts/items/:itemId/product-classification-candidates` | JWT + tenant | 商品分類候補一覧 |
 | POST | `/receipts/items/:itemId/splits` | JWT + tenant | 明細按分（ItemSplit）保存 |
 | POST | `/receipts/commit` | JWT + tenant | AI 解析結果の確定保存 |
 
@@ -277,6 +280,10 @@ sequenceDiagram
 |---------------|-----------|------|
 | `GET /receipts` | `month` | `YYYY-MM` フィルタ（任意） |
 | `GET /receipts` | `memberId` | 支払者フィルタ。空文字 `""` = 世帯全体 |
+| `GET /receipts/product-classification-review` | `status` | `needs_review` / `unclassified` / `outside_initial_scope`。複数指定可、省略時は3状態すべて |
+| 同上 | `categoryId` | 世帯カテゴリによる絞り込み（任意） |
+| 同上 | `from`, `to` | 購入日の期間（`YYYY-MM-DD`、任意） |
+| 同上 | `page`, `limit` | ページング。既定 1 / 20、`limit` 最大100 |
 | `GET /stats/monthly` | `month` | 対象月（省略時は当月 UTC 基準の `YYYY-MM`） |
 
 ### 4.4 Stats（精算）— `/api/stats`

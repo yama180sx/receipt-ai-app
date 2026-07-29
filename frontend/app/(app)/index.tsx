@@ -41,6 +41,7 @@ export default function HomeRoute() {
           onAnalysisReady={handleAnalysisReady}
           onGoToHistory={() => router.push('/history')}
           onGoToStats={() => router.push('/stats')}
+          onGoToClassificationReview={() => router.push('/classification-review')}
           onGoToReceiptTray={() => router.push('/tray')}
           onGoToSettlement={() => router.push('/settlement')}
           onGoToAdminMenu={() => router.push('/admin')}

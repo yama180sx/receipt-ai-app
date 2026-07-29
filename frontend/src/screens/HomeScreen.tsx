@@ -21,6 +21,7 @@ interface HomeScreenProps {
   onGoToHistory: () => void;
   onGoToStats: () => void;
   onGoToReceiptTray: () => void;
+  onGoToClassificationReview: () => void;
   onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
   currentMemberId: number;
@@ -34,6 +35,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToHistory,
   onGoToStats,
   onGoToReceiptTray,
+  onGoToClassificationReview,
   onGoToSettlement,
   onGoToAdminMenu,
   currentMemberId,
@@ -89,6 +91,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onGoToReceiptTray={onGoToReceiptTray}
             onGoToHistory={onGoToHistory}
             onGoToStats={onGoToStats}
+            onGoToClassificationReview={onGoToClassificationReview}
             onGoToSettlement={onGoToSettlement}
             onGoToAdminMenu={onGoToAdminMenu}
           />

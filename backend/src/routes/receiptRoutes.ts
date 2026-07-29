@@ -7,6 +7,7 @@ import { productClassificationCorrectionSchema, uploadReceiptSchema } from '../s
 
 import {
   getReceipts,
+  getProductClassificationReviewItems,
   createReceipt,
   updateReceipt,
   deleteReceipt,
@@ -48,6 +49,7 @@ router.get('/family-groups/members', getFamilyMembers);
 router.get('/uploads/:filename', serveReceiptImage);
 
 router.get('/receipts', getReceipts);
+router.get('/receipts/product-classification-review', getProductClassificationReviewItems);
 router.get('/receipts/jobs', getReceiptJobs);
 router.delete('/receipts/jobs/:jobId', discardReceiptJob);
 router.get('/receipts/latest', getLatestReceipt);

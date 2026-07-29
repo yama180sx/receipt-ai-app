@@ -41,6 +41,7 @@ RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router*
 |--------|-------------------|----------------------|--------|
 | `/` | `HomeScreen` | `features/home` | — |
 | `/history` | `HistoryScreen` | `useReceiptHistory` | `/` |
+| `/classification-review` | `ProductClassificationReviewScreen` | `useProductClassificationReview` | `/` |
 | `/stats` | `StatisticsScreen` | `useStatistics` | `/` |
 | `/tray` | `ReceiptTrayScreen` | `ReceiptTrayContext` | `/` |
 | `/scan/[jobId]` | `ReceiptScanScreen` | `useReceiptScan` | query `returnTo`（`home` / `tray`） |
@@ -77,6 +78,7 @@ flowchart TD
 
   Routes --> Home["/ HomeScreen"]
   Routes --> Hist["/history"]
+  Routes --> Review["/classification-review"]
   Routes --> Split["/history/.../split"]
   Routes --> Settle["/settlement"]
   Routes --> Stats["/stats"]
@@ -89,7 +91,7 @@ flowchart TD
   Routes --> AdminS["/admin/stats"]
   Routes --> Totp["/settings/totp"]
 
-  Home --> Hist & Stats & Tray & Settle & Admin
+  Home --> Hist & Review & Stats & Tray & Settle & Admin
   Tray --> Scan
   Hist --> Split
   Admin --> Cat & Prod & Prompt & AdminS
@@ -134,6 +136,7 @@ SafeAreaProvider
 |------|----------|-----------|---------------------|
 | **Home** | `screens/HomeScreen.tsx` | `useHomeDashboard`, `useReceiptUpload` | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
 | **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
+| **ProductClassificationReview** | `screens/ProductClassificationReviewScreen.tsx` | `useProductClassificationReview` | `GET /receipts/product-classification-review`, `GET /product-types`, `PATCH /receipts/items/:itemId/product-classification` |
 | **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /categories`, `PATCH /receipts/items/:id` |
 | **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
 | **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | `useReceiptScan` | `POST /receipts/commit` |

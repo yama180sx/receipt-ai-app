@@ -20,6 +20,8 @@ export {
   findProductClassificationAiTargets,
   findProductClassificationAiTargetInTx,
   findItemById,
+  findProductClassificationReviewItems,
+  type ReviewItemsParams,
   findCategoryByIdInTx,
   findItemSplitsInTx,
   findFamilyMembersByIdsInTx,

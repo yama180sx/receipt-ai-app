@@ -89,6 +89,23 @@ export type ProductClassificationCandidateSummary = {
   rank: number;
 };
 
+export type ProductClassificationReviewItem = ReceiptItemDetail & {
+  receipt: {
+    id: number;
+    storeName: string;
+    date?: string;
+  };
+  candidates: ProductClassificationCandidateSummary[];
+};
+
+export type ProductClassificationReviewPage = {
+  items: ProductClassificationReviewItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
 export type UpdateItemProductClassificationRequest = {
   productTypeId: number;
   scope: ClassificationCorrectionScope;
@@ -288,6 +305,8 @@ export const API_SCHEMA_EXPORTS = [
   'ClassificationCorrectionScope',
   'ProductClassificationCandidateSource',
   'ProductClassificationCandidateSummary',
+  'ProductClassificationReviewItem',
+  'ProductClassificationReviewPage',
   'UpdateItemProductClassificationRequest',
   'ItemSplitSummary',
   'ReceiptItemDetail',

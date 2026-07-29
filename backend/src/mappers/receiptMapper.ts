@@ -13,8 +13,11 @@ import type {
   ReceiptJobStatus,
   ProductTypeStatus,
   ProductTypeSummary,
+  ProductClassificationReviewItem,
+  ProductClassificationReviewPage,
   UploadJobResponse,
 } from '../types/apiSchemas';
+import { mapProductClassificationCandidatesToSummary } from './productClassificationMapper';
 import {
   receiptWithItemsCategory,
   receiptWithItemsCategorySplits,
@@ -172,6 +175,46 @@ export function mapReceiptList(
   receipts: ReceiptForDetail[]
 ): ReceiptDetail[] {
   return receipts.map((receipt) => mapReceiptToDetail(receipt)!);
+}
+
+type ProductClassificationReviewItemRecord = ReceiptItemForDetail & {
+  receipt: {
+    id: number;
+    storeName: string;
+    date: Date | null;
+  };
+  productClassificationCandidates: Parameters<
+    typeof mapProductClassificationCandidatesToSummary
+  >[0];
+};
+
+export function mapProductClassificationReviewItem(
+  item: ProductClassificationReviewItemRecord
+): ProductClassificationReviewItem {
+  return {
+    ...mapReceiptItemToDetail(item),
+    receipt: {
+      id: item.receipt.id,
+      storeName: item.receipt.storeName,
+      date: toIsoDateString(item.receipt.date),
+    },
+    candidates: mapProductClassificationCandidatesToSummary(
+      item.productClassificationCandidates
+    ),
+  };
+}
+
+export function mapProductClassificationReviewPage(input: {
+  items: ProductClassificationReviewItemRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}): ProductClassificationReviewPage {
+  return {
+    ...input,
+    items: input.items.map(mapProductClassificationReviewItem),
+  };
 }
 
 export function mapFamilyMemberToSummary(member: { id: number; name: string }): FamilyMemberSummary {

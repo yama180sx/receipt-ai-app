@@ -42,6 +42,49 @@ export async function findReceipts(params: ListReceiptsParams) {
   });
 }
 
+export type ReviewItemsParams = {
+  familyGroupId: number;
+  statuses: ProductTypeStatus[];
+  categoryId?: number;
+  from?: Date;
+  to?: Date;
+  page: number;
+  limit: number;
+};
+
+export async function findProductClassificationReviewItems(params: ReviewItemsParams) {
+  const where: Prisma.ItemWhereInput = {
+    productTypeStatus: { in: params.statuses },
+    receipt: {
+      familyGroupId: params.familyGroupId,
+      date: {
+        gte: params.from,
+        lte: params.to,
+      },
+    },
+    categoryId: params.categoryId,
+  };
+  const [items, total] = await prisma.$transaction([
+    prisma.item.findMany({
+      where,
+      include: {
+        receipt: true,
+        category: true,
+        productType: true,
+        productClassificationCandidates: {
+          include: { productType: true },
+          orderBy: { rank: 'asc' },
+        },
+      },
+      orderBy: [{ receipt: { date: 'desc' } }, { id: 'desc' }],
+      skip: (params.page - 1) * params.limit,
+      take: params.limit,
+    }),
+    prisma.item.count({ where }),
+  ]);
+  return { items, total };
+}
+
 export async function findLatestReceipt(familyGroupId: number) {
   return prisma.receipt.findFirst({
     where: { familyGroupId },
