@@ -9,6 +9,7 @@ import {
 } from '../../repositories/receiptRepository';
 import { DuplicateReceiptError } from './receiptDuplicateError';
 import { persistReceiptCommitInTx } from './receiptCommitPersistence';
+import { applyProductClassificationAiToItems } from '../productClassification/productClassificationAiIntegrationService';
 
 /**
  * パース済みデータを DB に永続化（重複チェック ＋ 世帯別学習）
@@ -63,6 +64,13 @@ export async function saveParsedReceipt(
       warnings,
       usageLogId,
     })
+  );
+
+  // 外部AIはDB commit後に実行する。失敗時も保存済みレシートはそのまま返す。
+  const savedBeforeAi = await findReceiptById(savedId);
+  await applyProductClassificationAiToItems(
+    familyGroupId,
+    savedBeforeAi?.items.map((item) => item.id) ?? []
   );
 
   const final = await findReceiptById(savedId);

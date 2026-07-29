@@ -174,6 +174,27 @@ export async function updateItemCategoryInTx(
   });
 }
 
+/** 商品分類AIなどが、カテゴリ以外を含む分類状態だけを更新するための入口。 */
+export async function updateItemProductClassificationInTx(
+  tx: PrismaTx,
+  itemId: number,
+  data: Pick<
+    ItemCreateInput,
+    | 'categoryId'
+    | 'standardCategoryId'
+    | 'productTypeId'
+    | 'productTypeStatus'
+    | 'classificationSource'
+    | 'classificationConfidence'
+  >
+) {
+  return tx.item.update({
+    where: { id: itemId },
+    data,
+    include: { category: true, productType: true },
+  });
+}
+
 export async function deleteItemSplitsInTx(tx: PrismaTx, itemId: number) {
   return tx.itemSplit.deleteMany({ where: { itemId } });
 }

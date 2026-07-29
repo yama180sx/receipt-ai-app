@@ -17,6 +17,9 @@ export {
   findReceiptByIdInTx,
   findReceiptByIdForTenantInTx,
   findItemWithReceiptInTx,
+  findProductClassificationAiTargets,
+  findProductClassificationAiTargetInTx,
+  findItemById,
   findCategoryByIdInTx,
   findItemSplitsInTx,
   findFamilyMembersByIdsInTx,
@@ -41,6 +44,7 @@ export {
   deleteItemsByReceiptIdInTx,
   createItemsInTx,
   updateItemCategoryInTx,
+  updateItemProductClassificationInTx,
   deleteItemSplitsInTx,
   createItemSplitsInTx,
 } from './receipt/receiptWriteRepository';
