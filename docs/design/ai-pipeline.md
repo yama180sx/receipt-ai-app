@@ -30,6 +30,23 @@ RecAIpt の AI パイプラインは、レシート画像を **Google Gemini** �
 
 ---
 
+## 1.1 商品分類 AI の契約境界
+
+商品分類はレシート画像解析とは別の AI 呼び出しとして扱う。画像や自由入力の分類候補を渡さず、類似検索などで絞り込んだ候補だけを Gemini に提示する。
+
+| 項目 | 内容 |
+|------|------|
+| プロンプトキー | `PRODUCT_CLASSIFICATION`（`PromptTemplate` の世帯別レコード） |
+| Provider | `ProductClassificationProvider` / `GeminiProductClassificationProvider` |
+| 入力 | `familyGroupId`、任意の店舗名、明細 ID・OCR 名・正規化名・候補の商品種別（標準カテゴリを含む） |
+| 出力 | 明細 ID、候補内の商品種別 ID または `null`、`high` / `medium` / `low` の確信度 |
+| 検証 | JSON スキーマ、明細 ID の重複・未知 ID、候補外商品種別、確信度を全件検証する。不正な応答はバッチ全体を拒否する。 |
+| 永続化 | Provider / 契約検証層は DB に保存しない。候補の選定、結果保存、利用量記録は後続の分類フローが担当する。 |
+
+実装は `backend/src/ai/productClassificationAiService.ts` を境界とする。Provider は Gemini の生テキストを返し、サービス層が契約検証済みの結果だけを後続処理へ渡す。これにより、AI が候補外の種別を返しても保存処理へ到達しない。
+
+---
+
 ## 2. 3層正規化
 
 フェーズ1（[MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md)）で定義した設計思想を、現行実装に沿って整理する。3 層は **適用タイミング** が異なる。
