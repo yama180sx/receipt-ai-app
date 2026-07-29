@@ -8,11 +8,16 @@ import {
   deleteItemsByReceiptIdInTx,
   findCategoryByIdInTx,
   findItemWithReceiptInTx,
+  findReceiptById,
   findReceiptByIdForTenantInTx,
   findReceiptByIdInTx,
   updateItemCategoryInTx,
   updateReceiptInTx as patchReceiptInTx,
 } from '../../repositories/receiptRepository';
+import {
+  applyProductClassificationAiToItems,
+  findItemAfterProductClassificationAi,
+} from '../productClassification/productClassificationAiIntegrationService';
 import { saveParsedReceipt } from './receiptPersistenceService';
 import {
   classifyItemWithSimilarityCandidates,
@@ -114,7 +119,14 @@ export async function updateReceiptById(
   familyGroupId: number,
   input: UpdateReceiptInput
 ) {
-  return runInTransaction((tx) => applyFullReceiptUpdateInTx(tx, receiptId, familyGroupId, input));
+  const updated = await runInTransaction((tx) =>
+    applyFullReceiptUpdateInTx(tx, receiptId, familyGroupId, input)
+  );
+  await applyProductClassificationAiToItems(
+    familyGroupId,
+    updated?.items.map((item) => item.id) ?? []
+  );
+  return findReceiptById(receiptId);
 }
 
 async function updateItemCategoryInTxHandler(
@@ -155,7 +167,9 @@ export async function updateItemCategoryById(
   familyGroupId: number,
   categoryId: number | null | undefined
 ) {
-  return runInTransaction((tx) =>
+  const updatedItem = await runInTransaction((tx) =>
     updateItemCategoryInTxHandler(tx, itemId, familyGroupId, categoryId)
   );
+  await applyProductClassificationAiToItems(familyGroupId, [itemId]);
+  return (await findItemAfterProductClassificationAi(itemId)) ?? updatedItem;
 }

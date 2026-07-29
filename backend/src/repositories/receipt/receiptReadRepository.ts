@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductTypeStatus } from '@prisma/client';
 import { prisma } from '../../utils/prismaClient';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
@@ -121,6 +121,56 @@ export async function findItemWithReceiptInTx(tx: PrismaTx, itemId: number) {
   return tx.item.findUnique({
     where: { id: itemId },
     include: { receipt: true },
+  });
+}
+
+const productClassificationAiTargetInclude = {
+  receipt: { select: { familyGroupId: true, storeName: true } },
+  productClassificationCandidates: {
+    include: { productType: { include: { standardCategory: true } } },
+    orderBy: { rank: 'asc' },
+  },
+} satisfies Prisma.ItemInclude;
+
+/** AI分類を送信できる、候補を持つ要確認明細だけを世帯スコープで取得する。 */
+export async function findProductClassificationAiTargets(
+  itemIds: number[],
+  familyGroupId: number
+) {
+  if (itemIds.length === 0) return [];
+  return prisma.item.findMany({
+    where: {
+      id: { in: itemIds },
+      productTypeStatus: ProductTypeStatus.NEEDS_REVIEW,
+      receipt: { familyGroupId },
+      productClassificationCandidates: { some: {} },
+    },
+    include: productClassificationAiTargetInclude,
+    orderBy: { id: 'asc' },
+  });
+}
+
+/** AI応答の反映直前に対象明細を再確認する。 */
+export async function findProductClassificationAiTargetInTx(
+  tx: PrismaTx,
+  itemId: number,
+  familyGroupId: number
+) {
+  return tx.item.findFirst({
+    where: {
+      id: itemId,
+      productTypeStatus: ProductTypeStatus.NEEDS_REVIEW,
+      receipt: { familyGroupId },
+      productClassificationCandidates: { some: {} },
+    },
+    include: productClassificationAiTargetInclude,
+  });
+}
+
+export async function findItemById(itemId: number) {
+  return prisma.item.findUnique({
+    where: { id: itemId },
+    include: { category: true, productType: true },
   });
 }
 

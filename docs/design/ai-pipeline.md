@@ -41,9 +41,11 @@ RecAIpt の AI パイプラインは、レシート画像を **Google Gemini** �
 | 入力 | `familyGroupId`、任意の店舗名、明細 ID・OCR 名・正規化名・候補の商品種別（標準カテゴリを含む） |
 | 出力 | 明細 ID、候補内の商品種別 ID または `null`、`high` / `medium` / `low` の確信度 |
 | 検証 | JSON スキーマ、明細 ID の重複・未知 ID、候補外商品種別、確信度を全件検証する。不正な応答はバッチ全体を拒否する。 |
-| 永続化 | Provider / 契約検証層は DB に保存しない。候補の選定、結果保存、利用量記録は後続の分類フローが担当する。 |
+| 永続化 | Provider / 契約検証層は DB に保存しない。保存後の統合サービスが結果を反映し、利用量記録は別途の分類フローが担当する。 |
 
-実装は `backend/src/ai/productClassificationAiService.ts` を境界とする。Provider は Gemini の生テキストを返し、サービス層が契約検証済みの結果だけを後続処理へ渡す。これにより、AI が候補外の種別を返しても保存処理へ到達しない。
+実装は `backend/src/ai/productClassificationAiService.ts` を契約境界とする。Provider は Gemini の生テキストを返し、サービス層が契約検証済みの結果だけを後続処理へ渡す。これにより、AI が候補外の種別を返しても保存処理へ到達しない。
+
+`productClassificationAiIntegrationService.ts` は、レシート・明細の保存完了後に候補を持つ `needs_review` 明細だけを一括送信する。`high` の候補内選択だけを `classified` / `ai` として確定し、それ以外・未返却結果は候補を残した `needs_review` とする。AI通信・検証・反映の失敗は記録して吸収し、レシート保存を失敗させない。
 
 ---
 
