@@ -36,6 +36,13 @@ enum ClassificationConfidence {
   LOW    @map("low")
 }
 
+enum ProductClassificationAiRunStatus {
+  SUCCEEDED         @map("succeeded")
+  INVALID_RESPONSE  @map("invalid_response")
+  PROVIDER_ERROR    @map("provider_error")
+  PERSISTENCE_ERROR @map("persistence_error")
+}
+
 enum ClassificationCorrectionScope {
   ITEM_ONLY                @map("item_only")
   SAME_OCR_NAME            @map("same_ocr_name")
@@ -64,6 +71,7 @@ model FamilyGroup {
   productHistories          ProductClassificationHistory[]
   productAliases            ProductClassificationAlias[]
   classificationCorrections ClassificationCorrection[]
+  productClassificationAiRuns ProductClassificationAiRun[]
   createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
 }
 
@@ -132,6 +140,7 @@ model Receipt {
   imagePath     String?
   items         Item[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
+  productClassificationAiRuns ProductClassificationAiRun[]
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyGroupId, date]) // 検索効率化
@@ -358,6 +367,29 @@ model ApiUsageLog {
 
   @@index([familyMemberId])
   @@index([createdAt])
+}
+
+// 商品分類AIの評価・障害分析用の実行ログ。OCR用ApiUsageLogとは分離する。
+model ProductClassificationAiRun {
+  id               Int                             @id @default(autoincrement())
+  familyGroupId    Int
+  familyGroup      FamilyGroup                     @relation(fields: [familyGroupId], references: [id])
+  receiptId        Int?
+  receipt          Receipt?                        @relation(fields: [receiptId], references: [id])
+  modelId          String
+  promptTokens     Int                             @default(0)
+  candidatesTokens Int                             @default(0)
+  totalTokens      Int                             @default(0)
+  targetItemCount  Int
+  classifiedCount  Int                             @default(0)
+  needsReviewCount Int                             @default(0)
+  unreturnedCount  Int                             @default(0)
+  status           ProductClassificationAiRunStatus
+  durationMs       Int
+  createdAt        DateTime                        @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, createdAt])
+  @@index([receiptId])
 }
 
 // [Issue #72/76] AIプロンプト管理マスタ (世帯別 — Issue #93-4)

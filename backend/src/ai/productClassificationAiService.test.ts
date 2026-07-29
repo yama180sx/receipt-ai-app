@@ -18,21 +18,17 @@ const request: ProductClassificationAiRequest = {
 describe('classifyProductsWithAi', () => {
   it('returns a validated response from an injected provider', async () => {
     const provider: ProductClassificationProvider = {
-      classifyProducts: vi.fn().mockResolvedValue(
-        '{"items":[{"itemId":10,"productTypeId":11,"confidence":"high"}]}'
-      ),
+      classifyProducts: vi.fn().mockResolvedValue({ text: '{"items":[{"itemId":10,"productTypeId":11,"confidence":"high"}]}', modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } }),
     };
 
     await expect(classifyProductsWithAi(request, provider)).resolves.toEqual({
-      items: [{ itemId: 10, productTypeId: 11, confidence: 'high' }],
+      response: { items: [{ itemId: 10, productTypeId: 11, confidence: 'high' }] }, modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
     });
   });
 
   it('rejects an invalid provider response without returning a partial result', async () => {
     const provider: ProductClassificationProvider = {
-      classifyProducts: vi.fn().mockResolvedValue(
-        '{"items":[{"itemId":10,"productTypeId":999,"confidence":"high"}]}'
-      ),
+      classifyProducts: vi.fn().mockResolvedValue({ text: '{"items":[{"itemId":10,"productTypeId":999,"confidence":"high"}]}', modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } }),
     };
 
     await expect(classifyProductsWithAi(request, provider)).rejects.toThrow('候補外の商品種別ID');

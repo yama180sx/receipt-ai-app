@@ -32,6 +32,15 @@ export const geminiProductClassificationProvider: ProductClassificationProvider 
       generationConfig: { responseMimeType: 'application/json' },
     });
     const result = await model.generateContent(buildClassificationPrompt(template.systemPrompt, request));
-    return result.response.text();
+    const response = await result.response;
+    return {
+      text: response.text(),
+      modelId: GEMINI_MODEL,
+      usage: {
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        candidatesTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        totalTokens: response.usageMetadata?.totalTokenCount ?? 0,
+      },
+    };
   },
 };

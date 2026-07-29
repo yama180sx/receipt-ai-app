@@ -5,7 +5,7 @@ import {
   ProductTypeStatus,
 } from '@prisma/client';
 
-const { aiMocks, receiptRepositoryMocks, productRepositoryMocks } = vi.hoisted(() => ({
+const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks } = vi.hoisted(() => ({
   aiMocks: { classifyProductsWithAi: vi.fn() },
   receiptRepositoryMocks: {
     findItemById: vi.fn(),
@@ -17,11 +17,13 @@ const { aiMocks, receiptRepositoryMocks, productRepositoryMocks } = vi.hoisted((
     findActiveProductTypeWithCategoryInTx: vi.fn(),
     findCategoryForProductTypeInTx: vi.fn(),
   },
+  runRepositoryMocks: { createProductClassificationAiRun: vi.fn().mockResolvedValue({}) },
 }));
 
 vi.mock('../../ai', () => aiMocks);
 vi.mock('../../repositories/receiptRepository', () => receiptRepositoryMocks);
 vi.mock('../../repositories/productClassificationRepository', () => productRepositoryMocks);
+vi.mock('../../repositories/productClassificationAiRunRepository', () => runRepositoryMocks);
 vi.mock('../../utils/prismaTransaction', () => ({
   runInTransaction: (fn: (tx: object) => Promise<unknown>) => fn({}),
 }));
@@ -33,7 +35,7 @@ const target = {
   name: '特濃牛乳 1000ml',
   normalizedName: '特濃牛乳 1000ml',
   categoryId: 5,
-  receipt: { familyGroupId: 1, storeName: 'テスト店' },
+  receipt: { id: 1, familyGroupId: 1, storeName: 'テスト店' },
   productClassificationCandidates: [
     {
       productTypeId: 11,
@@ -57,9 +59,7 @@ describe('applyProductClassificationAiToItems', () => {
   });
 
   it('high の候補内選択だけを分類済みとして保存する', async () => {
-    aiMocks.classifyProductsWithAi.mockResolvedValue({
-      items: [{ itemId: 10, productTypeId: 11, confidence: 'high' }],
-    });
+    aiMocks.classifyProductsWithAi.mockResolvedValue({ response: { items: [{ itemId: 10, productTypeId: 11, confidence: 'high' }] }, modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } });
 
     await applyProductClassificationAiToItems(1, [10]);
 
@@ -85,9 +85,7 @@ describe('applyProductClassificationAiToItems', () => {
     confidence,
     expectedConfidence,
   }) => {
-    aiMocks.classifyProductsWithAi.mockResolvedValue({
-      items: [{ itemId: 10, productTypeId, confidence }],
-    });
+    aiMocks.classifyProductsWithAi.mockResolvedValue({ response: { items: [{ itemId: 10, productTypeId, confidence }] }, modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } });
 
     await applyProductClassificationAiToItems(1, [10]);
 
