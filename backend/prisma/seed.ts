@@ -67,6 +67,22 @@ const DEFAULT_PROMPT = {
   version: 1,
 };
 
+const DEFAULT_PRODUCT_CLASSIFICATION_PROMPT = {
+  key: 'PRODUCT_CLASSIFICATION',
+  name: '商品分類システム標準プロンプト',
+  description: '候補内の商品種別だけを選択して明細を分類するための基本プロンプト',
+  systemPrompt: `あなたは家計簿の商品分類担当です。入力された各明細について、明細ごとに提示された候補の商品種別IDから最も適切なものだけを選んでください。
+
+必ず守ること:
+- 候補にない商品種別ID、カテゴリ名、自由文の分類名は返さない。
+- 判断できない場合は productTypeId を null にする。
+- confidence は high / medium / low のいずれかにする。
+- 出力には要求された itemId を重複させない。
+- JSON以外の文章やMarkdownは出力しない。`,
+  isActive: true,
+  version: 1,
+};
+
 async function seedMastersForFamily(
   familyGroupId: number,
   options: { useExplicitCategoryIds?: boolean } = {}
@@ -90,6 +106,9 @@ async function seedMastersForFamily(
 
   await prisma.promptTemplate.create({
     data: { ...DEFAULT_PROMPT, familyGroupId },
+  });
+  await prisma.promptTemplate.create({
+    data: { ...DEFAULT_PRODUCT_CLASSIFICATION_PROMPT, familyGroupId },
   });
 }
 

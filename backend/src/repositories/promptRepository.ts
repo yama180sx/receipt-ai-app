@@ -24,6 +24,16 @@ export async function findActivePromptTemplateByKey(key: string) {
   });
 }
 
+export async function findActivePromptTemplateByKeyForFamilyGroup(
+  familyGroupId: number,
+  key: string
+) {
+  return prisma.promptTemplate.findFirst({
+    where: { familyGroupId, key, isActive: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
 export async function deactivatePromptTemplatesByKey(familyGroupId: number, key: string) {
   return prisma.promptTemplate.updateMany({
     where: { key, familyGroupId },
