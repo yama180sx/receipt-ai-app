@@ -125,7 +125,7 @@ export async function findItemWithReceiptInTx(tx: PrismaTx, itemId: number) {
 }
 
 const productClassificationAiTargetInclude = {
-  receipt: { select: { familyGroupId: true, storeName: true } },
+  receipt: { select: { id: true, familyGroupId: true, storeName: true } },
   productClassificationCandidates: {
     include: { productType: { include: { standardCategory: true } } },
     orderBy: { rank: 'asc' },
