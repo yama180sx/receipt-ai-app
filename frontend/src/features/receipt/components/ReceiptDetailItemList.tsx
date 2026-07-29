@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { AppButton, AppSelect, AppTextInput } from '../../../components/ui';
 import type { ReceiptDetail, ReceiptItemDetail } from '../../../types/receipt';
 import { receiptDetailStyles as styles } from '../styles/receiptDetailStyles';
-import { getProductClassificationDisplay } from '../utils/productClassificationDisplay';
+import { getProductClassificationDisplay } from '../../../utils/productClassificationDisplay';
 
 type CategoryOption = { label: string; value: number };
 

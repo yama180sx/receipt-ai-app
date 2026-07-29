@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getProductClassificationDisplay } from './productClassificationDisplay';
+import { getProductClassificationDisplay } from '../../../utils/productClassificationDisplay';
 
 describe('getProductClassificationDisplay', () => {
   it('shows the classified product type and source', () => {

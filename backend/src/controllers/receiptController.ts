@@ -21,6 +21,7 @@ import {
   mapJobToStatus,
   mapReceiptItemToDetail,
   mapReceiptList,
+  mapProductClassificationReviewItems,
   mapReceiptToDetail,
   mapUploadJobResponse,
 } from '../mappers/receiptMapper';
@@ -37,6 +38,7 @@ import { updateReceiptById, updateItemCategoryById } from '../services/receipt/r
 import { correctItemProductClassification } from '../services/productClassification/productClassificationCorrectionService';
 import { listProductClassificationCandidates } from '../services/productClassification/productClassificationCandidateService';
 import { mapProductClassificationCandidatesToSummary } from '../mappers/productClassificationMapper';
+import { listProductClassificationReviewItems } from '../services/productClassification/productClassificationReviewService';
 import { updateItemSplitsById } from '../services/settlement/itemSplitService';
 import {
   getMonthlyStats as fetchMonthlyStats,
@@ -178,6 +180,25 @@ export const getItemProductClassificationCandidates = asyncHandler(async (req, r
   const itemId = getRouteParam(req, 'itemId');
   const candidates = await listProductClassificationCandidates(Number(itemId), familyGroupId);
   sendSuccess(res, mapProductClassificationCandidatesToSummary(candidates));
+});
+
+export const getProductClassificationReviewItems = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const { status, categoryId, month } = req.query;
+  const statuses = Array.isArray(status)
+    ? status.filter((value): value is string => typeof value === 'string')
+    : typeof status === 'string'
+      ? [status]
+      : undefined;
+  const parsedCategoryId = typeof categoryId === 'string' ? Number(categoryId) : undefined;
+
+  const items = await listProductClassificationReviewItems({
+    familyGroupId,
+    statuses,
+    ...(parsedCategoryId && Number.isInteger(parsedCategoryId) ? { categoryId: parsedCategoryId } : {}),
+    ...(typeof month === 'string' ? { month } : {}),
+  });
+  sendSuccess(res, mapProductClassificationReviewItems(items));
 });
 
 export const getReceipts = asyncHandler(async (req, res) => {

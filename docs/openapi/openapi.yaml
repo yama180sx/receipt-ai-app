@@ -44,6 +44,45 @@ paths:
                         items:
                           $ref: '#/components/schemas/ProductTypeSummary'
 
+  /product-classification/review-items:
+    get:
+      tags: [product-classification]
+      summary: 要確認・未分類の商品明細一覧取得
+      description: 世帯内の needs_review、unclassified、outside_initial_scope の明細を取得する。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: カンマ区切りの分類状態。省略時は要確認対象の全状態。
+          schema:
+            type: string
+            example: needs_review,unclassified,outside_initial_scope
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          description: 対象月（YYYY-MM）
+          schema:
+            type: string
+            pattern: '^\\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationReviewItem'
+
   /auth/resolve-family:
     post:
       tags: [auth]
@@ -1102,6 +1141,21 @@ components:
           format: float
         rank:
           type: integer
+
+    ProductClassificationReviewItem:
+      type: object
+      required: [item, receiptId, receiptDate, storeName]
+      properties:
+        item:
+          $ref: '#/components/schemas/ReceiptItemDetail'
+        receiptId:
+          type: integer
+        receiptDate:
+          type: string
+          format: date-time
+          nullable: true
+        storeName:
+          type: string
 
     ClassificationConfidence:
       type: string

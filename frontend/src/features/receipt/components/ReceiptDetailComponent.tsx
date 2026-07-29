@@ -7,7 +7,7 @@ import { ReceiptDetailActions } from './ReceiptDetailActions';
 import { ReceiptDetailHeader } from './ReceiptDetailHeader';
 import { ReceiptDetailImagePanel } from './ReceiptDetailImagePanel';
 import { ReceiptDetailItemList } from './ReceiptDetailItemList';
-import { ProductClassificationCorrectionModal } from './ProductClassificationCorrectionModal';
+import { ProductClassificationCorrectionModal } from '../../../components/ProductClassificationCorrectionModal';
 import { receiptDetailStyles as styles } from '../styles/receiptDetailStyles';
 
 export interface ReceiptDetailComponentProps {

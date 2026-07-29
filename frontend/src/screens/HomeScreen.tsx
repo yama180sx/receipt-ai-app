@@ -23,6 +23,7 @@ interface HomeScreenProps {
   onGoToReceiptTray: () => void;
   onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
+  onGoToProductClassificationReview: () => void;
   currentMemberId: number;
   memberName?: string | null;
   userRole?: string | null;
@@ -36,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToReceiptTray,
   onGoToSettlement,
   onGoToAdminMenu,
+  onGoToProductClassificationReview,
   currentMemberId,
   memberName,
   userRole,
@@ -91,6 +93,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onGoToStats={onGoToStats}
             onGoToSettlement={onGoToSettlement}
             onGoToAdminMenu={onGoToAdminMenu}
+            onGoToProductClassificationReview={onGoToProductClassificationReview}
           />
         </ScrollView>
 

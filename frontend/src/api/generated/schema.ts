@@ -42,6 +42,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/product-classification/review-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 要確認・未分類の商品明細一覧取得
+         * @description 世帯内の needs_review、unclassified、outside_initial_scope の明細を取得する。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description カンマ区切りの分類状態。省略時は要確認対象の全状態。 */
+                    status?: string;
+                    categoryId?: number;
+                    /** @description 対象月（YYYY-MM） */
+                    month?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationReviewItem"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/resolve-family": {
         parameters: {
             query?: never;
@@ -1541,6 +1588,13 @@ export interface components {
             /** Format: float */
             similarity: number;
             rank: number;
+        };
+        ProductClassificationReviewItem: {
+            item: components["schemas"]["ReceiptItemDetail"];
+            receiptId: number;
+            /** Format: date-time */
+            receiptDate: string | null;
+            storeName: string;
         };
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";

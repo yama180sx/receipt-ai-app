@@ -12,6 +12,8 @@ import type {
   ReceiptJobStatus,
   ProductTypeSummary,
   ProductClassificationCandidateSummary,
+  ProductClassificationReviewItem,
+  ProductTypeStatus,
 } from './generated';
 
 export type ListReceiptsParams = {
@@ -36,6 +38,12 @@ export type ProductClassificationCorrectionPayload = {
   productTypeId: number;
   scope: ProductClassificationCorrectionScope;
   classificationName?: string;
+};
+
+export type ListProductClassificationReviewItemsParams = {
+  statuses?: ProductTypeStatus[];
+  categoryId?: number;
+  month?: string;
 };
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
@@ -83,6 +91,16 @@ export const receiptApi = {
     itemId: number
   ): Promise<ApiSuccessResponse<ProductClassificationCandidateSummary[]>> {
     const res = await apiClient.get(`/receipts/items/${itemId}/product-classification-candidates`);
+    return res.data;
+  },
+
+  async listProductClassificationReviewItems(
+    params: ListProductClassificationReviewItemsParams = {}
+  ): Promise<ApiSuccessResponse<ProductClassificationReviewItem[]>> {
+    const { statuses, ...rest } = params;
+    const res = await apiClient.get('/product-classification/review-items', {
+      params: { ...rest, ...(statuses?.length ? { status: statuses.join(',') } : {}) },
+    });
     return res.data;
   },
 

@@ -12,6 +12,7 @@ import type {
   ReceiptJobListItem,
   ReceiptJobStatus,
   ProductTypeStatus,
+  ProductClassificationReviewItem,
   ProductTypeSummary,
   UploadJobResponse,
 } from '../types/apiSchemas';
@@ -172,6 +173,17 @@ export function mapReceiptList(
   receipts: ReceiptForDetail[]
 ): ReceiptDetail[] {
   return receipts.map((receipt) => mapReceiptToDetail(receipt)!);
+}
+
+export function mapProductClassificationReviewItems(
+  items: Array<ReceiptItemForDetail & { receipt: { id: number; date: Date | string | null; storeName: string } }>
+): ProductClassificationReviewItem[] {
+  return items.map((item) => ({
+    item: mapReceiptItemToDetail(item),
+    receiptId: item.receipt.id,
+    receiptDate: toIsoDateString(item.receipt.date) ?? null,
+    storeName: item.receipt.storeName,
+  }));
 }
 
 export function mapFamilyMemberToSummary(member: { id: number; name: string }): FamilyMemberSummary {
