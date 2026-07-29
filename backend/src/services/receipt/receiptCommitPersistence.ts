@@ -1,4 +1,5 @@
 import logger from '../../utils/logger';
+import { getCleanText } from '../../utils/normalizer';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import type { ParsedItem, ReceiptCommitPayload } from '../../types/receipt';
 import {
@@ -54,6 +55,7 @@ export async function persistReceiptCommitInTx(
 
       return {
         name: item.name,
+        normalizedName: getCleanText(item.name),
         price: parseFloat(String(item.price || 0)),
         quantity: parseFloat(String(item.quantity || 1)),
         ...classification,
@@ -65,6 +67,7 @@ export async function persistReceiptCommitInTx(
     memberId,
     familyGroupId,
     storeName: officialStoreName,
+    normalizedStoreName: getCleanText(officialStoreName),
     date: jstDate,
     totalAmount,
     taxAmount,
