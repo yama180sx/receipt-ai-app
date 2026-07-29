@@ -42,6 +42,13 @@ enum ClassificationCorrectionScope {
   SAME_CLASSIFICATION_NAME @map("same_classification_name")
 }
 
+enum ProductClassificationCandidateSource {
+  HISTORY              @map("history")
+  HOUSEHOLD_DICTIONARY @map("household_dictionary")
+  ALIAS                @map("alias")
+  STANDARD_DICTIONARY  @map("standard_dictionary")
+}
+
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
   id                        Int                            @id @default(autoincrement())
@@ -151,6 +158,7 @@ model Item {
   // [Issue #78] 負担割合の内訳（1対多）
   splits                    ItemSplit[]
   classificationCorrections ClassificationCorrection[]
+  productClassificationCandidates ProductClassificationCandidate[]
 
   @@index([standardCategoryId])
   @@index([productTypeId])
@@ -194,6 +202,7 @@ model ProductType {
   classificationAliases     ProductClassificationAlias[]
   previousCorrections       ClassificationCorrection[]     @relation("PreviousProductType")
   nextCorrections           ClassificationCorrection[]     @relation("NextProductType")
+  productClassificationCandidates ProductClassificationCandidate[]
 
   @@unique([standardCategoryId, name])
   @@index([standardCategoryId, displayOrder])
@@ -278,6 +287,24 @@ model ClassificationCorrection {
   @@index([familyGroupId, createdAt])
   @@index([itemId])
   @@index([actorMemberId])
+}
+
+// 類似検索で得た候補。候補自体は商品種別の確定を意味しない。
+model ProductClassificationCandidate {
+  id                    Int                                  @id @default(autoincrement())
+  itemId                Int
+  item                  Item                                 @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  productTypeId         Int
+  productType           ProductType                          @relation(fields: [productTypeId], references: [id])
+  source                ProductClassificationCandidateSource
+  matchedNormalizedName String
+  similarity            Float
+  rank                  Int
+  createdAt             DateTime                             @default(now()) @db.Timestamptz(3)
+
+  @@unique([itemId, productTypeId])
+  @@unique([itemId, rank])
+  @@index([productTypeId])
 }
 
 // [Issue #78] レシート明細ごとの負担内訳

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const repositoryMocks = vi.hoisted(() => ({
   createClassificationCorrectionInTx: vi.fn(),
+  deleteProductClassificationCandidatesInTx: vi.fn(),
   findActiveProductTypeWithCategoryInTx: vi.fn(),
   findCategoryForProductTypeInTx: vi.fn(),
   upsertHouseholdProductDictionaryInTx: vi.fn(),
@@ -72,6 +73,10 @@ describe('correctItemProductClassification', () => {
     );
     expect(repositoryMocks.upsertHouseholdProductDictionaryInTx).not.toHaveBeenCalled();
     expect(repositoryMocks.upsertProductClassificationAliasInTx).not.toHaveBeenCalled();
+    expect(repositoryMocks.deleteProductClassificationCandidatesInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      10
+    );
   });
 
   it('stores an OCR-name dictionary entry for SAME_OCR_NAME', async () => {

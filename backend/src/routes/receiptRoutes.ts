@@ -13,6 +13,7 @@ import {
   getLatestReceipt,
   updateItemCategory,
   updateItemProductClassification,
+  getItemProductClassificationCandidates,
   getMonthlyStats,
   getJobStatus,
   getReceiptJobs,
@@ -62,6 +63,7 @@ router.patch(
   validate(productClassificationCorrectionSchema),
   updateItemProductClassification
 );
+router.get('/receipts/items/:itemId/product-classification-candidates', getItemProductClassificationCandidates);
 router.post('/receipts/items/:itemId/splits', updateItemSplits);
 router.post('/receipts/commit', commitReceipt);
 

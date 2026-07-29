@@ -35,6 +35,8 @@ import {
 } from '../services/receipt/receiptQueryService';
 import { updateReceiptById, updateItemCategoryById } from '../services/receipt/receiptUpdateService';
 import { correctItemProductClassification } from '../services/productClassification/productClassificationCorrectionService';
+import { listProductClassificationCandidates } from '../services/productClassification/productClassificationCandidateService';
+import { mapProductClassificationCandidatesToSummary } from '../mappers/productClassificationMapper';
 import { updateItemSplitsById } from '../services/settlement/itemSplitService';
 import {
   getMonthlyStats as fetchMonthlyStats,
@@ -169,6 +171,13 @@ export const updateItemProductClassification = asyncHandler(async (req, res) => 
   const itemId = getRouteParam(req, 'itemId');
   const result = await correctItemProductClassification(Number(itemId), familyGroupId, memberId, req.body);
   sendSuccess(res, mapReceiptItemToDetail(result));
+});
+
+export const getItemProductClassificationCandidates = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const itemId = getRouteParam(req, 'itemId');
+  const candidates = await listProductClassificationCandidates(Number(itemId), familyGroupId);
+  sendSuccess(res, mapProductClassificationCandidatesToSummary(candidates));
 });
 
 export const getReceipts = asyncHandler(async (req, res) => {

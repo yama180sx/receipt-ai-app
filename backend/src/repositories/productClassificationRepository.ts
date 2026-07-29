@@ -1,4 +1,8 @@
-import { Prisma, type ClassificationCorrectionScope } from '@prisma/client';
+import {
+  Prisma,
+  type ClassificationCorrectionScope,
+  type ProductClassificationCandidateSource,
+} from '@prisma/client';
 import { prisma } from '../utils/prismaClient';
 import type { PrismaTx } from '../utils/prismaTransaction';
 
@@ -179,4 +183,44 @@ export async function findSimilarProductClassificationCandidatesInTx(
   `);
 
   return rows;
+}
+
+export type ProductClassificationCandidateInput = {
+  productTypeId: number;
+  source: ProductClassificationCandidateSource;
+  matchedNormalizedName: string;
+  similarity: number;
+  rank: number;
+};
+
+export async function replaceProductClassificationCandidatesInTx(
+  tx: PrismaTx,
+  itemId: number,
+  candidates: ProductClassificationCandidateInput[]
+) {
+  await tx.productClassificationCandidate.deleteMany({ where: { itemId } });
+  if (candidates.length === 0) return;
+  await tx.productClassificationCandidate.createMany({
+    data: candidates.map((candidate) => ({ itemId, ...candidate })),
+  });
+}
+
+export async function deleteProductClassificationCandidatesInTx(tx: PrismaTx, itemId: number) {
+  return tx.productClassificationCandidate.deleteMany({ where: { itemId } });
+}
+
+export async function findProductClassificationCandidatesForItem(
+  itemId: number,
+  familyGroupId: number
+) {
+  return prisma.item.findFirst({
+    where: { id: itemId, receipt: { familyGroupId } },
+    select: {
+      id: true,
+      productClassificationCandidates: {
+        include: { productType: true },
+        orderBy: { rank: 'asc' },
+      },
+    },
+  });
 }
