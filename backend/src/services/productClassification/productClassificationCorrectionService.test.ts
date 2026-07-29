@@ -100,4 +100,23 @@ describe('correctItemProductClassification', () => {
     );
     expect(repositoryMocks.upsertHouseholdProductDictionaryInTx).not.toHaveBeenCalled();
   });
+
+  it('rejects a correction for an item owned by another household', async () => {
+    repositoryMocks.findItemWithReceiptInTx.mockResolvedValue({
+      id: 20,
+      name: '別世帯の商品',
+      productTypeId: null,
+      receipt: { familyGroupId: 2 },
+    });
+
+    await expect(
+      correctItemProductClassification(20, 1, 7, {
+        productTypeId: 11,
+        scope: ClassificationCorrectionScope.ITEM_ONLY,
+      })
+    ).rejects.toThrow('ItemNotFound');
+
+    expect(repositoryMocks.updateItemCategoryInTx).not.toHaveBeenCalled();
+    expect(repositoryMocks.createClassificationCorrectionInTx).not.toHaveBeenCalled();
+  });
 });

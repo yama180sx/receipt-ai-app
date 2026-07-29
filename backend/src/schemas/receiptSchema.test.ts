@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ClassificationCorrectionScope } from '@prisma/client';
 import { productClassificationCorrectionSchema } from './receiptSchema';
 
 describe('productClassificationCorrectionSchema', () => {
@@ -17,5 +18,14 @@ describe('productClassificationCorrectionSchema', () => {
         classificationName: '牛乳',
       }).success
     ).toBe(true);
+  });
+
+  it('converts the API scope to the Prisma enum value', () => {
+    const result = productClassificationCorrectionSchema.parse({
+      productTypeId: 1,
+      scope: 'same_ocr_name',
+    });
+
+    expect(result.scope).toBe(ClassificationCorrectionScope.SAME_OCR_NAME);
   });
 });
