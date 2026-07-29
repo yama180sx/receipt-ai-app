@@ -21,6 +21,7 @@ type Props = {
   onGoToStats: () => void;
   onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
+  onGoToProductClassificationReview: () => void;
 };
 
 export const HomeMenuGrid: React.FC<Props> = ({
@@ -34,9 +35,19 @@ export const HomeMenuGrid: React.FC<Props> = ({
   onGoToStats,
   onGoToSettlement,
   onGoToAdminMenu,
+  onGoToProductClassificationReview,
 }) => (
   <>
     <View style={homeScreenStyles.gridContainer}>
+      <AppListItem
+        variant="nav"
+        onPress={onGoToProductClassificationReview}
+        title="商品分類を確認"
+        subtitle="要確認・未分類の明細を修正"
+        left={<Text style={homeScreenStyles.gridEmoji}>🏷️</Text>}
+        right={<View />}
+        style={homeScreenStyles.gridCard}
+      />
       <AppListItem
         variant="nav"
         onPress={onGoToReceiptTray}

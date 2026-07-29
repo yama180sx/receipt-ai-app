@@ -30,6 +30,7 @@ export type ClassificationSource = Schemas['ClassificationSource'];
 export type ClassificationConfidence = Schemas['ClassificationConfidence'];
 export type ProductClassificationCandidateSource = Schemas['ProductClassificationCandidateSource'];
 export type ProductClassificationCandidateSummary = Schemas['ProductClassificationCandidateSummary'];
+export type ProductClassificationReviewItem = Schemas['ProductClassificationReviewItem'];
 export type ItemSplitSummary = Schemas['ItemSplitSummary'];
 export type ReceiptItemDetail = Schemas['ReceiptItemDetail'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];

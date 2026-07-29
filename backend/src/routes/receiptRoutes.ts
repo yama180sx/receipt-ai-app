@@ -14,6 +14,7 @@ import {
   updateItemCategory,
   updateItemProductClassification,
   getItemProductClassificationCandidates,
+  getProductClassificationReviewItems,
   getMonthlyStats,
   getJobStatus,
   getReceiptJobs,
@@ -46,6 +47,8 @@ router.use(authMiddleware, tenantMiddleware);
 
 router.get('/family-groups/members', getFamilyMembers);
 router.get('/uploads/:filename', serveReceiptImage);
+
+router.get('/product-classification/review-items', getProductClassificationReviewItems);
 
 router.get('/receipts', getReceipts);
 router.get('/receipts/jobs', getReceiptJobs);

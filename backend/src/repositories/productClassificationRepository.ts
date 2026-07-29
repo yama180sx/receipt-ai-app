@@ -1,4 +1,5 @@
 import {
+  ProductTypeStatus,
   Prisma,
   type ClassificationCorrectionScope,
   type ProductClassificationCandidateSource,
@@ -222,5 +223,32 @@ export async function findProductClassificationCandidatesForItem(
         orderBy: { rank: 'asc' },
       },
     },
+  });
+}
+
+export type ProductClassificationReviewQuery = {
+  familyGroupId: number;
+  statuses: ProductTypeStatus[];
+  categoryId?: number;
+  startDate?: Date;
+  endDate?: Date;
+};
+
+export async function findProductClassificationReviewItems(query: ProductClassificationReviewQuery) {
+  return prisma.item.findMany({
+    where: {
+      productTypeStatus: { in: query.statuses },
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      receipt: {
+        familyGroupId: query.familyGroupId,
+        ...(query.startDate && query.endDate ? { date: { gte: query.startDate, lt: query.endDate } } : {}),
+      },
+    },
+    include: {
+      category: true,
+      productType: true,
+      receipt: { select: { id: true, date: true, storeName: true } },
+    },
+    orderBy: [{ receipt: { date: 'desc' } }, { id: 'asc' }],
   });
 }
