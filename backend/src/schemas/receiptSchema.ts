@@ -1,3 +1,4 @@
+import { ClassificationCorrectionScope } from '@prisma/client';
 import { z } from 'zod';
 
 /**
@@ -34,7 +35,15 @@ export const productClassificationCorrectionSchema = z
         message: '分類用名称は必須です',
       });
     }
-  });
+  })
+  .transform((input) => ({
+    ...input,
+    scope: {
+      item_only: ClassificationCorrectionScope.ITEM_ONLY,
+      same_ocr_name: ClassificationCorrectionScope.SAME_OCR_NAME,
+      same_classification_name: ClassificationCorrectionScope.SAME_CLASSIFICATION_NAME,
+    }[input.scope],
+  }));
 
 /**
  * 3. 最終的な保存・更新用のバリデーション

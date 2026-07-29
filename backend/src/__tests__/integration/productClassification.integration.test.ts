@@ -134,7 +134,7 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
 
   it('applies the learning priority and rejects cross-household item corrections', async () => {
     const milkId = await productTypeIdByCode('milk');
-    const tissueId = await productTypeIdByCode('tissue');
+    const tissueId = await productTypeIdByCode('tissues');
     const chipsId = await productTypeIdByCode('potato-chips');
 
     await prisma.productClassificationAlias.create({
