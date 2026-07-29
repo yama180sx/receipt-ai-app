@@ -113,6 +113,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | familyGroupId | Int | No | — | — | FamilyGroup.id | — | 複合 |
 | memberId | Int | No | — | — | FamilyMember.id | — | — |
 | storeName | String | No | — | — | — | — | — |
+| normalizedStoreName | String | No | `""` | — | — | — | GIN（`pg_trgm`） |
 | date | DateTime | No | — | — | — | — | 複合 |
 | totalAmount | Int | No | — | — | — | — | — |
 | taxAmount | Float | No | 0.0 | — | — | — | — |
@@ -121,7 +122,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | createdAt | DateTime | No | now() | — | — | — | — |
 
 **FK:** `familyGroupId` → `FamilyGroup.id`, `memberId` → `FamilyMember.id`  
-**Index:** `(familyGroupId, date)`
+**Index:** `(familyGroupId, date)`, `GIN(normalizedStoreName gin_trgm_ops)`
 
 > `memberId` は立替者（支払者）。業務意味は [domain-model.md §3.2](./domain-model.md)。
 
@@ -135,10 +136,14 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | receiptId | Int | No | — | — | Receipt.id | — | — |
 | categoryId | Int | Yes | — | — | Category.id | — | — |
 | name | String | No | — | — | — | — | — |
+| normalizedName | String | No | `""` | — | — | — | GIN（`pg_trgm`） |
 | price | Float | No | — | — | — | — | — |
 | quantity | Float | No | 1.0 | — | — | — | — |
 
 **FK:** `receiptId` → `Receipt.id` (**onDelete: Cascade**), `categoryId` → `Category.id`
+**Index:** `GIN(normalizedName gin_trgm_ops)`
+
+`normalizedStoreName` と `normalizedName` は、商品分類の類似候補検索および将来の履歴検索で共有する検索キーである。既存データはmigrationで小文字化・空白整理を行い、新規・更新データはアプリケーションの `getCleanText` で保存する。
 
 ---
 

@@ -2,6 +2,7 @@ import { prisma } from '../../utils/prismaClient';
 import type { ClassificationConfidence, ClassificationSource, ProductTypeStatus } from '@prisma/client';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
+import { getCleanText } from '../../utils/normalizer';
 
 export async function deleteReceiptById(receiptId: number, familyGroupId: number) {
   const existing = await prisma.receipt.findUnique({ where: { id: receiptId } });
@@ -15,6 +16,7 @@ export type ReceiptCreateWithItemsInput = {
   memberId: number;
   familyGroupId: number;
   storeName: string;
+  normalizedStoreName: string;
   date: Date;
   totalAmount: number;
   taxAmount: number;
@@ -22,6 +24,7 @@ export type ReceiptCreateWithItemsInput = {
   rawText: string;
   items: Array<{
     name: string;
+    normalizedName: string;
     price: number;
     quantity: number;
     categoryId: number | null;
@@ -40,6 +43,7 @@ export async function createReceiptInTx(tx: PrismaTx, input: ReceiptCreateWithIt
       memberId: input.memberId,
       familyGroupId: input.familyGroupId,
       storeName: input.storeName,
+      normalizedStoreName: input.normalizedStoreName,
       date: input.date,
       totalAmount: input.totalAmount,
       taxAmount: input.taxAmount,
@@ -65,13 +69,14 @@ export async function linkApiUsageLogToReceiptInTx(
 export async function updateReceiptInTx(
   tx: PrismaTx,
   receiptId: number,
-  data: { date?: Date; storeName?: string; totalAmount?: number }
+  data: { date?: Date; storeName?: string; normalizedStoreName?: string; totalAmount?: number }
 ) {
   return tx.receipt.update({
     where: { id: receiptId },
     data: {
       date: data.date,
       storeName: data.storeName,
+      normalizedStoreName: data.normalizedStoreName,
       totalAmount: data.totalAmount,
     },
   });
@@ -85,13 +90,14 @@ export async function updateReceiptStoreNamesInTx(
 ) {
   return tx.receipt.updateMany({
     where: { storeName: sourceStoreName, familyGroupId },
-    data: { storeName: targetStoreName },
+    data: { storeName: targetStoreName, normalizedStoreName: getCleanText(targetStoreName) },
   });
 }
 
 export type ItemCreateInput = {
   receiptId: number;
   name: string;
+  normalizedName: string;
   price: number;
   quantity: number;
   categoryId: number | null;

@@ -1,4 +1,4 @@
-import type { ClassificationCorrectionScope } from '@prisma/client';
+import { Prisma, type ClassificationCorrectionScope } from '@prisma/client';
 import { prisma } from '../utils/prismaClient';
 import type { PrismaTx } from '../utils/prismaTransaction';
 
@@ -75,4 +75,108 @@ export async function upsertProductClassificationAliasInTx(
     create: { ...input, isActive: true },
     update: { productTypeId: input.productTypeId, isActive: true },
   });
+}
+
+export type ProductSimilarityCandidateSource =
+  | 'history'
+  | 'household_dictionary'
+  | 'alias'
+  | 'standard_dictionary';
+
+export type ProductSimilarityCandidate = {
+  normalizedName: string;
+  productTypeId: number;
+  productTypeName: string;
+  standardCategoryId: number;
+  source: ProductSimilarityCandidateSource;
+  similarity: number;
+};
+
+type ProductSimilarityCandidateRow = ProductSimilarityCandidate;
+
+/**
+ * pg_trgm による商品分類候補検索。
+ * 世帯固有の候補は必ず familyGroupId で絞り、標準辞書だけは全世帯共通で検索する。
+ * このRepositoryは候補を返すだけで、Itemの分類状態を更新しない。
+ */
+export async function findSimilarProductClassificationCandidatesInTx(
+  tx: PrismaTx,
+  input: { familyGroupId: number; normalizedName: string; limit: number }
+): Promise<ProductSimilarityCandidate[]> {
+  const rows = await tx.$queryRaw<ProductSimilarityCandidateRow[]>(Prisma.sql`
+    WITH candidates AS (
+      SELECT
+        history."normalizedName",
+        history."productTypeId",
+        'history'::text AS source,
+        1 AS source_priority,
+        similarity(history."normalizedName", ${input.normalizedName}) AS similarity
+      FROM "ProductClassificationHistory" AS history
+      WHERE history."familyGroupId" = ${input.familyGroupId}
+        AND history."normalizedName" % ${input.normalizedName}
+
+      UNION ALL
+
+      SELECT
+        dictionary."normalizedName",
+        dictionary."productTypeId",
+        'household_dictionary'::text AS source,
+        2 AS source_priority,
+        similarity(dictionary."normalizedName", ${input.normalizedName}) AS similarity
+      FROM "HouseholdProductDictionary" AS dictionary
+      WHERE dictionary."familyGroupId" = ${input.familyGroupId}
+        AND dictionary."isActive" = true
+        AND dictionary."normalizedName" % ${input.normalizedName}
+
+      UNION ALL
+
+      SELECT
+        alias."normalizedName",
+        alias."productTypeId",
+        'alias'::text AS source,
+        3 AS source_priority,
+        similarity(alias."normalizedName", ${input.normalizedName}) AS similarity
+      FROM "ProductClassificationAlias" AS alias
+      WHERE alias."familyGroupId" = ${input.familyGroupId}
+        AND alias."isActive" = true
+        AND alias."normalizedName" % ${input.normalizedName}
+
+      UNION ALL
+
+      SELECT
+        standard."normalizedName",
+        standard."productTypeId",
+        'standard_dictionary'::text AS source,
+        4 AS source_priority,
+        similarity(standard."normalizedName", ${input.normalizedName}) AS similarity
+      FROM "StandardProductDictionary" AS standard
+      WHERE standard."isActive" = true
+        AND standard."normalizedName" % ${input.normalizedName}
+    ), ranked AS (
+      SELECT
+        candidates.*,
+        row_number() OVER (
+          PARTITION BY candidates."productTypeId"
+          ORDER BY candidates.similarity DESC, candidates.source_priority ASC, candidates."normalizedName" ASC
+        ) AS candidate_rank
+      FROM candidates
+    )
+    SELECT
+      ranked."normalizedName",
+      ranked."productTypeId",
+      product_type."name" AS "productTypeName",
+      product_type."standardCategoryId",
+      ranked.source,
+      ranked.similarity
+    FROM ranked
+    INNER JOIN "ProductType" AS product_type ON product_type.id = ranked."productTypeId"
+    INNER JOIN "StandardCategory" AS standard_category ON standard_category.id = product_type."standardCategoryId"
+    WHERE ranked.candidate_rank = 1
+      AND product_type."isActive" = true
+      AND standard_category."isActive" = true
+    ORDER BY ranked.similarity DESC, ranked.source_priority ASC, ranked."normalizedName" ASC
+    LIMIT ${input.limit}
+  `);
+
+  return rows;
 }

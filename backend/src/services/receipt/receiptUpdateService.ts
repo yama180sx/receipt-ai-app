@@ -1,4 +1,5 @@
 import { AppError } from '../../utils/appError';
+import { getCleanText } from '../../utils/normalizer';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import type { ReceiptCreateItemInput } from '../../types/receipt';
 import type { TenantContext } from '../../utils/context';
@@ -72,6 +73,7 @@ async function applyFullReceiptUpdateInTx(
   await patchReceiptInTx(tx, receiptId, {
     date: date ? new Date(date) : undefined,
     storeName: storeName || undefined,
+    normalizedStoreName: storeName ? getCleanText(storeName) : undefined,
     totalAmount: finalTotal,
   });
 
@@ -82,6 +84,7 @@ async function applyFullReceiptUpdateInTx(
       itemList.map(async (item) => ({
         receiptId,
         name: item.name,
+        normalizedName: getCleanText(item.name),
         price: parseFloat(String(item.price)) || 0,
         quantity: parseFloat(String(item.quantity)) || 0,
         ...(await classifyItemByExactMatch(tx, {

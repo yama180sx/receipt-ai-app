@@ -116,6 +116,7 @@ model Receipt {
   memberId      Int
   member        FamilyMember  @relation(fields: [memberId], references: [id])
   storeName     String
+  normalizedStoreName String @default("")
   date          DateTime      @db.Timestamptz(3)
   totalAmount   Int // 支払合計（税込）
   // [Issue #71] 外税額を保持するフィールド
@@ -143,6 +144,7 @@ model Item {
   classificationSource     ClassificationSource?
   classificationConfidence ClassificationConfidence?
   name                     String
+  normalizedName           String                    @default("")
   price                    Float
   quantity                 Float                     @default(1.0)
 
