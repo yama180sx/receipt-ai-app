@@ -96,6 +96,26 @@ export type ProductClassificationReviewItem = {
   storeName: string;
 };
 
+export type ProductClassificationLearningDataType = 'household_dictionary' | 'alias' | 'history';
+
+export type ProductClassificationLearningData = {
+  id: number;
+  type: ProductClassificationLearningDataType;
+  normalizedName: string;
+  productType: ProductTypeSummary;
+  isActive: boolean | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastDeactivationAudit: ProductClassificationLearningDataAudit | null;
+};
+
+export type ProductClassificationLearningDataAudit = {
+  reason: string;
+  actorMemberName: string | null;
+  familyGroupName: string;
+  createdAt: Date;
+};
+
 export type UpdateItemProductClassificationRequest = {
   productTypeId: number;
   scope: ClassificationCorrectionScope;

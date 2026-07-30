@@ -166,6 +166,27 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ---
 
+### ProductClassificationLearningDataAudit
+
+世帯辞書・別名を無効化した際の監査証跡。対象レコードへのポリモーフィックな外部キーは持たず、対象名と変更前の商品種別をスナップショットとして保存する。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| familyGroupId | Int | No | — | — | FamilyGroup.id | — | `(familyGroupId, createdAt)` |
+| actorMemberId | Int | Yes | — | — | FamilyMember.id | — | — |
+| learningDataType | ProductClassificationLearningDataType | No | — | — | — | — | `(learningDataType, learningDataId)` |
+| learningDataId | Int | No | — | — | — | — | 複合 |
+| normalizedName | String | No | — | — | — | — | — |
+| productTypeId | Int | No | — | — | — | — | — |
+| productTypeName | String | No | — | — | — | — | — |
+| reason | String | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | 複合 |
+
+**FK:** `familyGroupId` → `FamilyGroup.id`（Cascade）、`actorMemberId` → `FamilyMember.id`（SetNull）
+
+---
+
 ### ItemSplit
 
 | カラム | 型 | Nullable | Default | PK | FK | Unique | Index |

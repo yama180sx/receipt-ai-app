@@ -1,5 +1,6 @@
 import {
   ProductTypeStatus,
+  ProductClassificationLearningDataType,
   Prisma,
   type ClassificationCorrectionScope,
   type ProductClassificationCandidateSource,
@@ -80,6 +81,107 @@ export async function upsertProductClassificationAliasInTx(
     create: { ...input, isActive: true },
     update: { productTypeId: input.productTypeId, isActive: true },
   });
+}
+
+const learningDataProductTypeSelect = {
+  id: true,
+  code: true,
+  name: true,
+  standardCategoryId: true,
+} as const;
+
+export async function findProductClassificationLearningData(familyGroupId: number) {
+  const [dictionaries, aliases, histories] = await Promise.all([
+    prisma.householdProductDictionary.findMany({
+      where: { familyGroupId },
+      include: { productType: { select: learningDataProductTypeSelect } },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    prisma.productClassificationAlias.findMany({
+      where: { familyGroupId },
+      include: { productType: { select: learningDataProductTypeSelect } },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    prisma.productClassificationHistory.findMany({
+      where: { familyGroupId },
+      include: { productType: { select: learningDataProductTypeSelect } },
+      orderBy: { updatedAt: 'desc' },
+    }),
+  ]);
+
+  const events = dictionaries.length || aliases.length
+    ? await prisma.productClassificationLearningDataAudit.findMany({
+        where: {
+          familyGroupId,
+          OR: [
+            ...(dictionaries.length ? [{
+              learningDataType: ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY,
+              learningDataId: { in: dictionaries.map((record) => record.id) },
+            }] : []),
+            ...(aliases.length ? [{
+              learningDataType: ProductClassificationLearningDataType.ALIAS,
+              learningDataId: { in: aliases.map((record) => record.id) },
+            }] : []),
+          ],
+        },
+        include: { actorMember: { select: { name: true } }, familyGroup: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
+
+  return { dictionaries, aliases, histories, events };
+}
+
+export async function deactivateProductClassificationLearningDataInTx(
+  tx: PrismaTx,
+  input: {
+    familyGroupId: number;
+    actorMemberId: number;
+    type: 'household_dictionary' | 'alias';
+    id: number;
+    reason: string;
+  }
+) {
+  const result = input.type === 'household_dictionary'
+    ? await tx.householdProductDictionary.updateMany({
+        where: { id: input.id, familyGroupId: input.familyGroupId, isActive: true },
+        data: { isActive: false },
+      })
+    : await tx.productClassificationAlias.updateMany({
+        where: { id: input.id, familyGroupId: input.familyGroupId, isActive: true },
+        data: { isActive: false },
+      });
+
+  if (result.count === 0) return null;
+
+  const record = input.type === 'household_dictionary'
+    ? await tx.householdProductDictionary.findFirst({
+        where: { id: input.id, familyGroupId: input.familyGroupId },
+        include: { productType: { select: learningDataProductTypeSelect } },
+      })
+    : await tx.productClassificationAlias.findFirst({
+        where: { id: input.id, familyGroupId: input.familyGroupId },
+        include: { productType: { select: learningDataProductTypeSelect } },
+      });
+  if (!record) return null;
+
+  const audit = await tx.productClassificationLearningDataAudit.create({
+    data: {
+      familyGroupId: input.familyGroupId,
+      actorMemberId: input.actorMemberId,
+      learningDataType: input.type === 'household_dictionary'
+        ? ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY
+        : ProductClassificationLearningDataType.ALIAS,
+      learningDataId: record.id,
+      normalizedName: record.normalizedName,
+      productTypeId: record.productTypeId,
+      productTypeName: record.productType.name,
+      reason: input.reason,
+    },
+    include: { actorMember: { select: { name: true } }, familyGroup: { select: { name: true } } },
+  });
+
+  return { record, audit };
 }
 
 export type ProductSimilarityCandidateSource =

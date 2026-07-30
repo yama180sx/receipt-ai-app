@@ -177,6 +177,7 @@ async function main() {
   const password_hash = await bcrypt.hash(devPassword, 10);
 
   await prisma.item.deleteMany();
+  await prisma.productClassificationLearningDataAudit.deleteMany();
   await prisma.classificationCorrection.deleteMany();
   await prisma.productClassificationAlias.deleteMany();
   await prisma.productClassificationHistory.deleteMany();

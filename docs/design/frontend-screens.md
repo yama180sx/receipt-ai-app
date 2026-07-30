@@ -42,6 +42,7 @@ RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router*
 | `/` | `HomeScreen` | `features/home` | — |
 | `/history` | `HistoryScreen` | `useReceiptHistory` | `/` |
 | `/product-classification-review` | `ProductClassificationReviewScreen` | `useProductClassificationReview` | `/` |
+| `/product-classification-learning-data` | `ProductClassificationLearningDataScreen` | `useProductClassificationLearningData` | `/` |
 | `/stats` | `StatisticsScreen` | `useStatistics` | `/` |
 | `/tray` | `ReceiptTrayScreen` | `ReceiptTrayContext` | `/` |
 | `/scan/[jobId]` | `ReceiptScanScreen` | `useReceiptScan` | query `returnTo`（`home` / `tray`） |
@@ -137,6 +138,7 @@ SafeAreaProvider
 | **Home** | `screens/HomeScreen.tsx` | `useHomeDashboard`, `useReceiptUpload` | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
 | **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
 | **ProductClassificationReview** | `screens/ProductClassificationReviewScreen.tsx` | `useProductClassificationReview` | `GET /product-classification/review-items`, `GET /categories`, `GET /product-types`, `PATCH /receipts/items/:id/product-classification` |
+| **ProductClassificationLearningData** | `screens/ProductClassificationLearningDataScreen.tsx` | `useProductClassificationLearningData` | `GET /product-classification/learning-data`, `PATCH /product-classification/learning-data/:type/:id/deactivate` |
 | **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /stats/product-classification`, `GET /categories`, `PATCH /receipts/items/:id` |
 | **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
 | **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | `useReceiptScan` | `POST /receipts/commit` |

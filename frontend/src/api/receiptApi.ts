@@ -13,6 +13,7 @@ import type {
   ProductTypeSummary,
   ProductClassificationCandidateSummary,
   ProductClassificationReviewItem,
+  ProductClassificationLearningData,
   ProductTypeStatus,
 } from './generated';
 
@@ -101,6 +102,20 @@ export const receiptApi = {
     const res = await apiClient.get('/product-classification/review-items', {
       params: { ...rest, ...(statuses?.length ? { status: statuses.join(',') } : {}) },
     });
+    return res.data;
+  },
+
+  async listProductClassificationLearningData(): Promise<ApiSuccessResponse<ProductClassificationLearningData[]>> {
+    const res = await apiClient.get('/product-classification/learning-data');
+    return res.data;
+  },
+
+  async deactivateProductClassificationLearningData(
+    type: 'household_dictionary' | 'alias',
+    id: number,
+    reason: string
+  ): Promise<ApiSuccessResponse<ProductClassificationLearningData>> {
+    const res = await apiClient.patch(`/product-classification/learning-data/${type}/${id}/deactivate`, { reason });
     return res.data;
   },
 
