@@ -5,6 +5,7 @@ import { classifyItemByExactMatch } from './productClassificationService';
 function matchedRecord(productTypeId: number) {
   return {
     productTypeId,
+    isActive: true,
     productType: {
       standardCategory: { id: 4, name: '乳製品', parent: { name: '食費' } },
     },
@@ -87,5 +88,24 @@ describe('classifyItemByExactMatch', () => {
     expect(tx.productClassificationHistory.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { familyGroupId_normalizedName: { familyGroupId: 1, normalizedName: '対象商品' } } })
     );
+  });
+
+  it('ignores inactive household dictionaries and aliases', async () => {
+    const inactiveDictionary = { ...matchedRecord(101), isActive: false };
+    const inactiveAlias = { ...matchedRecord(102), isActive: false };
+    const standard = {
+      productTypeId: 104,
+      standardCategoryId: 4,
+      standardCategory: { id: 4, name: '乳製品', parent: { name: '食費' } },
+      productType: { id: 104 },
+    };
+
+    const withInactiveDictionary = createTx({ dictionary: { 1: inactiveDictionary }, standard });
+    const withInactiveAlias = createTx({ alias: { 1: inactiveAlias }, standard });
+
+    await expect(classifyItemByExactMatch(withInactiveDictionary as never, { familyGroupId: 1, itemName: '対象商品' }))
+      .resolves.toMatchObject({ productTypeId: 104, classificationSource: ClassificationSource.STANDARD_DICTIONARY });
+    await expect(classifyItemByExactMatch(withInactiveAlias as never, { familyGroupId: 1, itemName: '対象商品' }))
+      .resolves.toMatchObject({ productTypeId: 104, classificationSource: ClassificationSource.STANDARD_DICTIONARY });
   });
 });

@@ -45,6 +45,10 @@ export const productClassificationCorrectionSchema = z
     }[input.scope],
   }));
 
+export const deactivateProductClassificationLearningDataSchema = z.object({
+  reason: z.string().trim().min(1, '無効化理由は必須です').max(500, '無効化理由は500文字以内です'),
+});
+
 /**
  * 3. 最終的な保存・更新用のバリデーション
  * DB保存時に整合性をチェックするために使用

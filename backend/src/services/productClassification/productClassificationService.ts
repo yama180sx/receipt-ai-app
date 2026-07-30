@@ -43,18 +43,20 @@ async function findMatchedProductType(
     where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
     include: { productType: { include: productTypeInclude } },
   });
-  const dictionary = history
+  const dictionaryRecord = history
     ? null
     : await tx.householdProductDictionary.findUnique({
         where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
         include: { productType: { include: productTypeInclude } },
       });
-  const alias = history || dictionary
+  const dictionary = dictionaryRecord?.isActive ? dictionaryRecord : null;
+  const aliasRecord = history || dictionary
     ? null
     : await tx.productClassificationAlias.findUnique({
         where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
         include: { productType: { include: productTypeInclude } },
       });
+  const alias = aliasRecord?.isActive ? aliasRecord : null;
   const standard = history || dictionary || alias
     ? null
     : await tx.standardProductDictionary.findUnique({

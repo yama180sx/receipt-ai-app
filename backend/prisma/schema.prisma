@@ -56,6 +56,11 @@ enum ProductClassificationCandidateSource {
   STANDARD_DICTIONARY  @map("standard_dictionary")
 }
 
+enum ProductClassificationLearningDataType {
+  HOUSEHOLD_DICTIONARY @map("household_dictionary")
+  ALIAS                @map("alias")
+}
+
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
   id                        Int                            @id @default(autoincrement())
@@ -71,6 +76,7 @@ model FamilyGroup {
   productHistories          ProductClassificationHistory[]
   productAliases            ProductClassificationAlias[]
   classificationCorrections ClassificationCorrection[]
+  productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
   productClassificationAiRuns ProductClassificationAiRun[]
   createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
 }
@@ -90,6 +96,7 @@ model FamilyMember {
   apiUsageLogs              ApiUsageLog[] // [Issue #59] トークンログとのリレーション
   itemSplits                ItemSplit[] // [Issue #78] 負担明細へのリレーション
   classificationCorrections ClassificationCorrection[]
+  productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
 
   // ★ [Issue #81] 送金履歴リレーション
   sentTransfers     SettlementTransfer[] @relation("TransferSender")
@@ -296,6 +303,26 @@ model ClassificationCorrection {
   @@index([familyGroupId, createdAt])
   @@index([itemId])
   @@index([actorMemberId])
+}
+
+// 世帯固有の辞書・別名の無効化を、理由と対象世帯を含めて追跡する監査ログ。
+// ポリモーフィックな対象IDはスナップショットとして保持し、学習データ側を変更しても監査証跡を残す。
+model ProductClassificationLearningDataAudit {
+  id                    Int                                  @id @default(autoincrement())
+  familyGroupId         Int
+  familyGroup           FamilyGroup                          @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  actorMemberId         Int?
+  actorMember           FamilyMember?                        @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  learningDataType      ProductClassificationLearningDataType
+  learningDataId        Int
+  normalizedName        String
+  productTypeId         Int
+  productTypeName       String
+  reason                String
+  createdAt             DateTime                             @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, createdAt])
+  @@index([learningDataType, learningDataId])
 }
 
 // 類似検索で得た候補。候補自体は商品種別の確定を意味しない。

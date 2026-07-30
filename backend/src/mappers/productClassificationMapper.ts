@@ -1,8 +1,10 @@
 import type { ProductClassificationCandidate, ProductType } from '@prisma/client';
 import type {
+  ProductClassificationLearningData,
   ProductClassificationCandidateSummary,
   ProductTypeSummary,
 } from '../types/apiSchemas';
+import type { ProductClassificationLearningDataRecord } from '../services/productClassification/productClassificationLearningDataService';
 
 export function mapProductTypesToSummary(productTypes: ProductType[]): ProductTypeSummary[] {
   return productTypes.map((productType) => ({
@@ -27,5 +29,14 @@ export function mapProductClassificationCandidatesToSummary(
     matchedNormalizedName: candidate.matchedNormalizedName,
     similarity: candidate.similarity,
     rank: candidate.rank,
+  }));
+}
+
+export function mapProductClassificationLearningData(
+  records: ProductClassificationLearningDataRecord[]
+): ProductClassificationLearningData[] {
+  return records.map((record) => ({
+    ...record,
+    productType: { ...record.productType },
   }));
 }

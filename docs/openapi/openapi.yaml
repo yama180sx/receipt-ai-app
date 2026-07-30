@@ -83,6 +83,66 @@ paths:
                         items:
                           $ref: '#/components/schemas/ProductClassificationReviewItem'
 
+  /product-classification/learning-data:
+    get:
+      tags: [product-classification]
+      summary: 世帯の商品分類学習データ一覧取得
+      description: 世帯辞書・別名・確定履歴を取得する。標準辞書は返却せず、確定履歴は参照専用である。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationLearningData'
+
+  /product-classification/learning-data/{type}/{id}/deactivate:
+    patch:
+      tags: [product-classification]
+      summary: 世帯の商品分類学習データを無効化
+      description: 世帯辞書または別名のみ無効化できる。確定履歴と標準辞書は変更できない。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [household_dictionary, alias]
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateProductClassificationLearningDataRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationLearningData'
+
   /auth/resolve-family:
     post:
       tags: [auth]
@@ -1182,6 +1242,61 @@ components:
           nullable: true
         storeName:
           type: string
+
+    ProductClassificationLearningDataType:
+      type: string
+      enum: [household_dictionary, alias, history]
+
+    ProductClassificationLearningData:
+      type: object
+      required: [id, type, normalizedName, productType, isActive, createdAt, updatedAt, lastDeactivationAudit]
+      properties:
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/ProductClassificationLearningDataType'
+        normalizedName:
+          type: string
+        productType:
+          $ref: '#/components/schemas/ProductTypeSummary'
+        isActive:
+          type: boolean
+          nullable: true
+          description: 確定履歴は参照専用のため null
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastDeactivationAudit:
+          allOf:
+            - $ref: '#/components/schemas/ProductClassificationLearningDataAudit'
+          nullable: true
+
+    ProductClassificationLearningDataAudit:
+      type: object
+      required: [reason, actorMemberName, familyGroupName, createdAt]
+      properties:
+        reason:
+          type: string
+        actorMemberName:
+          type: string
+          nullable: true
+        familyGroupName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    DeactivateProductClassificationLearningDataRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
 
     ClassificationConfidence:
       type: string

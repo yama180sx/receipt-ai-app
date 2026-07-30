@@ -3,7 +3,7 @@ import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { tenantMiddleware } from '../middleware/tenantMiddleware';
 import { validate } from '../middleware/validate';
-import { productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
+import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
 
 import {
   getReceipts,
@@ -26,6 +26,10 @@ import {
   uploadReceipt,
 } from '../controllers/receiptController';
 import { serveReceiptImage } from '../controllers/uploadController';
+import {
+  deactivateProductClassificationLearningData,
+  getProductClassificationLearningData,
+} from '../controllers/productClassificationController';
 
 const router = express.Router();
 
@@ -49,6 +53,8 @@ router.get('/family-groups/members', getFamilyMembers);
 router.get('/uploads/:filename', serveReceiptImage);
 
 router.get('/product-classification/review-items', getProductClassificationReviewItems);
+router.get('/product-classification/learning-data', getProductClassificationLearningData);
+router.patch('/product-classification/learning-data/:type/:id/deactivate', validate(deactivateProductClassificationLearningDataSchema), deactivateProductClassificationLearningData);
 
 router.get('/receipts', getReceipts);
 router.get('/receipts/jobs', getReceiptJobs);

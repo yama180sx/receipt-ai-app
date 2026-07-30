@@ -89,6 +89,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/product-classification/learning-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 世帯の商品分類学習データ一覧取得
+         * @description 世帯辞書・別名・確定履歴を取得する。標準辞書は返却せず、確定履歴は参照専用である。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationLearningData"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-classification/learning-data/{type}/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 世帯の商品分類学習データを無効化
+         * @description 世帯辞書または別名のみ無効化できる。確定履歴と標準辞書は変更できない。
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    type: "household_dictionary" | "alias";
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeactivateProductClassificationLearningDataRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationLearningData"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/auth/resolve-family": {
         parameters: {
             query?: never;
@@ -1635,6 +1724,31 @@ export interface components {
             /** Format: date-time */
             receiptDate: string | null;
             storeName: string;
+        };
+        /** @enum {string} */
+        ProductClassificationLearningDataType: "household_dictionary" | "alias" | "history";
+        ProductClassificationLearningData: {
+            id: number;
+            type: components["schemas"]["ProductClassificationLearningDataType"];
+            normalizedName: string;
+            productType: components["schemas"]["ProductTypeSummary"];
+            /** @description 確定履歴は参照専用のため null */
+            isActive: boolean | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lastDeactivationAudit: components["schemas"]["ProductClassificationLearningDataAudit"] | null;
+        };
+        ProductClassificationLearningDataAudit: {
+            reason: string;
+            actorMemberName: string | null;
+            familyGroupName: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DeactivateProductClassificationLearningDataRequest: {
+            reason: string;
         };
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClassificationCorrectionScope } from '@prisma/client';
-import { productClassificationCorrectionSchema } from './receiptSchema';
+import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema } from './receiptSchema';
 
 describe('productClassificationCorrectionSchema', () => {
   it('requires classificationName only for SAME_CLASSIFICATION_NAME', () => {
@@ -27,5 +27,12 @@ describe('productClassificationCorrectionSchema', () => {
     });
 
     expect(result.scope).toBe(ClassificationCorrectionScope.SAME_OCR_NAME);
+  });
+});
+
+describe('deactivateProductClassificationLearningDataSchema', () => {
+  it('requires a non-empty reason', () => {
+    expect(deactivateProductClassificationLearningDataSchema.safeParse({ reason: '  ' }).success).toBe(false);
+    expect(deactivateProductClassificationLearningDataSchema.parse({ reason: '誤分類のため' })).toEqual({ reason: '誤分類のため' });
   });
 });

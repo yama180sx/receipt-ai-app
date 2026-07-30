@@ -258,6 +258,8 @@ sequenceDiagram
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の明細一覧 |
+| GET | `/product-classification/learning-data` | JWT + tenant | 世帯辞書・別名・確定履歴の一覧（標準辞書は含めない） |
+| PATCH | `/product-classification/learning-data/:type/:id/deactivate` | JWT + tenant | 理由を記録して世帯辞書または別名を無効化（確定履歴は参照専用） |
 | GET | `/receipts` | JWT + tenant | レシート一覧 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
