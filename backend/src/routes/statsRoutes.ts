@@ -3,6 +3,7 @@ import {
   getSettlementStatus,
   addSettlementTransfer,
   deleteSettlementTransfer,
+  getProductClassificationStats,
 } from '../controllers/statsController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { tenantMiddleware } from '../middleware/tenantMiddleware';
@@ -14,6 +15,7 @@ router.use(authMiddleware, tenantMiddleware);
 
 // 月間精算ステータスの取得
 router.get('/settlement', getSettlementStatus);
+router.get('/product-classification', getProductClassificationStats);
 
 // ★ [Issue #81] 送金履歴の追加
 router.post('/settlement/transfers', addSettlementTransfer);

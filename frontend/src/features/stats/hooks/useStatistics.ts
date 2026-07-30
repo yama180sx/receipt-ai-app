@@ -13,6 +13,7 @@ import type {
   MonthlyStatsViewModel,
   StatsCategoryOption,
 } from '../../../types/stats';
+import type { ProductClassificationStatsData } from '../../../api/generated';
 import { showAlert } from '../../../utils/alertMessage';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { getCurrentYearMonth, getRecentYearMonths, useMonthSelectOptions } from '../../../utils/monthSelectOptions';
@@ -34,6 +35,7 @@ export function useStatistics(currentMemberId: number) {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [data, setData] = useState<MonthlyStatsViewModel | null>(null);
   const [advancedData, setAdvancedData] = useState<AdvancedStatsViewModel | null>(null);
+  const [productClassificationData, setProductClassificationData] = useState<ProductClassificationStatsData | null>(null);
   const [allCategories, setAllCategories] = useState<StatsCategoryOption[]>([]);
   const [isMainModalVisible, setMainModalVisible] = useState(false);
 
@@ -48,9 +50,10 @@ export function useStatistics(currentMemberId: number) {
     if (!currentMemberId) return;
     try {
       setLoading(true);
-      const [statsRes, advRes, catRes] = await Promise.all([
+      const [statsRes, advRes, classificationRes, catRes] = await Promise.all([
         statsApi.getMonthlyStats(selectedMonth),
         statsApi.getAdvancedStats(),
+        statsApi.getProductClassificationStats(selectedMonth),
         categoryApi.listCategories(),
       ]);
 
@@ -58,6 +61,7 @@ export function useStatistics(currentMemberId: number) {
         setData(mapMonthlyStatsResponse(statsRes.data, selectedMonth));
       }
       if (advRes.success) setAdvancedData(mapAdvancedStatsResponse(advRes.data));
+      if (classificationRes.success) setProductClassificationData(classificationRes.data);
       if (catRes.success) setAllCategories(mapCategoryList(catRes.data));
     } catch (error: unknown) {
       console.error('[DEBUG-STATS] Fetch Error:', error);
@@ -103,6 +107,7 @@ export function useStatistics(currentMemberId: number) {
     loading,
     data,
     advancedData,
+    productClassificationData,
     allCategories,
     selectedMonth,
     setSelectedMonth,
