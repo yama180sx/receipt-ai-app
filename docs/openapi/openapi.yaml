@@ -696,6 +696,32 @@ paths:
                       data:
                         $ref: '#/components/schemas/AdvancedStatsData'
 
+  /stats/product-classification:
+    get:
+      tags: [stats]
+      summary: 商品分類統計
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationStatsData'
+
   /stats/settlement:
     get:
       tags: [stats]
@@ -1506,6 +1532,63 @@ components:
         color:
           type: string
           nullable: true
+
+    ProductTypeStatRow:
+      type: object
+      required: [productTypeId, productTypeName, totalAmount, itemCount]
+      properties:
+        productTypeId:
+          type: integer
+        productTypeName:
+          type: string
+        totalAmount:
+          type: number
+        itemCount:
+          type: integer
+
+    ProductClassificationCategoryStatRow:
+      type: object
+      required: [standardCategoryId, standardCategoryName, parentCategoryName, totalAmount, productTypes]
+      properties:
+        standardCategoryId:
+          type: integer
+        standardCategoryName:
+          type: string
+        parentCategoryName:
+          type: string
+        totalAmount:
+          type: number
+        productTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductTypeStatRow'
+
+    ProductTypeStatusStatRow:
+      type: object
+      required: [status, totalAmount, itemCount]
+      properties:
+        status:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        totalAmount:
+          type: number
+        itemCount:
+          type: integer
+
+    ProductClassificationStatsData:
+      type: object
+      required: [month, categoryStats, unresolved]
+      properties:
+        month:
+          type: string
+        categoryStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductClassificationCategoryStatRow'
+        unresolved:
+          type: array
+          description: ProductType 未設定の分類状態別集計。特定 ProductType の集計には含めない。
+          items:
+            $ref: '#/components/schemas/ProductTypeStatusStatRow'
 
     AdvancedStatsData:
       type: object

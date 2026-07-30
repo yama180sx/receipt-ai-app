@@ -4,4 +4,5 @@ export { StatsSummaryCard } from './components/StatsSummaryCard';
 export { StatsPieChart } from './components/StatsPieChart';
 export { StatsTrendSection, StatsParetoSection } from './components/StatsTrendSection';
 export { StatsLatestReceiptPreview } from './components/StatsLatestReceiptPreview';
+export { ProductClassificationStatsSection } from './components/ProductClassificationStatsSection';
 export { statsScreenStyles } from './styles/statsScreenStyles';

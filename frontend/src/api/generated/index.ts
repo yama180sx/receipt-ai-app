@@ -44,6 +44,10 @@ export type ItemSplitInput = Schemas['ItemSplitInput'];
 // --- stats ---
 export type MonthlyStatsData = Schemas['MonthlyStatsData'];
 export type AdvancedStatsData = Schemas['AdvancedStatsData'];
+export type ProductClassificationStatsData = Schemas['ProductClassificationStatsData'];
+export type ProductClassificationCategoryStatRow = Schemas['ProductClassificationCategoryStatRow'];
+export type ProductTypeStatRow = Schemas['ProductTypeStatRow'];
+export type ProductTypeStatusStatRow = Schemas['ProductTypeStatusStatRow'];
 export type CategoryStatRow = Schemas['CategoryStatRow'];
 export type TrendRow = Schemas['TrendRow'];
 export type ParetoRow = Schemas['ParetoRow'];

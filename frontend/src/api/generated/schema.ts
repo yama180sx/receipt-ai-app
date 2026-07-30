@@ -1058,6 +1058,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stats/product-classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 商品分類統計 */
+        get: {
+            parameters: {
+                query: {
+                    month: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationStatsData"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stats/settlement": {
         parameters: {
             query?: never;
@@ -1743,6 +1783,30 @@ export interface components {
             categoryName?: string;
             totalAmount?: number | string;
             color?: string | null;
+        };
+        ProductTypeStatRow: {
+            productTypeId: number;
+            productTypeName: string;
+            totalAmount: number;
+            itemCount: number;
+        };
+        ProductClassificationCategoryStatRow: {
+            standardCategoryId: number;
+            standardCategoryName: string;
+            parentCategoryName: string;
+            totalAmount: number;
+            productTypes: components["schemas"]["ProductTypeStatRow"][];
+        };
+        ProductTypeStatusStatRow: {
+            status: components["schemas"]["ProductTypeStatus"];
+            totalAmount: number;
+            itemCount: number;
+        };
+        ProductClassificationStatsData: {
+            month: string;
+            categoryStats: components["schemas"]["ProductClassificationCategoryStatRow"][];
+            /** @description ProductType 未設定の分類状態別集計。特定 ProductType の集計には含めない。 */
+            unresolved: components["schemas"]["ProductTypeStatusStatRow"][];
         };
         AdvancedStatsData: {
             trend: components["schemas"]["TrendRow"][];

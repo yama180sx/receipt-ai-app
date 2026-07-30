@@ -252,3 +252,25 @@ export async function findProductClassificationReviewItems(query: ProductClassif
     orderBy: [{ receipt: { date: 'desc' } }, { id: 'asc' }],
   });
 }
+
+export async function findProductClassificationStatsItems(
+  familyGroupId: number,
+  startDate: Date,
+  endDate: Date
+) {
+  return prisma.item.findMany({
+    where: { receipt: { familyGroupId, date: { gte: startDate, lt: endDate } } },
+    select: {
+      price: true,
+      quantity: true,
+      productTypeStatus: true,
+      productType: {
+        select: {
+          id: true,
+          name: true,
+          standardCategory: { select: { id: true, name: true, parent: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+}

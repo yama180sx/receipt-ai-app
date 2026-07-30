@@ -265,6 +265,7 @@ sequenceDiagram
 | GET | `/receipts/status/:jobId` | JWT + tenant | 解析ジョブ状態 |
 | GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート） |
 | GET | `/stats/advanced` | JWT + tenant | トレンド・パレート分析 |
+| GET | `/stats/product-classification` | JWT + tenant | 標準Category階層・確定ProductType・未確定状態別の月次集計 |
 | POST | `/receipts` | JWT + tenant | 手動レシート登録 |
 | DELETE | `/receipts/:id` | JWT + tenant | レシート削除 |
 | PATCH | `/receipts/:id` | JWT + tenant | レシート全体編集 |
@@ -284,6 +285,7 @@ sequenceDiagram
 | `GET /product-classification/review-items` | `categoryId` | 家計簿 Category による絞り込み（任意） |
 | `GET /product-classification/review-items` | `month` | `YYYY-MM` による期間絞り込み（任意） |
 | `GET /stats/monthly` | `month` | 対象月（省略時は当月 UTC 基準の `YYYY-MM`） |
+| `GET /stats/product-classification` | `month` | 対象月（必須、`YYYY-MM`） |
 
 ### 4.4 Stats（精算）— `/api/stats`
 

@@ -12,6 +12,7 @@ import {
   deleteSettlementTransfer as removeSettlementTransfer,
   getSettlementStatusData,
 } from '../services/settlement/settlementService';
+import { getProductClassificationStats as getProductClassificationStatsData } from '../services/productClassification/productClassificationStatsService';
 
 export const getSettlementStatus = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
@@ -35,4 +36,10 @@ export const deleteSettlementTransfer = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
   const data = await removeSettlementTransfer(ctx, Number(getRouteParam(req, 'id')));
   sendSuccess(res, mapDeletedSettlementTransferToApi(data.id));
+});
+
+export const getProductClassificationStats = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  sendSuccess(res, await getProductClassificationStatsData(familyGroupId, month));
 });
