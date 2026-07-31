@@ -418,11 +418,12 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 
 | 対象 | 方針 | 根拠 |
 |------|------|------|
-| Gemini | 結合テストで `vi.mock('../services/geminiService')` 等 | [testing/plan.md §4](../testing/plan.md) |
-| BullMQ Worker | テスト時は `receiptWorker` を import しない | `app.ts` / `server.ts` 分離（#91-3） |
-| Redis / Queue | Supertest 結合テストは Worker なしで API のみ検証 | `app.integration.test.ts` |
+| Gemini | レシート解析フローは `ReceiptAnalysisProvider` を差し替え、直接依存のテストだけ `vi.mock()` を使う | [testing/plan.md §4](../testing/plan.md) |
+| BullMQ Worker | テスト時は `server.ts` / `receiptWorker` を import しない | `app.ts` / `server.ts` 分離（#91-3） |
+| Redis / Queue | Supertest結合テストはファイル先頭で `test/mockReceiptQueue` を import し、Redis接続なしで API のみ検証する | `mockReceiptQueue.ts` |
+| normalizer | `getCleanText` は単体テスト、Prisma依存の `normalizeStoreName` はDB結合テスト | [testing/plan.md §4](../testing/plan.md) |
 
-詳細なモック戦略は Should 優先の [#91-7 / Issue #284](https://github.com/yama180sx/receipt-ai-app/issues/284) で拡充予定。本パイプラインの E2E（実 OCR）は [testing/plan.md §3](../testing/plan.md) のスコープ外とする。
+実Gemini OCR・実Redis Workerを通すE2Eは [testing/plan.md §3](../testing/plan.md) のスコープ外とし、手動回帰で確認する。
 
 ---
 

@@ -89,8 +89,18 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 
 ### 外部依存のモック
 
-- **Gemini**: 結合テストでは `vi.mock('../services/geminiService')` 等で必ずモック
-- **BullMQ Worker**: テスト時は import しない
+- **Gemini**: レシート解析フローでは `ReceiptAnalysisProvider` を
+  `setReceiptAnalysisProvider()` で差し替える。`geminiService.ts` を直接利用する
+  モジュールのテストでは `vi.mock()` を使い、実APIを呼ばない。
+- **BullMQ Worker**: `createApp()` を使うテストでは `server.ts` を import しないため、
+  Worker は起動しない。Queueを利用するSupertest結合テストは、ファイル先頭で
+  `test/mockReceiptQueue` を import してRedis接続を置き換える。
+- **normalizer**: `getCleanText` はDBなしの単体テストで検証する。
+  `normalizeStoreName` はPrismaで世帯内の店舗を検索するため、Prismaを模倣した単体テストは
+  行わず、テナント分離を含むDB結合テストで検証する。
+
+実Gemini OCR、実Redis Worker、実画像アップロードを通す確認は自動テストの対象外とし、
+`regression-checklist.md` に従う手動確認で扱う。
 
 ## 5. CI 方針
 
