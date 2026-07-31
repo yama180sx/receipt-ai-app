@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { categoryApi, receiptApi } from '../../../api';
 import { useIsWideLayout } from '../../../hooks/useIsWideLayout';
 import type { CategorySummary, ReceiptDetail } from '../../../types/receipt';
@@ -20,6 +20,9 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedMember, setSelectedMember] = useState(currentMemberId.toString());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const receiptRequestIdRef = useRef(0);
 
   const months = useMemo(() => getRecentYearMonths(6), []);
   const monthSelectOptions = useMonthSelectOptions(months, isWide);
@@ -34,6 +37,13 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || '';
   const baseUrl = API_URL.replace(/\/api\/?$/, '');
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -58,12 +68,15 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   }, []);
 
   const fetchReceipts = useCallback(async () => {
+    const requestId = ++receiptRequestIdRef.current;
     try {
       setLoading(true);
       const res = await receiptApi.listReceipts({
         ...(selectedMonth ? { month: selectedMonth } : {}),
         memberId: selectedMember,
+        ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {}),
       });
+      if (requestId !== receiptRequestIdRef.current) return;
       if (res.success) {
         const data = res.data;
         setReceipts(data);
@@ -76,11 +89,13 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         }
       }
     } catch (err) {
-      showApiErrorAlert('エラー', err, '履歴の取得に失敗しました。');
+      if (requestId === receiptRequestIdRef.current) {
+        showApiErrorAlert('エラー', err, '履歴の取得に失敗しました。');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === receiptRequestIdRef.current) setLoading(false);
     }
-  }, [selectedMonth, selectedMember, isWide, selectedReceipt?.id]);
+  }, [selectedMonth, selectedMember, debouncedSearchQuery, isWide, selectedReceipt?.id]);
 
   useEffect(() => {
     fetchCategories();
@@ -89,7 +104,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
 
   useEffect(() => {
     fetchReceipts();
-  }, [selectedMonth, selectedMember]);
+  }, [selectedMonth, selectedMember, debouncedSearchQuery]);
 
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
@@ -126,6 +141,8 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
     setSelectedMonth,
     selectedMember,
     setSelectedMember,
+    searchQuery,
+    setSearchQuery,
     monthSelectOptions,
     memberSelectOptions,
     baseUrl,

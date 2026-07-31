@@ -477,6 +477,8 @@ export interface paths {
                 query?: {
                     month?: string;
                     memberId?: string;
+                    /** @description 店舗名または明細名の類似検索語 */
+                    q?: string;
                 };
                 header?: never;
                 path?: never;

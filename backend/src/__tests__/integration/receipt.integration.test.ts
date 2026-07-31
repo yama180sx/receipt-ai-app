@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';
 import { clearMockReceiptJobs, registerMockReceiptJob } from '../../test/mockJobStore';
+import { prisma } from '../../utils/prismaClient';
+import { getCleanText } from '../../utils/normalizer';
 import {
   ensureTestMemberPassword,
   getTenantBItemId,
@@ -38,6 +40,50 @@ describe.skipIf(!shouldRunDbIntegration())('Receipt API integration', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('検索語で店舗名または明細名が類似する世帯内レシートだけを返す', async () => {
+    const suffix = Date.now();
+    const marker = `履歴検索牛乳${suffix}`;
+    const storeName = `履歴検索店${suffix}`;
+    const receipt = await prisma.receipt.create({
+      data: {
+        familyGroupId: 1,
+        memberId: 1,
+        storeName,
+        normalizedStoreName: getCleanText(storeName),
+        date: new Date('2026-07-31T00:00:00.000Z'),
+        totalAmount: 180,
+        items: {
+          create: {
+            name: marker,
+            normalizedName: getCleanText(marker),
+            price: 180,
+            quantity: 1,
+          },
+        },
+      },
+    });
+
+    try {
+      const token = await loginAsTestMember(app);
+      const res = await request(app)
+        .get('/api/receipts')
+        .query({ q: marker })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((item: { id: number }) => item.id)).toContain(receipt.id);
+
+      const storeRes = await request(app)
+        .get('/api/receipts')
+        .query({ q: storeName })
+        .set('Authorization', `Bearer ${token}`);
+      expect(storeRes.status).toBe(200);
+      expect(storeRes.body.data.map((item: { id: number }) => item.id)).toContain(receipt.id);
+    } finally {
+      await prisma.receipt.delete({ where: { id: receipt.id } });
+    }
   });
 });
 

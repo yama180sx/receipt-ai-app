@@ -20,6 +20,7 @@ import type {
 export type ListReceiptsParams = {
   month?: string;
   memberId?: string;
+  q?: string;
 };
 
 export type CommitReceiptPayload = {
