@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { AppBackButton, AppModal, AppSelect } from '../components/ui';
+import { AppBackButton, AppModal, AppSelect, AppTextInput } from '../components/ui';
 import { ReceiptDetailComponent } from '../components/ReceiptDetailComponent';
 import { useReceiptHistory } from '../features/history';
 import { colors } from '../theme/colors';
@@ -70,6 +70,15 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
         </View>
 
         <View style={[styles.filterContainer, history.isWide ? styles.filterContainerWide : styles.filterContainerMobile]}>
+          <View style={[styles.filterSelectWrap, history.isWide && styles.filterSelectWrapWide]}>
+            <AppTextInput
+              value={history.searchQuery}
+              onChangeText={history.setSearchQuery}
+              placeholder="店舗名・商品名で検索"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
           <View style={[styles.filterSelectWrap, history.isWide && styles.filterSelectWrapWide]}>
             <AppSelect<string>
               selectedValue={history.selectedMonth}

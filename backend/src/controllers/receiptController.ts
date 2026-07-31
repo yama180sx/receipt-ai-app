@@ -203,11 +203,12 @@ export const getProductClassificationReviewItems = asyncHandler(async (req, res)
 
 export const getReceipts = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();
-  const { month, memberId } = req.query;
+  const { month, memberId, q } = req.query;
   const receipts = await listReceipts({
     familyGroupId,
     memberId: typeof memberId === 'string' ? memberId : undefined,
     month: typeof month === 'string' ? month : undefined,
+    query: typeof q === 'string' ? q : undefined,
   });
   sendSuccess(res, mapReceiptList(receipts));
 });

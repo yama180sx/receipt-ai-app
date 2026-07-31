@@ -283,6 +283,7 @@ sequenceDiagram
 |---------------|-----------|------|
 | `GET /receipts` | `month` | `YYYY-MM` フィルタ（任意） |
 | `GET /receipts` | `memberId` | 支払者フィルタ。空文字 `""` = 世帯全体 |
+| `GET /receipts` | `q` | 店舗名または明細名の `pg_trgm` 類似検索語（任意）。月・支払者フィルタと併用可能。画面は入力後300msで検索する |
 | `GET /product-classification/review-items` | `status` | カンマ区切りの `needs_review` / `unclassified` / `outside_initial_scope`。省略時は全状態 |
 | `GET /product-classification/review-items` | `categoryId` | 家計簿 Category による絞り込み（任意） |
 | `GET /product-classification/review-items` | `month` | `YYYY-MM` による期間絞り込み（任意） |

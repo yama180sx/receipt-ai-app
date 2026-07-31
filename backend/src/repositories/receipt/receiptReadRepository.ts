@@ -3,6 +3,7 @@ import { prisma } from '../../utils/prismaClient';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../../utils/yearMonth';
+import { getCleanText } from '../../utils/normalizer';
 import {
   receiptWithItemsCategory,
   receiptWithItemsCategorySplits,
@@ -12,6 +13,7 @@ export type ListReceiptsParams = {
   familyGroupId: number;
   memberId?: string;
   month?: string;
+  query?: string;
 };
 
 function buildListWhere(params: ListReceiptsParams): Prisma.ReceiptWhereInput {
@@ -34,9 +36,41 @@ function buildListWhere(params: ListReceiptsParams): Prisma.ReceiptWhereInput {
   return where;
 }
 
+/**
+ * 店舗名・明細名を pg_trgm で検索する。検索候補は必ず世帯で絞り込み、
+ * 呼び出し側の月・メンバー条件は通常の Prisma where と合成する。
+ */
+async function findReceiptIdsByFuzzyQuery(familyGroupId: number, query: string): Promise<number[]> {
+  const normalizedQuery = getCleanText(query);
+  if (!normalizedQuery) return [];
+
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT receipt.id
+    FROM "Receipt" AS receipt
+    WHERE receipt."familyGroupId" = ${familyGroupId}
+      AND (
+        receipt."normalizedStoreName" % ${normalizedQuery}
+        OR EXISTS (
+          SELECT 1
+          FROM "Item" AS item
+          WHERE item."receiptId" = receipt.id
+            AND item."normalizedName" % ${normalizedQuery}
+        )
+      )
+  `;
+
+  return rows.map((row) => row.id);
+}
+
 export async function findReceipts(params: ListReceiptsParams) {
+  const where = buildListWhere(params);
+  const query = typeof params.query === 'string' ? params.query : '';
+  if (getCleanText(query)) {
+    where.id = { in: await findReceiptIdsByFuzzyQuery(params.familyGroupId, query) };
+  }
+
   return prisma.receipt.findMany({
-    where: buildListWhere(params),
+    where,
     include: receiptWithItemsCategorySplits,
     orderBy: { date: 'desc' },
   });
