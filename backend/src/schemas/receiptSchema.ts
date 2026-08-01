@@ -1,4 +1,4 @@
-import { ClassificationCorrectionScope } from '@prisma/client';
+import { ClassificationCorrectionScope, ProductTypeStatus } from '@prisma/client';
 import { z } from 'zod';
 
 /**
@@ -50,8 +50,8 @@ export const deactivateProductClassificationLearningDataSchema = z.object({
 });
 
 const reclassificationStatusMap = {
-  unclassified: 'unclassified',
-  needs_review: 'needs_review',
+  unclassified: ProductTypeStatus.UNCLASSIFIED,
+  needs_review: ProductTypeStatus.NEEDS_REVIEW,
 } as const;
 
 export const productClassificationReclassificationSchema = z

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ClassificationCorrectionScope } from '@prisma/client';
-import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema } from './receiptSchema';
+import { ClassificationCorrectionScope, ProductTypeStatus } from '@prisma/client';
+import {
+  deactivateProductClassificationLearningDataSchema,
+  productClassificationCorrectionSchema,
+  productClassificationReclassificationSchema,
+} from './receiptSchema';
 
 describe('productClassificationCorrectionSchema', () => {
   it('requires classificationName only for SAME_CLASSIFICATION_NAME', () => {
@@ -34,5 +38,19 @@ describe('deactivateProductClassificationLearningDataSchema', () => {
   it('requires a non-empty reason', () => {
     expect(deactivateProductClassificationLearningDataSchema.safeParse({ reason: '  ' }).success).toBe(false);
     expect(deactivateProductClassificationLearningDataSchema.parse({ reason: '誤分類のため' })).toEqual({ reason: '誤分類のため' });
+  });
+});
+
+describe('productClassificationReclassificationSchema', () => {
+  it('converts API statuses to the Prisma enum values', () => {
+    const result = productClassificationReclassificationSchema.parse({
+      statuses: ['unclassified', 'needs_review'],
+      limit: 10,
+    });
+
+    expect(result.statuses).toEqual([
+      ProductTypeStatus.UNCLASSIFIED,
+      ProductTypeStatus.NEEDS_REVIEW,
+    ]);
   });
 });
