@@ -66,6 +66,9 @@ export type PromptTemplate = Schemas['PromptTemplate'];
 export type CreatePromptTemplateRequest = Schemas['CreatePromptTemplateRequest'];
 export type UpdatePromptTemplateRequest = Schemas['UpdatePromptTemplateRequest'];
 export type AdminCostStatRow = Schemas['AdminCostStatRow'];
+export type CreateProductClassificationReclassificationRunRequest = Schemas['CreateProductClassificationReclassificationRunRequest'];
+export type ProductClassificationReclassificationRun = Schemas['ProductClassificationReclassificationRun'];
+export type ProductClassificationReclassificationItemAudit = Schemas['ProductClassificationReclassificationItemAudit'];
 
 // --- health ---
 export type HealthResponse = Schemas['HealthResponse'];

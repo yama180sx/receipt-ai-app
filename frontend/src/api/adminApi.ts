@@ -3,7 +3,9 @@ import type {
   AdminCostStatRow,
   ApiMessageResponse,
   ApiSuccessResponse,
+  CreateProductClassificationReclassificationRunRequest,
   CreatePromptTemplateRequest,
+  ProductClassificationReclassificationRun,
   PromptTemplate,
   UpdatePromptTemplateRequest,
 } from './generated';
@@ -42,10 +44,19 @@ export const adminApi = {
     const res = await apiClient.delete(`/admin/prompts/${id}`);
     return res.data;
   },
+
+  async createProductClassificationReclassificationRun(
+    input: CreateProductClassificationReclassificationRunRequest
+  ): Promise<ApiSuccessResponse<ProductClassificationReclassificationRun>> {
+    const res = await apiClient.post('/admin/product-classification/reclassification-runs', input);
+    return res.data;
+  },
 };
 
 export type {
   AdminCostStatRow,
+  CreateProductClassificationReclassificationRunRequest,
+  ProductClassificationReclassificationRun,
   CreatePromptTemplateRequest,
   PromptTemplate,
   UpdatePromptTemplateRequest,

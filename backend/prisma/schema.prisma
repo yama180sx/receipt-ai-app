@@ -61,6 +61,17 @@ enum ProductClassificationLearningDataType {
   ALIAS                @map("alias")
 }
 
+enum ProductClassificationReclassificationRunStatus {
+  COMPLETED       @map("completed")
+  PARTIAL_FAILURE @map("partial_failure")
+}
+
+enum ProductClassificationReclassificationItemOutcome {
+  UPDATED   @map("updated")
+  UNCHANGED @map("unchanged")
+  FAILED    @map("failed")
+}
+
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
   id                        Int                            @id @default(autoincrement())
@@ -78,6 +89,7 @@ model FamilyGroup {
   classificationCorrections ClassificationCorrection[]
   productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
   productClassificationAiRuns ProductClassificationAiRun[]
+  productClassificationReclassificationRuns ProductClassificationReclassificationRun[]
   createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
 }
 
@@ -97,6 +109,7 @@ model FamilyMember {
   itemSplits                ItemSplit[] // [Issue #78] 負担明細へのリレーション
   classificationCorrections ClassificationCorrection[]
   productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
+  productClassificationReclassificationRuns ProductClassificationReclassificationRun[]
 
   // ★ [Issue #81] 送金履歴リレーション
   sentTransfers     SettlementTransfer[] @relation("TransferSender")
@@ -175,6 +188,7 @@ model Item {
   splits                    ItemSplit[]
   classificationCorrections ClassificationCorrection[]
   productClassificationCandidates ProductClassificationCandidate[]
+  productClassificationReclassificationAudits ProductClassificationReclassificationItemAudit[]
 
   @@index([standardCategoryId])
   @@index([productTypeId])
@@ -323,6 +337,55 @@ model ProductClassificationLearningDataAudit {
 
   @@index([familyGroupId, createdAt])
   @@index([learningDataType, learningDataId])
+}
+
+// 既存明細の再分類実行と変更内容を世帯単位で追跡する監査ログ。
+model ProductClassificationReclassificationRun {
+  id             Int                                        @id @default(autoincrement())
+  familyGroupId  Int
+  familyGroup    FamilyGroup                                @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  actorMemberId  Int
+  actorMember    FamilyMember                               @relation(fields: [actorMemberId], references: [id], onDelete: Restrict)
+  targetStatuses ProductTypeStatus[]
+  startDate      DateTime?                                  @db.Timestamptz(3)
+  endDate        DateTime?                                  @db.Timestamptz(3)
+  limit          Int
+  selectedCount  Int                                        @default(0)
+  updatedCount   Int                                        @default(0)
+  unchangedCount Int                                        @default(0)
+  failedCount    Int                                        @default(0)
+  status         ProductClassificationReclassificationRunStatus
+  createdAt      DateTime                                   @default(now()) @db.Timestamptz(3)
+  completedAt    DateTime?                                  @db.Timestamptz(3)
+  itemAudits     ProductClassificationReclassificationItemAudit[]
+
+  @@index([familyGroupId, createdAt])
+  @@index([actorMemberId])
+}
+
+model ProductClassificationReclassificationItemAudit {
+  id                           Int                                              @id @default(autoincrement())
+  runId                        Int
+  run                          ProductClassificationReclassificationRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  itemId                       Int
+  item                         Item                                             @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  outcome                      ProductClassificationReclassificationItemOutcome
+  previousCategoryId           Int?
+  nextCategoryId               Int?
+  previousStandardCategoryId   Int?
+  nextStandardCategoryId       Int?
+  previousProductTypeId        Int?
+  nextProductTypeId            Int?
+  previousProductTypeStatus    ProductTypeStatus
+  nextProductTypeStatus        ProductTypeStatus
+  previousClassificationSource ClassificationSource?
+  nextClassificationSource     ClassificationSource?
+  errorMessage                 String?
+  createdAt                    DateTime                                         @default(now()) @db.Timestamptz(3)
+
+  @@unique([runId, itemId])
+  @@index([itemId])
+  @@index([outcome])
 }
 
 // 類似検索で得た候補。候補自体は商品種別の確定を意味しない。

@@ -187,6 +187,18 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ---
 
+### ProductClassificationReclassificationRun / ProductClassificationReclassificationItemAudit
+
+既存明細の再分類を世帯単位で実行した際の条件・集計結果と、実際に更新または失敗した明細の変更前後を保持する。`unclassified` と `needs_review` だけを対象にするため、手動確定済みの明細は更新対象に含めない。変更がない明細は実行集計にのみ含め、明細監査を重複作成しない。
+
+`ProductClassificationReclassificationRun` は `familyGroupId`、`actorMemberId`、対象状態配列、期間、上限、選択・更新・不変・失敗件数、完了状態を持つ。`ProductClassificationReclassificationItemAudit` は実行と明細に紐づき、更新前後のカテゴリ・標準カテゴリ・商品種別・状態・分類元、および失敗理由をスナップショットとして保存する。
+
+**FK:** Run の `familyGroupId` → `FamilyGroup.id`（Cascade）、`actorMemberId` → `FamilyMember.id`（Restrict）、ItemAudit の `runId` → Run.id（Cascade）、`itemId` → Item.id（Cascade）
+**Unique:** ItemAudit `(runId, itemId)`
+**Index:** Run `(familyGroupId, createdAt)`、`actorMemberId`、ItemAudit `itemId`、`outcome`
+
+---
+
 ### ItemSplit
 
 | カラム | 型 | Nullable | Default | PK | FK | Unique | Index |

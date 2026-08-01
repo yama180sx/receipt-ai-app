@@ -18,6 +18,7 @@ const DEFAULT_MOUNT_PROBE_PATHS = [
   '/api/auth/families/1/members',
   '/api/admin/stats',
   '/api/admin/prompts',
+  '/api/admin/product-classification/reclassification-runs',
   '/api/categories',
   '/api/product-master',
   '/api/stats/settlement',
