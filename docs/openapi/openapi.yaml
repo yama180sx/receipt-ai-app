@@ -143,6 +143,34 @@ paths:
                       data:
                         $ref: '#/components/schemas/ProductClassificationLearningData'
 
+  /admin/product-classification/reclassification-runs:
+    post:
+      tags: [product-classification]
+      summary: 世帯内の既存明細を再分類（管理者）
+      description: |
+        指定世帯の未分類・要確認明細を、確定履歴・世帯辞書・標準辞書・類似候補の既存優先順位で再評価する。
+        手動確定済み明細は対象外で、実行条件と変更内容は監査ログに保存する。管理者権限と二要素認証が必要。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductClassificationReclassificationRunRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationReclassificationRun'
+
   /auth/resolve-family:
     post:
       tags: [auth]
@@ -1302,6 +1330,111 @@ components:
           type: string
           minLength: 1
           maxLength: 500
+
+    ProductClassificationReclassificationRunStatus:
+      type: string
+      enum: [completed, partial_failure]
+
+    ProductClassificationReclassificationItemOutcome:
+      type: string
+      enum: [updated, unchanged, failed]
+
+    CreateProductClassificationReclassificationRunRequest:
+      type: object
+      properties:
+        statuses:
+          type: array
+          description: 対象にする未確定状態。省略時は unclassified と needs_review。
+          minItems: 1
+          items:
+            type: string
+            enum: [unclassified, needs_review]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+
+    ProductClassificationReclassificationItemAudit:
+      type: object
+      required: [itemId, outcome, previousProductTypeStatus, nextProductTypeStatus, previousClassificationSource, nextClassificationSource, createdAt]
+      properties:
+        itemId:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/ProductClassificationReclassificationItemOutcome'
+        previousProductTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        nextProductTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        previousProductTypeId:
+          type: integer
+          nullable: true
+        nextProductTypeId:
+          type: integer
+          nullable: true
+        previousClassificationSource:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+          nullable: true
+        nextClassificationSource:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ProductClassificationReclassificationRun:
+      type: object
+      required: [id, statuses, limit, selectedCount, updatedCount, unchangedCount, failedCount, status, createdAt, completedAt, itemAudits]
+      properties:
+        id:
+          type: integer
+        statuses:
+          type: array
+          items:
+            type: string
+            enum: [unclassified, needs_review]
+        startDate:
+          type: string
+          format: date-time
+          nullable: true
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        limit:
+          type: integer
+        selectedCount:
+          type: integer
+        updatedCount:
+          type: integer
+        unchangedCount:
+          type: integer
+        failedCount:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ProductClassificationReclassificationRunStatus'
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        itemAudits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductClassificationReclassificationItemAudit'
 
     ClassificationConfidence:
       type: string

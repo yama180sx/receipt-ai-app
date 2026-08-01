@@ -1,6 +1,9 @@
 import {
   ProductTypeStatus,
+  ClassificationSource,
   ProductClassificationLearningDataType,
+  ProductClassificationReclassificationItemOutcome,
+  ProductClassificationReclassificationRunStatus,
   Prisma,
   type ClassificationCorrectionScope,
   type ProductClassificationCandidateSource,
@@ -374,5 +377,111 @@ export async function findProductClassificationStatsItems(
         },
       },
     },
+  });
+}
+
+export type ProductClassificationReclassificationQuery = {
+  familyGroupId: number;
+  statuses: ProductTypeStatus[];
+  startDate?: Date;
+  endDate?: Date;
+  limit: number;
+};
+
+export async function findItemsForProductClassificationReclassification(
+  query: ProductClassificationReclassificationQuery
+) {
+  return prisma.item.findMany({
+    where: {
+      productTypeStatus: { in: query.statuses },
+      receipt: {
+        familyGroupId: query.familyGroupId,
+        ...(query.startDate ? { date: { gte: query.startDate } } : {}),
+        ...(query.endDate ? { date: { lt: query.endDate } } : {}),
+      },
+    },
+    select: { id: true },
+    orderBy: [{ receipt: { date: 'asc' } }, { id: 'asc' }],
+    take: query.limit,
+  });
+}
+
+export async function findItemForProductClassificationReclassificationInTx(
+  tx: PrismaTx,
+  itemId: number,
+  familyGroupId: number
+) {
+  return tx.item.findFirst({
+    where: { id: itemId, receipt: { familyGroupId } },
+    include: {
+      receipt: { select: { familyGroupId: true } },
+      productClassificationCandidates: {
+        select: {
+          productTypeId: true,
+          source: true,
+          matchedNormalizedName: true,
+          similarity: true,
+          rank: true,
+        },
+        orderBy: { rank: 'asc' },
+      },
+    },
+  });
+}
+
+export async function createProductClassificationReclassificationRun(
+  input: {
+    familyGroupId: number;
+    actorMemberId: number;
+    targetStatuses: ProductTypeStatus[];
+    startDate?: Date;
+    endDate?: Date;
+    limit: number;
+    selectedCount: number;
+  }
+) {
+  return prisma.productClassificationReclassificationRun.create({
+    data: {
+      ...input,
+      status: ProductClassificationReclassificationRunStatus.COMPLETED,
+    },
+  });
+}
+
+export async function createProductClassificationReclassificationItemAuditInTx(
+  tx: PrismaTx,
+  input: {
+    runId: number;
+    itemId: number;
+    outcome: ProductClassificationReclassificationItemOutcome;
+    previousCategoryId: number | null;
+    nextCategoryId: number | null;
+    previousStandardCategoryId: number | null;
+    nextStandardCategoryId: number | null;
+    previousProductTypeId: number | null;
+    nextProductTypeId: number | null;
+    previousProductTypeStatus: ProductTypeStatus;
+    nextProductTypeStatus: ProductTypeStatus;
+    previousClassificationSource: ClassificationSource | null;
+    nextClassificationSource: ClassificationSource | null;
+    errorMessage?: string;
+  }
+) {
+  return tx.productClassificationReclassificationItemAudit.create({ data: input });
+}
+
+export async function completeProductClassificationReclassificationRun(
+  runId: number,
+  input: {
+    updatedCount: number;
+    unchangedCount: number;
+    failedCount: number;
+    status: ProductClassificationReclassificationRunStatus;
+  }
+) {
+  return prisma.productClassificationReclassificationRun.update({
+    where: { id: runId },
+    data: { ...input, completedAt: new Date() },
+    include: { itemAudits: { orderBy: { id: 'asc' } } },
   });
 }

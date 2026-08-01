@@ -10,6 +10,7 @@ interface AdminMenuScreenProps {
   onBack: () => void;
   onGoToPromptEditor: () => void;
   onGoToAdminStats: () => void;
+  onGoToProductClassificationReclassification: () => void;
 }
 
 const adm = colors.semantic.admin;
@@ -18,6 +19,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onBack,
   onGoToPromptEditor,
   onGoToAdminStats,
+  onGoToProductClassificationReclassification,
 }) => {
   return (
     <View style={[screenLayout.container, styles.containerAdmin]}>
@@ -39,6 +41,18 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
             left={
               <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.prompt }]}>
                 <Text>📝</Text>
+              </View>
+            }
+          />
+
+          <AppListItem
+            variant="nav"
+            onPress={onGoToProductClassificationReclassification}
+            title="既存明細の再分類"
+            subtitle="最新の辞書で未分類・要確認明細を再評価"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.warning.bg }]}>
+                <Text>🔄</Text>
               </View>
             }
           />

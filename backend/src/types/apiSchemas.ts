@@ -81,6 +81,46 @@ export type ProductClassificationCandidateSource =
   | 'alias'
   | 'standard_dictionary';
 
+export type ProductClassificationReclassificationRunStatus = 'completed' | 'partial_failure';
+
+export type ProductClassificationReclassificationItemOutcome = 'updated' | 'unchanged' | 'failed';
+
+export type CreateProductClassificationReclassificationRunRequest = {
+  statuses?: Array<'unclassified' | 'needs_review'>;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+};
+
+export type ProductClassificationReclassificationItemAudit = {
+  itemId: number;
+  outcome: ProductClassificationReclassificationItemOutcome;
+  previousProductTypeStatus: ProductTypeStatus;
+  nextProductTypeStatus: ProductTypeStatus;
+  previousProductTypeId: number | null;
+  nextProductTypeId: number | null;
+  previousClassificationSource: ClassificationSource | null;
+  nextClassificationSource: ClassificationSource | null;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
+export type ProductClassificationReclassificationRun = {
+  id: number;
+  statuses: Array<'unclassified' | 'needs_review'>;
+  startDate: Date | null;
+  endDate: Date | null;
+  limit: number;
+  selectedCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  failedCount: number;
+  status: ProductClassificationReclassificationRunStatus;
+  createdAt: Date;
+  completedAt: Date | null;
+  itemAudits: ProductClassificationReclassificationItemAudit[];
+};
+
 export type ProductClassificationCandidateSummary = {
   productType: ProductTypeSummary;
   source: ProductClassificationCandidateSource;
@@ -315,6 +355,11 @@ export const API_SCHEMA_EXPORTS = [
   'ClassificationCorrectionScope',
   'ProductClassificationCandidateSource',
   'ProductClassificationCandidateSummary',
+  'ProductClassificationReclassificationRunStatus',
+  'ProductClassificationReclassificationItemOutcome',
+  'CreateProductClassificationReclassificationRunRequest',
+  'ProductClassificationReclassificationItemAudit',
+  'ProductClassificationReclassificationRun',
   'ProductClassificationReviewItem',
   'UpdateItemProductClassificationRequest',
   'ItemSplitSummary',

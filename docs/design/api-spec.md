@@ -260,6 +260,7 @@ sequenceDiagram
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の明細一覧 |
 | GET | `/product-classification/learning-data` | JWT + tenant | 世帯辞書・別名・確定履歴の一覧（標準辞書は含めない） |
 | PATCH | `/product-classification/learning-data/:type/:id/deactivate` | JWT + tenant | 理由を記録して世帯辞書または別名を無効化（確定履歴は参照専用） |
+| POST | `/admin/product-classification/reclassification-runs` | JWT + tenant + ADMIN + TOTP | 未分類・要確認の既存明細を世帯内で再評価し、実行・変更内容を監査保存 |
 | GET | `/receipts` | JWT + tenant | レシート一覧 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
@@ -287,6 +288,7 @@ sequenceDiagram
 | `GET /product-classification/review-items` | `status` | カンマ区切りの `needs_review` / `unclassified` / `outside_initial_scope`。省略時は全状態 |
 | `GET /product-classification/review-items` | `categoryId` | 家計簿 Category による絞り込み（任意） |
 | `GET /product-classification/review-items` | `month` | `YYYY-MM` による期間絞り込み（任意） |
+| `POST /admin/product-classification/reclassification-runs` | body | `statuses`（`unclassified` / `needs_review`）、`startDate`、`endDate`、`limit`（1〜500、既定100）。管理者メニューから実行し、手動確定済み明細は対象外。 |
 | `GET /stats/monthly` | `month` | 対象月（省略時は当月 UTC 基準の `YYYY-MM`） |
 | `GET /stats/product-classification` | `month` | 対象月（必須、`YYYY-MM`） |
 

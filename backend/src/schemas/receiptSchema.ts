@@ -49,6 +49,34 @@ export const deactivateProductClassificationLearningDataSchema = z.object({
   reason: z.string().trim().min(1, '無効化理由は必須です').max(500, '無効化理由は500文字以内です'),
 });
 
+const reclassificationStatusMap = {
+  unclassified: 'unclassified',
+  needs_review: 'needs_review',
+} as const;
+
+export const productClassificationReclassificationSchema = z
+  .object({
+    statuses: z.array(z.enum(['unclassified', 'needs_review'])).min(1).max(2).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+    limit: z.coerce.number().int().min(1).max(500).default(100),
+  })
+  .superRefine((input, ctx) => {
+    if (input.startDate && input.endDate && input.startDate >= input.endDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endDate'],
+        message: '終了日時は開始日時より後にしてください',
+      });
+    }
+  })
+  .transform((input) => ({
+    ...input,
+    statuses: (input.statuses ?? ['unclassified', 'needs_review']).map(
+      (status) => reclassificationStatusMap[status]
+    ),
+  }));
+
 /**
  * 3. 最終的な保存・更新用のバリデーション
  * DB保存時に整合性をチェックするために使用

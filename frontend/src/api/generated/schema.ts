@@ -178,6 +178,52 @@ export interface paths {
         };
         trace?: never;
     };
+    "/admin/product-classification/reclassification-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 世帯内の既存明細を再分類（管理者）
+         * @description 指定世帯の未分類・要確認明細を、確定履歴・世帯辞書・標準辞書・類似候補の既存優先順位で再評価する。
+         *     手動確定済み明細は対象外で、実行条件と変更内容は監査ログに保存する。管理者権限と二要素認証が必要。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateProductClassificationReclassificationRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationReclassificationRun"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/resolve-family": {
         parameters: {
             query?: never;
@@ -1751,6 +1797,51 @@ export interface components {
         };
         DeactivateProductClassificationLearningDataRequest: {
             reason: string;
+        };
+        /** @enum {string} */
+        ProductClassificationReclassificationRunStatus: "completed" | "partial_failure";
+        /** @enum {string} */
+        ProductClassificationReclassificationItemOutcome: "updated" | "unchanged" | "failed";
+        CreateProductClassificationReclassificationRunRequest: {
+            /** @description 対象にする未確定状態。省略時は unclassified と needs_review。 */
+            statuses?: ("unclassified" | "needs_review")[];
+            /** Format: date-time */
+            startDate?: string;
+            /** Format: date-time */
+            endDate?: string;
+            limit?: number;
+        };
+        ProductClassificationReclassificationItemAudit: {
+            itemId: number;
+            outcome: components["schemas"]["ProductClassificationReclassificationItemOutcome"];
+            previousProductTypeStatus: components["schemas"]["ProductTypeStatus"];
+            nextProductTypeStatus: components["schemas"]["ProductTypeStatus"];
+            previousProductTypeId?: number | null;
+            nextProductTypeId?: number | null;
+            previousClassificationSource: components["schemas"]["ClassificationSource"] | null;
+            nextClassificationSource: components["schemas"]["ClassificationSource"] | null;
+            errorMessage?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ProductClassificationReclassificationRun: {
+            id: number;
+            statuses: ("unclassified" | "needs_review")[];
+            /** Format: date-time */
+            startDate?: string | null;
+            /** Format: date-time */
+            endDate?: string | null;
+            limit: number;
+            selectedCount: number;
+            updatedCount: number;
+            unchangedCount: number;
+            failedCount: number;
+            status: components["schemas"]["ProductClassificationReclassificationRunStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            itemAudits: components["schemas"]["ProductClassificationReclassificationItemAudit"][];
         };
         /** @enum {string} */
         ClassificationConfidence: "high" | "medium" | "low";

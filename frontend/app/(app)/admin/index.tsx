@@ -13,6 +13,7 @@ export default function AdminMenuRoute() {
         onBack={goHome}
         onGoToPromptEditor={() => router.push('/admin/prompts')}
         onGoToAdminStats={() => router.push('/admin/stats')}
+        onGoToProductClassificationReclassification={() => router.push('/admin/product-classification-reclassification')}
       />
     </AppScreenShell>
   );
