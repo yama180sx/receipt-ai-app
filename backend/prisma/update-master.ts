@@ -1,11 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 import { syncPostgresIdSequence } from './syncSequences';
+import { syncStandardProductClassificationMasters } from './syncStandardProductClassificationMasters';
 
 const prisma = new PrismaClient();
 
 /** 第1世帯向けマスタ更新（運用環境 — 全データ削除なし） */
 async function main() {
   console.log('--- 🔄 Master Data Update Start ---');
+
+  await syncStandardProductClassificationMasters(prisma);
+  console.log('🗂️ Standard product classification masters synchronized.');
 
   const defaultFamily = await prisma.familyGroup.findFirst({ orderBy: { id: 'asc' } });
   if (!defaultFamily) {

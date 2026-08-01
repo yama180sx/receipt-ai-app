@@ -114,22 +114,22 @@ cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する
 | スクリプト | 実際の実行方法 | 用途 | 影響 |
 |------------|----------------|------|------|
 | `backend/prisma/seed.ts` | `npm run prisma:seed`（`prisma db seed`） | 開発環境の初期化 | **全データ削除後、再投入** |
-| `backend/prisma/update-master.ts` | `npx tsx prisma/update-master.ts` | 運用中のマスタ更新 | **マスタのみ upsert**（Receipt 等は不変） |
+| `backend/prisma/update-master.ts` | `npm run prisma:update` | 運用中のマスタ更新 | **マスタのみ upsert**（Receipt 等は不変） |
 | `backend/prisma/run-sync-sequences.ts` | `npm run prisma:sync-sequences` | id シーケンス修復 | データ削除なし |
 
-> **注意:** [db-operations.md](../db-operations.md) では歴史的に `npm run prisma:init` / `prisma:update` と記載されているが、`backend/package.json` に該当 script は **未定義**。上表のコマンドが as-built の正。
+> **注意:** `npm run prisma:init` は `backend/package.json` に存在しない。開発環境の初期化には `npm run prisma:seed` を、非破壊のマスタ同期には `npm run prisma:update` を使用する。
 
 Docker 経由の例:
 
 ```bash
 docker compose exec backend npm run prisma:seed          # 開発のみ — 全削除
-docker compose exec backend npx tsx prisma/update-master.ts
+docker compose exec backend npm run prisma:update
 docker compose exec backend npm run prisma:sync-sequences
 ```
 
 ### 4.2 マスタ追加の流れ（要約）
 
-1. `update-master.ts` に upsert 定義を追加
+1. `standardProductClassificationSeed.ts` または `update-master.ts` にマスタ定義を追加
 2. `seed.ts` にも同内容を同期（新規参画者の初期化用）
 3. stable では `update-master.ts` のみ実行
 

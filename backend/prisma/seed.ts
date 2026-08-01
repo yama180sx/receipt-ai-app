@@ -5,10 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { syncAllSeedTableSequences, syncPostgresIdSequence } from './syncSequences';
 import {
-  INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_DICTIONARY,
-  STANDARD_CATEGORIES,
-} from './standardProductClassificationSeed';
+  syncStandardProductClassificationMasters,
+} from './syncStandardProductClassificationMasters';
 
 const prisma = new PrismaClient();
 
@@ -112,64 +110,6 @@ async function seedMastersForFamily(
   });
 }
 
-async function seedStandardProductClassificationMasters() {
-  const categoryIdByCode = new Map<string, number>();
-
-  for (const category of STANDARD_CATEGORIES) {
-    const parentId = category.parentCode
-      ? categoryIdByCode.get(category.parentCode)
-      : undefined;
-
-    if (category.parentCode && !parentId) {
-      throw new Error(`StandardCategory parent is missing: ${category.parentCode}`);
-    }
-
-    const created = await prisma.standardCategory.create({
-      data: {
-        code: category.code,
-        name: category.name,
-        parentId,
-        displayOrder: category.displayOrder,
-      },
-    });
-    categoryIdByCode.set(category.code, created.id);
-  }
-
-  const productTypeIdByCode = new Map<string, number>();
-  for (const productType of INITIAL_PRODUCT_TYPES) {
-    const standardCategoryId = categoryIdByCode.get(productType.standardCategoryCode);
-    if (!standardCategoryId) {
-      throw new Error(`ProductType category is missing: ${productType.standardCategoryCode}`);
-    }
-
-    const created = await prisma.productType.create({
-      data: {
-        code: productType.code,
-        name: productType.name,
-        standardCategoryId,
-        displayOrder: productType.displayOrder,
-      },
-    });
-    productTypeIdByCode.set(productType.code, created.id);
-  }
-
-  for (const entry of INITIAL_STANDARD_PRODUCT_DICTIONARY) {
-    const standardCategoryId = categoryIdByCode.get(entry.standardCategoryCode);
-    const productTypeId = productTypeIdByCode.get(entry.productTypeCode);
-    if (!standardCategoryId || !productTypeId) {
-      throw new Error(`StandardProductDictionary reference is missing: ${entry.normalizedName}`);
-    }
-
-    await prisma.standardProductDictionary.create({
-      data: {
-        normalizedName: entry.normalizedName,
-        standardCategoryId,
-        productTypeId,
-      },
-    });
-  }
-}
-
 async function main() {
   console.log('--- 🚀 Seeding Start (Multi-Tenancy Architecture) ---');
 
@@ -195,7 +135,7 @@ async function main() {
 
   console.log('🗑️ Existing data cleared.');
 
-  await seedStandardProductClassificationMasters();
+  await syncStandardProductClassificationMasters(prisma);
   console.log('🗂️ Standard product classification masters seeded.');
 
   const familyGroup = await prisma.familyGroup.create({
