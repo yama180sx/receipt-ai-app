@@ -23,6 +23,7 @@ export const STANDARD_CATEGORIES: StandardCategorySeed[] = [
   { code: 'food-snacks', name: 'お菓子', parentCode: 'food', displayOrder: 11 },
   { code: 'food-instant', name: 'インスタント食品', parentCode: 'food', displayOrder: 12 },
   { code: 'food-dairy', name: '乳製品', parentCode: 'food', displayOrder: 13 },
+  { code: 'food-beverages', name: '飲料', parentCode: 'food', displayOrder: 14 },
   { code: 'daily-goods', name: '日用品', displayOrder: 20 },
   { code: 'daily-laundry', name: '洗濯用品', parentCode: 'daily-goods', displayOrder: 21 },
   { code: 'daily-paper', name: '紙製品', parentCode: 'daily-goods', displayOrder: 22 },
@@ -50,6 +51,10 @@ export const INITIAL_PRODUCT_TYPES: ProductTypeSeed[] = [
   { code: 'retort-food', name: 'レトルト食品', standardCategoryCode: 'food-instant', displayOrder: 3 },
   { code: 'frozen-food', name: '冷凍食品', standardCategoryCode: 'food-instant', displayOrder: 4 },
   { code: 'milk', name: '牛乳', standardCategoryCode: 'food-dairy', displayOrder: 1 },
+  { code: 'tea', name: 'お茶', standardCategoryCode: 'food-beverages', displayOrder: 1 },
+  { code: 'carbonated-drinks', name: '炭酸飲料', standardCategoryCode: 'food-beverages', displayOrder: 2 },
+  { code: 'coffee', name: 'コーヒー', standardCategoryCode: 'food-beverages', displayOrder: 3 },
+  { code: 'other-beverages', name: 'その他飲料', standardCategoryCode: 'food-beverages', displayOrder: 4 },
   { code: 'laundry-detergent', name: '洗濯洗剤', standardCategoryCode: 'daily-laundry', displayOrder: 1 },
   { code: 'fabric-softener', name: '柔軟剤', standardCategoryCode: 'daily-laundry', displayOrder: 2 },
   { code: 'bleach', name: '漂白剤', standardCategoryCode: 'daily-laundry', displayOrder: 3 },
@@ -58,10 +63,19 @@ export const INITIAL_PRODUCT_TYPES: ProductTypeSeed[] = [
   { code: 'kitchen-paper', name: 'キッチンペーパー', standardCategoryCode: 'daily-paper', displayOrder: 3 },
 ];
 
-// Phase 1では各ProductTypeの標準名称を完全一致辞書として登録する。
-export const INITIAL_STANDARD_PRODUCT_DICTIONARY: StandardProductDictionarySeed[] =
-  INITIAL_PRODUCT_TYPES.map((productType) => ({
+// 各ProductTypeの標準名称に加え、実レシートで確認した誤分類リスクの低いOCR名を完全一致辞書として登録する。
+export const INITIAL_STANDARD_PRODUCT_DICTIONARY: StandardProductDictionarySeed[] = [
+  ...INITIAL_PRODUCT_TYPES.map((productType) => ({
     normalizedName: productType.name,
     standardCategoryCode: productType.standardCategoryCode,
     productTypeCode: productType.code,
-  }));
+  })),
+  { normalizedName: 'zone hyper 400ml', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages' },
+  { normalizedName: 'nope ギルティ炭酸 600ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
+  { normalizedName: 'grダカラやさしい麦茶2lx6', standardCategoryCode: 'food-beverages', productTypeCode: 'tea' },
+  { normalizedName: 'grダカラ麦茶手売680mlx', standardCategoryCode: 'food-beverages', productTypeCode: 'tea' },
+  { normalizedName: 'nescafeex b珈琲無糖', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee' },
+  { normalizedName: 'nescafeex b珈琲無糖x 特', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee' },
+  { normalizedName: 'ファンタ gdグレープ 500ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
+  { normalizedName: 'ファンタ芳醇アップル 500ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
+];

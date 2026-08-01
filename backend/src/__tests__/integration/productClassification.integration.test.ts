@@ -186,4 +186,15 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
       .send({ productTypeId: milkId, scope: 'item_only' });
     expect(crossTenantRes.status).toBe(404);
   });
+
+  it('uses the beverage standard dictionary in a household other than the source household', async () => {
+    const teaId = await productTypeIdByCode('tea');
+
+    await expect(
+      classifyItemByExactMatch(prisma as never, { familyGroupId: 2, itemName: 'GRダカラやさしい麦茶2Lx6' })
+    ).resolves.toMatchObject({
+      productTypeId: teaId,
+      classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+    });
+  });
 });
