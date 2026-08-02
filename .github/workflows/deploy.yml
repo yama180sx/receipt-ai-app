@@ -68,6 +68,8 @@ jobs:
           GEMINI_MODEL="${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}"
           GEMINI_RETRY_COUNT=3
           GEMINI_RETRY_DELAY=2000
+          RECEIPT_MANUAL_RETRY_LIMIT=${{ vars.RECEIPT_MANUAL_RETRY_LIMIT || '1' }}
+          RECEIPT_MANUAL_RETRY_FAILURE_CODES="${{ vars.RECEIPT_MANUAL_RETRY_FAILURE_CODES || 'gemini_daily_quota' }}"
           CORS_ORIGIN="http://${{ secrets.HOST_IP }},http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_WEB_PORT }},http://${{ secrets.HOST_IP }}:${{ secrets.STABLE_DEV_PORT || '8082' }},exp://${{ secrets.HOST_IP }}:${{ secrets.STABLE_DEV_PORT || '8082' }},http://localhost:${{ secrets.STABLE_DEV_PORT || '8082' }},http://127.0.0.1:${{ secrets.STABLE_DEV_PORT || '8082' }}"
           LOG_LEVEL=info
           EOF

@@ -9,7 +9,7 @@ import {
 } from '../types/receiptJob';
 import { showAlert } from '../utils/alertMessage';
 import { showConfirmDialog } from '../utils/confirmDialog';
-import { discardReceiptJob, fetchReceiptScanInitialData } from '../utils/receiptJobActions';
+import { discardReceiptJob, fetchReceiptScanInitialData, retryReceiptJob } from '../utils/receiptJobActions';
 import {
   countReceiptTrayItems,
   resolveReceiptTrayItemDisplay,
@@ -27,8 +27,11 @@ export type ReceiptTrayContextValue = {
   addLocalFailedJob: (reason: string) => void;
   openTrayItem: (item: ReceiptTrayItem) => Promise<void>;
   discardTrayItem: (item: ReceiptTrayItem) => Promise<void>;
+  retryTrayItem: (item: ReceiptTrayItem) => Promise<void>;
   canOpenTrayItem: (item: ReceiptTrayItem) => boolean;
   canDiscardTrayItem: (item: ReceiptTrayItem) => boolean;
+  canRetryTrayItem: (item: ReceiptTrayItem) => boolean;
+  retryingJobId: string | null;
 };
 
 type UseReceiptTrayControllerOptions = {
@@ -44,6 +47,7 @@ export function useReceiptTrayController({
 }: UseReceiptTrayControllerOptions): ReceiptTrayContextValue {
   const { jobs, activeCount, refreshing, refresh } = useReceiptJobs(enabled);
   const [localFailedJobs, setLocalFailedJobs] = useState<LocalFailedReceiptJob[]>([]);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
 
   const addLocalFailedJob = useCallback((reason: string) => {
     setLocalFailedJobs((prev) => [
@@ -76,6 +80,9 @@ export function useReceiptTrayController({
   }, []);
 
   const canDiscardTrayItem = useCallback((_item: ReceiptTrayItem): boolean => true, []);
+  const canRetryTrayItem = useCallback((item: ReceiptTrayItem): boolean =>
+    !isLocalFailedReceiptJob(item) && item.state === 'failed' && item.retry?.eligible === true,
+  []);
 
   const proceedOpenTrayItem = useCallback(
     async (item: ReceiptJobListItem) => {
@@ -151,6 +158,21 @@ export function useReceiptTrayController({
     [refresh]
   );
 
+  const retryTrayItem = useCallback(async (item: ReceiptTrayItem) => {
+    if (!canRetryTrayItem(item) || retryingJobId) return;
+    setRetryingJobId(item.id);
+    try {
+      await retryReceiptJob(item.id);
+      showAlert('再実行を開始しました', '同じレシート画像を解析キューへ再投入しました。');
+      await refresh();
+    } catch {
+      showAlert('再実行できません', '元画像が見つからないか、再実行できない状態です。再撮影してください。');
+      await refresh();
+    } finally {
+      setRetryingJobId(null);
+    }
+  }, [canRetryTrayItem, refresh, retryingJobId]);
+
   return {
     jobs,
     activeCount,
@@ -162,7 +184,10 @@ export function useReceiptTrayController({
     addLocalFailedJob,
     openTrayItem,
     discardTrayItem,
+    retryTrayItem,
     canOpenTrayItem,
     canDiscardTrayItem,
+    canRetryTrayItem,
+    retryingJobId,
   };
 }

@@ -7,6 +7,7 @@ import {
   enrichCompletedJobPayload,
   listReceiptJobsForMember,
   discardReceiptJobForMember,
+  retryFailedReceiptJobForMember,
 } from '../services/receiptJobService';
 import { requireTenantContext } from '../utils/context';
 import { getRouteParam } from '../utils/routeParams';
@@ -76,6 +77,16 @@ export const discardReceiptJob = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
   await discardReceiptJobForMember(getRouteParam(req, 'jobId'), ctx.familyGroupId, ctx.memberId);
   sendMessage(res, 'Discarded');
+});
+
+export const retryReceiptJob = asyncHandler(async (req, res) => {
+  const ctx = requireTenantContext();
+  const job = await retryFailedReceiptJobForMember(
+    getRouteParam(req, 'jobId'),
+    ctx.familyGroupId,
+    ctx.memberId
+  );
+  sendSuccess(res, { jobId: String(job.id), status: 'queued' });
 });
 
 export const getCategories = asyncHandler(async (_req, res) => {

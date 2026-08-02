@@ -215,6 +215,7 @@ sequenceDiagram
 | 確認トレイ | `ReceiptTrayContext` — 完了ジョブを一覧表示し、`ReceiptScanScreen` へ遷移 |
 | 重複警告 | 完了ジョブに `duplicateSuspected` / `existingReceiptId` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — キュー除去 + 未保存画像削除 |
+| 失敗ジョブの再実行 | `POST /api/receipts/jobs/:jobId/retry` — 元画像が残る本人の Gemini 日次クォータ超過だけを同じ画像で再投入。自動再試行はしない |
 
 #### 確認画面（`ReceiptScanScreen`）
 
@@ -291,6 +292,7 @@ flowchart TB
 | 404 秘匿 | 他世帯・他メンバーのジョブ ID は 404（存在を漏らさない） |
 | commit 後 | `removeReceiptJobAfterCommit` — キューから除去（画像は Receipt に紐づくため残す） |
 | 破棄 | `discardReceiptJobForMember` — キュー除去 + 未保存画像ファイル削除 |
+| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。既定は Gemini 日次クォータ超過のみ・手動再実行1回まで |
 
 ---
 
@@ -304,6 +306,8 @@ flowchart TB
 | `GEMINI_MODEL` | `gemini-2.0-flash` | 使用モデル |
 | `GEMINI_RETRY_COUNT` | `3` | 429 / 5xx リトライ回数 |
 | `GEMINI_RETRY_DELAY` | `2000` | 初回リトライ待機 ms（指数バックオフ） |
+| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要 |
+| `RECEIPT_MANUAL_RETRY_FAILURE_CODES` | `gemini_daily_quota` | 手動再実行を許可する失敗コード（カンマ区切り）。現行の候補は `gemini_daily_quota`、`http_429`、`http_5xx` |
 
 ### 6.2 解析処理（`analyzeReceiptImage`）
 
@@ -435,7 +439,7 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 | `backend/src/services/receiptService.ts` | `analyzeOnly`, `saveParsedReceipt`, `saveConfirmedReceipt` |
 | `backend/src/workers/receiptWorker.ts` | BullMQ Worker |
 | `backend/src/queues/receiptQueue.ts` | キュー定義 |
-| `backend/src/services/receiptJobService.ts` | ジョブ一覧・enrich・破棄 |
+| `backend/src/services/receiptJobService.ts` | ジョブ一覧・enrich・破棄・失敗ジョブ再実行 |
 | `backend/src/utils/normalizer.ts` | 3層正規化（形式・表記） |
 | `backend/src/services/categoryService.ts` | カテゴリ推定 |
 | `backend/src/controllers/adminController.ts` | プロンプト CRUD |

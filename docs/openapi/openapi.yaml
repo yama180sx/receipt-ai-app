@@ -685,6 +685,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiMessageEnvelope'
 
+  /receipts/jobs/{jobId}/retry:
+    post:
+      tags: [receipt]
+      summary: 失敗した解析ジョブを同じ画像で再実行
+      description: 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadJobResponse'
+        '404':
+          description: Not Found
+        '409':
+          description: 再実行できないジョブ状態または元画像なし
+
   /receipts/status/{jobId}:
     get:
       tags: [receipt]
@@ -1829,6 +1859,15 @@ components:
         failedReason:
           type: string
           nullable: true
+        retry:
+          type: object
+          description: 失敗ジョブの手動再実行可否。サーバー側ポリシーで判定する。
+          properties:
+            eligible:
+              type: boolean
+            remainingCount:
+              type: integer
+              minimum: 0
         parsedData:
           type: object
           properties:

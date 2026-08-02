@@ -10,6 +10,7 @@ import type {
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
+  UploadJobResponse,
   ProductTypeSummary,
   ProductClassificationCandidateSummary,
   ProductClassificationReviewItem,
@@ -145,6 +146,11 @@ export const receiptApi = {
 
   async discardJob(jobId: string): Promise<ApiMessageResponse> {
     const res = await apiClient.delete(`/receipts/jobs/${jobId}`);
+    return res.data;
+  },
+
+  async retryJob(jobId: string): Promise<ApiSuccessResponse<UploadJobResponse>> {
+    const res = await apiClient.post(`/receipts/jobs/${jobId}/retry`);
     return res.data;
   },
 

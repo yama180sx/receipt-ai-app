@@ -13,3 +13,7 @@ export async function fetchReceiptScanInitialData(
 export async function discardReceiptJob(jobId: string): Promise<void> {
   await receiptApi.discardJob(jobId);
 }
+
+export async function retryReceiptJob(jobId: string): Promise<void> {
+  await receiptApi.retryJob(jobId);
+}

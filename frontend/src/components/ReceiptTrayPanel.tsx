@@ -15,8 +15,11 @@ type Props = {
   onOpenFullTray?: () => void;
   onItemPress?: (item: ReceiptTrayItem) => void;
   onItemDiscard?: (item: ReceiptTrayItem) => void;
+  onItemRetry?: (item: ReceiptTrayItem) => void;
   canOpenItem?: (item: ReceiptTrayItem) => boolean;
   canDiscardItem?: (item: ReceiptTrayItem) => boolean;
+  canRetryItem?: (item: ReceiptTrayItem) => boolean;
+  retryingJobId?: string | null;
 };
 
 export function ReceiptTrayPanel({
@@ -28,8 +31,11 @@ export function ReceiptTrayPanel({
   onOpenFullTray,
   onItemPress,
   onItemDiscard,
+  onItemRetry,
   canOpenItem,
   canDiscardItem,
+  canRetryItem,
+  retryingJobId,
 }: Props) {
   const sections = useMemo(() => groupReceiptTrayItems(items), [items]);
   const totalCount = items.length;
@@ -77,8 +83,11 @@ export function ReceiptTrayPanel({
                 item={item}
                 canOpen={canOpenItem?.(item) ?? false}
                 canDiscard={canDiscardItem?.(item) ?? false}
+                canRetry={canRetryItem?.(item) ?? false}
+                retrying={retryingJobId === item.id}
                 onPress={onItemPress ? () => onItemPress(item) : undefined}
                 onDiscard={onItemDiscard ? () => onItemDiscard(item) : undefined}
+                onRetry={onItemRetry ? () => onItemRetry(item) : undefined}
               />
             ))}
           </View>

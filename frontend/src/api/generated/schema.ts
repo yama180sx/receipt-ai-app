@@ -1054,6 +1054,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receipts/jobs/{jobId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 失敗した解析ジョブを同じ画像で再実行
+         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["UploadJobResponse"];
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 再実行できないジョブ状態または元画像なし */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receipts/status/{jobId}": {
         parameters: {
             query?: never;
@@ -2166,6 +2223,11 @@ export interface components {
             imagePath: string | null;
             createdAt: number;
             failedReason?: string | null;
+            /** @description 失敗ジョブの手動再実行可否。サーバー側ポリシーで判定する。 */
+            retry?: {
+                eligible?: boolean;
+                remainingCount?: number;
+            };
             parsedData?: {
                 storeName?: string;
                 purchaseDate?: string;

@@ -205,6 +205,10 @@ export type ReceiptJobListItem = {
   imagePath: string | null;
   createdAt: number;
   failedReason?: string | null;
+  retry?: {
+    eligible: boolean;
+    remainingCount: number;
+  };
   parsedData?: {
     storeName: string;
     purchaseDate: string;

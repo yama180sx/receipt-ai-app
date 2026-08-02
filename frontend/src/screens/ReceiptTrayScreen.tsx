@@ -22,8 +22,11 @@ export function ReceiptTrayScreen({ onBack }: Props) {
     refresh,
     openTrayItem,
     discardTrayItem,
+    retryTrayItem,
     canOpenTrayItem,
     canDiscardTrayItem,
+    canRetryTrayItem,
+    retryingJobId,
   } = useReceiptTray();
 
   /** 解析一覧表示のたびに 1 回取得（自動ポーリングはしない） */
@@ -75,8 +78,11 @@ export function ReceiptTrayScreen({ onBack }: Props) {
           showSectionHeaders
           onItemPress={(item) => void openTrayItem(item)}
           onItemDiscard={(item) => void discardTrayItem(item)}
+          onItemRetry={(item) => void retryTrayItem(item)}
           canOpenItem={canOpenTrayItem}
           canDiscardItem={canDiscardTrayItem}
+          canRetryItem={canRetryTrayItem}
+          retryingJobId={retryingJobId}
           emptyTitle="確認待ちのレシートはありません"
           emptyDescription="ホームからレシートを撮影すると、解析状況がここに表示されます。"
         />

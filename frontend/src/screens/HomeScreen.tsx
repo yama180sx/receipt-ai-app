@@ -80,8 +80,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onGoToReceiptTray={onGoToReceiptTray}
             onItemPress={(item) => void tray.openTrayItem(item)}
             onItemDiscard={(item) => void tray.discardTrayItem(item)}
+            onItemRetry={(item) => void tray.retryTrayItem(item)}
             canOpenItem={tray.canOpenTrayItem}
             canDiscardItem={tray.canDiscardTrayItem}
+            canRetryItem={tray.canRetryTrayItem}
+            retryingJobId={tray.retryingJobId}
           />
 
           <HomeMenuGrid
