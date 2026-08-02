@@ -4,6 +4,7 @@ import {
   ProductClassificationLearningDataType,
   ProductClassificationReclassificationItemOutcome,
   ProductClassificationReclassificationRunStatus,
+  StandardProductClassificationRuleAuditAction,
   Prisma,
   type ClassificationCorrectionScope,
   type ProductClassificationCandidateSource,
@@ -70,22 +71,6 @@ export async function upsertHouseholdProductDictionaryInTx(
   });
 }
 
-export async function upsertProductClassificationAliasInTx(
-  tx: PrismaTx,
-  input: { familyGroupId: number; normalizedName: string; productTypeId: number }
-) {
-  return tx.productClassificationAlias.upsert({
-    where: {
-      familyGroupId_normalizedName: {
-        familyGroupId: input.familyGroupId,
-        normalizedName: input.normalizedName,
-      },
-    },
-    create: { ...input, isActive: true },
-    update: { productTypeId: input.productTypeId, isActive: true },
-  });
-}
-
 const learningDataProductTypeSelect = {
   id: true,
   code: true,
@@ -94,13 +79,8 @@ const learningDataProductTypeSelect = {
 } as const;
 
 export async function findProductClassificationLearningData(familyGroupId: number) {
-  const [dictionaries, aliases, histories] = await Promise.all([
+  const [dictionaries, histories] = await Promise.all([
     prisma.householdProductDictionary.findMany({
-      where: { familyGroupId },
-      include: { productType: { select: learningDataProductTypeSelect } },
-      orderBy: { updatedAt: 'desc' },
-    }),
-    prisma.productClassificationAlias.findMany({
       where: { familyGroupId },
       include: { productType: { select: learningDataProductTypeSelect } },
       orderBy: { updatedAt: 'desc' },
@@ -112,27 +92,19 @@ export async function findProductClassificationLearningData(familyGroupId: numbe
     }),
   ]);
 
-  const events = dictionaries.length || aliases.length
+  const events = dictionaries.length
     ? await prisma.productClassificationLearningDataAudit.findMany({
         where: {
           familyGroupId,
-          OR: [
-            ...(dictionaries.length ? [{
-              learningDataType: ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY,
-              learningDataId: { in: dictionaries.map((record) => record.id) },
-            }] : []),
-            ...(aliases.length ? [{
-              learningDataType: ProductClassificationLearningDataType.ALIAS,
-              learningDataId: { in: aliases.map((record) => record.id) },
-            }] : []),
-          ],
+          learningDataType: ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY,
+          learningDataId: { in: dictionaries.map((record) => record.id) },
         },
         include: { actorMember: { select: { name: true } }, familyGroup: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
       })
     : [];
 
-  return { dictionaries, aliases, histories, events };
+  return { dictionaries, histories, events };
 }
 
 export async function deactivateProductClassificationLearningDataInTx(
@@ -140,41 +112,29 @@ export async function deactivateProductClassificationLearningDataInTx(
   input: {
     familyGroupId: number;
     actorMemberId: number;
-    type: 'household_dictionary' | 'alias';
+    type: 'household_dictionary';
     id: number;
     reason: string;
   }
 ) {
-  const result = input.type === 'household_dictionary'
-    ? await tx.householdProductDictionary.updateMany({
-        where: { id: input.id, familyGroupId: input.familyGroupId, isActive: true },
-        data: { isActive: false },
-      })
-    : await tx.productClassificationAlias.updateMany({
-        where: { id: input.id, familyGroupId: input.familyGroupId, isActive: true },
-        data: { isActive: false },
-      });
+  const result = await tx.householdProductDictionary.updateMany({
+    where: { id: input.id, familyGroupId: input.familyGroupId, isActive: true },
+    data: { isActive: false },
+  });
 
   if (result.count === 0) return null;
 
-  const record = input.type === 'household_dictionary'
-    ? await tx.householdProductDictionary.findFirst({
-        where: { id: input.id, familyGroupId: input.familyGroupId },
-        include: { productType: { select: learningDataProductTypeSelect } },
-      })
-    : await tx.productClassificationAlias.findFirst({
-        where: { id: input.id, familyGroupId: input.familyGroupId },
-        include: { productType: { select: learningDataProductTypeSelect } },
-      });
+  const record = await tx.householdProductDictionary.findFirst({
+    where: { id: input.id, familyGroupId: input.familyGroupId },
+    include: { productType: { select: learningDataProductTypeSelect } },
+  });
   if (!record) return null;
 
   const audit = await tx.productClassificationLearningDataAudit.create({
     data: {
       familyGroupId: input.familyGroupId,
       actorMemberId: input.actorMemberId,
-      learningDataType: input.type === 'household_dictionary'
-        ? ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY
-        : ProductClassificationLearningDataType.ALIAS,
+      learningDataType: ProductClassificationLearningDataType.HOUSEHOLD_DICTIONARY,
       learningDataId: record.id,
       normalizedName: record.normalizedName,
       productTypeId: record.productTypeId,
@@ -190,7 +150,6 @@ export async function deactivateProductClassificationLearningDataInTx(
 export type ProductSimilarityCandidateSource =
   | 'history'
   | 'household_dictionary'
-  | 'alias'
   | 'standard_dictionary';
 
 export type ProductSimilarityCandidate = {
@@ -241,27 +200,14 @@ export async function findSimilarProductClassificationCandidatesInTx(
       UNION ALL
 
       SELECT
-        alias."normalizedName",
-        alias."productTypeId",
-        'alias'::text AS source,
-        3 AS source_priority,
-        similarity(alias."normalizedName", ${input.normalizedName}) AS similarity
-      FROM "ProductClassificationAlias" AS alias
-      WHERE alias."familyGroupId" = ${input.familyGroupId}
-        AND alias."isActive" = true
-        AND alias."normalizedName" % ${input.normalizedName}
-
-      UNION ALL
-
-      SELECT
-        standard."normalizedName",
+        standard."normalizedKeyword" AS "normalizedName",
         standard."productTypeId",
         'standard_dictionary'::text AS source,
-        4 AS source_priority,
-        similarity(standard."normalizedName", ${input.normalizedName}) AS similarity
-      FROM "StandardProductDictionary" AS standard
+        3 AS source_priority,
+        similarity(standard."normalizedKeyword", ${input.normalizedName}) AS similarity
+      FROM "StandardProductClassificationRule" AS standard
       WHERE standard."isActive" = true
-        AND standard."normalizedName" % ${input.normalizedName}
+        AND standard."normalizedKeyword" % ${input.normalizedName}
     ), ranked AS (
       SELECT
         candidates.*,
@@ -484,4 +430,89 @@ export async function completeProductClassificationReclassificationRun(
     data: { ...input, completedAt: new Date() },
     include: { itemAudits: { orderBy: { id: 'asc' } } },
   });
+}
+
+const standardRuleInclude = {
+  productType: { select: { id: true, code: true, name: true, standardCategoryId: true } },
+  createdByMember: { select: { name: true } },
+  updatedByMember: { select: { name: true } },
+} as const;
+
+export async function findStandardProductClassificationRules(includeInactive: boolean) {
+  return prisma.standardProductClassificationRule.findMany({
+    where: includeInactive ? {} : { isActive: true },
+    include: standardRuleInclude,
+    orderBy: [{ isActive: 'desc' }, { priority: 'asc' }, { id: 'asc' }],
+  });
+}
+
+export async function findStandardRulePreviewItems(familyGroupId: number, normalizedKeyword: string) {
+  const where = { normalizedName: { contains: normalizedKeyword }, receipt: { familyGroupId } };
+  const [matchedCount, items] = await Promise.all([
+    prisma.item.count({ where }),
+    prisma.item.findMany({
+    where,
+    select: { id: true, name: true, normalizedName: true },
+    orderBy: { id: 'desc' },
+      take: 10,
+    }),
+  ]);
+  return { matchedCount, items };
+}
+
+export async function createStandardProductClassificationRuleInTx(
+  tx: PrismaTx,
+  input: { normalizedKeyword: string; productTypeId: number; priority: number; reason: string; actorMemberId: number }
+) {
+  const productType = await findActiveProductTypeWithCategoryInTx(tx, input.productTypeId);
+  if (!productType) return null;
+  const rule = await tx.standardProductClassificationRule.create({
+    data: {
+      normalizedKeyword: input.normalizedKeyword,
+      standardCategoryId: productType.standardCategoryId,
+      productTypeId: input.productTypeId,
+      priority: input.priority,
+      lastChangeReason: input.reason,
+      createdByMemberId: input.actorMemberId,
+      updatedByMemberId: input.actorMemberId,
+    },
+    include: standardRuleInclude,
+  });
+  await tx.standardProductClassificationRuleAudit.create({
+    data: { ruleId: rule.id, action: StandardProductClassificationRuleAuditAction.CREATED, actorMemberId: input.actorMemberId, normalizedKeyword: rule.normalizedKeyword, productTypeId: rule.productTypeId, productTypeName: rule.productType.name, priority: rule.priority, isActive: rule.isActive, reason: input.reason },
+  });
+  return rule;
+}
+
+export async function updateStandardProductClassificationRuleInTx(
+  tx: PrismaTx,
+  id: number,
+  input: { normalizedKeyword: string; productTypeId: number; priority: number; reason: string; actorMemberId: number }
+) {
+  const productType = await findActiveProductTypeWithCategoryInTx(tx, input.productTypeId);
+  if (!productType) return null;
+  const exists = await tx.standardProductClassificationRule.findUnique({ where: { id } });
+  if (!exists) return null;
+  const rule = await tx.standardProductClassificationRule.update({
+    where: { id },
+    data: { normalizedKeyword: input.normalizedKeyword, standardCategoryId: productType.standardCategoryId, productTypeId: input.productTypeId, priority: input.priority, lastChangeReason: input.reason, updatedByMemberId: input.actorMemberId },
+    include: standardRuleInclude,
+  });
+  await tx.standardProductClassificationRuleAudit.create({
+    data: { ruleId: rule.id, action: StandardProductClassificationRuleAuditAction.UPDATED, actorMemberId: input.actorMemberId, normalizedKeyword: rule.normalizedKeyword, productTypeId: rule.productTypeId, productTypeName: rule.productType.name, priority: rule.priority, isActive: rule.isActive, reason: input.reason },
+  });
+  return rule;
+}
+
+export async function deactivateStandardProductClassificationRuleInTx(
+  tx: PrismaTx, id: number, actorMemberId: number, reason: string
+) {
+  const rule = await tx.standardProductClassificationRule.updateMany({ where: { id, isActive: true }, data: { isActive: false, lastChangeReason: reason, updatedByMemberId: actorMemberId } });
+  if (!rule.count) return null;
+  const updated = await tx.standardProductClassificationRule.findUnique({ where: { id }, include: standardRuleInclude });
+  if (!updated) return null;
+  await tx.standardProductClassificationRuleAudit.create({
+    data: { ruleId: updated.id, action: StandardProductClassificationRuleAuditAction.DEACTIVATED, actorMemberId, normalizedKeyword: updated.normalizedKeyword, productTypeId: updated.productTypeId, productTypeName: updated.productType.name, priority: updated.priority, isActive: false, reason },
+  });
+  return updated;
 }

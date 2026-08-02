@@ -17,7 +17,7 @@ import {
 const app = createApp();
 const familyGroupId = 1;
 const memberId = 1;
-const learningNames = ['分類回帰OCR商品', '分類回帰別名元商品', '分類回帰別名', '牛乳'];
+const learningNames = ['分類回帰OCR商品', '牛乳'];
 let createdReceiptId: number | null = null;
 
 async function createTestItem(name: string) {
@@ -54,9 +54,6 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
       where: { familyGroupId, normalizedName: { in: learningNames } },
     });
     await prisma.householdProductDictionary.deleteMany({
-      where: { familyGroupId, normalizedName: { in: learningNames } },
-    });
-    await prisma.productClassificationAlias.deleteMany({
       where: { familyGroupId, normalizedName: { in: learningNames } },
     });
   });
@@ -115,42 +112,10 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     ).resolves.toMatchObject({ productTypeId: null, classificationSource: null });
   });
 
-  it('reuses a SAME_CLASSIFICATION_NAME correction as a household alias', async () => {
-    const item = await createTestItem('分類回帰別名元商品');
-    const token = await loginAsTestMember(app, memberId);
-    const milkId = await productTypeIdByCode('milk');
-
-    const res = await request(app)
-      .patch(`/api/receipts/items/${item.id}/product-classification`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        productTypeId: milkId,
-        scope: 'same_classification_name',
-        classificationName: '分類回帰別名',
-      });
-
-    expect(res.status).toBe(200);
-    await expect(
-      prisma.productClassificationAlias.findUnique({
-        where: { familyGroupId_normalizedName: { familyGroupId, normalizedName: '分類回帰別名' } },
-      })
-    ).resolves.toMatchObject({ productTypeId: milkId });
-    await expect(
-      classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '分類回帰別名' })
-    ).resolves.toMatchObject({
-      productTypeId: milkId,
-      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
-    });
-  });
-
   it('applies the learning priority and rejects cross-household item corrections', async () => {
     const milkId = await productTypeIdByCode('milk');
     const tissueId = await productTypeIdByCode('tissues');
-    const chipsId = await productTypeIdByCode('potato-chips');
 
-    await prisma.productClassificationAlias.create({
-      data: { familyGroupId, normalizedName: '牛乳', productTypeId: chipsId },
-    });
     await prisma.householdProductDictionary.create({
       data: { familyGroupId, normalizedName: '牛乳', productTypeId: tissueId },
     });
@@ -171,12 +136,6 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     });
 
     await prisma.householdProductDictionary.deleteMany({ where: { familyGroupId, normalizedName: '牛乳' } });
-    await expect(
-      classifyItemByExactMatch(prisma as never, { familyGroupId, itemName: '牛乳' })
-    ).resolves.toMatchObject({
-      productTypeId: chipsId,
-      classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY,
-    });
 
     const token = await loginAsTestMember(app, memberId);
     const tenantBItemId = await getTenantBItemId();

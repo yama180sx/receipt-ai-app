@@ -157,6 +157,7 @@ SafeAreaProvider
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
 | **ProductClassificationReclassification** | `screens/ProductClassificationReclassificationScreen.tsx` | 既存の未分類・要確認明細を安全に再評価し結果を表示 | `POST /admin/product-classification/reclassification-runs` |
+| **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワードルールの登録・無効化と自世帯プレビュー | `GET/POST/PATCH /admin/product-classification/standard-rules` |
 
 ### 3.3 認証・その他
 

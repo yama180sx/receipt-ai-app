@@ -69,6 +69,10 @@ export type AdminCostStatRow = Schemas['AdminCostStatRow'];
 export type CreateProductClassificationReclassificationRunRequest = Schemas['CreateProductClassificationReclassificationRunRequest'];
 export type ProductClassificationReclassificationRun = Schemas['ProductClassificationReclassificationRun'];
 export type ProductClassificationReclassificationItemAudit = Schemas['ProductClassificationReclassificationItemAudit'];
+export type StandardProductClassificationRule = Schemas['StandardProductClassificationRule'];
+export type StandardProductClassificationRulePreview = Schemas['StandardProductClassificationRulePreview'];
+export type UpsertStandardProductClassificationRuleRequest = Schemas['UpsertStandardProductClassificationRuleRequest'];
+export type PreviewStandardProductClassificationRuleRequest = Schemas['PreviewStandardProductClassificationRuleRequest'];
 
 // --- health ---
 export type HealthResponse = Schemas['HealthResponse'];

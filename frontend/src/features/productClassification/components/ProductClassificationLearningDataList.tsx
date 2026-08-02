@@ -6,7 +6,7 @@ import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 
 type Props = { records: ProductClassificationLearningData[]; deactivatingId: number | null; onDeactivate: (record: ProductClassificationLearningData) => void };
-const typeLabels = { household_dictionary: '世帯辞書', alias: '別名', history: '確定履歴' } as const;
+const typeLabels = { household_dictionary: '世帯辞書', history: '確定履歴' } as const;
 
 export const ProductClassificationLearningDataList: React.FC<Props> = ({ records, deactivatingId, onDeactivate }) => <FlatList
   data={records} keyExtractor={(record) => `${record.type}-${record.id}`} contentContainerStyle={records.length ? styles.list : styles.emptyList}

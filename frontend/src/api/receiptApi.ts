@@ -33,13 +33,11 @@ export type CommitReceiptPayload = {
 export type ReceiptJobStatusResponse = ApiSuccessResponse<ReceiptJobStatus>;
 export type ProductClassificationCorrectionScope =
   | 'item_only'
-  | 'same_ocr_name'
-  | 'same_classification_name';
+  | 'same_ocr_name';
 
 export type ProductClassificationCorrectionPayload = {
   productTypeId: number;
   scope: ProductClassificationCorrectionScope;
-  classificationName?: string;
 };
 
 export type ListProductClassificationReviewItemsParams = {
@@ -112,7 +110,7 @@ export const receiptApi = {
   },
 
   async deactivateProductClassificationLearningData(
-    type: 'household_dictionary' | 'alias',
+    type: 'household_dictionary',
     id: number,
     reason: string
   ): Promise<ApiSuccessResponse<ProductClassificationLearningData>> {

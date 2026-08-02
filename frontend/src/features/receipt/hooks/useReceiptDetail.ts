@@ -32,7 +32,6 @@ export function useReceiptDetail({
   const [correctionItem, setCorrectionItem] = useState<ReceiptItemDetail | null>(null);
   const [correctionProductTypeId, setCorrectionProductTypeId] = useState<number | null>(null);
   const [correctionScope, setCorrectionScope] = useState<ProductClassificationCorrectionScope>('item_only');
-  const [classificationName, setClassificationName] = useState('');
   const [correctionLoading, setCorrectionLoading] = useState(false);
 
   const cacheKey = useMemo(() => Date.now(), []);
@@ -122,7 +121,6 @@ export function useReceiptDetail({
     setCorrectionItem(item);
     setCorrectionProductTypeId(item.productTypeId);
     setCorrectionScope('item_only');
-    setClassificationName('');
     if (productTypes.length > 0) return;
 
     try {
@@ -146,7 +144,6 @@ export function useReceiptDetail({
       const res = await receiptApi.updateItemProductClassification(correctionItem.id, {
         productTypeId: correctionProductTypeId,
         scope: correctionScope,
-        ...(correctionScope === 'same_classification_name' ? { classificationName } : {}),
       });
       if (res.success) {
         showAlert('成功', '商品種別を修正しました。');
@@ -178,11 +175,9 @@ export function useReceiptDetail({
     correctionItem,
     correctionProductTypeId,
     correctionScope,
-    classificationName,
     correctionLoading,
     setCorrectionProductTypeId,
     setCorrectionScope,
-    setClassificationName,
     openProductClassificationCorrection,
     closeProductClassificationCorrection,
     saveProductClassificationCorrection,

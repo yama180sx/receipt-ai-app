@@ -15,6 +15,7 @@ export interface ParsedItem {
   categoryId?: number | null;
   standardCategoryId?: number | null;
   productTypeId?: number | null;
+  productTypeName?: string | null;
   productTypeStatus?: string;
   classificationSource?: string | null;
   classificationConfidence?: string | null;

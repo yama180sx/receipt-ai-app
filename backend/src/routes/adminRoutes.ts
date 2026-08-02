@@ -1,9 +1,16 @@
 import { Router } from 'express';
 import * as adminController from '../controllers/adminController';
 import { isAdmin } from '../middleware/authMiddleware';
-import { createProductClassificationReclassificationRun } from '../controllers/productClassificationController';
+import {
+  createProductClassificationReclassificationRun,
+  createStandardProductClassificationRules,
+  deactivateStandardProductClassificationRules,
+  getStandardProductClassificationRules,
+  previewStandardProductClassificationRules,
+  updateStandardProductClassificationRules,
+} from '../controllers/productClassificationController';
 import { validate } from '../middleware/validate';
-import { productClassificationReclassificationSchema } from '../schemas/receiptSchema';
+import { deactivateProductClassificationLearningDataSchema, productClassificationReclassificationSchema, standardProductClassificationRulePreviewSchema, standardProductClassificationRuleSchema } from '../schemas/receiptSchema';
 
 const router = Router();
 
@@ -27,5 +34,11 @@ router.post(
   validate(productClassificationReclassificationSchema),
   createProductClassificationReclassificationRun
 );
+
+router.get('/product-classification/standard-rules', getStandardProductClassificationRules);
+router.post('/product-classification/standard-rules/preview', validate(standardProductClassificationRulePreviewSchema), previewStandardProductClassificationRules);
+router.post('/product-classification/standard-rules', validate(standardProductClassificationRuleSchema), createStandardProductClassificationRules);
+router.patch('/product-classification/standard-rules/:id', validate(standardProductClassificationRuleSchema), updateStandardProductClassificationRules);
+router.patch('/product-classification/standard-rules/:id/deactivate', validate(deactivateProductClassificationLearningDataSchema), deactivateStandardProductClassificationRules);
 
 export default router;

@@ -29,9 +29,9 @@ export default function ProductClassificationReviewScreen({ onBack }: Props) {
       : <ProductClassificationReviewList items={review.items} onSelect={(entry) => void review.openCorrection(entry.item)} />}
     <ProductClassificationCorrectionModal
       item={review.correctionItem} productTypes={review.productTypes} selectedProductTypeId={review.correctionProductTypeId}
-      scope={review.correctionScope} classificationName={review.classificationName} loading={review.correctionLoading}
+      scope={review.correctionScope} loading={review.correctionLoading}
       onClose={review.closeCorrection} onProductTypeChange={review.setCorrectionProductTypeId}
-      onScopeChange={review.setCorrectionScope} onClassificationNameChange={review.setClassificationName}
+      onScopeChange={review.setCorrectionScope}
       onSave={() => void review.saveCorrection()}
     />
   </View>;

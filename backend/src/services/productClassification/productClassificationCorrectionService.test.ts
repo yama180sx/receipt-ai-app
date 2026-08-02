@@ -12,7 +12,6 @@ const repositoryMocks = vi.hoisted(() => ({
   findActiveProductTypeWithCategoryInTx: vi.fn(),
   findCategoryForProductTypeInTx: vi.fn(),
   upsertHouseholdProductDictionaryInTx: vi.fn(),
-  upsertProductClassificationAliasInTx: vi.fn(),
   findItemWithReceiptInTx: vi.fn(),
   updateItemCategoryInTx: vi.fn(),
 }));
@@ -72,7 +71,6 @@ describe('correctItemProductClassification', () => {
       })
     );
     expect(repositoryMocks.upsertHouseholdProductDictionaryInTx).not.toHaveBeenCalled();
-    expect(repositoryMocks.upsertProductClassificationAliasInTx).not.toHaveBeenCalled();
     expect(repositoryMocks.deleteProductClassificationCandidatesInTx).toHaveBeenCalledWith(
       expect.anything(),
       10
@@ -89,21 +87,6 @@ describe('correctItemProductClassification', () => {
       expect.anything(),
       { familyGroupId: 1, normalizedName: '明治 おいしい牛乳', productTypeId: 11 }
     );
-    expect(repositoryMocks.upsertProductClassificationAliasInTx).not.toHaveBeenCalled();
-  });
-
-  it('stores a supplied classification name as an alias for SAME_CLASSIFICATION_NAME', async () => {
-    await correctItemProductClassification(10, 1, 7, {
-      productTypeId: 11,
-      scope: ClassificationCorrectionScope.SAME_CLASSIFICATION_NAME,
-      classificationName: '牛乳',
-    });
-
-    expect(repositoryMocks.upsertProductClassificationAliasInTx).toHaveBeenCalledWith(
-      expect.anything(),
-      { familyGroupId: 1, normalizedName: '牛乳', productTypeId: 11 }
-    );
-    expect(repositoryMocks.upsertHouseholdProductDictionaryInTx).not.toHaveBeenCalled();
   });
 
   it('rejects a correction for an item owned by another household', async () => {

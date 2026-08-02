@@ -21,8 +21,7 @@ function createUnmatchedTx(categoryName = '食費') {
   return {
     productClassificationHistory: { findUnique: vi.fn().mockResolvedValue(null) },
     householdProductDictionary: { findUnique: vi.fn().mockResolvedValue(null) },
-    productClassificationAlias: { findUnique: vi.fn().mockResolvedValue(null) },
-    standardProductDictionary: { findUnique: vi.fn().mockResolvedValue(null) },
+    standardProductClassificationRule: { findMany: vi.fn().mockResolvedValue([]) },
     category: { findFirst: vi.fn().mockResolvedValue({ id: 2, name: categoryName }) },
   };
 }

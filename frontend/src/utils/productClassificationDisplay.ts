@@ -8,7 +8,7 @@ export function getProductClassificationDisplay(
   if (item.productType) {
     const source = item.classificationSource === 'history' ? '確定履歴'
       : item.classificationSource === 'household_dictionary' ? '世帯辞書'
-        : item.classificationSource === 'standard_dictionary' ? '標準辞書'
+        : item.classificationSource === 'standard_dictionary' ? '標準ルール'
           : item.classificationSource === 'ai' ? 'AI'
             : item.classificationSource === 'manual' ? '手動修正'
               : item.classificationSource === 'similarity' ? '類似候補' : undefined;

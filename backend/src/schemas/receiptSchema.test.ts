@@ -7,7 +7,7 @@ import {
 } from './receiptSchema';
 
 describe('productClassificationCorrectionSchema', () => {
-  it('requires classificationName only for SAME_CLASSIFICATION_NAME', () => {
+  it('accepts only the supported correction scopes', () => {
     expect(
       productClassificationCorrectionSchema.safeParse({
         productTypeId: 1,
@@ -15,13 +15,7 @@ describe('productClassificationCorrectionSchema', () => {
       }).success
     ).toBe(false);
 
-    expect(
-      productClassificationCorrectionSchema.safeParse({
-        productTypeId: 1,
-        scope: 'same_classification_name',
-        classificationName: '牛乳',
-      }).success
-    ).toBe(true);
+    expect(productClassificationCorrectionSchema.safeParse({ productTypeId: 1, scope: 'same_ocr_name' }).success).toBe(true);
   });
 
   it('converts the API scope to the Prisma enum value', () => {

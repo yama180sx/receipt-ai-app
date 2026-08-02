@@ -11,6 +11,7 @@
     "prisma:seed": "prisma db seed",
     "prisma:update": "npx tsx prisma/update-master.ts",
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
+    "prisma:reset-receipt-data": "npx tsx prisma/reset-receipt-data-preserve-auth.ts",
     "test": "vitest run",
     "test:integration": "RUN_API_INTEGRATION=1 vitest run --config vitest.integration.config.ts",
     "check:openapi": "vitest run src/openapiDrift.test.ts src/utils/openapiRouteCollector.test.ts src/utils/apiRouteEndpoint.test.ts src/types/apiSchemas.test.ts"
