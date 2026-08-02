@@ -19,6 +19,7 @@ import {
   getJobStatus,
   getReceiptJobs,
   discardReceiptJob,
+  retryReceiptJob,
   getAdvancedStats,
   commitReceipt,
   getFamilyMembers,
@@ -59,6 +60,7 @@ router.patch('/product-classification/learning-data/:type/:id/deactivate', valid
 router.get('/receipts', getReceipts);
 router.get('/receipts/jobs', getReceiptJobs);
 router.delete('/receipts/jobs/:jobId', discardReceiptJob);
+router.post('/receipts/jobs/:jobId/retry', retryReceiptJob);
 router.get('/receipts/latest', getLatestReceipt);
 router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);

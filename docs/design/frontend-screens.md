@@ -142,7 +142,7 @@ SafeAreaProvider
 | **ProductClassificationReview** | `screens/ProductClassificationReviewScreen.tsx` | `useProductClassificationReview` | `GET /product-classification/review-items`, `GET /categories`, `GET /product-types`, `PATCH /receipts/items/:id/product-classification` |
 | **ProductClassificationLearningData** | `screens/ProductClassificationLearningDataScreen.tsx` | `useProductClassificationLearningData` | `GET /product-classification/learning-data`, `PATCH /product-classification/learning-data/:type/:id/deactivate` |
 | **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /stats/product-classification`, `GET /categories`, `PATCH /receipts/items/:id` |
-| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
+| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `POST /receipts/jobs/:id/retry`, `DELETE /receipts/jobs/:id` |
 | **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | `useReceiptScan` | `POST /receipts/commit` |
 | **SplitEditor** | `screens/SplitEditorScreen.tsx` | `useSplitEditor` | `GET /family-groups/members`, `POST /receipts/items/:id/splits` |
 | **Settlement** | `screens/SettlementSummaryScreen.tsx` | `useSettlementSummary` | `GET /stats/settlement`, `POST /stats/settlement/transfers`, `DELETE /stats/settlement/transfers/:id` |
@@ -304,7 +304,7 @@ sequenceDiagram
 | ホームから | `/` | `scanPath(jobId, 'home')` |
 | トレイから | `/tray` | `scanPath(jobId, 'tray')` |
 
-`ReceiptTrayProvider` はログイン後に `useReceiptJobs` でジョブをポーリングし、完了時にスキャン画面を開く。
+`ReceiptTrayProvider` はログイン後に `useReceiptJobs` でジョブをポーリングし、完了時にスキャン画面を開く。元画像が残る失敗ジョブには再実行操作を表示し、同じ画像で新規ジョブを投入する。
 
 ---
 

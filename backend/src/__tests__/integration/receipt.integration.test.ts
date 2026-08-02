@@ -5,7 +5,7 @@ import fs from 'fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';
-import { clearMockReceiptJobs, registerMockReceiptJob } from '../../test/mockJobStore';
+import { clearMockReceiptJobs, mockReceiptJobs, registerMockReceiptJob } from '../../test/mockJobStore';
 import { prisma } from '../../utils/prismaClient';
 import { getCleanText } from '../../utils/normalizer';
 import {
@@ -258,6 +258,92 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(404);
+  });
+
+  it('POST /receipts/jobs/:jobId/retry requeues an owned failed job with its existing image', async () => {
+    clearMockReceiptJobs();
+    const imagePath = 'uploads/retry-source.webp';
+    fs.mkdirSync('uploads', { recursive: true });
+    fs.writeFileSync(imagePath, 'fixture');
+    registerMockReceiptJob('retry-source', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath,
+      manualRetryCount: 0,
+    }, {
+      state: 'failed',
+      failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+    });
+
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const res = await request(app)
+        .post('/api/receipts/jobs/retry-source/retry')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ jobId: 'retry-retry-source', status: 'queued' });
+      expect(mockReceiptJobs.has('retry-source')).toBe(false);
+      expect(mockReceiptJobs.get('retry-retry-source')?.data.imagePath).toBe(imagePath);
+      expect(mockReceiptJobs.get('retry-retry-source')?.data.manualRetryCount).toBe(1);
+    } finally {
+      fs.unlinkSync(imagePath);
+    }
+  });
+
+  it('POST /receipts/jobs/:jobId/retry rejects a missing source image', async () => {
+    registerMockReceiptJob('retry-missing-image', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath: 'uploads/missing-retry-source.webp',
+    }, { state: 'failed' });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .post('/api/receipts/jobs/retry-missing-image/retry')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(409);
+  });
+
+  it('POST /receipts/jobs/:jobId/retry rejects a job owned by another member', async () => {
+    registerMockReceiptJob('retry-other-member', {
+      memberId: 2,
+      familyGroupId: 1,
+      imagePath: 'uploads/other-member.webp',
+    }, { state: 'failed' });
+
+    const token = await loginAsTestMember(app, 1);
+    const res = await request(app)
+      .post('/api/receipts/jobs/retry-other-member/retry')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('POST /receipts/jobs/:jobId/retry rejects a daily quota job after the manual retry limit', async () => {
+    const imagePath = 'uploads/retry-limit.webp';
+    fs.writeFileSync(imagePath, 'fixture');
+    registerMockReceiptJob('retry-limit', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath,
+      manualRetryCount: 1,
+    }, {
+      state: 'failed',
+      failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+    });
+
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const res = await request(app)
+        .post('/api/receipts/jobs/retry-limit/retry')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+    } finally {
+      fs.unlinkSync(imagePath);
+    }
   });
 
   it('rejects unauthenticated upload image access', async () => {

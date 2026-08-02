@@ -12,13 +12,15 @@ let jobCounter = 0;
 vi.mock('../queues/receiptQueue', () => ({
   RECEIPT_QUEUE_NAME: 'receipt-analysis',
   receiptQueue: {
-    add: vi.fn().mockImplementation(async (_name: string, data: { memberId?: number; familyGroupId?: number; imagePath?: string }) => {
-      const id = `mock-job-${++jobCounter}`;
+    add: vi.fn().mockImplementation(async (_name: string, data: { memberId?: number; familyGroupId?: number; imagePath?: string; failureCode?: string; manualRetryCount?: number }, options?: { jobId?: string }) => {
+      const id = options?.jobId ?? `mock-job-${++jobCounter}`;
       registerMockReceiptJob(id, {
         memberId: data.memberId!,
         familyGroupId: data.familyGroupId!,
         imagePath: data.imagePath,
-      });
+        failureCode: data.failureCode,
+        manualRetryCount: data.manualRetryCount,
+      }, { state: 'waiting' });
       return { id };
     }),
     getJob: vi.fn().mockImplementation(async (id: string) => mockReceiptJobs.get(id) ?? null),

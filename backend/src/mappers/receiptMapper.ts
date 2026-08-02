@@ -21,6 +21,7 @@ import {
   receiptWithItemsCategorySplits,
 } from '../repositories/receipt/receiptIncludes';
 import { checkDuplicateReceipt } from '../services/duplicateReceiptService';
+import { getReceiptManualRetryInfo } from '../config/receiptRetryPolicy';
 
 export type ReceiptWithItemsCategorySplits = Prisma.ReceiptGetPayload<{
   include: typeof receiptWithItemsCategorySplits;
@@ -259,6 +260,15 @@ export async function mapReceiptJobToListItem(
     imagePath,
     createdAt: job.timestamp,
     failedReason: state === 'failed' ? job.failedReason ?? null : undefined,
+    retry: state === 'failed'
+      ? getReceiptManualRetryInfo({
+          state,
+          imagePath,
+          failureCode: typeof job.data?.failureCode === 'string' ? job.data.failureCode : null,
+          failedReason: job.failedReason,
+          manualRetryCount: job.data?.manualRetryCount,
+        })
+      : undefined,
   };
 
   if (state !== 'completed' || !job.returnvalue) {

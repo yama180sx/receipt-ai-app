@@ -267,6 +267,7 @@ sequenceDiagram
 | GET | `/receipts` | JWT + tenant | レシート一覧 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
+| POST | `/receipts/jobs/:jobId/retry` | JWT + tenant | 本人の失敗ジョブを元画像から再投入 |
 | GET | `/receipts/latest` | JWT + tenant | 最新レシート 1 件 |
 | GET | `/receipts/status/:jobId` | JWT + tenant | 解析ジョブ状態 |
 | GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート） |
@@ -637,6 +638,7 @@ sequenceDiagram
 | ジョブ一覧 | ログインメンバー**本人**のジョブのみ（`memberId` 一致） |
 | 完了ジョブ | `duplicateSuspected`, `existingReceiptId`, `parsedData` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — 本人ジョブのみ |
+| 再実行 | `POST /api/receipts/jobs/:jobId/retry` — 本人の Gemini 日次クォータ超過ジョブだけを対象に、設定済み回数上限と元画像を確認して新規ジョブを投入し、元ジョブを除去 |
 | commit 後 | `jobId` 指定時、キューからジョブ削除を試行 |
 
 ---
