@@ -187,6 +187,14 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ---
 
+### ProductClassificationAiRun
+
+商品分類AIの実行結果・評価・障害診断を世帯単位で記録する。`provider_error`、`invalid_response`、`persistence_error` の場合、`failureCode` には `http_429`、`network_etimedout`、`prompt_not_found`、`response_validation` などの固定コードだけを保存する。生の例外文・Gemini応答・認証情報は保存しない。
+
+`modelId` は成功・失敗を問わず呼び出し時の設定モデル名を保存する。これにより、モデル変更後も失敗傾向を比較できる。
+
+**Index:** `(familyGroupId, createdAt)`、`receiptId`
+
 ### ProductClassificationReclassificationRun / ProductClassificationReclassificationItemAudit
 
 既存明細の再分類を世帯単位で実行した際の条件・集計結果と、実際に更新または失敗した明細の変更前後を保持する。`unclassified` と `needs_review` だけを対象にするため、手動確定済みの明細は更新対象に含めない。変更がない明細は実行集計にのみ含め、明細監査を重複作成しない。

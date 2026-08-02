@@ -45,7 +45,7 @@ RecAIpt の AI パイプラインは、レシート画像を **Google Gemini** �
 
 実装は `backend/src/ai/productClassificationAiService.ts` を契約境界とする。Provider は Gemini の生テキストを返し、サービス層が契約検証済みの結果だけを後続処理へ渡す。これにより、AI が候補外の種別を返しても保存処理へ到達しない。
 
-`productClassificationAiIntegrationService.ts` は、レシート・明細の保存完了後に候補を持つ `needs_review` 明細だけを一括送信する。`high` の候補内選択だけを `classified` / `ai` として確定し、それ以外・未返却結果は候補を残した `needs_review` とする。AI通信・検証・反映の失敗は記録して吸収し、レシート保存を失敗させない。
+`productClassificationAiIntegrationService.ts` は、レシート・明細の保存完了後に候補を持つ `needs_review` 明細だけを一括送信する。`high` の候補内選択だけを `classified` / `ai` として確定し、それ以外・未返却結果は候補を残した `needs_review` とする。AI通信・検証・反映の失敗は記録して吸収し、レシート保存を失敗させない。失敗監査には設定モデル名と、`http_429`・`network_etimedout`・`prompt_not_found`・`response_validation` などの安全な固定コードだけを保存し、生の例外文や認証情報は保存しない。
 
 ---
 
