@@ -15,7 +15,6 @@ function matchedRecord(productTypeId: number) {
 function createTx(input: {
   history?: Record<number, unknown>;
   dictionary?: Record<number, unknown>;
-  alias?: Record<number, unknown>;
   standard?: unknown;
 }) {
   return {
@@ -29,21 +28,19 @@ function createTx(input: {
         Promise.resolve(input.dictionary?.[where.familyGroupId_normalizedName.familyGroupId] ?? null)
       ),
     },
-    productClassificationAlias: {
-      findUnique: vi.fn(({ where }) =>
-        Promise.resolve(input.alias?.[where.familyGroupId_normalizedName.familyGroupId] ?? null)
-      ),
+    standardProductClassificationRule: {
+      findMany: vi.fn().mockResolvedValue(input.standard ? [{
+        ...(input.standard as object), normalizedKeyword: '対象商品', priority: 100,
+      }] : []),
     },
-    standardProductDictionary: { findUnique: vi.fn().mockResolvedValue(input.standard ?? null) },
     category: { findFirst: vi.fn().mockResolvedValue({ id: 2 }) },
   };
 }
 
 describe('classifyItemByExactMatch', () => {
-  it('applies history, household dictionary, alias, and standard dictionary in that order', async () => {
+  it('applies history, household dictionary, and standard rules in that order', async () => {
     const history = matchedRecord(101);
     const dictionary = matchedRecord(102);
-    const alias = matchedRecord(103);
     const standard = {
       productTypeId: 104,
       standardCategoryId: 4,
@@ -51,17 +48,14 @@ describe('classifyItemByExactMatch', () => {
       productType: { id: 104 },
     };
 
-    const withHistory = createTx({ history: { 1: history }, dictionary: { 1: dictionary }, alias: { 1: alias }, standard });
-    const withDictionary = createTx({ dictionary: { 1: dictionary }, alias: { 1: alias }, standard });
-    const withAlias = createTx({ alias: { 1: alias }, standard });
+    const withHistory = createTx({ history: { 1: history }, dictionary: { 1: dictionary }, standard });
+    const withDictionary = createTx({ dictionary: { 1: dictionary }, standard });
     const withStandard = createTx({ standard });
 
     await expect(classifyItemByExactMatch(withHistory as never, { familyGroupId: 1, itemName: '対象商品' }))
       .resolves.toMatchObject({ productTypeId: 101, classificationSource: ClassificationSource.HISTORY });
     await expect(classifyItemByExactMatch(withDictionary as never, { familyGroupId: 1, itemName: '対象商品' }))
       .resolves.toMatchObject({ productTypeId: 102, classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY });
-    await expect(classifyItemByExactMatch(withAlias as never, { familyGroupId: 1, itemName: '対象商品' }))
-      .resolves.toMatchObject({ productTypeId: 103, classificationSource: ClassificationSource.HOUSEHOLD_DICTIONARY });
     await expect(classifyItemByExactMatch(withStandard as never, { familyGroupId: 1, itemName: '対象商品' }))
       .resolves.toMatchObject({ productTypeId: 104, classificationSource: ClassificationSource.STANDARD_DICTIONARY });
   });
@@ -70,7 +64,6 @@ describe('classifyItemByExactMatch', () => {
     const tx = createTx({
       history: { 2: matchedRecord(201) },
       dictionary: { 2: matchedRecord(202) },
-      alias: { 2: matchedRecord(203) },
       standard: {
         productTypeId: 204,
         standardCategoryId: 4,
@@ -90,9 +83,8 @@ describe('classifyItemByExactMatch', () => {
     );
   });
 
-  it('ignores inactive household dictionaries and aliases', async () => {
+  it('ignores inactive household dictionaries', async () => {
     const inactiveDictionary = { ...matchedRecord(101), isActive: false };
-    const inactiveAlias = { ...matchedRecord(102), isActive: false };
     const standard = {
       productTypeId: 104,
       standardCategoryId: 4,
@@ -101,11 +93,8 @@ describe('classifyItemByExactMatch', () => {
     };
 
     const withInactiveDictionary = createTx({ dictionary: { 1: inactiveDictionary }, standard });
-    const withInactiveAlias = createTx({ alias: { 1: inactiveAlias }, standard });
 
     await expect(classifyItemByExactMatch(withInactiveDictionary as never, { familyGroupId: 1, itemName: '対象商品' }))
-      .resolves.toMatchObject({ productTypeId: 104, classificationSource: ClassificationSource.STANDARD_DICTIONARY });
-    await expect(classifyItemByExactMatch(withInactiveAlias as never, { familyGroupId: 1, itemName: '対象商品' }))
       .resolves.toMatchObject({ productTypeId: 104, classificationSource: ClassificationSource.STANDARD_DICTIONARY });
   });
 });

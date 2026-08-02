@@ -42,7 +42,7 @@ export function useProductClassificationLearningData() {
 
   const confirmDeactivate = useCallback(async () => {
     if (!pendingRecord || pendingRecord.type === 'history' || !reason.trim()) return;
-    const deactivatableType: 'household_dictionary' | 'alias' = pendingRecord.type;
+    const deactivatableType: 'household_dictionary' = pendingRecord.type;
     setDeactivatingId(pendingRecord.id);
     try {
       await receiptApi.deactivateProductClassificationLearningData(deactivatableType, pendingRecord.id, reason.trim());

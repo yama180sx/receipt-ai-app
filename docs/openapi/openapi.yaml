@@ -87,7 +87,7 @@ paths:
     get:
       tags: [product-classification]
       summary: 世帯の商品分類学習データ一覧取得
-      description: 世帯辞書・別名・確定履歴を取得する。標準辞書は返却せず、確定履歴は参照専用である。
+      description: 世帯辞書・確定履歴を取得する。標準ルールは返却せず、確定履歴は参照専用である。
       security:
         - bearerAuth: []
       responses:
@@ -109,7 +109,7 @@ paths:
     patch:
       tags: [product-classification]
       summary: 世帯の商品分類学習データを無効化
-      description: 世帯辞書または別名のみ無効化できる。確定履歴と標準辞書は変更できない。
+      description: 世帯辞書のみ無効化できる。確定履歴と標準ルールは変更できない。
       security:
         - bearerAuth: []
       parameters:
@@ -118,7 +118,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [household_dictionary, alias]
+            enum: [household_dictionary]
         - name: id
           in: path
           required: true
@@ -170,6 +170,121 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/ProductClassificationReclassificationRun'
+
+  /admin/product-classification/standard-rules:
+    get:
+      tags: [product-classification]
+      summary: 標準分類ルール一覧取得（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/StandardProductClassificationRule' }
+    post:
+      tags: [product-classification]
+      summary: 標準分類ルール追加（管理者）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
+
+  /admin/product-classification/standard-rules/preview:
+    post:
+      tags: [product-classification]
+      summary: 標準分類ルールの自世帯内プレビュー（管理者）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PreviewStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRulePreview' } }
+
+  /admin/product-classification/standard-rules/{id}:
+    patch:
+      tags: [product-classification]
+      summary: 標準分類ルール更新（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
+
+  /admin/product-classification/standard-rules/{id}/deactivate:
+    patch:
+      tags: [product-classification]
+      summary: 標準分類ルール無効化（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeactivateProductClassificationLearningDataRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
 
   /auth/resolve-family:
     post:
@@ -1239,11 +1354,11 @@ components:
 
     ClassificationCorrectionScope:
       type: string
-      enum: [item_only, same_ocr_name, same_classification_name]
+      enum: [item_only, same_ocr_name]
 
     ProductClassificationCandidateSource:
       type: string
-      enum: [history, household_dictionary, alias, standard_dictionary]
+      enum: [history, household_dictionary, standard_dictionary]
 
     ProductClassificationCandidateSummary:
       type: object
@@ -1278,7 +1393,7 @@ components:
 
     ProductClassificationLearningDataType:
       type: string
-      enum: [household_dictionary, alias, history]
+      enum: [household_dictionary, history]
 
     ProductClassificationLearningData:
       type: object
@@ -1330,6 +1445,54 @@ components:
           type: string
           minLength: 1
           maxLength: 500
+
+    UpsertStandardProductClassificationRuleRequest:
+      type: object
+      required: [keyword, productTypeId, priority, reason]
+      properties:
+        keyword: { type: string, minLength: 1, maxLength: 100 }
+        productTypeId: { type: integer, minimum: 1 }
+        priority: { type: integer, minimum: 0, maximum: 100000 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    PreviewStandardProductClassificationRuleRequest:
+      type: object
+      required: [keyword]
+      properties:
+        keyword: { type: string, minLength: 1, maxLength: 100 }
+
+    StandardProductClassificationRule:
+      type: object
+      required: [id, keyword, productType, priority, isActive, createdByMemberName, updatedByMemberName, lastChangeReason, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        keyword: { type: string }
+        productType: { $ref: '#/components/schemas/ProductTypeSummary' }
+        priority: { type: integer }
+        isActive: { type: boolean }
+        createdByMemberName: { type: string, nullable: true }
+        updatedByMemberName: { type: string, nullable: true }
+        lastChangeReason: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StandardProductClassificationRulePreviewItem:
+      type: object
+      required: [id, name, normalizedName]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        normalizedName: { type: string }
+
+    StandardProductClassificationRulePreview:
+      type: object
+      required: [normalizedKeyword, matchedCount, items]
+      properties:
+        normalizedKeyword: { type: string }
+        matchedCount: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StandardProductClassificationRulePreviewItem' }
 
     ProductClassificationReclassificationRunStatus:
       type: string
@@ -1720,9 +1883,6 @@ components:
           type: integer
         scope:
           $ref: '#/components/schemas/ClassificationCorrectionScope'
-        classificationName:
-          type: string
-          description: scope が same_classification_name の場合は必須
 
     SaveItemSplitsRequest:
       type: object

@@ -24,24 +24,13 @@ export const uploadReceiptSchema = z.object({
 export const productClassificationCorrectionSchema = z
   .object({
     productTypeId: z.coerce.number().int().positive(),
-    scope: z.enum(['item_only', 'same_ocr_name', 'same_classification_name']),
-    classificationName: z.string().trim().min(1).optional(),
-  })
-  .superRefine((input, ctx) => {
-    if (input.scope === 'same_classification_name' && !input.classificationName) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['classificationName'],
-        message: '分類用名称は必須です',
-      });
-    }
+    scope: z.enum(['item_only', 'same_ocr_name']),
   })
   .transform((input) => ({
     ...input,
     scope: {
       item_only: ClassificationCorrectionScope.ITEM_ONLY,
       same_ocr_name: ClassificationCorrectionScope.SAME_OCR_NAME,
-      same_classification_name: ClassificationCorrectionScope.SAME_CLASSIFICATION_NAME,
     }[input.scope],
   }));
 
@@ -76,6 +65,17 @@ export const productClassificationReclassificationSchema = z
       (status) => reclassificationStatusMap[status]
     ),
   }));
+
+export const standardProductClassificationRuleSchema = z.object({
+  keyword: z.string().trim().min(1).max(100),
+  productTypeId: z.coerce.number().int().positive(),
+  priority: z.coerce.number().int().min(0).max(100000),
+  reason: z.string().trim().min(1, '変更理由は必須です').max(500),
+});
+
+export const standardProductClassificationRulePreviewSchema = z.object({
+  keyword: z.string().trim().min(1).max(100),
+});
 
 /**
  * 3. 最終的な保存・更新用のバリデーション

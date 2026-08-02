@@ -13,14 +13,12 @@ import {
   findActiveProductTypeWithCategoryInTx,
   findCategoryForProductTypeInTx,
   upsertHouseholdProductDictionaryInTx,
-  upsertProductClassificationAliasInTx,
 } from '../../repositories/productClassificationRepository';
 import { findItemWithReceiptInTx, updateItemCategoryInTx } from '../../repositories/receiptRepository';
 
 export type ProductClassificationCorrectionInput = {
   productTypeId: number;
   scope: ClassificationCorrectionScope;
-  classificationName?: string;
 };
 
 async function correctItemProductClassificationInTx(
@@ -65,16 +63,6 @@ async function correctItemProductClassificationInTx(
     const normalizedName = getCleanText(item.name);
     if (!normalizedName) throw new AppError('ItemNameRequired', 400);
     await upsertHouseholdProductDictionaryInTx(tx, {
-      familyGroupId,
-      normalizedName,
-      productTypeId: productType.id,
-    });
-  }
-
-  if (input.scope === ClassificationCorrectionScope.SAME_CLASSIFICATION_NAME) {
-    const normalizedName = getCleanText(input.classificationName ?? '');
-    if (!normalizedName) throw new AppError('ClassificationNameRequired', 400);
-    await upsertProductClassificationAliasInTx(tx, {
       familyGroupId,
       normalizedName,
       productTypeId: productType.id,

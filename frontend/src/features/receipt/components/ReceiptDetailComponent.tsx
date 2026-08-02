@@ -90,12 +90,10 @@ export const ReceiptDetailComponent: React.FC<ReceiptDetailComponentProps> = ({
         productTypes={detail.productTypes}
         selectedProductTypeId={detail.correctionProductTypeId}
         scope={detail.correctionScope}
-        classificationName={detail.classificationName}
         loading={detail.correctionLoading}
         onClose={detail.closeProductClassificationCorrection}
         onProductTypeChange={detail.setCorrectionProductTypeId}
         onScopeChange={detail.setCorrectionScope}
-        onClassificationNameChange={detail.setClassificationName}
         onSave={() => void detail.saveProductClassificationCorrection()}
       />
       <View style={styles.scrollFooter} />

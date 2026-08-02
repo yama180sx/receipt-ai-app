@@ -12,10 +12,12 @@ export type ProductTypeSeed = {
   displayOrder: number;
 };
 
-export type StandardProductDictionarySeed = {
-  normalizedName: string;
+export type StandardProductClassificationRuleSeed = {
+  normalizedKeyword: string;
   standardCategoryCode: string;
   productTypeCode: string;
+  priority: number;
+  reason: string;
 };
 
 export const STANDARD_CATEGORIES: StandardCategorySeed[] = [
@@ -63,19 +65,36 @@ export const INITIAL_PRODUCT_TYPES: ProductTypeSeed[] = [
   { code: 'kitchen-paper', name: 'キッチンペーパー', standardCategoryCode: 'daily-paper', displayOrder: 3 },
 ];
 
-// 各ProductTypeの標準名称に加え、実レシートで確認した誤分類リスクの低いOCR名を完全一致辞書として登録する。
-export const INITIAL_STANDARD_PRODUCT_DICTIONARY: StandardProductDictionarySeed[] = [
-  ...INITIAL_PRODUCT_TYPES.map((productType) => ({
-    normalizedName: productType.name,
-    standardCategoryCode: productType.standardCategoryCode,
-    productTypeCode: productType.code,
-  })),
-  { normalizedName: 'zone hyper 400ml', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages' },
-  { normalizedName: 'nope ギルティ炭酸 600ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
-  { normalizedName: 'grダカラやさしい麦茶2lx6', standardCategoryCode: 'food-beverages', productTypeCode: 'tea' },
-  { normalizedName: 'grダカラ麦茶手売680mlx', standardCategoryCode: 'food-beverages', productTypeCode: 'tea' },
-  { normalizedName: 'nescafeex b珈琲無糖', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee' },
-  { normalizedName: 'nescafeex b珈琲無糖x 特', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee' },
-  { normalizedName: 'ファンタ gdグレープ 500ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
-  { normalizedName: 'ファンタ芳醇アップル 500ml', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks' },
+// 初期標準ルール。短語・用途が広すぎる語は含めず、正規化済みOCR名への包含で判定する。
+export const INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES: StandardProductClassificationRuleSeed[] = [
+  { normalizedKeyword: 'ポテトチップス', standardCategoryCode: 'food-snacks', productTypeCode: 'potato-chips', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'ポテチ', standardCategoryCode: 'food-snacks', productTypeCode: 'potato-chips', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'お茶', standardCategoryCode: 'food-beverages', productTypeCode: 'tea', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '麦茶', standardCategoryCode: 'food-beverages', productTypeCode: 'tea', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'むぎちゃ', standardCategoryCode: 'food-beverages', productTypeCode: 'tea', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '緑茶', standardCategoryCode: 'food-beverages', productTypeCode: 'tea', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'りょくちゃ', standardCategoryCode: 'food-beverages', productTypeCode: 'tea', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'コーヒー', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '珈琲', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'coffee', standardCategoryCode: 'food-beverages', productTypeCode: 'coffee', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'コーラ', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'ファンタ', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'サイダー', standardCategoryCode: 'food-beverages', productTypeCode: 'carbonated-drinks', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'zone', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'monster', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'redbull', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'レッドブル', standardCategoryCode: 'food-beverages', productTypeCode: 'other-beverages', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '洗濯洗剤', standardCategoryCode: 'daily-laundry', productTypeCode: 'laundry-detergent', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'アタック', standardCategoryCode: 'daily-laundry', productTypeCode: 'laundry-detergent', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'nanox', standardCategoryCode: 'daily-laundry', productTypeCode: 'laundry-detergent', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '柔軟剤', standardCategoryCode: 'daily-laundry', productTypeCode: 'fabric-softener', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'レノア', standardCategoryCode: 'daily-laundry', productTypeCode: 'fabric-softener', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'ハミング', standardCategoryCode: 'daily-laundry', productTypeCode: 'fabric-softener', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: '漂白剤', standardCategoryCode: 'daily-laundry', productTypeCode: 'bleach', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'ハイター', standardCategoryCode: 'daily-laundry', productTypeCode: 'bleach', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'ティッシュ', standardCategoryCode: 'daily-paper', productTypeCode: 'tissues', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'トイレットペーパー', standardCategoryCode: 'daily-paper', productTypeCode: 'toilet-paper', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'トイレロール', standardCategoryCode: 'daily-paper', productTypeCode: 'toilet-paper', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'キッチンペーパー', standardCategoryCode: 'daily-paper', productTypeCode: 'kitchen-paper', priority: 100, reason: '初期標準ルール' },
+  { normalizedKeyword: 'キッチンタオル', standardCategoryCode: 'daily-paper', productTypeCode: 'kitchen-paper', priority: 100, reason: '初期標準ルール' },
 ];

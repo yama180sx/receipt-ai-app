@@ -6,8 +6,15 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/sendApiResponse';
 import { mapProductClassificationLearningData } from '../mappers/productClassificationMapper';
 import { reclassifyProductClassificationItems } from '../services/productClassification/productClassificationReclassificationService';
+import {
+  createStandardProductClassificationRule,
+  deactivateStandardProductClassificationRule,
+  listStandardProductClassificationRules,
+  previewStandardProductClassificationRule,
+  updateStandardProductClassificationRule,
+} from '../services/productClassification/standardProductClassificationRuleService';
 
-const learningDataTypes = new Set(['household_dictionary', 'alias']);
+const learningDataTypes = new Set(['household_dictionary']);
 
 export const getProductClassificationLearningData = asyncHandler(async (_req, res) => {
   const { familyGroupId } = requireTenantContext();
@@ -21,7 +28,7 @@ export const deactivateProductClassificationLearningData = asyncHandler(async (r
   const id = Number(getRouteParam(req, 'id'));
   if (!Number.isInteger(id) || id < 1) throw new AppError('InvalidLearningDataId', 400);
   sendSuccess(res, mapProductClassificationLearningData([
-    await deactivateLearningData(familyGroupId, memberId, type as 'household_dictionary' | 'alias', id, req.body.reason),
+    await deactivateLearningData(familyGroupId, memberId, type as 'household_dictionary', id, req.body.reason),
   ])[0]);
 });
 
@@ -54,4 +61,48 @@ export const createProductClassificationReclassificationRun = asyncHandler(async
       createdAt: audit.createdAt,
     })),
   });
+});
+
+function mapStandardRule(rule: Awaited<ReturnType<typeof createStandardProductClassificationRule>>) {
+  return {
+    id: rule.id,
+    keyword: rule.normalizedKeyword,
+    productType: rule.productType,
+    priority: rule.priority,
+    isActive: rule.isActive,
+    createdByMemberName: rule.createdByMember?.name ?? null,
+    updatedByMemberName: rule.updatedByMember?.name ?? null,
+    lastChangeReason: rule.lastChangeReason,
+    createdAt: rule.createdAt,
+    updatedAt: rule.updatedAt,
+  };
+}
+
+export const getStandardProductClassificationRules = asyncHandler(async (req, res) => {
+  const includeInactive = req.query.includeInactive === 'true';
+  sendSuccess(res, (await listStandardProductClassificationRules(includeInactive)).map(mapStandardRule));
+});
+
+export const previewStandardProductClassificationRules = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  sendSuccess(res, await previewStandardProductClassificationRule(familyGroupId, req.body.keyword));
+});
+
+export const createStandardProductClassificationRules = asyncHandler(async (req, res) => {
+  const { memberId } = requireTenantContext();
+  sendSuccess(res, mapStandardRule(await createStandardProductClassificationRule(memberId, req.body)));
+});
+
+export const updateStandardProductClassificationRules = asyncHandler(async (req, res) => {
+  const { memberId } = requireTenantContext();
+  const id = Number(getRouteParam(req, 'id'));
+  if (!Number.isInteger(id) || id < 1) throw new AppError('InvalidStandardClassificationRuleId', 400);
+  sendSuccess(res, mapStandardRule(await updateStandardProductClassificationRule(id, memberId, req.body)));
+});
+
+export const deactivateStandardProductClassificationRules = asyncHandler(async (req, res) => {
+  const { memberId } = requireTenantContext();
+  const id = Number(getRouteParam(req, 'id'));
+  if (!Number.isInteger(id) || id < 1) throw new AppError('InvalidStandardClassificationRuleId', 400);
+  sendSuccess(res, mapStandardRule(await deactivateStandardProductClassificationRule(id, memberId, req.body.reason)));
 });

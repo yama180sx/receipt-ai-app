@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { syncStandardProductClassificationMasters } from '../../../prisma/syncStandardProductClassificationMasters';
 import {
   INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_DICTIONARY,
+  INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES,
   STANDARD_CATEGORIES,
 } from '../../../prisma/standardProductClassificationSeed';
 
@@ -27,16 +27,16 @@ describe('syncStandardProductClassificationMasters', () => {
         return { id };
       }),
     };
-    const standardProductDictionary = { upsert: vi.fn(async () => ({ id: 1 })) };
-    const prisma = { standardCategory, productType, standardProductDictionary };
+    const standardProductClassificationRule = { upsert: vi.fn(async () => ({ id: 1 })) };
+    const prisma = { standardCategory, productType, standardProductClassificationRule };
 
     await syncStandardProductClassificationMasters(prisma as never);
     await syncStandardProductClassificationMasters(prisma as never);
 
     expect(standardCategory.upsert).toHaveBeenCalledTimes(STANDARD_CATEGORIES.length * 2);
     expect(productType.upsert).toHaveBeenCalledTimes(INITIAL_PRODUCT_TYPES.length * 2);
-    expect(standardProductDictionary.upsert).toHaveBeenCalledTimes(
-      INITIAL_STANDARD_PRODUCT_DICTIONARY.length * 2
+    expect(standardProductClassificationRule.upsert).toHaveBeenCalledTimes(
+      INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.length * 2
     );
     expect(standardCategory.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -44,10 +44,10 @@ describe('syncStandardProductClassificationMasters', () => {
         create: expect.objectContaining({ parentId: categoryIdByCode.get('food') }),
       })
     );
-    expect(standardProductDictionary.upsert).toHaveBeenCalledWith(
+    expect(standardProductClassificationRule.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { normalizedName: 'zone hyper 400ml' },
-        update: expect.objectContaining({ isActive: true }),
+        where: expect.objectContaining({ normalizedKeyword_productTypeId: expect.objectContaining({ normalizedKeyword: 'zone' }) }),
+        update: {},
       })
     );
   });

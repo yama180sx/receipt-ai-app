@@ -11,6 +11,7 @@ interface AdminMenuScreenProps {
   onGoToPromptEditor: () => void;
   onGoToAdminStats: () => void;
   onGoToProductClassificationReclassification: () => void;
+  onGoToStandardProductClassificationRules: () => void;
 }
 
 const adm = colors.semantic.admin;
@@ -20,6 +21,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onGoToPromptEditor,
   onGoToAdminStats,
   onGoToProductClassificationReclassification,
+  onGoToStandardProductClassificationRules,
 }) => {
   return (
     <View style={[screenLayout.container, styles.containerAdmin]}>
@@ -32,6 +34,14 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
       <ScrollView contentContainerStyle={screenLayout.scrollContent}>
         <View style={cardStyles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
+
+          <AppListItem
+            variant="nav"
+            onPress={onGoToStandardProductClassificationRules}
+            title="標準分類ルール管理"
+            subtitle="全世帯共通のキーワード分類を管理"
+            left={<View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.prompt }]}><Text>🏷️</Text></View>}
+          />
 
           <AppListItem
             variant="nav"

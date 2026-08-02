@@ -15,7 +15,7 @@ export default function ProductClassificationLearningDataScreen({ onBack }: Prop
   const learningData = useProductClassificationLearningData();
   return <View style={screenLayout.container}>
     <View style={screenLayout.header}><AppBackButton onPress={onBack} /><Text style={screenLayout.headerTitle}>分類学習データ</Text><View style={styles.spacer} /></View>
-    <Text style={styles.description}>世帯辞書と別名を確認・無効化できます。確定履歴と標準辞書は変更できません。</Text>
+    <Text style={styles.description}>世帯辞書を確認・無効化できます。確定履歴と標準ルールは変更できません。</Text>
     <ProductClassificationLearningDataFilters value={learningData.type} onChange={learningData.setType} />
     {learningData.loading ? <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /></View> : <ProductClassificationLearningDataList records={learningData.records} deactivatingId={learningData.deactivatingId} onDeactivate={learningData.deactivate} />}
     <AppModal

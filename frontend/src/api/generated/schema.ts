@@ -98,7 +98,7 @@ export interface paths {
         };
         /**
          * 世帯の商品分類学習データ一覧取得
-         * @description 世帯辞書・別名・確定履歴を取得する。標準辞書は返却せず、確定履歴は参照専用である。
+         * @description 世帯辞書・確定履歴を取得する。標準ルールは返却せず、確定履歴は参照専用である。
          */
         get: {
             parameters: {
@@ -145,14 +145,14 @@ export interface paths {
         head?: never;
         /**
          * 世帯の商品分類学習データを無効化
-         * @description 世帯辞書または別名のみ無効化できる。確定履歴と標準辞書は変更できない。
+         * @description 世帯辞書のみ無効化できる。確定履歴と標準ルールは変更できない。
          */
         patch: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    type: "household_dictionary" | "alias";
+                    type: "household_dictionary";
                     id: number;
                 };
                 cookie?: never;
@@ -222,6 +222,202 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 標準分類ルール一覧取得（管理者） */
+        get: {
+            parameters: {
+                query?: {
+                    includeInactive?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** 標準分類ルール追加（管理者） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpsertStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 標準分類ルールの自世帯内プレビュー（管理者） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PreviewStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRulePreview"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 標準分類ルール更新（管理者） */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpsertStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 標準分類ルール無効化（管理者） */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeactivateProductClassificationLearningDataRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/auth/resolve-family": {
@@ -1755,9 +1951,9 @@ export interface components {
         /** @enum {string} */
         ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "similarity" | "ai" | "manual";
         /** @enum {string} */
-        ClassificationCorrectionScope: "item_only" | "same_ocr_name" | "same_classification_name";
+        ClassificationCorrectionScope: "item_only" | "same_ocr_name";
         /** @enum {string} */
-        ProductClassificationCandidateSource: "history" | "household_dictionary" | "alias" | "standard_dictionary";
+        ProductClassificationCandidateSource: "history" | "household_dictionary" | "standard_dictionary";
         ProductClassificationCandidateSummary: {
             productType: components["schemas"]["ProductTypeSummary"];
             source: components["schemas"]["ProductClassificationCandidateSource"];
@@ -1774,7 +1970,7 @@ export interface components {
             storeName: string;
         };
         /** @enum {string} */
-        ProductClassificationLearningDataType: "household_dictionary" | "alias" | "history";
+        ProductClassificationLearningDataType: "household_dictionary" | "history";
         ProductClassificationLearningData: {
             id: number;
             type: components["schemas"]["ProductClassificationLearningDataType"];
@@ -1797,6 +1993,39 @@ export interface components {
         };
         DeactivateProductClassificationLearningDataRequest: {
             reason: string;
+        };
+        UpsertStandardProductClassificationRuleRequest: {
+            keyword: string;
+            productTypeId: number;
+            priority: number;
+            reason: string;
+        };
+        PreviewStandardProductClassificationRuleRequest: {
+            keyword: string;
+        };
+        StandardProductClassificationRule: {
+            id: number;
+            keyword: string;
+            productType: components["schemas"]["ProductTypeSummary"];
+            priority: number;
+            isActive: boolean;
+            createdByMemberName: string | null;
+            updatedByMemberName: string | null;
+            lastChangeReason: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        StandardProductClassificationRulePreviewItem: {
+            id: number;
+            name: string;
+            normalizedName: string;
+        };
+        StandardProductClassificationRulePreview: {
+            normalizedKeyword: string;
+            matchedCount: number;
+            items: components["schemas"]["StandardProductClassificationRulePreviewItem"][];
         };
         /** @enum {string} */
         ProductClassificationReclassificationRunStatus: "completed" | "partial_failure";
@@ -1964,8 +2193,6 @@ export interface components {
         UpdateItemProductClassificationRequest: {
             productTypeId: number;
             scope: components["schemas"]["ClassificationCorrectionScope"];
-            /** @description scope が same_classification_name の場合は必須 */
-            classificationName?: string;
         };
         SaveItemSplitsRequest: {
             splits: components["schemas"]["ItemSplitInput"][];

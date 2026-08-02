@@ -7,7 +7,7 @@ import { runInTransaction } from '../../utils/prismaTransaction';
 
 export type ProductClassificationLearningDataRecord = {
   id: number;
-  type: 'household_dictionary' | 'alias' | 'history';
+  type: 'household_dictionary' | 'history';
   normalizedName: string;
   productType: { id: number; code: string; name: string; standardCategoryId: number };
   isActive: boolean | null;
@@ -22,11 +22,11 @@ export type ProductClassificationLearningDataRecord = {
 };
 
 export async function listProductClassificationLearningData(familyGroupId: number) {
-  const { dictionaries, aliases, histories, events } = await findProductClassificationLearningData(familyGroupId);
+  const { dictionaries, histories, events } = await findProductClassificationLearningData(familyGroupId);
   const latestEventByLearningData = new Map(
     events.map((event) => [`${event.learningDataType.toLowerCase()}-${event.learningDataId}`, event])
   );
-  const toAudit = (type: 'household_dictionary' | 'alias', id: number) => {
+  const toAudit = (type: 'household_dictionary', id: number) => {
     const event = latestEventByLearningData.get(`${type}-${id}`);
     return event ? {
       reason: event.reason,
@@ -37,7 +37,6 @@ export async function listProductClassificationLearningData(familyGroupId: numbe
   };
   return [
     ...dictionaries.map((record): ProductClassificationLearningDataRecord => ({ ...record, type: 'household_dictionary', lastDeactivationAudit: toAudit('household_dictionary', record.id) })),
-    ...aliases.map((record): ProductClassificationLearningDataRecord => ({ ...record, type: 'alias', lastDeactivationAudit: toAudit('alias', record.id) })),
     ...histories.map((record): ProductClassificationLearningDataRecord => ({ ...record, type: 'history', isActive: null, lastDeactivationAudit: null })),
   ].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
 }
@@ -45,7 +44,7 @@ export async function listProductClassificationLearningData(familyGroupId: numbe
 export async function deactivateLearningData(
   familyGroupId: number,
   actorMemberId: number,
-  type: 'household_dictionary' | 'alias',
+  type: 'household_dictionary',
   id: number,
   reason: string
 ) {

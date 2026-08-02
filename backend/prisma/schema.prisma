@@ -44,21 +44,18 @@ enum ProductClassificationAiRunStatus {
 }
 
 enum ClassificationCorrectionScope {
-  ITEM_ONLY                @map("item_only")
-  SAME_OCR_NAME            @map("same_ocr_name")
-  SAME_CLASSIFICATION_NAME @map("same_classification_name")
+  ITEM_ONLY     @map("item_only")
+  SAME_OCR_NAME @map("same_ocr_name")
 }
 
 enum ProductClassificationCandidateSource {
   HISTORY              @map("history")
   HOUSEHOLD_DICTIONARY @map("household_dictionary")
-  ALIAS                @map("alias")
   STANDARD_DICTIONARY  @map("standard_dictionary")
 }
 
 enum ProductClassificationLearningDataType {
   HOUSEHOLD_DICTIONARY @map("household_dictionary")
-  ALIAS                @map("alias")
 }
 
 enum ProductClassificationReclassificationRunStatus {
@@ -70,6 +67,12 @@ enum ProductClassificationReclassificationItemOutcome {
   UPDATED   @map("updated")
   UNCHANGED @map("unchanged")
   FAILED    @map("failed")
+}
+
+enum StandardProductClassificationRuleAuditAction {
+  CREATED     @map("created")
+  UPDATED     @map("updated")
+  DEACTIVATED @map("deactivated")
 }
 
 // [Issue #45] 世帯（テナント）最上位テーブル
@@ -85,7 +88,6 @@ model FamilyGroup {
   settlementTransfers       SettlementTransfer[]
   productDictionaries       HouseholdProductDictionary[]
   productHistories          ProductClassificationHistory[]
-  productAliases            ProductClassificationAlias[]
   classificationCorrections ClassificationCorrection[]
   productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
   productClassificationAiRuns ProductClassificationAiRun[]
@@ -110,6 +112,9 @@ model FamilyMember {
   classificationCorrections ClassificationCorrection[]
   productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
   productClassificationReclassificationRuns ProductClassificationReclassificationRun[]
+  standardRulesCreated StandardProductClassificationRule[] @relation("StandardRuleCreatedBy")
+  standardRulesUpdated StandardProductClassificationRule[] @relation("StandardRuleUpdatedBy")
+  standardRuleAudits   StandardProductClassificationRuleAudit[] @relation("StandardRuleAuditActor")
 
   // ★ [Issue #81] 送金履歴リレーション
   sentTransfers     SettlementTransfer[] @relation("TransferSender")
@@ -208,7 +213,7 @@ model StandardCategory {
   color        String?
 
   productTypes      ProductType[]
-  dictionaryEntries StandardProductDictionary[]
+  classificationRules StandardProductClassificationRule[]
   items             Item[]
 
   @@unique([parentId, name])
@@ -226,10 +231,9 @@ model ProductType {
   isActive           Boolean          @default(true)
 
   items                     Item[]
-  standardDictionaryEntries StandardProductDictionary[]
+  standardClassificationRules StandardProductClassificationRule[]
   householdDictionaries     HouseholdProductDictionary[]
   classificationHistories   ProductClassificationHistory[]
-  classificationAliases     ProductClassificationAlias[]
   previousCorrections       ClassificationCorrection[]     @relation("PreviousProductType")
   nextCorrections           ClassificationCorrection[]     @relation("NextProductType")
   productClassificationCandidates ProductClassificationCandidate[]
@@ -238,20 +242,47 @@ model ProductType {
   @@index([standardCategoryId, displayOrder])
 }
 
-// リポジトリで管理する完全一致用の標準辞書。
-model StandardProductDictionary {
-  id                 Int              @id @default(autoincrement())
-  normalizedName     String           @unique
-  standardCategoryId Int
-  standardCategory   StandardCategory @relation(fields: [standardCategoryId], references: [id])
-  productTypeId      Int
-  productType        ProductType      @relation(fields: [productTypeId], references: [id])
-  isActive           Boolean          @default(true)
-  createdAt          DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime         @updatedAt @db.Timestamptz(3)
+// 全世帯共通の、正規化済み商品名に対する包含分類ルール。
+model StandardProductClassificationRule {
+  id                  Int                                   @id @default(autoincrement())
+  normalizedKeyword   String
+  standardCategoryId  Int
+  standardCategory    StandardCategory                      @relation(fields: [standardCategoryId], references: [id])
+  productTypeId       Int
+  productType         ProductType                           @relation(fields: [productTypeId], references: [id])
+  priority            Int
+  isActive            Boolean                               @default(true)
+  createdByMemberId   Int?
+  createdByMember     FamilyMember?                         @relation("StandardRuleCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  updatedByMemberId   Int?
+  updatedByMember     FamilyMember?                         @relation("StandardRuleUpdatedBy", fields: [updatedByMemberId], references: [id], onDelete: SetNull)
+  lastChangeReason    String
+  createdAt           DateTime                              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                              @updatedAt @db.Timestamptz(3)
+  audits              StandardProductClassificationRuleAudit[]
 
-  @@index([standardCategoryId])
+  @@unique([normalizedKeyword, productTypeId])
+  @@index([isActive, priority])
   @@index([productTypeId])
+}
+
+model StandardProductClassificationRuleAudit {
+  id                  Int                                        @id @default(autoincrement())
+  ruleId              Int
+  rule                StandardProductClassificationRule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  action              StandardProductClassificationRuleAuditAction
+  actorMemberId       Int?
+  actorMember         FamilyMember?                              @relation("StandardRuleAuditActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  normalizedKeyword   String
+  productTypeId       Int
+  productTypeName     String
+  priority            Int
+  isActive            Boolean
+  reason              String
+  createdAt           DateTime                                   @default(now()) @db.Timestamptz(3)
+
+  @@index([ruleId, createdAt])
+  @@index([actorMemberId])
 }
 
 // 以下は世帯固有の学習データ。すべてfamilyGroupIdで分離する。
@@ -284,21 +315,6 @@ model ProductClassificationHistory {
   @@index([productTypeId])
 }
 
-model ProductClassificationAlias {
-  id             Int         @id @default(autoincrement())
-  familyGroupId  Int
-  familyGroup    FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
-  normalizedName String
-  productTypeId  Int
-  productType    ProductType @relation(fields: [productTypeId], references: [id])
-  isActive       Boolean     @default(true)
-  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
-
-  @@unique([familyGroupId, normalizedName])
-  @@index([productTypeId])
-}
-
 model ClassificationCorrection {
   id                    Int                           @id @default(autoincrement())
   familyGroupId         Int
@@ -319,7 +335,7 @@ model ClassificationCorrection {
   @@index([actorMemberId])
 }
 
-// 世帯固有の辞書・別名の無効化を、理由と対象世帯を含めて追跡する監査ログ。
+// 世帯固有の辞書の無効化を、理由と対象世帯を含めて追跡する監査ログ。
 // ポリモーフィックな対象IDはスナップショットとして保持し、学習データ側を変更しても監査証跡を残す。
 model ProductClassificationLearningDataAudit {
   id                    Int                                  @id @default(autoincrement())

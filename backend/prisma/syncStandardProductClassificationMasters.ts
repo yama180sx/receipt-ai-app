@@ -1,13 +1,13 @@
 import type { PrismaClient } from '@prisma/client';
 import {
   INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_DICTIONARY,
+  INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES,
   STANDARD_CATEGORIES,
 } from './standardProductClassificationSeed';
 
 type StandardMasterClient = Pick<
   PrismaClient,
-  'standardCategory' | 'productType' | 'standardProductDictionary'
+  'standardCategory' | 'productType' | 'standardProductClassificationRule'
 >;
 
 /**
@@ -61,18 +61,19 @@ export async function syncStandardProductClassificationMasters(prisma: StandardM
     productTypeIdByCode.set(productType.code, record.id);
   }
 
-  for (const entry of INITIAL_STANDARD_PRODUCT_DICTIONARY) {
+  for (const entry of INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES) {
     const standardCategoryId = categoryIdByCode.get(entry.standardCategoryCode);
     const productTypeId = productTypeIdByCode.get(entry.productTypeCode);
     if (!standardCategoryId || !productTypeId) {
-      throw new Error(`StandardProductDictionary reference is missing: ${entry.normalizedName}`);
+      throw new Error(`StandardProductClassificationRule reference is missing: ${entry.normalizedKeyword}`);
     }
 
-    const data = { standardCategoryId, productTypeId, isActive: true };
-    await prisma.standardProductDictionary.upsert({
-      where: { normalizedName: entry.normalizedName },
-      create: { normalizedName: entry.normalizedName, ...data },
-      update: data,
+    const data = { standardCategoryId, productTypeId, priority: entry.priority, isActive: true, lastChangeReason: entry.reason };
+    await prisma.standardProductClassificationRule.upsert({
+      where: { normalizedKeyword_productTypeId: { normalizedKeyword: entry.normalizedKeyword, productTypeId } },
+      create: { normalizedKeyword: entry.normalizedKeyword, ...data },
+      // 管理画面での優先度・有効状態・理由を、マスタ同期で上書きしない。
+      update: {},
     });
   }
 }

@@ -119,10 +119,10 @@ async function main() {
   await prisma.item.deleteMany();
   await prisma.productClassificationLearningDataAudit.deleteMany();
   await prisma.classificationCorrection.deleteMany();
-  await prisma.productClassificationAlias.deleteMany();
   await prisma.productClassificationHistory.deleteMany();
   await prisma.householdProductDictionary.deleteMany();
-  await prisma.standardProductDictionary.deleteMany();
+  await prisma.standardProductClassificationRuleAudit.deleteMany();
+  await prisma.standardProductClassificationRule.deleteMany();
   await prisma.productType.deleteMany();
   await prisma.standardCategory.deleteMany();
   await prisma.settlementTransfer.deleteMany();

@@ -258,9 +258,12 @@ sequenceDiagram
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の明細一覧 |
-| GET | `/product-classification/learning-data` | JWT + tenant | 世帯辞書・別名・確定履歴の一覧（標準辞書は含めない） |
-| PATCH | `/product-classification/learning-data/:type/:id/deactivate` | JWT + tenant | 理由を記録して世帯辞書または別名を無効化（確定履歴は参照専用） |
+| GET | `/product-classification/learning-data` | JWT + tenant | 世帯辞書・確定履歴の一覧（標準ルールは含めない） |
+| PATCH | `/product-classification/learning-data/:type/:id/deactivate` | JWT + tenant | 理由を記録して世帯辞書を無効化（確定履歴は参照専用） |
 | POST | `/admin/product-classification/reclassification-runs` | JWT + tenant + ADMIN + TOTP | 未分類・要確認の既存明細を世帯内で再評価し、実行・変更内容を監査保存 |
+| GET/POST/PATCH | `/admin/product-classification/standard-rules` | JWT + tenant + ADMIN + TOTP | 全世帯共通の標準分類ルールを一覧・追加・更新 |
+| POST | `/admin/product-classification/standard-rules/preview` | JWT + tenant + ADMIN + TOTP | 自世帯の明細だけを対象にキーワード命中を確認 |
+| PATCH | `/admin/product-classification/standard-rules/:id/deactivate` | JWT + tenant + ADMIN + TOTP | 理由を記録して標準分類ルールを無効化 |
 | GET | `/receipts` | JWT + tenant | レシート一覧 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |

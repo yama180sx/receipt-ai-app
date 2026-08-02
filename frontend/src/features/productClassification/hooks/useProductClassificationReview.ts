@@ -30,7 +30,6 @@ export function useProductClassificationReview() {
   const [correctionItem, setCorrectionItem] = useState<ReceiptItemDetail | null>(null);
   const [correctionProductTypeId, setCorrectionProductTypeId] = useState<number | null>(null);
   const [correctionScope, setCorrectionScope] = useState<ProductClassificationCorrectionScope>('item_only');
-  const [classificationName, setClassificationName] = useState('');
   const [correctionLoading, setCorrectionLoading] = useState(false);
 
   const monthOptions = useMonthSelectOptions(useMemo(() => getRecentYearMonths(6), []), isWide);
@@ -82,7 +81,6 @@ export function useProductClassificationReview() {
     setCorrectionItem(item);
     setCorrectionProductTypeId(item.productTypeId);
     setCorrectionScope('item_only');
-    setClassificationName('');
     if (productTypes.length > 0) return;
     try {
       const res = await receiptApi.listProductTypes();
@@ -104,7 +102,6 @@ export function useProductClassificationReview() {
       await receiptApi.updateItemProductClassification(correctionItem.id, {
         productTypeId: correctionProductTypeId,
         scope: correctionScope,
-        ...(correctionScope === 'same_classification_name' ? { classificationName } : {}),
       });
       setCorrectionItem(null);
       await fetchItems();
@@ -113,12 +110,12 @@ export function useProductClassificationReview() {
     } finally {
       setCorrectionLoading(false);
     }
-  }, [classificationName, correctionItem, correctionProductTypeId, correctionScope, fetchItems]);
+  }, [correctionItem, correctionProductTypeId, correctionScope, fetchItems]);
 
   return {
     loading, items, statuses, categoryId, month, statusOptions, categoryOptions, monthOptions,
     setCategoryId, setMonth, toggleStatus, fetchItems,
-    productTypes, correctionItem, correctionProductTypeId, correctionScope, classificationName, correctionLoading,
-    setCorrectionProductTypeId, setCorrectionScope, setClassificationName, openCorrection, closeCorrection, saveCorrection,
+    productTypes, correctionItem, correctionProductTypeId, correctionScope, correctionLoading,
+    setCorrectionProductTypeId, setCorrectionScope, openCorrection, closeCorrection, saveCorrection,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_DICTIONARY,
+  INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES,
   STANDARD_CATEGORIES,
 } from '../../../prisma/standardProductClassificationSeed';
 
@@ -37,27 +37,23 @@ describe('standard product classification seed', () => {
     );
   });
 
-  it('maps every initial product type to a valid category and dictionary entry', () => {
+  it('maps every initial rule to a valid category and product type', () => {
     const categoryCodes = new Set(STANDARD_CATEGORIES.map((category) => category.code));
-    const dictionaryCodes = new Set(
-      INITIAL_STANDARD_PRODUCT_DICTIONARY.map((entry) => entry.productTypeCode)
-    );
-
-    for (const productType of INITIAL_PRODUCT_TYPES) {
-      expect(categoryCodes).toContain(productType.standardCategoryCode);
-      expect(dictionaryCodes).toContain(productType.code);
+    for (const rule of INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES) {
+      expect(categoryCodes).toContain(rule.standardCategoryCode);
+      expect(INITIAL_PRODUCT_TYPES.map((productType) => productType.code)).toContain(rule.productTypeCode);
     }
   });
 
-  it('includes only normalized, exact-match beverage dictionary entries', () => {
-    expect(INITIAL_STANDARD_PRODUCT_DICTIONARY).toEqual(
+  it('includes beverage and daily-goods keyword rules while excluding unsafe one-character terms', () => {
+    expect(INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ normalizedName: 'zone hyper 400ml', productTypeCode: 'other-beverages' }),
-        expect.objectContaining({ normalizedName: 'grダカラやさしい麦茶2lx6', productTypeCode: 'tea' }),
-        expect.objectContaining({ normalizedName: 'nescafeex b珈琲無糖', productTypeCode: 'coffee' }),
-        expect.objectContaining({ normalizedName: 'ファンタ gdグレープ 500ml', productTypeCode: 'carbonated-drinks' }),
+        expect.objectContaining({ normalizedKeyword: '麦茶', productTypeCode: 'tea' }),
+        expect.objectContaining({ normalizedKeyword: 'コーヒー', productTypeCode: 'coffee' }),
+        expect.objectContaining({ normalizedKeyword: '洗濯洗剤', productTypeCode: 'laundry-detergent' }),
+        expect.objectContaining({ normalizedKeyword: 'トイレットペーパー', productTypeCode: 'toilet-paper' }),
       ])
     );
-    expect(INITIAL_STANDARD_PRODUCT_DICTIONARY.every((entry) => entry.normalizedName === entry.normalizedName.normalize('NFKC').toLowerCase().trim())).toBe(true);
+    expect(INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.some((entry) => entry.normalizedKeyword === '茶')).toBe(false);
   });
 });

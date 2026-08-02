@@ -12,6 +12,7 @@
 | :--- | :--- | :--- | :--- |
 | **seed.ts** | `npm run prisma:seed` | 開発環境の初期化 | **全データ削除後、再投入** |
 | **update-master.ts** | `npm run prisma:update` | 運用・テスト環境の更新 | **マスタデータのみ更新 (upsert)** |
+| **reset-receipt-data-preserve-auth.ts** | `npm run prisma:reset-receipt-data` | 開発環境のレシート業務データ初期化 | **認証情報を保持** |
 
 ---
 
@@ -20,6 +21,10 @@
 ### A. `seed.ts` (初期化用)
 - **ファイルパス**: `backend/prisma/seed.ts`
 - **動作**: 冒頭で `deleteMany()` を実行し、全テーブルを空にしてからデータを投入します。
+
+### B. 認証を保持したレシートデータ初期化
+
+`npm run prisma:reset-receipt-data` は、レシート、明細、割り勘、精算、商品分類の世帯学習・監査・AI実行ログ、レシートに紐づく利用量ログに加え、Redis上の解析待ち／解析済みBullMQジョブと未保存レシート画像を削除する。`FamilyGroup` と `FamilyMember` は削除・更新しないため、パスワードハッシュ、ロール、TOTP、招待コードを保持できる。世帯別カテゴリ・店舗・プロンプト、および全世帯共通の標準分類ルールも保持する。
 - **実行タイミング**:
   - 開発環境でデータ構成をリセットしたいとき。
   - プロジェクトに初めて参画し、ローカル環境を構築するとき。
@@ -53,7 +58,7 @@
 
 ## 5. 既存明細の再分類
 
-標準辞書を追加した後に既存明細へ適用したい場合は、二要素認証済みの管理者として管理者メニューから実行します。APIは `POST /api/admin/product-classification/reclassification-runs` です。既定では `unclassified` と `needs_review` のみを最大100件再評価し、手動確定済み明細は対象にしません。
+標準分類ルールを追加・編集・無効化した後に既存明細へ適用したい場合は、二要素認証済みの管理者として管理者メニューから実行します。APIは `POST /api/admin/product-classification/reclassification-runs` です。既定では `unclassified` と `needs_review` のみを最大100件再評価し、手動確定済み明細は対象にしません。ルール変更だけで既存明細は更新されません。
 
 実行前に対象世帯・期間・件数上限を確認し、まずdev環境で少数件数から実行してください。レスポンスの `updatedCount`、`unchangedCount`、`failedCount` と `itemAudits` で結果を確認します。同じ条件を再実行して変更がなければ、明細の更新・明細監査ログは増えません。
 

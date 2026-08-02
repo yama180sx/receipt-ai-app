@@ -168,7 +168,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ### ProductClassificationLearningDataAudit
 
-世帯辞書・別名を無効化した際の監査証跡。対象レコードへのポリモーフィックな外部キーは持たず、対象名と変更前の商品種別をスナップショットとして保存する。
+世帯辞書を無効化した際の監査証跡。対象レコードへのポリモーフィックな外部キーは持たず、対象名と変更前の商品種別をスナップショットとして保存する。
 
 | カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
 |--------|-----|----------|---------|----|----|--------|-------|
@@ -196,6 +196,15 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 **FK:** Run の `familyGroupId` → `FamilyGroup.id`（Cascade）、`actorMemberId` → `FamilyMember.id`（Restrict）、ItemAudit の `runId` → Run.id（Cascade）、`itemId` → Item.id（Cascade）
 **Unique:** ItemAudit `(runId, itemId)`
 **Index:** Run `(familyGroupId, createdAt)`、`actorMemberId`、ItemAudit `itemId`、`outcome`
+
+### StandardProductClassificationRule / StandardProductClassificationRuleAudit
+
+全世帯共通の標準分類ルール。`normalizedKeyword` は `getCleanText` 済みで、アクティブなルールのキーワードを明細の正規化名に包含できる場合だけ候補となる。最小の `priority` が一意の商品種別を指す場合のみ自動確定し、異なる商品種別が同順位なら `needs_review` とする。世帯固有の完全一致学習が必ず先行する。
+
+Rule はキーワード、商品種別・標準カテゴリ、優先度、有効状態、登録・最終変更者、最終変更理由と日時を持つ。Audit は追加・編集・無効化ごとに操作人・理由・当時の値を保存する。ルールは全世帯共通のため `familyGroupId` を持たない。プレビュー対象の明細検索だけは、要求者の `familyGroupId` で限定する。
+
+**Unique:** Rule `(normalizedKeyword, productTypeId)`
+**Index:** Rule `(isActive, priority)`、`productTypeId`、Audit `(ruleId, createdAt)`、`actorMemberId`
 
 ---
 

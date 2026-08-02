@@ -72,13 +72,11 @@ export type ClassificationConfidence = 'high' | 'medium' | 'low';
 
 export type ClassificationCorrectionScope =
   | 'item_only'
-  | 'same_ocr_name'
-  | 'same_classification_name';
+  | 'same_ocr_name';
 
 export type ProductClassificationCandidateSource =
   | 'history'
   | 'household_dictionary'
-  | 'alias'
   | 'standard_dictionary';
 
 export type ProductClassificationReclassificationRunStatus = 'completed' | 'partial_failure';
@@ -136,7 +134,7 @@ export type ProductClassificationReviewItem = {
   storeName: string;
 };
 
-export type ProductClassificationLearningDataType = 'household_dictionary' | 'alias' | 'history';
+export type ProductClassificationLearningDataType = 'household_dictionary' | 'history';
 
 export type ProductClassificationLearningData = {
   id: number;
@@ -159,7 +157,6 @@ export type ProductClassificationLearningDataAudit = {
 export type UpdateItemProductClassificationRequest = {
   productTypeId: number;
   scope: ClassificationCorrectionScope;
-  classificationName?: string;
 };
 
 export type ItemSplitSummary = {

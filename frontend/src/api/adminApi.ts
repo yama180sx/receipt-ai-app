@@ -6,6 +6,9 @@ import type {
   CreateProductClassificationReclassificationRunRequest,
   CreatePromptTemplateRequest,
   ProductClassificationReclassificationRun,
+  StandardProductClassificationRule,
+  StandardProductClassificationRulePreview,
+  UpsertStandardProductClassificationRuleRequest,
   PromptTemplate,
   UpdatePromptTemplateRequest,
 } from './generated';
@@ -51,12 +54,40 @@ export const adminApi = {
     const res = await apiClient.post('/admin/product-classification/reclassification-runs', input);
     return res.data;
   },
+
+  async listStandardProductClassificationRules(includeInactive = true): Promise<ApiSuccessResponse<StandardProductClassificationRule[]>> {
+    const res = await apiClient.get('/admin/product-classification/standard-rules', { params: { includeInactive } });
+    return res.data;
+  },
+
+  async previewStandardProductClassificationRule(keyword: string): Promise<ApiSuccessResponse<StandardProductClassificationRulePreview>> {
+    const res = await apiClient.post('/admin/product-classification/standard-rules/preview', { keyword });
+    return res.data;
+  },
+
+  async createStandardProductClassificationRule(input: UpsertStandardProductClassificationRuleRequest): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
+    const res = await apiClient.post('/admin/product-classification/standard-rules', input);
+    return res.data;
+  },
+
+  async updateStandardProductClassificationRule(id: number, input: UpsertStandardProductClassificationRuleRequest): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
+    const res = await apiClient.patch(`/admin/product-classification/standard-rules/${id}`, input);
+    return res.data;
+  },
+
+  async deactivateStandardProductClassificationRule(id: number, reason: string): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
+    const res = await apiClient.patch(`/admin/product-classification/standard-rules/${id}/deactivate`, { reason });
+    return res.data;
+  },
 };
 
 export type {
   AdminCostStatRow,
   CreateProductClassificationReclassificationRunRequest,
   ProductClassificationReclassificationRun,
+  StandardProductClassificationRule,
+  StandardProductClassificationRulePreview,
+  UpsertStandardProductClassificationRuleRequest,
   CreatePromptTemplateRequest,
   PromptTemplate,
   UpdatePromptTemplateRequest,

@@ -29,12 +29,13 @@ type MatchedProductType = {
   rootCategoryName: string;
   source: ClassificationSource;
 };
+type StandardRuleConflict = { conflict: true };
 
 async function findMatchedProductType(
   tx: PrismaTx,
   familyGroupId: number,
   normalizedName: string
-): Promise<MatchedProductType | null> {
+): Promise<MatchedProductType | StandardRuleConflict | null> {
   const productTypeInclude = {
     standardCategory: { include: { parent: true } },
   } as const;
@@ -50,32 +51,30 @@ async function findMatchedProductType(
         include: { productType: { include: productTypeInclude } },
       });
   const dictionary = dictionaryRecord?.isActive ? dictionaryRecord : null;
-  const aliasRecord = history || dictionary
-    ? null
-    : await tx.productClassificationAlias.findUnique({
-        where: { familyGroupId_normalizedName: { familyGroupId, normalizedName } },
-        include: { productType: { include: productTypeInclude } },
-      });
-  const alias = aliasRecord?.isActive ? aliasRecord : null;
-  const standard = history || dictionary || alias
-    ? null
-    : await tx.standardProductDictionary.findUnique({
-        where: { normalizedName },
+  const standardRules = history || dictionary
+    ? []
+    : await tx.standardProductClassificationRule.findMany({
+        where: { isActive: true },
         include: { standardCategory: { include: { parent: true } }, productType: true },
+        orderBy: [{ priority: 'asc' }, { id: 'asc' }],
       });
 
-  if (history || dictionary || alias) {
-    const record = history ?? dictionary ?? alias!;
+  if (history || dictionary) {
+    const record = history ?? dictionary!;
     const category = record.productType.standardCategory;
     return {
       productTypeId: record.productTypeId,
       standardCategoryId: category.id,
       rootCategoryName: category.parent?.name ?? category.name,
-      // 別名も世帯内の辞書学習として API では household_dictionary に集約する。
       source: history ? ClassificationSource.HISTORY : ClassificationSource.HOUSEHOLD_DICTIONARY,
     };
   }
-  if (standard) {
+  const matchingRules = standardRules.filter((rule) => normalizedName.includes(rule.normalizedKeyword));
+  if (matchingRules.length > 0) {
+    const highestPriority = matchingRules[0].priority;
+    const highestRules = matchingRules.filter((rule) => rule.priority === highestPriority);
+    if (new Set(highestRules.map((rule) => rule.productTypeId)).size > 1) return { conflict: true };
+    const standard = highestRules[0];
     return {
       productTypeId: standard.productTypeId,
       standardCategoryId: standard.standardCategoryId,
@@ -96,7 +95,7 @@ export async function classifyItemByExactMatch(
     ? await findMatchedProductType(tx, input.familyGroupId, normalizedName)
     : null;
 
-  if (matched) {
+  if (matched && !('conflict' in matched)) {
     const legacyCategory = await tx.category.findFirst({
       where: { familyGroupId: input.familyGroupId, name: matched.rootCategoryName },
       select: { id: true },
@@ -108,6 +107,17 @@ export async function classifyItemByExactMatch(
       productTypeStatus: ProductTypeStatus.CLASSIFIED,
       classificationSource: matched.source,
       classificationConfidence: ClassificationConfidence.HIGH,
+    };
+  }
+
+  if (matched?.conflict) {
+    return {
+      categoryId: input.categoryId ?? null,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: ProductTypeStatus.NEEDS_REVIEW,
+      classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+      classificationConfidence: ClassificationConfidence.MEDIUM,
     };
   }
 
@@ -146,12 +156,11 @@ const candidateSourceMap: Record<
 > = {
   history: ProductClassificationCandidateSource.HISTORY,
   household_dictionary: ProductClassificationCandidateSource.HOUSEHOLD_DICTIONARY,
-  alias: ProductClassificationCandidateSource.ALIAS,
   standard_dictionary: ProductClassificationCandidateSource.STANDARD_DICTIONARY,
 };
 
 /**
- * 完全一致で未解決の明細へ類似候補を付与する。
+ * 標準ルールで未解決の明細へ類似候補を付与する。
  * 類似候補はProductTypeを確定せず、needs_reviewとして保持するだけである。
  */
 export async function classifyItemWithSimilarityCandidates(

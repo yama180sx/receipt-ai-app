@@ -25,7 +25,7 @@ describe.skipIf(!shouldRunDbIntegration())('Product similarity search (#111-1)',
     await prisma.productClassificationHistory.deleteMany({
       where: { normalizedName: householdName, familyGroupId: { in: [familyGroupId, otherFamilyGroupId] } },
     });
-    await prisma.standardProductDictionary.deleteMany({ where: { normalizedName: standardName } });
+    await prisma.standardProductClassificationRule.deleteMany({ where: { normalizedKeyword: standardName } });
   });
 
   it('returns same-household and standard candidates without exposing another household', async () => {
@@ -39,11 +39,13 @@ describe.skipIf(!shouldRunDbIntegration())('Product similarity search (#111-1)',
     await prisma.productClassificationHistory.create({
       data: { familyGroupId: otherFamilyGroupId, normalizedName: householdName, productTypeId: tissues.id },
     });
-    await prisma.standardProductDictionary.create({
+    await prisma.standardProductClassificationRule.create({
       data: {
-        normalizedName: standardName,
+        normalizedKeyword: standardName,
         standardCategoryId: chips.standardCategoryId,
         productTypeId: chips.id,
+        priority: 100,
+        lastChangeReason: 'integration test',
       },
     });
 

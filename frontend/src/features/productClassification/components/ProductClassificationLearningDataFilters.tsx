@@ -8,7 +8,7 @@ type Props = { value: ProductClassificationLearningDataType | 'all'; onChange: (
 
 const options: Array<{ label: string; value: ProductClassificationLearningDataType | 'all' }> = [
   { label: 'すべて', value: 'all' }, { label: '世帯辞書', value: 'household_dictionary' },
-  { label: '別名', value: 'alias' }, { label: '確定履歴', value: 'history' },
+  { label: '確定履歴', value: 'history' },
 ];
 
 export const ProductClassificationLearningDataFilters: React.FC<Props> = ({ value, onChange }) => <View style={styles.row}>

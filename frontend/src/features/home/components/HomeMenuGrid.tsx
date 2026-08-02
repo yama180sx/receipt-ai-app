@@ -54,7 +54,7 @@ export const HomeMenuGrid: React.FC<Props> = ({
         variant="nav"
         onPress={onGoToProductClassificationLearningData}
         title="分類学習データを管理"
-        subtitle="世帯辞書・別名・確定履歴を確認"
+        subtitle="世帯辞書・確定履歴を確認"
         left={<Text style={homeScreenStyles.gridEmoji}>🗂️</Text>}
         right={<View />}
         style={homeScreenStyles.gridCard}

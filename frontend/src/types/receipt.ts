@@ -36,6 +36,10 @@ export interface ParsedReceiptItemInput {
   price: number | string;
   quantity: number | string;
   categoryId: number | null;
+  productTypeId?: number | null;
+  productTypeName?: string | null;
+  productTypeStatus?: string;
+  classificationSource?: string | null;
 }
 
 /** commit 前の parsedData（ViewModel — api-spec §5.3 準拠、OpenAPI CommitReceiptRequest とは別） */

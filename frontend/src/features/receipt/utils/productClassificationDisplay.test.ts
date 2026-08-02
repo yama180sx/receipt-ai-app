@@ -10,7 +10,7 @@ describe('getProductClassificationDisplay', () => {
         classificationSource: 'standard_dictionary',
         classificationConfidence: 'high',
       })
-    ).toEqual({ label: '牛乳', detail: '標準辞書' });
+    ).toEqual({ label: '牛乳', detail: '標準ルール' });
   });
 
   it('distinguishes an item outside the initial scope', () => {
