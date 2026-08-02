@@ -5,9 +5,11 @@ import {
   ProductClassificationAiRunStatus,
 } from '@prisma/client';
 import { classifyProductsWithAi } from '../../ai';
+import { getConfiguredProductClassificationModelId } from '../../ai/geminiProductClassificationProvider';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 import { createProductClassificationAiRun } from '../../repositories/productClassificationAiRunRepository';
 import logger from '../../utils/logger';
+import { getHttpStatusFromError, getNodeErrorCode } from '../../utils/httpError';
 import { runInTransaction } from '../../utils/prismaTransaction';
 import {
   findItemById,
@@ -25,6 +27,25 @@ const confidenceMap = {
   medium: ClassificationConfidence.MEDIUM,
   low: ClassificationConfidence.LOW,
 } as const;
+
+/**
+ * 秘密値やGeminiの生レスポンスを監査へ残さず、再発時に切り分けられる固定コードだけを返す。
+ */
+function toSafeProviderFailureCode(error: unknown): string {
+  if (error instanceof ProductClassificationResponseValidationError) return 'response_validation';
+
+  const status = getHttpStatusFromError(error);
+  if (status !== undefined) return `http_${status}`;
+
+  const nodeErrorCode = getNodeErrorCode(error);
+  if (nodeErrorCode) return `network_${nodeErrorCode.toLowerCase()}`;
+
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('PRODUCT_CLASSIFICATION') && message.includes('見つかりません')) {
+    return 'prompt_not_found';
+  }
+  return 'provider_error';
+}
 
 /**
  * 保存済みで候補を持つ要確認明細へ分類AIを適用する。
@@ -65,7 +86,22 @@ export async function applyProductClassificationAiToItems(
       })),
     });
   } catch (error) {
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: 'unknown', promptTokens: 0, candidatesTokens: 0, totalTokens: 0, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: error instanceof ProductClassificationResponseValidationError ? ProductClassificationAiRunStatus.INVALID_RESPONSE : ProductClassificationAiRunStatus.PROVIDER_ERROR, durationMs: Date.now() - startedAt }).catch(() => undefined);
+    const isInvalidResponse = error instanceof ProductClassificationResponseValidationError;
+    await createProductClassificationAiRun({
+      familyGroupId,
+      receiptId: targets[0].receipt.id,
+      modelId: getConfiguredProductClassificationModelId(),
+      promptTokens: 0,
+      candidatesTokens: 0,
+      totalTokens: 0,
+      targetItemCount: targets.length,
+      classifiedCount: 0,
+      needsReviewCount: 0,
+      unreturnedCount: 0,
+      status: isInvalidResponse ? ProductClassificationAiRunStatus.INVALID_RESPONSE : ProductClassificationAiRunStatus.PROVIDER_ERROR,
+      failureCode: toSafeProviderFailureCode(error),
+      durationMs: Date.now() - startedAt,
+    }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] 分類AIを適用できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
       itemIds: targets.map((item) => item.id),
@@ -128,7 +164,7 @@ export async function applyProductClassificationAiToItems(
     const classifiedCount = aiResult.response.items.filter((item) => item.productTypeId !== null && item.confidence === 'high').length;
     await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount, needsReviewCount: aiResult.response.items.length - classifiedCount, unreturnedCount: targets.length - returnedIds.size, status: ProductClassificationAiRunStatus.SUCCEEDED, durationMs: Date.now() - startedAt }).catch(() => undefined);
   } catch (error) {
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, durationMs: Date.now() - startedAt }).catch(() => undefined);
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, failureCode: 'persistence_error', durationMs: Date.now() - startedAt }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] AI分類結果を保存できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
       itemIds: targets.map((item) => item.id),

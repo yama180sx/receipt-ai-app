@@ -491,6 +491,7 @@ model ProductClassificationAiRun {
   needsReviewCount Int                             @default(0)
   unreturnedCount  Int                             @default(0)
   status           ProductClassificationAiRunStatus
+  failureCode      String?                         @db.VarChar(64)
   durationMs       Int
   createdAt        DateTime                        @default(now()) @db.Timestamptz(3)
 

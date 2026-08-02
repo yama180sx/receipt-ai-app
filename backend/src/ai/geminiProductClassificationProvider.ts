@@ -9,6 +9,11 @@ import {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
+/** 失敗監査にも利用する、分類AIの設定済みモデル名。 */
+export function getConfiguredProductClassificationModelId(): string {
+  return GEMINI_MODEL;
+}
+
 function buildClassificationPrompt(systemPrompt: string, request: ProductClassificationAiRequest): string {
   return `${systemPrompt}\n\n### 分類対象 (JSON)\n${JSON.stringify({
     storeName: request.storeName,

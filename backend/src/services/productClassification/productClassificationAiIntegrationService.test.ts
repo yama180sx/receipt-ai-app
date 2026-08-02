@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ClassificationConfidence,
   ClassificationSource,
+  ProductClassificationAiRunStatus,
   ProductTypeStatus,
 } from '@prisma/client';
+import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 
 const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks } = vi.hoisted(() => ({
   aiMocks: { classifyProductsWithAi: vi.fn() },
@@ -104,10 +106,31 @@ describe('applyProductClassificationAiToItems', () => {
   });
 
   it('AI障害時は例外を伝播せず既存の要確認状態を維持する', async () => {
-    aiMocks.classifyProductsWithAi.mockRejectedValue(new Error('Gemini unavailable'));
+    aiMocks.classifyProductsWithAi.mockRejectedValue(Object.assign(new Error('Gemini unavailable'), { status: 429 }));
 
     await expect(applyProductClassificationAiToItems(1, [10])).resolves.toBeUndefined();
     expect(receiptRepositoryMocks.updateItemProductClassificationInTx).not.toHaveBeenCalled();
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        status: ProductClassificationAiRunStatus.PROVIDER_ERROR,
+        failureCode: 'http_429',
+      })
+    );
+  });
+
+  it('契約違反は安全な失敗コードとして監査する', async () => {
+    aiMocks.classifyProductsWithAi.mockRejectedValue(
+      new ProductClassificationResponseValidationError('候補外の商品種別IDが含まれています。')
+    );
+
+    await expect(applyProductClassificationAiToItems(1, [10])).resolves.toBeUndefined();
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: ProductClassificationAiRunStatus.INVALID_RESPONSE,
+        failureCode: 'response_validation',
+      })
+    );
   });
 
   it('AI分類対象の取得失敗もレシート保存へ伝播させない', async () => {
