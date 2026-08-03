@@ -72,6 +72,39 @@ describe('classifyItemWithSimilarityCandidates', () => {
     expect(similaritySearchMocks.findProductSimilarityCandidates).not.toHaveBeenCalled();
   });
 
+  it('does not search candidates for an approved negative adjustment line in a target category', async () => {
+    const result = await classifyItemWithSimilarityCandidates(createUnmatchedTx() as never, {
+      familyGroupId: 1,
+      itemName: 'まとめ売り値引',
+      price: -9,
+      categoryId: 2,
+    });
+
+    expect(result).toMatchObject({
+      classification: {
+        categoryId: 2,
+        productTypeStatus: ProductTypeStatus.NOT_APPLICABLE,
+        productTypeId: null,
+      },
+      candidates: [],
+    });
+    expect(similaritySearchMocks.findProductSimilarityCandidates).not.toHaveBeenCalled();
+  });
+
+  it('keeps an ordinary negative line eligible for classification', async () => {
+    similaritySearchMocks.findProductSimilarityCandidates.mockResolvedValue([]);
+
+    const result = await classifyItemWithSimilarityCandidates(createUnmatchedTx() as never, {
+      familyGroupId: 1,
+      itemName: '返品',
+      price: -500,
+      categoryId: 2,
+    });
+
+    expect(result.classification.productTypeStatus).toBe(ProductTypeStatus.UNCLASSIFIED);
+    expect(similaritySearchMocks.findProductSimilarityCandidates).toHaveBeenCalled();
+  });
+
   it('maps saved candidates to their Prisma source and rank', () => {
     expect(
       toProductClassificationCandidateInputs([

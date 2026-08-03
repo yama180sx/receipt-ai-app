@@ -51,7 +51,7 @@ export interface paths {
         };
         /**
          * 要確認・未分類の商品明細一覧取得
-         * @description 世帯内の needs_review、unclassified、outside_initial_scope の明細を取得する。
+         * @description 世帯内の needs_review、unclassified、outside_initial_scope の商品明細を取得する。商品種別対象外の not_applicable（対象外カテゴリおよび承認済みの値引き・アプリ適用行）は含めない。
          */
         get: {
             parameters: {
@@ -189,7 +189,7 @@ export interface paths {
         put?: never;
         /**
          * 世帯内の既存明細を再分類（管理者）
-         * @description 指定世帯の未分類・要確認明細を、確定履歴・世帯辞書・標準辞書・類似候補の既存優先順位で再評価する。
+         * @description 指定世帯の未分類・要確認明細を再評価する。承認済みの負額の値引き・アプリ適用行は、辞書・類似候補より先に商品種別対象外へ更新する。
          *     手動確定済み明細は対象外で、実行条件と変更内容は監査ログに保存する。管理者権限と二要素認証が必要。
          */
         post: {
@@ -2003,7 +2003,10 @@ export interface components {
             name: string;
             standardCategoryId: number;
         };
-        /** @enum {string} */
+        /**
+         * @description classified は商品種別確定、needs_review と unclassified は商品分類対象、outside_initial_scope は初期種別範囲外、not_applicable は商品種別対象外（対象外カテゴリまたは承認済みの値引き・アプリ適用行）。
+         * @enum {string}
+         */
         ProductTypeStatus: "classified" | "needs_review" | "unclassified" | "outside_initial_scope" | "not_applicable";
         /** @enum {string} */
         ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "similarity" | "ai" | "manual";

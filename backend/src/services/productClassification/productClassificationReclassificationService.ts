@@ -95,6 +95,7 @@ async function reclassifyItemInTx(
   const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
     familyGroupId,
     itemName: item.name,
+    price: item.price,
     categoryId: item.categoryId,
   });
   const candidateInputs = toProductClassificationCandidateInputs(candidates);

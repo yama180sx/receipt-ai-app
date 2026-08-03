@@ -12,6 +12,7 @@ describe('getProductClassificationStats', () => {
     mocks.findProductClassificationStatsItems.mockResolvedValue([
       { price: 100, quantity: 2, productTypeStatus: 'CLASSIFIED', productType: { id: 1, name: '牛乳', standardCategory: { id: 10, name: '乳製品', parent: { name: '食費' } } } },
       { price: 300, quantity: 1, productTypeStatus: 'NEEDS_REVIEW', productType: null },
+      { price: -161, quantity: 1, productTypeStatus: 'NOT_APPLICABLE', productType: null },
     ]);
 
     await expect(getProductClassificationStats(1, '2026-07')).resolves.toEqual({

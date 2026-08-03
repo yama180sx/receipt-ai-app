@@ -16,4 +16,12 @@ describe('parseProductClassificationReviewStatuses', () => {
       'UNCLASSIFIED',
     ]);
   });
+
+  it('does not make not_applicable selectable in the review list', () => {
+    expect(parseProductClassificationReviewStatuses(['not_applicable'])).toEqual([
+      'NEEDS_REVIEW',
+      'UNCLASSIFIED',
+      'OUTSIDE_INITIAL_SCOPE',
+    ]);
+  });
 });

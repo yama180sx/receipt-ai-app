@@ -78,7 +78,11 @@ export function ReceiptScanItemList({ scan }: Props) {
             />
           </AppFormField>
           <Text style={styles.classification}>
-            商品種別: {item.productTypeName ?? (item.productTypeStatus === 'needs_review' ? '要確認' : '未分類')}
+            商品種別: {item.productTypeName ?? (
+              item.productTypeStatus === 'needs_review' ? '要確認'
+                : item.productTypeStatus === 'outside_initial_scope' ? '初期分類の対象外'
+                  : item.productTypeStatus === 'not_applicable' ? '対象外' : '未分類'
+            )}
             {item.classificationSource === 'standard_dictionary' ? '（標準ルール）' : ''}
           </Text>
         </View>
