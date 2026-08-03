@@ -39,6 +39,7 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
       const { classification } = await classifyItemWithSimilarityCandidates(tx, {
         familyGroupId,
         itemName: item.name,
+        price: item.price,
         categoryId: item.categoryId,
       });
       const productType = classification.productTypeId

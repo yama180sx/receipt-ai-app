@@ -1,6 +1,6 @@
 import { ClassificationSource } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
-import { classifyItemByExactMatch } from './productClassificationService';
+import { classifyItemByExactMatch, isNonProductAdjustmentLine } from './productClassificationService';
 
 function matchedRecord(productTypeId: number) {
   return {
@@ -38,6 +38,42 @@ function createTx(input: {
 }
 
 describe('classifyItemByExactMatch', () => {
+  it.each([
+    ['▼20260706app', -119],
+    ['LINE割引 5%', -161],
+    ['まとめ売り値引', -9],
+    ['感謝デー 5%', -157],
+  ])('identifies the approved non-product adjustment pattern: %s', (itemName, price) => {
+    expect(isNonProductAdjustmentLine({ itemName, price })).toBe(true);
+  });
+
+  it('does not identify a non-product adjustment from a negative amount alone', () => {
+    expect(isNonProductAdjustmentLine({ itemName: '返品', price: -500 })).toBe(false);
+    expect(isNonProductAdjustmentLine({ itemName: 'LINE割引 5%', price: 161 })).toBe(false);
+    expect(isNonProductAdjustmentLine({ itemName: 'LINE割引 5%', price: Number.NaN })).toBe(false);
+  });
+
+  it('excludes an approved adjustment before reading household learning data', async () => {
+    const tx = createTx({ history: { 1: matchedRecord(101) } });
+
+    await expect(classifyItemByExactMatch(tx as never, {
+      familyGroupId: 1,
+      itemName: 'LINE割引 5%',
+      price: -161,
+      categoryId: 2,
+    })).resolves.toEqual({
+      categoryId: 2,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: 'NOT_APPLICABLE',
+      classificationSource: null,
+      classificationConfidence: null,
+    });
+    expect(tx.productClassificationHistory.findUnique).not.toHaveBeenCalled();
+    expect(tx.householdProductDictionary.findUnique).not.toHaveBeenCalled();
+    expect(tx.standardProductClassificationRule.findMany).not.toHaveBeenCalled();
+  });
+
   it('applies history, household dictionary, and standard rules in that order', async () => {
     const history = matchedRecord(101);
     const dictionary = matchedRecord(102);

@@ -342,8 +342,14 @@ export async function findItemsForProductClassificationReclassification(
       productTypeStatus: { in: query.statuses },
       receipt: {
         familyGroupId: query.familyGroupId,
-        ...(query.startDate ? { date: { gte: query.startDate } } : {}),
-        ...(query.endDate ? { date: { lt: query.endDate } } : {}),
+        ...((query.startDate || query.endDate)
+          ? {
+              date: {
+                ...(query.startDate ? { gte: query.startDate } : {}),
+                ...(query.endDate ? { lt: query.endDate } : {}),
+              },
+            }
+          : {}),
       },
     },
     select: { id: true },

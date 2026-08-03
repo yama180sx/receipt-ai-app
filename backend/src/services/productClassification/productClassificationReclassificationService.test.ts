@@ -35,6 +35,7 @@ function item(overrides: Record<string, unknown> = {}) {
   return {
     id: 10,
     name: 'GRダカラやさしい麦茶2Lx6',
+    price: 100,
     categoryId: 1,
     standardCategoryId: null,
     productTypeId: null,

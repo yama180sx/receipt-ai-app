@@ -1,6 +1,6 @@
 import '../../test/mockReceiptQueue';
 
-import { ClassificationCorrectionScope, ClassificationSource } from '@prisma/client';
+import { ClassificationCorrectionScope, ClassificationSource, ProductTypeStatus } from '@prisma/client';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';
@@ -154,6 +154,30 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     ).resolves.toMatchObject({
       productTypeId: teaId,
       classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+    });
+  });
+
+  it('keeps the household category while excluding an approved negative adjustment line', async () => {
+    const category = await prisma.category.findFirst({
+      where: { familyGroupId, name: '食費' },
+      select: { id: true },
+    });
+    if (!category) throw new Error('Food category is not seeded.');
+
+    await expect(
+      classifyItemByExactMatch(prisma as never, {
+        familyGroupId,
+        itemName: 'LINE割引 5%',
+        price: -161,
+        categoryId: category.id,
+      })
+    ).resolves.toEqual({
+      categoryId: category.id,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: ProductTypeStatus.NOT_APPLICABLE,
+      classificationSource: null,
+      classificationConfidence: null,
     });
   });
 });

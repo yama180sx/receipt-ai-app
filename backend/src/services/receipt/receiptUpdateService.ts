@@ -94,6 +94,7 @@ async function applyFullReceiptUpdateInTx(
         const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
           familyGroupId,
           itemName: item.name,
+          price: parseFloat(String(item.price)) || 0,
           categoryId: item.categoryId ? Number(item.categoryId) : null,
         });
         return {
@@ -149,6 +150,7 @@ async function updateItemCategoryInTxHandler(
   const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
     familyGroupId,
     itemName: currentItem.name,
+    price: currentItem.price,
     categoryId: categoryId ? Number(categoryId) : null,
   });
   const updatedItem = await updateItemCategoryInTx(tx, itemId, classification);

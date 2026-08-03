@@ -53,6 +53,7 @@ export async function persistReceiptCommitInTx(
       const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
         familyGroupId,
         itemName: item.name,
+        price: parseFloat(String(item.price || 0)),
         categoryId: item.categoryId ? Number(item.categoryId) : null,
       });
 

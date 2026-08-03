@@ -31,6 +31,23 @@ type MatchedProductType = {
 };
 type StandardRuleConflict = { conflict: true };
 
+/**
+ * 実レシートで確認した、商品種別を持たない値引き・アプリ適用のOCR表記。
+ * 負額だけでは返品・返金等を除外できないため、明細名の限定パターンと組み合わせる。
+ */
+const nonProductAdjustmentNamePatterns = [
+  /^▼\d{8}app$/,
+  /^line割引 \d+%$/,
+  /^まとめ売り値引$/,
+  /^感謝デー \d+%$/,
+] as const;
+
+export function isNonProductAdjustmentLine(input: { itemName: string; price?: number }): boolean {
+  if (input.price === undefined || !Number.isFinite(input.price) || input.price >= 0) return false;
+  const normalizedName = getCleanText(input.itemName);
+  return nonProductAdjustmentNamePatterns.some((pattern) => pattern.test(normalizedName));
+}
+
 async function findMatchedProductType(
   tx: PrismaTx,
   familyGroupId: number,
@@ -88,8 +105,21 @@ async function findMatchedProductType(
 /** 完全一致分類。類似検索・AI・ユーザー修正の学習は後続Phaseで扱う。 */
 export async function classifyItemByExactMatch(
   tx: PrismaTx,
-  input: { familyGroupId: number; itemName: string; categoryId?: number | null }
+  input: { familyGroupId: number; itemName: string; price?: number; categoryId?: number | null }
 ): Promise<ProductClassificationResult> {
+  // 値引き・アプリ適用行は、世帯辞書・標準ルール・類似検索・AIより先に除外する。
+  // 家計簿カテゴリと金額は呼び出し元でそのまま保存される。
+  if (isNonProductAdjustmentLine(input)) {
+    return {
+      categoryId: input.categoryId ?? null,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: ProductTypeStatus.NOT_APPLICABLE,
+      classificationSource: null,
+      classificationConfidence: null,
+    };
+  }
+
   const normalizedName = getCleanText(input.itemName);
   const matched = normalizedName
     ? await findMatchedProductType(tx, input.familyGroupId, normalizedName)
@@ -165,7 +195,7 @@ const candidateSourceMap: Record<
  */
 export async function classifyItemWithSimilarityCandidates(
   tx: PrismaTx,
-  input: { familyGroupId: number; itemName: string; categoryId?: number | null }
+  input: { familyGroupId: number; itemName: string; price?: number; categoryId?: number | null }
 ): Promise<ProductClassificationWithCandidatesResult> {
   const classification = await classifyItemByExactMatch(tx, input);
   if (classification.productTypeStatus !== ProductTypeStatus.UNCLASSIFIED) {
