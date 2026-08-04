@@ -10,6 +10,7 @@ import {
   classifyItemWithSimilarityCandidates,
   toProductClassificationCandidateInputs,
 } from '../productClassification/productClassificationService';
+import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
 
 /** commit トランザクション内で永続化するための準備済み入力 */
 export type ReceiptCommitTxInput = {
@@ -50,11 +51,17 @@ export async function persistReceiptCommitInTx(
 
   const itemsToCreate = await Promise.all(
     parsedData.items.map(async (item: ParsedItem) => {
-      const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+      const categoryId = await resolveAdjustmentCategoryIdInTx(tx, {
         familyGroupId,
         itemName: item.name,
         price: parseFloat(String(item.price || 0)),
         categoryId: item.categoryId ? Number(item.categoryId) : null,
+      });
+      const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+        familyGroupId,
+        itemName: item.name,
+        price: parseFloat(String(item.price || 0)),
+        categoryId,
       });
 
       return {

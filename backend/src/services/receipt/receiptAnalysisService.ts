@@ -5,6 +5,7 @@ import { validateReceiptItems } from '../validationService';
 import type { TenantContext } from '../../utils/context';
 import { runInTransaction } from '../../utils/prismaTransaction';
 import { classifyItemWithSimilarityCandidates } from '../productClassification/productClassificationService';
+import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
 
 /**
  * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
@@ -36,11 +37,17 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
   // ここでは候補を永続化せず、確定保存時に改めて同じ分類を実行する。
   parsedData.items = await runInTransaction((tx) =>
     Promise.all(itemsWithCategories.map(async (item) => {
-      const { classification } = await classifyItemWithSimilarityCandidates(tx, {
+      const categoryId = await resolveAdjustmentCategoryIdInTx(tx, {
         familyGroupId,
         itemName: item.name,
         price: item.price,
         categoryId: item.categoryId,
+      });
+      const { classification } = await classifyItemWithSimilarityCandidates(tx, {
+        familyGroupId,
+        itemName: item.name,
+        price: item.price,
+        categoryId,
       });
       const productType = classification.productTypeId
         ? await tx.productType.findUnique({

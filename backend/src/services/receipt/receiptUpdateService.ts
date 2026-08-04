@@ -24,6 +24,7 @@ import {
   toProductClassificationCandidateInputs,
 } from '../productClassification/productClassificationService';
 import { replaceProductClassificationCandidatesInTx } from '../../repositories/productClassificationRepository';
+import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
 
 export type ManualReceiptInput = {
   date: string;
@@ -91,11 +92,17 @@ async function applyFullReceiptUpdateInTx(
   if (itemList.length > 0) {
     const classifiedItems = await Promise.all(
       itemList.map(async (item) => {
-        const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+        const categoryId = await resolveAdjustmentCategoryIdInTx(tx, {
           familyGroupId,
           itemName: item.name,
           price: parseFloat(String(item.price)) || 0,
           categoryId: item.categoryId ? Number(item.categoryId) : null,
+        });
+        const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+          familyGroupId,
+          itemName: item.name,
+          price: parseFloat(String(item.price)) || 0,
+          categoryId,
         });
         return {
           receiptId,
@@ -147,11 +154,18 @@ async function updateItemCategoryInTxHandler(
     if (!category) throw new AppError('CategoryNotFound', 404);
   }
 
-  const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+  const resolvedCategoryId = await resolveAdjustmentCategoryIdInTx(tx, {
     familyGroupId,
     itemName: currentItem.name,
     price: currentItem.price,
     categoryId: categoryId ? Number(categoryId) : null,
+  });
+
+  const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+    familyGroupId,
+    itemName: currentItem.name,
+    price: currentItem.price,
+    categoryId: resolvedCategoryId,
   });
   const updatedItem = await updateItemCategoryInTx(tx, itemId, classification);
   await replaceProductClassificationCandidatesInTx(

@@ -20,6 +20,7 @@ const DEFAULT_CATEGORIES = [
   { id: 7, name: '教養・娯楽', color: '#2ecc71', keywords: ['本', '雑誌', '映画', 'チケット', 'ゲーム', '遊園地'] },
   { id: 8, name: '交通費', color: '#95a5a6', keywords: ['電車', 'バス', 'タクシー', 'ガソリン', '駐車'] },
   { id: 9, name: '消費税', color: '#795548', keywords: ['消費税', '外税', '税', '軽', '税金', 'tax'] },
+  { id: 10, name: '値引き等', color: '#6C757D', keywords: [] as string[], isAdjustment: true },
   { id: 99, name: 'その他', color: '#ADB5BD', keywords: [] as string[] },
 ];
 
