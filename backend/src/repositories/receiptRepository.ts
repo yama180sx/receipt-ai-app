@@ -27,7 +27,7 @@ export {
 
 export {
   queryMonthlyReceiptTotal,
-  queryMonthlyCategoryStats,
+  findMonthlyCategoryStatItems,
   findLatestReceiptInMonth,
   queryReceiptTrend,
   queryParetoByCategory,

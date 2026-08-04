@@ -81,10 +81,13 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | familyGroupId | Int | No | — | — | FamilyGroup.id | 複合 | Yes |
 | color | String | Yes | — | — | — | — | — |
 | keywords | Json | No | `[]` | — | — | — | — |
+| isAdjustment | Boolean | No | false | — | — | — | 複合 |
 
 **FK:** `familyGroupId` → `FamilyGroup.id`  
 **Unique:** `(name, familyGroupId)`  
 **Index:** `familyGroupId`
+
+`isAdjustment = true` は、値引き・アプリ適用などの調整明細を保存する世帯別Categoryである。統計時だけ同一レシートの通常Categoryへ比例配賦し、配賦対象がなければこのCategoryに残す。`Item`・`ItemSplit`の値は変更しない。
 
 ---
 

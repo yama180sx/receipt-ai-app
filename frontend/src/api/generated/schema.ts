@@ -2277,6 +2277,7 @@ export interface components {
             stats: components["schemas"]["CategoryStatRow"][];
             latestReceipt: components["schemas"]["ReceiptDetail"] | null;
         };
+        /** @description 月次カテゴリ集計。調整Categoryの負額は、同一レシートの通常Categoryへ統計時のみ比例配賦され、配賦対象がなければ調整Categoryとして返る。 */
         CategoryStatRow: {
             categoryId?: number | null;
             categoryName?: string;

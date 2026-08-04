@@ -131,10 +131,13 @@ model Category {
   familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
   color         String?
   keywords      Json        @default("[]")
+  // 値引き・アプリ適用など、統計時にレシート内の通常Categoryへ配賦する調整明細用。
+  isAdjustment  Boolean     @default(false)
   items         Item[]
 
   @@unique([name, familyGroupId])
   @@index([familyGroupId])
+  @@index([familyGroupId, isAdjustment])
 }
 
 // 店舗正規化マスタ (世帯別マスタ — Issue #93-4)

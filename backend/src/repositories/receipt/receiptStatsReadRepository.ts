@@ -12,23 +12,24 @@ export async function queryMonthlyReceiptTotal(familyGroupId: number, month: str
   return totalRes[0]?.total || 0;
 }
 
-export async function queryMonthlyCategoryStats(familyGroupId: number, month: string) {
-  return prisma.$queryRaw<
-    { categoryId: number | null; categoryName: string | null; color: string | null; totalAmount: number }[]
-  >`
-    SELECT 
-      c.id as "categoryId",
-      c.name as "categoryName",
-      c.color as "color",
-      SUM(i.price * i.quantity)::double precision as "totalAmount"
-    FROM "Item" i
-    JOIN "Receipt" r ON i."receiptId" = r.id
-    LEFT JOIN "Category" c ON i."categoryId" = c.id
-    WHERE r."familyGroupId" = ${familyGroupId}
-    AND TO_CHAR(r.date, 'YYYY-MM') = ${month}
-    GROUP BY c.id, c.name, c.color
-    ORDER BY "totalAmount" DESC
-  `;
+export async function findMonthlyCategoryStatItems(familyGroupId: number, month: string) {
+  return prisma.item.findMany({
+    where: {
+      receipt: {
+        familyGroupId,
+        date: {
+          gte: new Date(`${month}-01`),
+          lt: new Date(new Date(`${month}-01`).setMonth(new Date(`${month}-01`).getMonth() + 1)),
+        },
+      },
+    },
+    select: {
+      receiptId: true,
+      price: true,
+      quantity: true,
+      category: { select: { id: true, name: true, color: true, isAdjustment: true } },
+    },
+  });
 }
 
 export async function findLatestReceiptInMonth(familyGroupId: number, month: string) {

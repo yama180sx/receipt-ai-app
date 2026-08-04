@@ -27,3 +27,22 @@ export async function findFallbackCategoryIdInTx(tx: PrismaTx, familyGroupId: nu
     select: { id: true },
   });
 }
+
+export async function findOrCreateAdjustmentCategoryInTx(tx: PrismaTx, familyGroupId: number) {
+  const existing = await tx.category.findFirst({
+    where: { familyGroupId, isAdjustment: true },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  return tx.category.create({
+    data: {
+      familyGroupId,
+      name: '値引き等',
+      color: '#6C757D',
+      keywords: [],
+      isAdjustment: true,
+    },
+    select: { id: true },
+  });
+}

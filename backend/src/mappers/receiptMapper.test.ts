@@ -21,6 +21,7 @@ describe('receiptMapper', () => {
     familyGroupId: 1,
     color: '#ff0000',
     keywords: [],
+    isAdjustment: false,
   };
 
   const receipt = {
