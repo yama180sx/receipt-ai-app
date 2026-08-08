@@ -119,6 +119,33 @@ describe('classifyItemByExactMatch', () => {
     );
   });
 
+  it('classifies an approved vehicle fuel rule into the same-family transport category', async () => {
+    const standard = {
+      productTypeId: 501,
+      standardCategoryId: 50,
+      standardCategory: { id: 50, name: '交通・通信', parent: null },
+      productType: { id: 501 },
+    };
+    const tx = createTx({ standard });
+
+    await expect(classifyItemByExactMatch(tx as never, {
+      familyGroupId: 1,
+      itemName: '対象商品',
+      price: 175.4,
+      categoryId: 99,
+    })).resolves.toMatchObject({
+      categoryId: 2,
+      standardCategoryId: 50,
+      productTypeId: 501,
+      productTypeStatus: 'CLASSIFIED',
+      classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+    });
+    expect(tx.category.findFirst).toHaveBeenCalledWith({
+      where: { familyGroupId: 1, name: '交通・通信' },
+      select: { id: true },
+    });
+  });
+
   it('ignores inactive household dictionaries', async () => {
     const inactiveDictionary = { ...matchedRecord(101), isActive: false };
     const standard = {

@@ -150,6 +150,8 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 `productTypeStatus = not_applicable` は、商品種別を扱わないカテゴリに加え、承認済みの明細名パターンに一致する負額の値引き・アプリ適用行にも用いる。この場合も `Item` の `price`、`quantity`、`categoryId` は保持し、商品種別・候補・AI分類だけを対象外にする。既存の状態値と列で表現できるため、この扱いのためのDB migrationは不要である。
 
+Issue #114-10 では、世帯別 `Category` の旧名称 `交通費` を標準カテゴリ名 `交通・通信` に統一する。通常は `Category.name` の更新だけで `Item.categoryId` は維持される。同一世帯に両方のカテゴリが存在する場合だけ、`交通費` を参照する `Item.categoryId` を既存 `交通・通信` へ更新して旧カテゴリを削除する。
+
 ### ProductClassificationCandidate
 
 類似検索で得た商品種別候補を、明細ごとに保持する。候補レコードは商品種別の確定を意味しない。
