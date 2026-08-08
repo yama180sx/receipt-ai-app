@@ -112,6 +112,22 @@ export default function HistoryScreen({ onBack, currentMemberId, onGoToSplitEdit
                 renderItem={renderItem}
                 contentContainerStyle={styles.list}
                 ListEmptyComponent={<Text style={styles.empty}>該当する履歴がありません</Text>}
+                ListFooterComponent={history.hasNext ? (
+                  <View style={styles.loadMoreContainer}>
+                    <TouchableOpacity
+                      style={[styles.loadMoreButton, history.loadingMore && styles.loadMoreButtonDisabled]}
+                      onPress={() => void history.loadMore()}
+                      disabled={history.loadingMore}
+                      activeOpacity={0.7}
+                    >
+                      {history.loadingMore ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text style={styles.loadMoreText}>さらに読み込む</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 initialNumToRender={15}
               />
             )}
@@ -185,6 +201,20 @@ const styles = StyleSheet.create({
   amount: { fontSize: 18, fontWeight: 'bold', color: colors.primary },
   itemCountBadge: { backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   itemCountText: { fontSize: 10, color: colors.secondary },
+  loadMoreContainer: { alignItems: 'center', paddingVertical: spacing.md },
+  loadMoreButton: {
+    minWidth: 160,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+  },
+  loadMoreButtonDisabled: { opacity: 0.6 },
+  loadMoreText: { color: colors.primary, fontWeight: '700' },
   empty: { textAlign: 'center', marginTop: 50, color: colors.text.muted },
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyDetailWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },

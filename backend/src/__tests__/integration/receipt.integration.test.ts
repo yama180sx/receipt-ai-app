@@ -39,7 +39,9 @@ describe.skipIf(!shouldRunDbIntegration())('Receipt API integration', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(Array.isArray(res.body.data.items)).toBe(true);
+    expect(typeof res.body.data.hasNext).toBe('boolean');
+    expect(res.body.data.nextCursor === null || typeof res.body.data.nextCursor === 'string').toBe(true);
   });
 
   it('検索語で店舗名または明細名が類似する世帯内レシートだけを返す', async () => {
@@ -73,14 +75,125 @@ describe.skipIf(!shouldRunDbIntegration())('Receipt API integration', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.data.map((item: { id: number }) => item.id)).toContain(receipt.id);
+      expect(res.body.data.items.map((item: { id: number }) => item.id)).toContain(receipt.id);
 
       const storeRes = await request(app)
         .get('/api/receipts')
         .query({ q: storeName })
         .set('Authorization', `Bearer ${token}`);
       expect(storeRes.status).toBe(200);
-      expect(storeRes.body.data.map((item: { id: number }) => item.id)).toContain(receipt.id);
+      expect(storeRes.body.data.items.map((item: { id: number }) => item.id)).toContain(receipt.id);
+    } finally {
+      await prisma.receipt.delete({ where: { id: receipt.id } });
+    }
+  });
+
+  it('returns a cursor page without loading all fuzzy search results', async () => {
+    const suffix = Date.now();
+    const marker = `ページ検索${suffix}`;
+    const receipts = await Promise.all(
+      Array.from({ length: 21 }, (_, index) => prisma.receipt.create({
+        data: {
+          familyGroupId: 1,
+          memberId: 1,
+          storeName: marker,
+          normalizedStoreName: getCleanText(marker),
+          date: new Date(`2026-07-30T00:${String(index).padStart(2, '0')}:00.000Z`),
+          totalAmount: 100 + index,
+          items: {
+            create: {
+              name: `${marker}-${index}`,
+              normalizedName: getCleanText(`${marker}-${index}`),
+              price: 100 + index,
+              quantity: 1,
+            },
+          },
+        },
+      }))
+    );
+
+    try {
+      const token = await loginAsTestMember(app);
+      const first = await request(app)
+        .get('/api/receipts')
+        .query({ q: marker, limit: 20 })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(first.status).toBe(200);
+      expect(first.body.data.items).toHaveLength(20);
+      expect(first.body.data.hasNext).toBe(true);
+      expect(typeof first.body.data.nextCursor).toBe('string');
+
+      const second = await request(app)
+        .get('/api/receipts')
+        .query({ q: marker, limit: 20, cursor: first.body.data.nextCursor })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(second.status).toBe(200);
+      expect(second.body.data.items).toHaveLength(1);
+      expect(second.body.data.hasNext).toBe(false);
+      expect(second.body.data.nextCursor).toBeNull();
+      expect([...first.body.data.items, ...second.body.data.items].map((item: { id: number }) => item.id))
+        .toEqual(receipts.sort((a, b) => b.date.getTime() - a.date.getTime() || b.id - a.id).map((item) => item.id));
+    } finally {
+      await prisma.receipt.deleteMany({ where: { id: { in: receipts.map((receipt) => receipt.id) } } });
+    }
+  });
+
+  it('rejects invalid pagination inputs', async () => {
+    const token = await loginAsTestMember(app);
+
+    const limitRes = await request(app)
+      .get('/api/receipts')
+      .query({ limit: 51 })
+      .set('Authorization', `Bearer ${token}`);
+    expect(limitRes.status).toBe(400);
+    expect(limitRes.body.message).toBe('InvalidLimit');
+
+    const cursorRes = await request(app)
+      .get('/api/receipts')
+      .query({ cursor: 'invalid' })
+      .set('Authorization', `Bearer ${token}`);
+    expect(cursorRes.status).toBe(400);
+    expect(cursorRes.body.message).toBe('InvalidCursor');
+
+    const emptyCursorRes = await request(app)
+      .get('/api/receipts')
+      .query({ cursor: '' })
+      .set('Authorization', `Bearer ${token}`);
+    expect(emptyCursorRes.status).toBe(400);
+    expect(emptyCursorRes.body.message).toBe('InvalidCursor');
+  });
+
+  it('returns one receipt by id for the current family group', async () => {
+    const receipt = await prisma.receipt.create({
+      data: {
+        familyGroupId: 1,
+        memberId: 1,
+        storeName: '詳細取得店',
+        normalizedStoreName: getCleanText('詳細取得店'),
+        date: new Date('2026-08-01T00:00:00.000Z'),
+        totalAmount: 500,
+        items: {
+          create: {
+            name: '詳細取得品',
+            normalizedName: getCleanText('詳細取得品'),
+            price: 500,
+            quantity: 1,
+          },
+        },
+      },
+    });
+
+    try {
+      const token = await loginAsTestMember(app);
+      const res = await request(app)
+        .get(`/api/receipts/${receipt.id}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).toBe(receipt.id);
+      expect(res.body.data.items).toHaveLength(1);
     } finally {
       await prisma.receipt.delete({ where: { id: receipt.id } });
     }
@@ -108,6 +221,38 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
       .send({ categoryId: 2 });
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a receipt owned by another family group', async () => {
+    const tenantBReceipt = await prisma.receipt.create({
+      data: {
+        familyGroupId: 2,
+        memberId: TENANT_B_ADMIN_MEMBER_ID,
+        storeName: '別世帯詳細取得店',
+        normalizedStoreName: getCleanText('別世帯詳細取得店'),
+        date: new Date('2026-08-01T00:00:00.000Z'),
+        totalAmount: 500,
+        items: {
+          create: {
+            name: '別世帯詳細取得品',
+            normalizedName: getCleanText('別世帯詳細取得品'),
+            price: 500,
+            quantity: 1,
+          },
+        },
+      },
+    });
+    const tokenA = await loginAsTestMember(app, 1);
+    try {
+      const res = await request(app)
+        .get(`/api/receipts/${tenantBReceipt.id}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe('ReceiptNotFound');
+    } finally {
+      await prisma.receipt.delete({ where: { id: tenantBReceipt.id } });
+    }
   });
 
   it('rejects cross-tenant getJobStatus', async () => {

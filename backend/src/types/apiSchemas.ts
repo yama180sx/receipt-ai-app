@@ -194,6 +194,12 @@ export type ReceiptDetail = {
   items: ReceiptItemDetail[];
 };
 
+export type ReceiptListPage = {
+  items: ReceiptDetail[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};
+
 export type ReceiptValidation = {
   isSuspicious: boolean;
   warnings: string[];
@@ -366,6 +372,7 @@ export const API_SCHEMA_EXPORTS = [
   'ItemSplitSummary',
   'ReceiptItemDetail',
   'ReceiptDetail',
+  'ReceiptListPage',
   'ReceiptValidation',
   'ReceiptJobListItem',
   'ReceiptJobStatus',

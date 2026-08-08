@@ -5,6 +5,12 @@ import type { CategorySummary, ReceiptDetail } from '../../../types/receipt';
 import type { FamilyMemberSummary } from '../../../types/settlement';
 import { showApiErrorAlert } from '../../../utils/apiError';
 import { getRecentYearMonths, useMonthSelectOptions } from '../../../utils/monthSelectOptions';
+import {
+  appendReceiptHistoryPage,
+  canLoadMore,
+  replaceReceiptHistoryPage,
+  type ReceiptHistoryPaginationState,
+} from '../utils/receiptHistoryPagination';
 
 type UseReceiptHistoryOptions = {
   currentMemberId: number;
@@ -14,7 +20,13 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   const isWide = useIsWideLayout();
 
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [receipts, setReceipts] = useState<ReceiptDetail[]>([]);
+  const [pagination, setPagination] = useState<ReceiptHistoryPaginationState>({
+    items: [],
+    nextCursor: null,
+    hasNext: false,
+  });
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [members, setMembers] = useState<FamilyMemberSummary[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
@@ -67,25 +79,36 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
     }
   }, []);
 
-  const fetchReceipts = useCallback(async () => {
+  const getListParams = useCallback((cursor?: string) => ({
+    ...(selectedMonth ? { month: selectedMonth } : {}),
+    memberId: selectedMember,
+    ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {}),
+    ...(cursor ? { cursor } : {}),
+  }), [selectedMonth, selectedMember, debouncedSearchQuery]);
+
+  const fetchReceipts = useCallback(async (clearSelection = false) => {
     const requestId = ++receiptRequestIdRef.current;
     try {
       setLoading(true);
-      const res = await receiptApi.listReceipts({
-        ...(selectedMonth ? { month: selectedMonth } : {}),
-        memberId: selectedMember,
-        ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {}),
-      });
+      setLoadingMore(false);
+      if (clearSelection) {
+        setReceipts([]);
+        setPagination({ items: [], nextCursor: null, hasNext: false });
+        setSelectedReceipt(null);
+      }
+      const res = await receiptApi.listReceipts(getListParams());
       if (requestId !== receiptRequestIdRef.current) return;
       if (res.success) {
         const data = res.data;
-        setReceipts(data);
+        const nextPage = replaceReceiptHistoryPage(data);
+        setReceipts(nextPage.items);
+        setPagination(nextPage);
 
-        if (selectedReceipt) {
-          const updated = data.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
+        if (!clearSelection && selectedReceipt) {
+          const updated = nextPage.items.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
           if (updated) setSelectedReceipt(updated);
-        } else if (isWide && data.length > 0) {
-          setSelectedReceipt(data[0]);
+        } else if (isWide && nextPage.items.length > 0) {
+          setSelectedReceipt(nextPage.items[0]);
         }
       }
     } catch (err) {
@@ -95,7 +118,30 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
     } finally {
       if (requestId === receiptRequestIdRef.current) setLoading(false);
     }
-  }, [selectedMonth, selectedMember, debouncedSearchQuery, isWide, selectedReceipt?.id]);
+  }, [getListParams, isWide, selectedReceipt]);
+
+  const loadMore = useCallback(async () => {
+    const cursor = pagination.nextCursor;
+    if (loadingMore || !pagination.hasNext || !cursor) return;
+
+    const requestId = ++receiptRequestIdRef.current;
+    try {
+      setLoadingMore(true);
+      const res = await receiptApi.listReceipts(getListParams(cursor));
+      if (requestId !== receiptRequestIdRef.current) return;
+      if (res.success) {
+        const nextPage = appendReceiptHistoryPage(pagination, res.data);
+        setReceipts(nextPage.items);
+        setPagination(nextPage);
+      }
+    } catch (err) {
+      if (requestId === receiptRequestIdRef.current) {
+        showApiErrorAlert('エラー', err, '追加の履歴取得に失敗しました。');
+      }
+    } finally {
+      if (requestId === receiptRequestIdRef.current) setLoadingMore(false);
+    }
+  }, [getListParams, loadingMore, pagination]);
 
   useEffect(() => {
     fetchCategories();
@@ -103,7 +149,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   }, [fetchCategories, fetchMembers]);
 
   useEffect(() => {
-    fetchReceipts();
+    void fetchReceipts(true);
   }, [selectedMonth, selectedMember, debouncedSearchQuery]);
 
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
@@ -133,7 +179,9 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   return {
     isWide,
     loading,
+    loadingMore,
     receipts,
+    hasNext: canLoadMore(pagination),
     categories,
     selectedReceipt,
     setSelectedReceipt,
@@ -147,6 +195,7 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
     memberSelectOptions,
     baseUrl,
     fetchReceipts,
+    loadMore,
     handleCategoryChange,
   };
 }

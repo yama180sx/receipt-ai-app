@@ -36,6 +36,7 @@ export type ProductClassificationLearningData = Schemas['ProductClassificationLe
 export type ItemSplitSummary = Schemas['ItemSplitSummary'];
 export type ReceiptItemDetail = Schemas['ReceiptItemDetail'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];
+export type ReceiptListPage = Schemas['ReceiptListPage'];
 export type FamilyMemberSummary = Schemas['FamilyMemberSummary'];
 export type ReceiptJobListItem = Schemas['ReceiptJobListItem'];
 export type ReceiptJobStatus = Schemas['ReceiptJobStatus'];

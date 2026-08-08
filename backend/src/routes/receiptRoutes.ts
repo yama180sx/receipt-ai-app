@@ -7,6 +7,7 @@ import { deactivateProductClassificationLearningDataSchema, productClassificatio
 
 import {
   getReceipts,
+  getReceipt,
   createReceipt,
   updateReceipt,
   deleteReceipt,
@@ -66,6 +67,7 @@ router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
 router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', createReceipt);
+router.get('/receipts/:id', getReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 router.patch('/receipts/:id', updateReceipt);
 router.patch('/receipts/items/:id', updateItemCategory);

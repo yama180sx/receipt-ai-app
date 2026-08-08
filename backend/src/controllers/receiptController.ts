@@ -31,6 +31,7 @@ import { commitReceipt as commitReceiptService } from '../services/receipt/recei
 import { createManualReceipt } from '../services/receipt/receiptUpdateService';
 import {
   listReceipts,
+  getReceiptById,
   getLatestReceipt as fetchLatestReceipt,
   deleteReceiptById,
   listFamilyMembers,
@@ -46,6 +47,42 @@ import {
   getAdvancedStats as fetchAdvancedStats,
 } from '../services/receipt/receiptStatsService';
 import { SplitInput } from '../services/settlement/itemSplitAllocation';
+import { getCleanText } from '../utils/normalizer';
+import { decodeReceiptCursor, type ReceiptPaginationFilters } from '../utils/receiptPaginationCursor';
+import { normalizeYearMonth } from '../utils/yearMonth';
+
+function invalidQueryParameter(message: string): never {
+  throw new AppError(message, 400);
+}
+
+function getOptionalQueryValue(value: unknown, errorMessage: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') return invalidQueryParameter(errorMessage);
+  return value;
+}
+
+function parseMonth(value: string | undefined): string | undefined {
+  if (value === undefined || value === '') return undefined;
+  const month = normalizeYearMonth(value);
+  if (!month) return invalidQueryParameter('InvalidMonth');
+  return month;
+}
+
+function parseMemberId(value: string | undefined): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (!/^[1-9]\d*$/.test(value)) return invalidQueryParameter('InvalidMemberId');
+  const memberId = Number(value);
+  if (!Number.isSafeInteger(memberId)) return invalidQueryParameter('InvalidMemberId');
+  return memberId;
+}
+
+function parseLimit(value: string | undefined): number {
+  if (value === undefined) return 20;
+  if (!/^[1-9]\d*$/.test(value)) return invalidQueryParameter('InvalidLimit');
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit > 50) return invalidQueryParameter('InvalidLimit');
+  return limit;
+}
 
 export const getJobStatus = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();
@@ -214,14 +251,40 @@ export const getProductClassificationReviewItems = asyncHandler(async (req, res)
 
 export const getReceipts = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();
-  const { month, memberId, q } = req.query;
-  const receipts = await listReceipts({
+  const monthValue = getOptionalQueryValue(req.query.month, 'InvalidMonth');
+  const memberIdValue = getOptionalQueryValue(req.query.memberId, 'InvalidMemberId');
+  const queryValue = getOptionalQueryValue(req.query.q, 'InvalidQuery');
+  const limitValue = getOptionalQueryValue(req.query.limit, 'InvalidLimit');
+  const cursorValue = getOptionalQueryValue(req.query.cursor, 'InvalidCursor');
+  const month = parseMonth(monthValue);
+  const memberId = parseMemberId(memberIdValue);
+  const query = queryValue ? getCleanText(queryValue) || undefined : undefined;
+  const limit = parseLimit(limitValue);
+  const filters: ReceiptPaginationFilters = { month, memberId, query };
+  if (cursorValue === '') invalidQueryParameter('InvalidCursor');
+  const cursor = cursorValue ? decodeReceiptCursor(cursorValue, filters) : undefined;
+  const page = await listReceipts({
     familyGroupId,
-    memberId: typeof memberId === 'string' ? memberId : undefined,
-    month: typeof month === 'string' ? month : undefined,
-    query: typeof q === 'string' ? q : undefined,
+    ...filters,
+    limit,
+    cursor,
   });
-  sendSuccess(res, mapReceiptList(receipts));
+  sendSuccess(res, {
+    items: mapReceiptList(page.receipts),
+    nextCursor: page.nextCursor,
+    hasNext: page.hasNext,
+  });
+});
+
+export const getReceipt = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const receiptId = Number(getRouteParam(req, 'id'));
+  if (!Number.isSafeInteger(receiptId) || receiptId < 1) {
+    throw new AppError('InvalidReceiptId', 400);
+  }
+
+  const receipt = await getReceiptById(receiptId, familyGroupId);
+  sendSuccess(res, mapReceiptToDetail(receipt));
 });
 
 export const getLatestReceipt = asyncHandler(async (_req, res) => {
