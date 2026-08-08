@@ -24,15 +24,16 @@ describe('standard product classification seed', () => {
     );
   });
 
-  it('defines exactly the initial 21 product types including beverages', () => {
-    expect(INITIAL_PRODUCT_TYPES).toHaveLength(21);
-    expect(new Set(INITIAL_PRODUCT_TYPES.map((productType) => productType.code)).size).toBe(21);
+  it('defines exactly the initial 22 product types including beverages and vehicle fuel', () => {
+    expect(INITIAL_PRODUCT_TYPES).toHaveLength(22);
+    expect(new Set(INITIAL_PRODUCT_TYPES.map((productType) => productType.code)).size).toBe(22);
     expect(INITIAL_PRODUCT_TYPES).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'tea', standardCategoryCode: 'food-beverages' }),
         expect.objectContaining({ code: 'carbonated-drinks', standardCategoryCode: 'food-beverages' }),
         expect.objectContaining({ code: 'coffee', standardCategoryCode: 'food-beverages' }),
         expect.objectContaining({ code: 'other-beverages', standardCategoryCode: 'food-beverages' }),
+        expect.objectContaining({ code: 'vehicle-fuel', name: '燃料（車用）', standardCategoryCode: 'transport-communication' }),
       ])
     );
   });
@@ -52,8 +53,13 @@ describe('standard product classification seed', () => {
         expect.objectContaining({ normalizedKeyword: 'コーヒー', productTypeCode: 'coffee' }),
         expect.objectContaining({ normalizedKeyword: '洗濯洗剤', productTypeCode: 'laundry-detergent' }),
         expect.objectContaining({ normalizedKeyword: 'トイレットペーパー', productTypeCode: 'toilet-paper' }),
+        expect.objectContaining({ normalizedKeyword: 'レギュラー', productTypeCode: 'vehicle-fuel' }),
+        expect.objectContaining({ normalizedKeyword: 'ハイオク', productTypeCode: 'vehicle-fuel' }),
+        expect.objectContaining({ normalizedKeyword: '軽油', productTypeCode: 'vehicle-fuel' }),
       ])
     );
     expect(INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.some((entry) => entry.normalizedKeyword === '茶')).toBe(false);
+    expect(INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.some((entry) => entry.normalizedKeyword === '洗車')).toBe(false);
+    expect(INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.some((entry) => entry.normalizedKeyword === '灯油')).toBe(false);
   });
 });

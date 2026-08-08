@@ -157,6 +157,41 @@ describe.skipIf(!shouldRunDbIntegration())('Product classification regression (#
     });
   });
 
+  it('classifies vehicle fuel into each household’s transport-and-communications category', async () => {
+    const vehicleFuelId = await productTypeIdByCode('vehicle-fuel');
+
+    for (const targetFamilyGroupId of [1, 2]) {
+      const category = await prisma.category.findFirst({
+        where: { familyGroupId: targetFamilyGroupId, name: '交通・通信' },
+        select: { id: true },
+      });
+      if (!category) throw new Error(`Transport category is not seeded for family ${targetFamilyGroupId}.`);
+
+      await expect(
+        classifyItemByExactMatch(prisma as never, {
+          familyGroupId: targetFamilyGroupId,
+          itemName: 'レギュラー',
+          price: 175.4,
+          categoryId: null,
+        })
+      ).resolves.toMatchObject({
+        categoryId: category.id,
+        productTypeId: vehicleFuelId,
+        productTypeStatus: ProductTypeStatus.CLASSIFIED,
+        classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+      });
+    }
+
+    await expect(
+      classifyItemByExactMatch(prisma as never, {
+        familyGroupId,
+        itemName: '洗車プリペイド',
+        price: 1000,
+        categoryId: null,
+      })
+    ).resolves.toMatchObject({ productTypeId: null, classificationSource: null });
+  });
+
   it('keeps the household category while excluding an approved negative adjustment line', async () => {
     const category = await prisma.category.findFirst({
       where: { familyGroupId, name: '食費' },
