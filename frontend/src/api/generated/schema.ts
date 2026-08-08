@@ -721,6 +721,10 @@ export interface paths {
                     memberId?: string;
                     /** @description 店舗名または明細名の類似検索語 */
                     q?: string;
+                    /** @description 取得件数（省略時20、1〜50） */
+                    limit?: number;
+                    /** @description 次ページ取得用の署名付き不透明カーソル */
+                    cursor?: string;
                 };
                 header?: never;
                 path?: never;
@@ -735,7 +739,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["ReceiptDetail"][];
+                            data?: components["schemas"]["ReceiptListPage"];
                         };
                     };
                 };
@@ -822,7 +826,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** レシート詳細 1 件 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ReceiptDetail"];
+                        };
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** レシート削除 */
@@ -2166,6 +2194,11 @@ export interface components {
             memberId?: number;
             familyGroupId?: number;
             items: components["schemas"]["ReceiptItemDetail"][];
+        };
+        ReceiptListPage: {
+            items: components["schemas"]["ReceiptDetail"][];
+            nextCursor: string | null;
+            hasNext: boolean;
         };
         ManualReceiptRequest: {
             date: string;

@@ -468,6 +468,19 @@ paths:
           description: 店舗名または明細名の類似検索語
           schema:
             type: string
+        - name: limit
+          in: query
+          description: 取得件数（省略時20、1〜50）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 次ページ取得用の署名付き不透明カーソル
+          schema:
+            type: string
       responses:
         '200':
           description: OK
@@ -479,9 +492,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/ReceiptDetail'
+                        $ref: '#/components/schemas/ReceiptListPage'
     post:
       tags: [receipt]
       summary: 手動レシート登録
@@ -533,6 +544,30 @@ paths:
                           - type: 'null'
 
   /receipts/{id}:
+    get:
+      tags: [receipt]
+      summary: レシート詳細 1 件
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptDetail'
     patch:
       tags: [receipt]
       summary: レシート全体編集
@@ -1719,6 +1754,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReceiptItemDetail'
+
+    ReceiptListPage:
+      type: object
+      required: [items, nextCursor, hasNext]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptDetail'
+        nextCursor:
+          type: string
+          nullable: true
+        hasNext:
+          type: boolean
 
     ManualReceiptRequest:
       type: object

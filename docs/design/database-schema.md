@@ -146,7 +146,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 **FK:** `receiptId` → `Receipt.id` (**onDelete: Cascade**), `categoryId` → `Category.id`
 **Index:** `GIN(normalizedName gin_trgm_ops)`
 
-`normalizedStoreName` と `normalizedName` は、商品分類の類似候補検索および将来の履歴検索で共有する検索キーである。既存データはmigrationで小文字化・空白整理を行い、新規・更新データはアプリケーションの `getCleanText` で保存する。
+`normalizedStoreName` と `normalizedName` は、商品分類の類似候補検索および履歴検索で共有する検索キーである。既存データはmigrationで小文字化・空白整理を行い、新規・更新データはアプリケーションの `getCleanText` で保存する。
 
 `productTypeStatus = not_applicable` は、商品種別を扱わないカテゴリに加え、承認済みの明細名パターンに一致する負額の値引き・アプリ適用行にも用いる。この場合も `Item` の `price`、`quantity`、`categoryId` は保持し、商品種別・候補・AI分類だけを対象外にする。既存の状態値と列で表現できるため、この扱いのためのDB migrationは不要である。
 

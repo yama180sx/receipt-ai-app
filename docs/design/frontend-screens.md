@@ -138,7 +138,7 @@ SafeAreaProvider
 | 画面 | ファイル | 主な Hook | 主要 API（Hook 内） |
 |------|----------|-----------|---------------------|
 | **Home** | `screens/HomeScreen.tsx` | `useHomeDashboard`, `useReceiptUpload` | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
-| **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
+| **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`（カーソル追加読み込み）, `PATCH /receipts/items/:id` |
 | **ProductClassificationReview** | `screens/ProductClassificationReviewScreen.tsx` | `useProductClassificationReview` | `GET /product-classification/review-items`, `GET /categories`, `GET /product-types`, `PATCH /receipts/items/:id/product-classification` |
 | **ProductClassificationLearningData** | `screens/ProductClassificationLearningDataScreen.tsx` | `useProductClassificationLearningData` | `GET /product-classification/learning-data`, `PATCH /product-classification/learning-data/:type/:id/deactivate` |
 | **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /stats/product-classification`, `GET /categories`, `PATCH /receipts/items/:id` |

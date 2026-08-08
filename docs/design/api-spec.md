@@ -264,7 +264,8 @@ sequenceDiagram
 | GET/POST/PATCH | `/admin/product-classification/standard-rules` | JWT + tenant + ADMIN + TOTP | 全世帯共通の標準分類ルールを一覧・追加・更新 |
 | POST | `/admin/product-classification/standard-rules/preview` | JWT + tenant + ADMIN + TOTP | 自世帯の明細だけを対象にキーワード命中を確認 |
 | PATCH | `/admin/product-classification/standard-rules/:id/deactivate` | JWT + tenant + ADMIN + TOTP | 理由を記録して標準分類ルールを無効化 |
-| GET | `/receipts` | JWT + tenant | レシート一覧 |
+| GET | `/receipts` | JWT + tenant | カーソルページネーション付きレシート一覧 |
+| GET | `/receipts/:id` | JWT + tenant | 自世帯のレシート詳細 1 件 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
 | POST | `/receipts/jobs/:jobId/retry` | JWT + tenant | 本人の失敗ジョブを元画像から再投入 |
@@ -289,6 +290,12 @@ sequenceDiagram
 | `GET /receipts` | `month` | `YYYY-MM` フィルタ（任意） |
 | `GET /receipts` | `memberId` | 支払者フィルタ。空文字 `""` = 世帯全体 |
 | `GET /receipts` | `q` | 店舗名または明細名の `pg_trgm` 類似検索語（任意）。月・支払者フィルタと併用可能。画面は入力後300msで検索する |
+| `GET /receipts` | `limit` | 取得件数。省略時20、1〜50。範囲外は400 |
+| `GET /receipts` | `cursor` | 次ページ取得用の署名付き不透明カーソル。フィルタ条件が異なる場合や不正値は400 |
+
+`GET /receipts` は `date DESC, id DESC` の順で、`data.items`、`data.nextCursor`、`data.hasNext` を返す。総件数は返さず、画面は `hasNext` が真の間だけ追加読み込みを表示する。フィルタ変更時はカーソルを破棄して先頭ページを取得する。
+
+`GET /receipts/:id` は自世帯の `ReceiptDetail` を1件返す。存在しないIDと別世帯のIDはともに404とし、レシートの存在有無を世帯外へ公開しない。
 | `GET /product-classification/review-items` | `status` | カンマ区切りの `needs_review` / `unclassified` / `outside_initial_scope`。省略時は全状態 |
 | `GET /product-classification/review-items` | `categoryId` | 家計簿 Category による絞り込み（任意） |
 | `GET /product-classification/review-items` | `month` | `YYYY-MM` による期間絞り込み（任意） |

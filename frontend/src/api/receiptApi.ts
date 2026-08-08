@@ -7,6 +7,7 @@ import type {
   ItemSplitInput,
   ItemSplitSummary,
   ReceiptDetail,
+  ReceiptListPage,
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
@@ -22,6 +23,8 @@ export type ListReceiptsParams = {
   month?: string;
   memberId?: string;
   q?: string;
+  limit?: number;
+  cursor?: string;
 };
 
 export type CommitReceiptPayload = {
@@ -49,8 +52,13 @@ export type ListProductClassificationReviewItemsParams = {
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
 export const receiptApi = {
-  async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptDetail[]>> {
+  async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptListPage>> {
     const res = await apiClient.get('/receipts', { params });
+    return res.data;
+  },
+
+  async getReceipt(receiptId: number): Promise<ApiSuccessResponse<ReceiptDetail>> {
+    const res = await apiClient.get(`/receipts/${receiptId}`);
     return res.data;
   },
 
