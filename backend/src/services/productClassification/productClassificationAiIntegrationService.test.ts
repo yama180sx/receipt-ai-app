@@ -1,0 +1,145 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ClassificationConfidence,
+  ClassificationSource,
+  ProductClassificationAiRunStatus,
+  ProductTypeStatus,
+} from '@prisma/client';
+import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
+
+const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks } = vi.hoisted(() => ({
+  aiMocks: { classifyProductsWithAi: vi.fn() },
+  receiptRepositoryMocks: {
+    findItemById: vi.fn(),
+    findProductClassificationAiTargetInTx: vi.fn(),
+    findProductClassificationAiTargets: vi.fn(),
+    updateItemProductClassificationInTx: vi.fn(),
+  },
+  productRepositoryMocks: {
+    findActiveProductTypeWithCategoryInTx: vi.fn(),
+    findCategoryForProductTypeInTx: vi.fn(),
+  },
+  runRepositoryMocks: { createProductClassificationAiRun: vi.fn().mockResolvedValue({}) },
+}));
+
+vi.mock('../../ai', () => aiMocks);
+vi.mock('../../repositories/receiptRepository', () => receiptRepositoryMocks);
+vi.mock('../../repositories/productClassificationRepository', () => productRepositoryMocks);
+vi.mock('../../repositories/productClassificationAiRunRepository', () => runRepositoryMocks);
+vi.mock('../../utils/prismaTransaction', () => ({
+  runInTransaction: (fn: (tx: object) => Promise<unknown>) => fn({}),
+}));
+
+import { applyProductClassificationAiToItems } from './productClassificationAiIntegrationService';
+
+const target = {
+  id: 10,
+  name: '特濃牛乳 1000ml',
+  normalizedName: '特濃牛乳 1000ml',
+  categoryId: 5,
+  receipt: { id: 1, familyGroupId: 1, storeName: 'テスト店' },
+  productClassificationCandidates: [
+    {
+      productTypeId: 11,
+      productType: { name: '牛乳', standardCategory: { name: '乳製品' } },
+    },
+  ],
+};
+
+describe('applyProductClassificationAiToItems', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    receiptRepositoryMocks.findProductClassificationAiTargets.mockResolvedValue([target]);
+    receiptRepositoryMocks.findProductClassificationAiTargetInTx.mockResolvedValue(target);
+    receiptRepositoryMocks.updateItemProductClassificationInTx.mockResolvedValue({});
+    productRepositoryMocks.findActiveProductTypeWithCategoryInTx.mockResolvedValue({
+      id: 11,
+      standardCategoryId: 21,
+      standardCategory: { name: '乳製品', parent: { name: '食費' } },
+    });
+    productRepositoryMocks.findCategoryForProductTypeInTx.mockResolvedValue({ id: 5 });
+  });
+
+  it('high の候補内選択だけを分類済みとして保存する', async () => {
+    aiMocks.classifyProductsWithAi.mockResolvedValue({ response: { items: [{ itemId: 10, productTypeId: 11, confidence: 'high' }] }, modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } });
+
+    await applyProductClassificationAiToItems(1, [10]);
+
+    expect(receiptRepositoryMocks.updateItemProductClassificationInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      10,
+      expect.objectContaining({
+        categoryId: 5,
+        standardCategoryId: 21,
+        productTypeId: 11,
+        productTypeStatus: ProductTypeStatus.CLASSIFIED,
+        classificationSource: ClassificationSource.AI,
+        classificationConfidence: ClassificationConfidence.HIGH,
+      })
+    );
+  });
+
+  it.each([
+    { productTypeId: 11, confidence: 'medium' as const, expectedConfidence: ClassificationConfidence.MEDIUM },
+    { productTypeId: null, confidence: 'low' as const, expectedConfidence: ClassificationConfidence.LOW },
+  ])('medium・low・null は候補を残した要確認状態として保存する', async ({
+    productTypeId,
+    confidence,
+    expectedConfidence,
+  }) => {
+    aiMocks.classifyProductsWithAi.mockResolvedValue({ response: { items: [{ itemId: 10, productTypeId, confidence }] }, modelId: 'mock', usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 } });
+
+    await applyProductClassificationAiToItems(1, [10]);
+
+    expect(receiptRepositoryMocks.updateItemProductClassificationInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      10,
+      expect.objectContaining({
+        categoryId: 5,
+        standardCategoryId: null,
+        productTypeId: null,
+        productTypeStatus: ProductTypeStatus.NEEDS_REVIEW,
+        classificationSource: ClassificationSource.AI,
+        classificationConfidence: expectedConfidence,
+      })
+    );
+  });
+
+  it('AI障害時は例外を伝播せず既存の要確認状態を維持する', async () => {
+    aiMocks.classifyProductsWithAi.mockRejectedValue(Object.assign(new Error('Gemini unavailable'), { status: 429 }));
+
+    await expect(applyProductClassificationAiToItems(1, [10])).resolves.toBeUndefined();
+    expect(receiptRepositoryMocks.updateItemProductClassificationInTx).not.toHaveBeenCalled();
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        status: ProductClassificationAiRunStatus.PROVIDER_ERROR,
+        failureCode: 'http_429',
+      })
+    );
+  });
+
+  it('契約違反は安全な失敗コードとして監査する', async () => {
+    aiMocks.classifyProductsWithAi.mockRejectedValue(
+      new ProductClassificationResponseValidationError('候補外の商品種別IDが含まれています。')
+    );
+
+    await expect(applyProductClassificationAiToItems(1, [10])).resolves.toBeUndefined();
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: ProductClassificationAiRunStatus.INVALID_RESPONSE,
+        failureCode: 'response_validation',
+      })
+    );
+  });
+
+  it('AI分類対象の取得失敗もレシート保存へ伝播させない', async () => {
+    receiptRepositoryMocks.findProductClassificationAiTargets.mockRejectedValue(
+      new Error('database temporarily unavailable')
+    );
+
+    await expect(applyProductClassificationAiToItems(1, [10])).resolves.toBeUndefined();
+    expect(aiMocks.classifyProductsWithAi).not.toHaveBeenCalled();
+    expect(receiptRepositoryMocks.updateItemProductClassificationInTx).not.toHaveBeenCalled();
+  });
+});

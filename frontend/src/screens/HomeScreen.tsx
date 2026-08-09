@@ -23,6 +23,8 @@ interface HomeScreenProps {
   onGoToReceiptTray: () => void;
   onGoToSettlement?: () => void;
   onGoToAdminMenu?: () => void;
+  onGoToProductClassificationReview: () => void;
+  onGoToProductClassificationLearningData: () => void;
   currentMemberId: number;
   memberName?: string | null;
   userRole?: string | null;
@@ -36,6 +38,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onGoToReceiptTray,
   onGoToSettlement,
   onGoToAdminMenu,
+  onGoToProductClassificationReview,
+  onGoToProductClassificationLearningData,
   currentMemberId,
   memberName,
   userRole,
@@ -76,8 +80,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onGoToReceiptTray={onGoToReceiptTray}
             onItemPress={(item) => void tray.openTrayItem(item)}
             onItemDiscard={(item) => void tray.discardTrayItem(item)}
+            onItemRetry={(item) => void tray.retryTrayItem(item)}
             canOpenItem={tray.canOpenTrayItem}
             canDiscardItem={tray.canDiscardTrayItem}
+            canRetryItem={tray.canRetryTrayItem}
+            retryingJobId={tray.retryingJobId}
           />
 
           <HomeMenuGrid
@@ -91,6 +98,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onGoToStats={onGoToStats}
             onGoToSettlement={onGoToSettlement}
             onGoToAdminMenu={onGoToAdminMenu}
+            onGoToProductClassificationReview={onGoToProductClassificationReview}
+            onGoToProductClassificationLearningData={onGoToProductClassificationLearningData}
           />
         </ScrollView>
 

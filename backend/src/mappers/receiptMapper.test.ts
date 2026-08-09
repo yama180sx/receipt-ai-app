@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ClassificationConfidence,
+  ClassificationSource,
+  ProductTypeStatus,
+} from '@prisma/client';
+import {
   mapCategoriesToSummary,
   mapFamilyMembersToSummary,
   mapItemSplitToSummary,
@@ -16,6 +21,7 @@ describe('receiptMapper', () => {
     familyGroupId: 1,
     color: '#ff0000',
     keywords: [],
+    isAdjustment: false,
   };
 
   const receipt = {
@@ -34,6 +40,12 @@ describe('receiptMapper', () => {
         id: 100,
         receiptId: 10,
         categoryId: 1,
+        standardCategoryId: null,
+        productTypeId: null,
+        productTypeStatus: ProductTypeStatus.UNCLASSIFIED,
+        classificationSource: null,
+        classificationConfidence: null,
+        productType: null,
         name: 'りんご',
         price: 120,
         quantity: 10,
@@ -71,6 +83,12 @@ describe('receiptMapper', () => {
           quantity: 10,
           categoryId: 1,
           category: { id: 1, name: '食費', color: '#ff0000' },
+          standardCategoryId: null,
+          productTypeId: null,
+          productType: null,
+          productTypeStatus: 'unclassified',
+          classificationSource: null,
+          classificationConfidence: null,
           splits: [{ id: 1, itemId: 100, familyMemberId: 2, amount: 600 }],
         },
       ],
@@ -93,6 +111,12 @@ describe('receiptMapper', () => {
       id: 101,
       receiptId: 10,
       categoryId: null,
+      standardCategoryId: null,
+      productTypeId: null,
+      productTypeStatus: ProductTypeStatus.UNCLASSIFIED,
+      classificationSource: null,
+      classificationConfidence: null,
+      productType: null,
       name: '牛乳',
       price: 200,
       quantity: 1,
@@ -106,7 +130,40 @@ describe('receiptMapper', () => {
       quantity: 1,
       categoryId: null,
       category: null,
+      standardCategoryId: null,
+      productTypeId: null,
+      productType: null,
+      productTypeStatus: 'unclassified',
+      classificationSource: null,
+      classificationConfidence: null,
       splits: undefined,
+    });
+  });
+
+  it('maps product classification fields to API enum values', () => {
+    const item = {
+      id: 102,
+      receiptId: 10,
+      categoryId: 1,
+      standardCategoryId: 4,
+      productTypeId: 11,
+      productTypeStatus: ProductTypeStatus.CLASSIFIED,
+      classificationSource: ClassificationSource.STANDARD_DICTIONARY,
+      classificationConfidence: ClassificationConfidence.HIGH,
+      name: '牛乳',
+      price: 200,
+      quantity: 1,
+      category,
+      productType: { id: 11, code: 'milk', name: '牛乳', standardCategoryId: 4, isActive: true, displayOrder: 1 },
+    };
+
+    expect(mapReceiptItemToDetail(item)).toMatchObject({
+      standardCategoryId: 4,
+      productTypeId: 11,
+      productType: { id: 11, code: 'milk', name: '牛乳', standardCategoryId: 4 },
+      productTypeStatus: 'classified',
+      classificationSource: 'standard_dictionary',
+      classificationConfidence: 'high',
     });
   });
 

@@ -15,5 +15,18 @@
     "version": 1,
     "createdAt": "2026-06-07T20:55:48.904Z",
     "updatedAt": "2026-06-07T20:55:48.904Z"
+  },
+  {
+    "id": 10,
+    "familyGroupId": 1,
+    "key": "PRODUCT_CLASSIFICATION",
+    "name": "商品分類システム標準プロンプト",
+    "description": "候補内の商品種別だけを選択して明細を分類するための基本プロンプト",
+    "systemPrompt": "あなたは家計簿の商品分類担当です。入力された各明細について、明細ごとに提示された候補の商品種別IDから最も適切なものだけを選んでください。\n\n必ず守ること:\n- 候補にない商品種別ID、カテゴリ名、自由文の分類名は返さない。\n- 判断できない場合は productTypeId を null にする。\n- confidence は high / medium / low のいずれかにする。\n- 出力には要求された itemId を重複させない。\n- JSON以外の文章やMarkdownは出力しない。",
+    "domainHints": null,
+    "isActive": true,
+    "version": 1,
+    "createdAt": "2026-06-07T20:55:48.904Z",
+    "updatedAt": "2026-06-07T20:55:48.904Z"
   }
 ]

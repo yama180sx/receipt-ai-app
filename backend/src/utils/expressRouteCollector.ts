@@ -18,8 +18,8 @@ const DEFAULT_MOUNT_PROBE_PATHS = [
   '/api/auth/families/1/members',
   '/api/admin/stats',
   '/api/admin/prompts',
+  '/api/admin/product-classification/reclassification-runs',
   '/api/categories',
-  '/api/product-master',
   '/api/stats/settlement',
   '/api/receipts',
   '/api/receipts/upload',
@@ -33,6 +33,10 @@ function joinPaths(prefix: string, segment: string): string {
   }
   const combined = `${prefix}${segment.startsWith('/') ? segment : `/${segment}`}`;
   return combined.replace(/\/+/g, '/') || '/';
+}
+
+function getLayerPath(layer: RouterLayer): string | undefined {
+  return layer.path;
 }
 
 function resolveMountPrefix(
@@ -50,10 +54,10 @@ function resolveMountPrefix(
         : fullProbe;
 
     layer.path = undefined;
-    if (layer.match(relativeProbe) && layer.path) {
-      if (layer.path.length > longest.length) {
-        longest = layer.path;
-      }
+    if (!layer.match(relativeProbe)) continue;
+    const matchedPath = getLayerPath(layer);
+    if (typeof matchedPath === 'string' && matchedPath.length > longest.length) {
+      longest = matchedPath;
     }
   }
   return longest;

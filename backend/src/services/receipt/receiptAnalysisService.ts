@@ -1,10 +1,11 @@
 import logger from '../../utils/logger';
-import { getCleanText } from '../../utils/normalizer';
 import { getReceiptAnalysisProvider } from '../../ai';
 import { estimateCategoryId } from '../categoryService';
 import { validateReceiptItems } from '../validationService';
 import type { TenantContext } from '../../utils/context';
-import { findProductMasterByCompositeKey } from '../../repositories/productMasterRepository';
+import { runInTransaction } from '../../utils/prismaTransaction';
+import { classifyItemWithSimilarityCandidates } from '../productClassification/productClassificationService';
+import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
 
 /**
  * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
@@ -15,18 +16,12 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId}, 世帯: ${familyGroupId})`);
 
   const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(imagePath, memberId);
-  const cleanStore = getCleanText(parsedData.storeName || '');
-
   const itemsWithCategories = await Promise.all(
     parsedData.items.map(async (item) => {
-      const cleanName = getCleanText(item.name);
       let initialCategoryId = null;
 
       if (familyGroupId) {
-        const mastered = await findProductMasterByCompositeKey(cleanName, cleanStore, familyGroupId);
-        initialCategoryId = mastered
-          ? mastered.categoryId
-          : await estimateCategoryId(cleanName, cleanStore, familyGroupId);
+        initialCategoryId = await estimateCategoryId(item.name, parsedData.storeName || '', familyGroupId);
       }
 
       return {
@@ -38,7 +33,31 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
     })
   );
 
-  parsedData.items = itemsWithCategories;
+  // 確認画面でも、保存時と同じ優先順位（世帯内学習 → 標準ルール）で分類結果を表示する。
+  // ここでは候補を永続化せず、確定保存時に改めて同じ分類を実行する。
+  parsedData.items = await runInTransaction((tx) =>
+    Promise.all(itemsWithCategories.map(async (item) => {
+      const categoryId = await resolveAdjustmentCategoryIdInTx(tx, {
+        familyGroupId,
+        itemName: item.name,
+        price: item.price,
+        categoryId: item.categoryId,
+      });
+      const { classification } = await classifyItemWithSimilarityCandidates(tx, {
+        familyGroupId,
+        itemName: item.name,
+        price: item.price,
+        categoryId,
+      });
+      const productType = classification.productTypeId
+        ? await tx.productType.findUnique({
+            where: { id: classification.productTypeId },
+            select: { name: true },
+          })
+        : null;
+      return { ...item, ...classification, productTypeName: productType?.name ?? null };
+    }))
+  );
   parsedData.taxAmount = parsedData.taxAmount
     ? parseFloat(String(parsedData.taxAmount))
     : undefined;

@@ -77,6 +77,14 @@ export function ReceiptScanItemList({ scan }: Props) {
               placeholder="未選択"
             />
           </AppFormField>
+          <Text style={styles.classification}>
+            商品種別: {item.productTypeName ?? (
+              item.productTypeStatus === 'needs_review' ? '要確認'
+                : item.productTypeStatus === 'outside_initial_scope' ? '初期分類の対象外'
+                  : item.productTypeStatus === 'not_applicable' ? '対象外' : '未分類'
+            )}
+            {item.classificationSource === 'standard_dictionary' ? '（標準ルール）' : ''}
+          </Text>
         </View>
       ))}
       <View style={{ height: 60 }} />
@@ -115,4 +123,5 @@ const styles = StyleSheet.create({
   itemSubGroup: { flex: 1 },
   subLabel: { fontSize: 10, color: s.textMuted, fontWeight: 'bold', marginBottom: 4 },
   subTotalText: { fontSize: 14, fontWeight: '700', color: s.textItem, paddingTop: 4 },
+  classification: { color: s.textMuted, fontSize: 12, marginTop: 4 },
 });

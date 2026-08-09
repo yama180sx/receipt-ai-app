@@ -32,7 +32,6 @@ export const prisma = basePrisma.$extends({
         // 世帯ID（familyGroupId）による分離が必要なモデル定義
         const tenantModels = [
           'Receipt',
-          'ProductMaster',
           'FamilyMember',
           'Category',
           'Store',

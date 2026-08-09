@@ -1,4 +1,5 @@
 import { AppError } from '../../utils/appError';
+import { getCleanText } from '../../utils/normalizer';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import type { ReceiptCreateItemInput } from '../../types/receipt';
 import type { TenantContext } from '../../utils/context';
@@ -7,13 +8,23 @@ import {
   deleteItemsByReceiptIdInTx,
   findCategoryByIdInTx,
   findItemWithReceiptInTx,
+  findReceiptById,
   findReceiptByIdForTenantInTx,
   findReceiptByIdInTx,
   updateItemCategoryInTx,
   updateReceiptInTx as patchReceiptInTx,
 } from '../../repositories/receiptRepository';
+import {
+  applyProductClassificationAiToItems,
+  findItemAfterProductClassificationAi,
+} from '../productClassification/productClassificationAiIntegrationService';
 import { saveParsedReceipt } from './receiptPersistenceService';
-import { upsertProductMasterCategory } from './receiptProductMasterLearning';
+import {
+  classifyItemWithSimilarityCandidates,
+  toProductClassificationCandidateInputs,
+} from '../productClassification/productClassificationService';
+import { replaceProductClassificationCandidatesInTx } from '../../repositories/productClassificationRepository';
+import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
 
 export type ManualReceiptInput = {
   date: string;
@@ -72,34 +83,39 @@ async function applyFullReceiptUpdateInTx(
   await patchReceiptInTx(tx, receiptId, {
     date: date ? new Date(date) : undefined,
     storeName: storeName || undefined,
+    normalizedStoreName: storeName ? getCleanText(storeName) : undefined,
     totalAmount: finalTotal,
   });
 
   await deleteItemsByReceiptIdInTx(tx, receiptId);
 
   if (itemList.length > 0) {
-    await createItemsInTx(
-      tx,
-      itemList.map((i) => ({
-        receiptId,
-        name: i.name,
-        price: parseFloat(String(i.price)) || 0,
-        quantity: parseFloat(String(i.quantity)) || 0,
-        categoryId: i.categoryId ? Number(i.categoryId) : null,
-      }))
-    );
-
-    const resolvedStoreName = storeName || existing.storeName;
-    for (const item of itemList) {
-      if (item.categoryId) {
-        await upsertProductMasterCategory(tx, {
-          itemName: item.name,
-          storeName: resolvedStoreName,
+    const classifiedItems = await Promise.all(
+      itemList.map(async (item) => {
+        const categoryId = await resolveAdjustmentCategoryIdInTx(tx, {
           familyGroupId,
-          categoryId: Number(item.categoryId),
+          itemName: item.name,
+          price: parseFloat(String(item.price)) || 0,
+          categoryId: item.categoryId ? Number(item.categoryId) : null,
         });
-      }
-    }
+        const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+          familyGroupId,
+          itemName: item.name,
+          price: parseFloat(String(item.price)) || 0,
+          categoryId,
+        });
+        return {
+          receiptId,
+          name: item.name,
+          normalizedName: getCleanText(item.name),
+          price: parseFloat(String(item.price)) || 0,
+          quantity: parseFloat(String(item.quantity)) || 0,
+          ...classification,
+          productClassificationCandidates: toProductClassificationCandidateInputs(candidates),
+        };
+      })
+    );
+    await createItemsInTx(tx, classifiedItems);
   }
 
   return findReceiptByIdInTx(tx, receiptId);
@@ -111,7 +127,14 @@ export async function updateReceiptById(
   familyGroupId: number,
   input: UpdateReceiptInput
 ) {
-  return runInTransaction((tx) => applyFullReceiptUpdateInTx(tx, receiptId, familyGroupId, input));
+  const updated = await runInTransaction((tx) =>
+    applyFullReceiptUpdateInTx(tx, receiptId, familyGroupId, input)
+  );
+  await applyProductClassificationAiToItems(
+    familyGroupId,
+    updated?.items.map((item) => item.id) ?? []
+  );
+  return findReceiptById(receiptId);
 }
 
 async function updateItemCategoryInTxHandler(
@@ -131,20 +154,25 @@ async function updateItemCategoryInTxHandler(
     if (!category) throw new AppError('CategoryNotFound', 404);
   }
 
-  const updatedItem = await updateItemCategoryInTx(
+  const resolvedCategoryId = await resolveAdjustmentCategoryIdInTx(tx, {
+    familyGroupId,
+    itemName: currentItem.name,
+    price: currentItem.price,
+    categoryId: categoryId ? Number(categoryId) : null,
+  });
+
+  const { classification, candidates } = await classifyItemWithSimilarityCandidates(tx, {
+    familyGroupId,
+    itemName: currentItem.name,
+    price: currentItem.price,
+    categoryId: resolvedCategoryId,
+  });
+  const updatedItem = await updateItemCategoryInTx(tx, itemId, classification);
+  await replaceProductClassificationCandidatesInTx(
     tx,
     itemId,
-    categoryId ? Number(categoryId) : null
+    toProductClassificationCandidateInputs(candidates)
   );
-
-  if (categoryId) {
-    await upsertProductMasterCategory(tx, {
-      itemName: currentItem.name,
-      storeName: currentItem.receipt.storeName,
-      familyGroupId,
-      categoryId: Number(categoryId),
-    });
-  }
 
   return updatedItem;
 }
@@ -155,7 +183,9 @@ export async function updateItemCategoryById(
   familyGroupId: number,
   categoryId: number | null | undefined
 ) {
-  return runInTransaction((tx) =>
+  const updatedItem = await runInTransaction((tx) =>
     updateItemCategoryInTxHandler(tx, itemId, familyGroupId, categoryId)
   );
+  await applyProductClassificationAiToItems(familyGroupId, [itemId]);
+  return (await findItemAfterProductClassificationAi(itemId)) ?? updatedItem;
 }

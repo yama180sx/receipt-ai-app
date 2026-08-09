@@ -24,9 +24,19 @@ export type LoginRequest = Schemas['LoginRequest'];
 
 // --- receipt ---
 export type CategorySummary = Schemas['CategorySummary'];
+export type ProductTypeSummary = Schemas['ProductTypeSummary'];
+export type ProductTypeStatus = Schemas['ProductTypeStatus'];
+export type ClassificationSource = Schemas['ClassificationSource'];
+export type ClassificationConfidence = Schemas['ClassificationConfidence'];
+export type ProductClassificationCandidateSource = Schemas['ProductClassificationCandidateSource'];
+export type ProductClassificationCandidateSummary = Schemas['ProductClassificationCandidateSummary'];
+export type ProductClassificationReviewItem = Schemas['ProductClassificationReviewItem'];
+export type ProductClassificationLearningDataType = Schemas['ProductClassificationLearningDataType'];
+export type ProductClassificationLearningData = Schemas['ProductClassificationLearningData'];
 export type ItemSplitSummary = Schemas['ItemSplitSummary'];
 export type ReceiptItemDetail = Schemas['ReceiptItemDetail'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];
+export type ReceiptListPage = Schemas['ReceiptListPage'];
 export type FamilyMemberSummary = Schemas['FamilyMemberSummary'];
 export type ReceiptJobListItem = Schemas['ReceiptJobListItem'];
 export type ReceiptJobStatus = Schemas['ReceiptJobStatus'];
@@ -37,6 +47,10 @@ export type ItemSplitInput = Schemas['ItemSplitInput'];
 // --- stats ---
 export type MonthlyStatsData = Schemas['MonthlyStatsData'];
 export type AdvancedStatsData = Schemas['AdvancedStatsData'];
+export type ProductClassificationStatsData = Schemas['ProductClassificationStatsData'];
+export type ProductClassificationCategoryStatRow = Schemas['ProductClassificationCategoryStatRow'];
+export type ProductTypeStatRow = Schemas['ProductTypeStatRow'];
+export type ProductTypeStatusStatRow = Schemas['ProductTypeStatusStatRow'];
 export type CategoryStatRow = Schemas['CategoryStatRow'];
 export type TrendRow = Schemas['TrendRow'];
 export type ParetoRow = Schemas['ParetoRow'];
@@ -47,20 +61,19 @@ export type CreateSettlementTransferRequest = Schemas['CreateSettlementTransferR
 
 // --- category ---
 export type Category = Schemas['Category'];
-export type CreateCategoryRequest = Schemas['CreateCategoryRequest'];
-export type OptimizeCategoryResponse = Schemas['OptimizeCategoryResponse'];
-
-// --- productMaster ---
-export type ProductMaster = Schemas['ProductMaster'];
-export type UpdateProductMasterRequest = Schemas['UpdateProductMasterRequest'];
-export type MergeStoreNamesRequest = Schemas['MergeStoreNamesRequest'];
-export type MergeStoreNamesResponse = Schemas['MergeStoreNamesResponse'];
 
 // --- admin ---
 export type PromptTemplate = Schemas['PromptTemplate'];
 export type CreatePromptTemplateRequest = Schemas['CreatePromptTemplateRequest'];
 export type UpdatePromptTemplateRequest = Schemas['UpdatePromptTemplateRequest'];
 export type AdminCostStatRow = Schemas['AdminCostStatRow'];
+export type CreateProductClassificationReclassificationRunRequest = Schemas['CreateProductClassificationReclassificationRunRequest'];
+export type ProductClassificationReclassificationRun = Schemas['ProductClassificationReclassificationRun'];
+export type ProductClassificationReclassificationItemAudit = Schemas['ProductClassificationReclassificationItemAudit'];
+export type StandardProductClassificationRule = Schemas['StandardProductClassificationRule'];
+export type StandardProductClassificationRulePreview = Schemas['StandardProductClassificationRulePreview'];
+export type UpsertStandardProductClassificationRuleRequest = Schemas['UpsertStandardProductClassificationRuleRequest'];
+export type PreviewStandardProductClassificationRuleRequest = Schemas['PreviewStandardProductClassificationRuleRequest'];
 
 // --- health ---
 export type HealthResponse = Schemas['HealthResponse'];

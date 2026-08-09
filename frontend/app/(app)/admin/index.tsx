@@ -11,10 +11,10 @@ export default function AdminMenuRoute() {
     <AppScreenShell fullWidth>
       <AdminMenuScreen
         onBack={goHome}
-        onGoToCategories={() => router.push('/admin/categories')}
-        onGoToProductMaster={() => router.push('/admin/product-master')}
         onGoToPromptEditor={() => router.push('/admin/prompts')}
         onGoToAdminStats={() => router.push('/admin/stats')}
+        onGoToStandardProductClassificationRules={() => router.push('/admin/product-classification-rules')}
+        onGoToProductClassificationReclassification={() => router.push('/admin/product-classification-reclassification')}
       />
     </AppScreenShell>
   );

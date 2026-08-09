@@ -22,8 +22,11 @@ type Props = {
   item: ReceiptTrayItem;
   onPress?: () => void;
   onDiscard?: () => void;
+  onRetry?: () => void;
   canOpen?: boolean;
   canDiscard?: boolean;
+  canRetry?: boolean;
+  retrying?: boolean;
 };
 
 function badgeStyle(kind: ReceiptJobDisplayKind) {
@@ -45,8 +48,11 @@ export function ReceiptJobTrayRow({
   item,
   onPress,
   onDiscard,
+  onRetry,
   canOpen = false,
   canDiscard = false,
+  canRetry = false,
+  retrying = false,
 }: Props) {
   const display = resolveReceiptTrayItemDisplay(item);
   const isDuplicate = display.kind === 'duplicate_suspected';
@@ -100,6 +106,7 @@ export function ReceiptJobTrayRow({
 
       {canDiscard && onDiscard ? (
         <View style={styles.actions}>
+          {canRetry && onRetry ? <AppButton title="再実行" size="sm" onPress={onRetry} loading={retrying} disabled={retrying} /> : null}
           <AppButton title="破棄" variant="outline" size="sm" onPress={onDiscard} />
         </View>
       ) : null}

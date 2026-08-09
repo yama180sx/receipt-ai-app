@@ -1,4 +1,7 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prismaClient';
+
+type PromptDomainHints = Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
 
 export async function findPromptTemplatesByFamilyGroup(familyGroupId: number) {
   return prisma.promptTemplate.findMany({
@@ -21,6 +24,16 @@ export async function findActivePromptTemplateByKey(key: string) {
   });
 }
 
+export async function findActivePromptTemplateByKeyForFamilyGroup(
+  familyGroupId: number,
+  key: string
+) {
+  return prisma.promptTemplate.findFirst({
+    where: { familyGroupId, key, isActive: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
 export async function deactivatePromptTemplatesByKey(familyGroupId: number, key: string) {
   return prisma.promptTemplate.updateMany({
     where: { key, familyGroupId },
@@ -33,7 +46,7 @@ export async function createPromptTemplateRecord(data: {
   name?: string;
   description?: string;
   systemPrompt: string;
-  domainHints?: unknown;
+  domainHints?: PromptDomainHints;
   isActive?: boolean;
   version: number;
   familyGroupId: number;
@@ -53,7 +66,7 @@ export async function updatePromptTemplateRecord(
     name?: string;
     description?: string;
     systemPrompt?: string;
-    domainHints?: unknown;
+    domainHints?: PromptDomainHints;
     version?: { increment: number };
   }
 ) {

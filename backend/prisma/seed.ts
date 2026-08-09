@@ -4,6 +4,9 @@ import process from 'node:process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { syncAllSeedTableSequences, syncPostgresIdSequence } from './syncSequences';
+import {
+  syncStandardProductClassificationMasters,
+} from './syncStandardProductClassificationMasters';
 
 const prisma = new PrismaClient();
 
@@ -15,8 +18,9 @@ const DEFAULT_CATEGORIES = [
   { id: 5, name: '外食', color: '#f1c40f', keywords: ['カフェ', 'ランチ', 'ディナー', 'レストラン', 'マクドナルド', '吉野家', '弁当', 'セット'] },
   { id: 6, name: '交際費', color: '#9b59b6', keywords: ['プレゼント', '贈り物', '会費', '香典', '祝儀'] },
   { id: 7, name: '教養・娯楽', color: '#2ecc71', keywords: ['本', '雑誌', '映画', 'チケット', 'ゲーム', '遊園地'] },
-  { id: 8, name: '交通費', color: '#95a5a6', keywords: ['電車', 'バス', 'タクシー', 'ガソリン', '駐車'] },
+  { id: 8, name: '交通・通信', color: '#95a5a6', keywords: ['電車', 'バス', 'タクシー', 'ガソリン', '駐車'] },
   { id: 9, name: '消費税', color: '#795548', keywords: ['消費税', '外税', '税', '軽', '税金', 'tax'] },
+  { id: 10, name: '値引き等', color: '#6C757D', keywords: [] as string[], isAdjustment: true },
   { id: 99, name: 'その他', color: '#ADB5BD', keywords: [] as string[] },
 ];
 
@@ -62,6 +66,22 @@ const DEFAULT_PROMPT = {
   version: 1,
 };
 
+const DEFAULT_PRODUCT_CLASSIFICATION_PROMPT = {
+  key: 'PRODUCT_CLASSIFICATION',
+  name: '商品分類システム標準プロンプト',
+  description: '候補内の商品種別だけを選択して明細を分類するための基本プロンプト',
+  systemPrompt: `あなたは家計簿の商品分類担当です。入力された各明細について、明細ごとに提示された候補の商品種別IDから最も適切なものだけを選んでください。
+
+必ず守ること:
+- 候補にない商品種別ID、カテゴリ名、自由文の分類名は返さない。
+- 判断できない場合は productTypeId を null にする。
+- confidence は high / medium / low のいずれかにする。
+- 出力には要求された itemId を重複させない。
+- JSON以外の文章やMarkdownは出力しない。`,
+  isActive: true,
+  version: 1,
+};
+
 async function seedMastersForFamily(
   familyGroupId: number,
   options: { useExplicitCategoryIds?: boolean } = {}
@@ -86,6 +106,9 @@ async function seedMastersForFamily(
   await prisma.promptTemplate.create({
     data: { ...DEFAULT_PROMPT, familyGroupId },
   });
+  await prisma.promptTemplate.create({
+    data: { ...DEFAULT_PRODUCT_CLASSIFICATION_PROMPT, familyGroupId },
+  });
 }
 
 async function main() {
@@ -95,8 +118,15 @@ async function main() {
   const password_hash = await bcrypt.hash(devPassword, 10);
 
   await prisma.item.deleteMany();
+  await prisma.productClassificationLearningDataAudit.deleteMany();
+  await prisma.classificationCorrection.deleteMany();
+  await prisma.productClassificationHistory.deleteMany();
+  await prisma.householdProductDictionary.deleteMany();
+  await prisma.standardProductClassificationRuleAudit.deleteMany();
+  await prisma.standardProductClassificationRule.deleteMany();
+  await prisma.productType.deleteMany();
+  await prisma.standardCategory.deleteMany();
   await prisma.settlementTransfer.deleteMany();
-  await prisma.productMaster.deleteMany();
   await prisma.receipt.deleteMany();
   await prisma.familyMember.deleteMany();
   await prisma.promptTemplate.deleteMany();
@@ -105,6 +135,9 @@ async function main() {
   await prisma.familyGroup.deleteMany();
 
   console.log('🗑️ Existing data cleared.');
+
+  await syncStandardProductClassificationMasters(prisma);
+  console.log('🗂️ Standard product classification masters seeded.');
 
   const familyGroup = await prisma.familyGroup.create({
     data: { id: 1, name: '山本家', inviteCode: 'YAMAMOTO-2026' },
@@ -125,15 +158,6 @@ async function main() {
   // 明示 id 投入後はシーケンスを進めないと第2世帯の auto-increment が id=1 で衝突する
   await syncPostgresIdSequence(prisma, 'Category');
   console.log('📂 Masters seeded (山本家).');
-
-  await prisma.productMaster.create({
-    data: {
-      familyGroupId: familyGroup.id,
-      name: 'サッポロ生ビール',
-      storeName: 'セイコーマート',
-      categoryId: 1,
-    },
-  });
 
   await prisma.receipt.create({
     data: {

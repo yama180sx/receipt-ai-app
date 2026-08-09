@@ -8,47 +8,6 @@ export async function findCategoriesByFamilyGroup(familyGroupId: number) {
   });
 }
 
-export async function findCategoryColorsByFamilyGroup(familyGroupId: number) {
-  return prisma.category.findMany({
-    where: { familyGroupId },
-    select: { color: true },
-  });
-}
-
-export async function createCategoryRecord(input: {
-  name: string;
-  color: string;
-  familyGroupId: number;
-}) {
-  return prisma.category.create({ data: input });
-}
-
-export async function findCategoryByIdAndFamilyGroup(categoryId: number, familyGroupId: number) {
-  return prisma.category.findFirst({
-    where: { id: categoryId, familyGroupId },
-  });
-}
-
-export async function deleteCategoryById(categoryId: number) {
-  return prisma.category.delete({ where: { id: categoryId } });
-}
-
-export async function groupProductMasterStatsByCategory(familyGroupId: number) {
-  return prisma.productMaster.groupBy({
-    by: ['name', 'categoryId'],
-    where: { familyGroupId },
-    _count: { name: true },
-    having: { name: { _count: { gte: 5 } } },
-  });
-}
-
-export async function updateCategoryKeywords(categoryId: number, keywords: string[]) {
-  return prisma.category.update({
-    where: { id: categoryId },
-    data: { keywords },
-  });
-}
-
 export async function findCategoryIdByKeywordInTx(
   tx: PrismaTx,
   familyGroupId: number,
@@ -65,6 +24,25 @@ export async function findCategoryIdByKeywordInTx(
 export async function findFallbackCategoryIdInTx(tx: PrismaTx, familyGroupId: number) {
   return tx.category.findFirst({
     where: { familyGroupId, name: 'その他' },
+    select: { id: true },
+  });
+}
+
+export async function findOrCreateAdjustmentCategoryInTx(tx: PrismaTx, familyGroupId: number) {
+  const existing = await tx.category.findFirst({
+    where: { familyGroupId, isAdjustment: true },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  return tx.category.create({
+    data: {
+      familyGroupId,
+      name: '値引き等',
+      color: '#6C757D',
+      keywords: [],
+      isAdjustment: true,
+    },
     select: { id: true },
   });
 }

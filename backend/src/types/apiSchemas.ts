@@ -46,6 +46,119 @@ export type CategorySummary = {
   color?: string | null;
 };
 
+export type ProductTypeSummary = {
+  id: number;
+  code: string;
+  name: string;
+  standardCategoryId: number;
+};
+
+export type ProductTypeStatus =
+  | 'classified'
+  | 'needs_review'
+  | 'unclassified'
+  | 'outside_initial_scope'
+  | 'not_applicable';
+
+export type ClassificationSource =
+  | 'history'
+  | 'household_dictionary'
+  | 'standard_dictionary'
+  | 'similarity'
+  | 'ai'
+  | 'manual';
+
+export type ClassificationConfidence = 'high' | 'medium' | 'low';
+
+export type ClassificationCorrectionScope =
+  | 'item_only'
+  | 'same_ocr_name';
+
+export type ProductClassificationCandidateSource =
+  | 'history'
+  | 'household_dictionary'
+  | 'standard_dictionary';
+
+export type ProductClassificationReclassificationRunStatus = 'completed' | 'partial_failure';
+
+export type ProductClassificationReclassificationItemOutcome = 'updated' | 'unchanged' | 'failed';
+
+export type CreateProductClassificationReclassificationRunRequest = {
+  statuses?: Array<'unclassified' | 'needs_review'>;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+};
+
+export type ProductClassificationReclassificationItemAudit = {
+  itemId: number;
+  outcome: ProductClassificationReclassificationItemOutcome;
+  previousProductTypeStatus: ProductTypeStatus;
+  nextProductTypeStatus: ProductTypeStatus;
+  previousProductTypeId: number | null;
+  nextProductTypeId: number | null;
+  previousClassificationSource: ClassificationSource | null;
+  nextClassificationSource: ClassificationSource | null;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
+export type ProductClassificationReclassificationRun = {
+  id: number;
+  statuses: Array<'unclassified' | 'needs_review'>;
+  startDate: Date | null;
+  endDate: Date | null;
+  limit: number;
+  selectedCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  failedCount: number;
+  status: ProductClassificationReclassificationRunStatus;
+  createdAt: Date;
+  completedAt: Date | null;
+  itemAudits: ProductClassificationReclassificationItemAudit[];
+};
+
+export type ProductClassificationCandidateSummary = {
+  productType: ProductTypeSummary;
+  source: ProductClassificationCandidateSource;
+  matchedNormalizedName: string;
+  similarity: number;
+  rank: number;
+};
+
+export type ProductClassificationReviewItem = {
+  item: ReceiptItemDetail;
+  receiptId: number;
+  receiptDate: string | null;
+  storeName: string;
+};
+
+export type ProductClassificationLearningDataType = 'household_dictionary' | 'history';
+
+export type ProductClassificationLearningData = {
+  id: number;
+  type: ProductClassificationLearningDataType;
+  normalizedName: string;
+  productType: ProductTypeSummary;
+  isActive: boolean | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastDeactivationAudit: ProductClassificationLearningDataAudit | null;
+};
+
+export type ProductClassificationLearningDataAudit = {
+  reason: string;
+  actorMemberName: string | null;
+  familyGroupName: string;
+  createdAt: Date;
+};
+
+export type UpdateItemProductClassificationRequest = {
+  productTypeId: number;
+  scope: ClassificationCorrectionScope;
+};
+
 export type ItemSplitSummary = {
   id: number;
   itemId: number;
@@ -60,6 +173,12 @@ export type ReceiptItemDetail = {
   quantity: number;
   categoryId: number | null;
   category?: CategorySummary | null;
+  standardCategoryId: number | null;
+  productTypeId: number | null;
+  productType?: ProductTypeSummary | null;
+  productTypeStatus: ProductTypeStatus;
+  classificationSource: ClassificationSource | null;
+  classificationConfidence: ClassificationConfidence | null;
   splits?: ItemSplitSummary[];
 };
 
@@ -75,6 +194,12 @@ export type ReceiptDetail = {
   items: ReceiptItemDetail[];
 };
 
+export type ReceiptListPage = {
+  items: ReceiptDetail[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};
+
 export type ReceiptValidation = {
   isSuspicious: boolean;
   warnings: string[];
@@ -86,6 +211,10 @@ export type ReceiptJobListItem = {
   imagePath: string | null;
   createdAt: number;
   failedReason?: string | null;
+  retry?: {
+    eligible: boolean;
+    remainingCount: number;
+  };
   parsedData?: {
     storeName: string;
     purchaseDate: string;
@@ -190,24 +319,6 @@ export type Category = {
   keywords: string[];
 };
 
-export type OptimizeCategoryResponse = {
-  message: string;
-  updatedCount?: number;
-};
-
-// --- productMaster ---
-export type ProductMaster = {
-  id: number;
-  name: string;
-  storeName: string | null;
-  categoryId: number | null;
-  category?: CategorySummary | null;
-};
-
-export type MergeStoreNamesResponse = {
-  updatedCount: number;
-};
-
 // --- admin ---
 export type PromptTemplate = {
   id: number;
@@ -244,9 +355,24 @@ export const API_SCHEMA_EXPORTS = [
   'LoginResponse',
   'TotpSetupInfo',
   'CategorySummary',
+  'ProductTypeSummary',
+  'ProductTypeStatus',
+  'ClassificationSource',
+  'ClassificationConfidence',
+  'ClassificationCorrectionScope',
+  'ProductClassificationCandidateSource',
+  'ProductClassificationCandidateSummary',
+  'ProductClassificationReclassificationRunStatus',
+  'ProductClassificationReclassificationItemOutcome',
+  'CreateProductClassificationReclassificationRunRequest',
+  'ProductClassificationReclassificationItemAudit',
+  'ProductClassificationReclassificationRun',
+  'ProductClassificationReviewItem',
+  'UpdateItemProductClassificationRequest',
   'ItemSplitSummary',
   'ReceiptItemDetail',
   'ReceiptDetail',
+  'ReceiptListPage',
   'ReceiptValidation',
   'ReceiptJobListItem',
   'ReceiptJobStatus',
@@ -262,9 +388,6 @@ export const API_SCHEMA_EXPORTS = [
   'SettlementTransfer',
   'SettlementStatusData',
   'Category',
-  'OptimizeCategoryResponse',
-  'ProductMaster',
-  'MergeStoreNamesResponse',
   'PromptTemplate',
   'AdminCostStatRow',
   'HealthResponse',

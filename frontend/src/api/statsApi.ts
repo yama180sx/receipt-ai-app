@@ -6,6 +6,7 @@ import type {
   MonthlyStatsData,
   SettlementStatusData,
   SettlementTransfer,
+  ProductClassificationStatsData,
 } from './generated';
 
 /** 統計・精算 API（/api/stats/*） */
@@ -17,6 +18,11 @@ export const statsApi = {
 
   async getAdvancedStats(): Promise<ApiSuccessResponse<AdvancedStatsData>> {
     const res = await apiClient.get('/stats/advanced');
+    return res.data;
+  },
+
+  async getProductClassificationStats(month: string): Promise<ApiSuccessResponse<ProductClassificationStatsData>> {
+    const res = await apiClient.get('/stats/product-classification', { params: { month } });
     return res.data;
   },
 

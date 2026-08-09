@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Prisma } from '@prisma/client';
 import logger from '../../utils/logger';
 import { AppError } from '../../utils/appError';
 import type { TenantContext } from '../../utils/context';
@@ -19,6 +20,15 @@ import type { AdminCostStatDomain } from '../../mappers/adminMapper';
 const RATE_USD_TO_JPY = 150;
 const PRICE_USD_PER_INPUT = 0.075 / 1000000;
 const PRICE_USD_PER_OUTPUT = 0.3 / 1000000;
+
+function toDomainHints(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Prisma.InputJsonObject;
+  }
+  throw new AppError('Domain Hints はJSONオブジェクトで指定してください', 400);
+}
 
 const syncPromptsToJson = async (familyGroupId: number) => {
   try {
@@ -68,7 +78,7 @@ export async function createPromptTemplate(
     name,
     description,
     systemPrompt,
-    domainHints,
+    domainHints: toDomainHints(domainHints),
     isActive,
     version: 1,
     familyGroupId,
@@ -97,7 +107,7 @@ export async function updatePromptTemplate(
     name: input.name,
     description: input.description,
     systemPrompt: input.systemPrompt,
-    domainHints: input.domainHints,
+    domainHints: toDomainHints(input.domainHints),
     version: { increment: 1 },
   });
 

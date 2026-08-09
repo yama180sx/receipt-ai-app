@@ -7,6 +7,7 @@ import {
   StatsLatestReceiptPreview,
   StatsPieChart,
   StatsParetoSection,
+  ProductClassificationStatsSection,
   StatsSummaryCard,
   StatsTrendSection,
   statsScreenStyles,
@@ -67,6 +68,8 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ currentMembe
           <View style={stats.isWide ? statsScreenStyles.dashboardGrid : undefined}>
             <View style={stats.isWide ? statsScreenStyles.leftColumn : undefined}>
               <StatsSummaryCard data={stats.data} />
+
+              <ProductClassificationStatsSection data={stats.productClassificationData} />
 
               <View style={cardStyles.section}>
                 <Text style={statsScreenStyles.sectionTitle}>支出内訳</Text>

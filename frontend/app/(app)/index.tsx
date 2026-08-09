@@ -44,6 +44,8 @@ export default function HomeRoute() {
           onGoToReceiptTray={() => router.push('/tray')}
           onGoToSettlement={() => router.push('/settlement')}
           onGoToAdminMenu={() => router.push('/admin')}
+          onGoToProductClassificationReview={() => router.push('/product-classification-review')}
+          onGoToProductClassificationLearningData={() => router.push('/product-classification-learning-data')}
           currentMemberId={currentMemberId}
           memberName={currentMemberName}
           userRole={currentUserRole}

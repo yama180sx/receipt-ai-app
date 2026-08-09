@@ -17,11 +17,10 @@ export function toReceiptForSplitEditor(receipt: ReceiptDetail): ReceiptForSplit
 }
 
 export async function loadReceiptForSplitEditor(receiptId: number): Promise<ReceiptForSplitEditor | null> {
-  const res = await receiptApi.listReceipts();
+  const res = await receiptApi.getReceipt(receiptId);
   if (!res.success) {
     return null;
   }
 
-  const receipt = res.data.find((row) => row.id === receiptId);
-  return receipt ? toReceiptForSplitEditor(receipt) : null;
+  return toReceiptForSplitEditor(res.data);
 }

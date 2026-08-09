@@ -12,8 +12,11 @@ type Props = {
   onGoToReceiptTray: () => void;
   onItemPress: (item: ReceiptTrayItem) => void;
   onItemDiscard: (item: ReceiptTrayItem) => void;
+  onItemRetry: (item: ReceiptTrayItem) => void;
   canOpenItem: (item: ReceiptTrayItem) => boolean;
   canDiscardItem: (item: ReceiptTrayItem) => boolean;
+  canRetryItem: (item: ReceiptTrayItem) => boolean;
+  retryingJobId: string | null;
 };
 
 export const HomeTrayPreview: React.FC<Props> = ({
@@ -22,8 +25,11 @@ export const HomeTrayPreview: React.FC<Props> = ({
   onGoToReceiptTray,
   onItemPress,
   onItemDiscard,
+  onItemRetry,
   canOpenItem,
   canDiscardItem,
+  canRetryItem,
+  retryingJobId,
 }) => (
   <View style={homeScreenStyles.traySection}>
     <View style={homeScreenStyles.traySectionHeader}>
@@ -41,8 +47,11 @@ export const HomeTrayPreview: React.FC<Props> = ({
       onOpenFullTray={onGoToReceiptTray}
       onItemPress={onItemPress}
       onItemDiscard={onItemDiscard}
+      onItemRetry={onItemRetry}
       canOpenItem={canOpenItem}
       canDiscardItem={canDiscardItem}
+      canRetryItem={canRetryItem}
+      retryingJobId={retryingJobId}
       emptyTitle="確認待ちのレシートはありません"
       emptyDescription="撮影したレシートの解析状況がここに表示されます。"
     />

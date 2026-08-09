@@ -3,7 +3,7 @@ info:
   title: Receipt AI App API
   description: |
     OpenAPI 正本（全公開 API）。
-    Phase 1: auth / receipt / stats — Phase 2 (#98-8-10): category / productMaster / admin / upload / health。
+    Phase 1: auth / receipt / stats — Phase 2 (#98-8-10): category / admin / upload / health。
     詳細な as-built 仕様は docs/design/api-spec.md を参照。
   version: 1.1.0
 
@@ -18,12 +18,274 @@ tags:
   - name: receipt
   - name: stats
   - name: category
-  - name: productMaster
   - name: admin
   - name: upload
   - name: health
 
 paths:
+  /product-types:
+    get:
+      tags: [product-classification]
+      summary: 有効な商品種別一覧取得
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductTypeSummary'
+
+  /product-classification/review-items:
+    get:
+      tags: [product-classification]
+      summary: 要確認・未分類の商品明細一覧取得
+      description: 世帯内の needs_review、unclassified、outside_initial_scope の商品明細を取得する。商品種別対象外の not_applicable（対象外カテゴリおよび承認済みの値引き・アプリ適用行）は含めない。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: カンマ区切りの分類状態。省略時は要確認対象の全状態。
+          schema:
+            type: string
+            example: needs_review,unclassified,outside_initial_scope
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          description: 対象月（YYYY-MM）
+          schema:
+            type: string
+            pattern: '^\\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationReviewItem'
+
+  /product-classification/learning-data:
+    get:
+      tags: [product-classification]
+      summary: 世帯の商品分類学習データ一覧取得
+      description: 世帯辞書・確定履歴を取得する。標準ルールは返却せず、確定履歴は参照専用である。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationLearningData'
+
+  /product-classification/learning-data/{type}/{id}/deactivate:
+    patch:
+      tags: [product-classification]
+      summary: 世帯の商品分類学習データを無効化
+      description: 世帯辞書のみ無効化できる。確定履歴と標準ルールは変更できない。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [household_dictionary]
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateProductClassificationLearningDataRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationLearningData'
+
+  /admin/product-classification/reclassification-runs:
+    post:
+      tags: [product-classification]
+      summary: 世帯内の既存明細を再分類（管理者）
+      description: |
+        指定世帯の未分類・要確認明細を再評価する。承認済みの負額の値引き・アプリ適用行は、辞書・類似候補より先に商品種別対象外へ更新する。
+        手動確定済み明細は対象外で、実行条件と変更内容は監査ログに保存する。管理者権限と二要素認証が必要。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductClassificationReclassificationRunRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationReclassificationRun'
+
+  /admin/product-classification/standard-rules:
+    get:
+      tags: [product-classification]
+      summary: 標準分類ルール一覧取得（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/StandardProductClassificationRule' }
+    post:
+      tags: [product-classification]
+      summary: 標準分類ルール追加（管理者）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
+
+  /admin/product-classification/standard-rules/preview:
+    post:
+      tags: [product-classification]
+      summary: 標準分類ルールの自世帯内プレビュー（管理者）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PreviewStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRulePreview' } }
+
+  /admin/product-classification/standard-rules/{id}:
+    patch:
+      tags: [product-classification]
+      summary: 標準分類ルール更新（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertStandardProductClassificationRuleRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
+
+  /admin/product-classification/standard-rules/{id}/deactivate:
+    patch:
+      tags: [product-classification]
+      summary: 標準分類ルール無効化（管理者）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeactivateProductClassificationLearningDataRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/StandardProductClassificationRule' } }
+
   /auth/resolve-family:
     post:
       tags: [auth]
@@ -201,6 +463,24 @@ paths:
           in: query
           schema:
             type: string
+        - name: q
+          in: query
+          description: 店舗名または明細名の類似検索語
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: 取得件数（省略時20、1〜50）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          description: 次ページ取得用の署名付き不透明カーソル
+          schema:
+            type: string
       responses:
         '200':
           description: OK
@@ -212,9 +492,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/ReceiptDetail'
+                        $ref: '#/components/schemas/ReceiptListPage'
     post:
       tags: [receipt]
       summary: 手動レシート登録
@@ -266,6 +544,30 @@ paths:
                           - type: 'null'
 
   /receipts/{id}:
+    get:
+      tags: [receipt]
+      summary: レシート詳細 1 件
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptDetail'
     patch:
       tags: [receipt]
       summary: レシート全体編集
@@ -418,6 +720,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiMessageEnvelope'
 
+  /receipts/jobs/{jobId}/retry:
+    post:
+      tags: [receipt]
+      summary: 失敗した解析ジョブを同じ画像で再実行
+      description: 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadJobResponse'
+        '404':
+          description: Not Found
+        '409':
+          description: 再実行できないジョブ状態または元画像なし
+
   /receipts/status/{jobId}:
     get:
       tags: [receipt]
@@ -473,6 +805,66 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/ReceiptItemDetail'
+
+  /receipts/items/{itemId}/product-classification:
+    patch:
+      tags: [receipt]
+      summary: 明細商品種別修正
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemProductClassificationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReceiptItemDetail'
+
+  /receipts/items/{itemId}/product-classification-candidates:
+    get:
+      tags: [receipt]
+      summary: 明細の商品分類候補取得
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductClassificationCandidateSummary'
+        '404':
+          description: Not Found
 
   /receipts/items/{itemId}/splits:
     post:
@@ -577,6 +969,32 @@ paths:
                       data:
                         $ref: '#/components/schemas/AdvancedStatsData'
 
+  /stats/product-classification:
+    get:
+      tags: [stats]
+      summary: 商品分類統計
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductClassificationStatsData'
+
   /stats/settlement:
     get:
       tags: [stats]
@@ -675,173 +1093,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Category'
-    post:
-      tags: [category]
-      summary: カテゴリ新規作成
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateCategoryRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/Category'
-
-  /categories/{id}:
-    delete:
-      tags: [category]
-      summary: カテゴリ削除
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiMessageEnvelope'
-
-  /categories/optimize:
-    post:
-      tags: [category]
-      summary: ProductMaster からキーワード最適化
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/OptimizeCategoryResponse'
-
-  /product-master:
-    get:
-      tags: [productMaster]
-      summary: 学習マスタ一覧
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-        - name: store
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/ProductMaster'
-
-  /product-master/{id}:
-    patch:
-      tags: [productMaster]
-      summary: マスタ個別更新
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProductMasterRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/ProductMaster'
-    delete:
-      tags: [productMaster]
-      summary: マスタ削除
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiMessageEnvelope'
-
-  /product-master/merge-stores:
-    post:
-      tags: [productMaster]
-      summary: 店舗名統合
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MergeStoreNamesRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/MergeStoreNamesResponse'
-
   /uploads/{filename}:
     get:
       tags: [upload]
@@ -1145,6 +1396,279 @@ components:
           type: string
           nullable: true
 
+    ProductTypeSummary:
+      type: object
+      required: [id, code, name, standardCategoryId]
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        standardCategoryId:
+          type: integer
+
+    ProductTypeStatus:
+      type: string
+      description: classified は商品種別確定、needs_review と unclassified は商品分類対象、outside_initial_scope は初期種別範囲外、not_applicable は商品種別対象外（対象外カテゴリまたは承認済みの値引き・アプリ適用行）。
+      enum: [classified, needs_review, unclassified, outside_initial_scope, not_applicable]
+
+    ClassificationSource:
+      type: string
+      enum: [history, household_dictionary, standard_dictionary, similarity, ai, manual]
+
+    ClassificationCorrectionScope:
+      type: string
+      enum: [item_only, same_ocr_name]
+
+    ProductClassificationCandidateSource:
+      type: string
+      enum: [history, household_dictionary, standard_dictionary]
+
+    ProductClassificationCandidateSummary:
+      type: object
+      required: [productType, source, matchedNormalizedName, similarity, rank]
+      properties:
+        productType:
+          $ref: '#/components/schemas/ProductTypeSummary'
+        source:
+          $ref: '#/components/schemas/ProductClassificationCandidateSource'
+        matchedNormalizedName:
+          type: string
+        similarity:
+          type: number
+          format: float
+        rank:
+          type: integer
+
+    ProductClassificationReviewItem:
+      type: object
+      required: [item, receiptId, receiptDate, storeName]
+      properties:
+        item:
+          $ref: '#/components/schemas/ReceiptItemDetail'
+        receiptId:
+          type: integer
+        receiptDate:
+          type: string
+          format: date-time
+          nullable: true
+        storeName:
+          type: string
+
+    ProductClassificationLearningDataType:
+      type: string
+      enum: [household_dictionary, history]
+
+    ProductClassificationLearningData:
+      type: object
+      required: [id, type, normalizedName, productType, isActive, createdAt, updatedAt, lastDeactivationAudit]
+      properties:
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/ProductClassificationLearningDataType'
+        normalizedName:
+          type: string
+        productType:
+          $ref: '#/components/schemas/ProductTypeSummary'
+        isActive:
+          type: boolean
+          nullable: true
+          description: 確定履歴は参照専用のため null
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastDeactivationAudit:
+          allOf:
+            - $ref: '#/components/schemas/ProductClassificationLearningDataAudit'
+          nullable: true
+
+    ProductClassificationLearningDataAudit:
+      type: object
+      required: [reason, actorMemberName, familyGroupName, createdAt]
+      properties:
+        reason:
+          type: string
+        actorMemberName:
+          type: string
+          nullable: true
+        familyGroupName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    DeactivateProductClassificationLearningDataRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    UpsertStandardProductClassificationRuleRequest:
+      type: object
+      required: [keyword, productTypeId, priority, reason]
+      properties:
+        keyword: { type: string, minLength: 1, maxLength: 100 }
+        productTypeId: { type: integer, minimum: 1 }
+        priority: { type: integer, minimum: 0, maximum: 100000 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    PreviewStandardProductClassificationRuleRequest:
+      type: object
+      required: [keyword]
+      properties:
+        keyword: { type: string, minLength: 1, maxLength: 100 }
+
+    StandardProductClassificationRule:
+      type: object
+      required: [id, keyword, productType, priority, isActive, createdByMemberName, updatedByMemberName, lastChangeReason, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        keyword: { type: string }
+        productType: { $ref: '#/components/schemas/ProductTypeSummary' }
+        priority: { type: integer }
+        isActive: { type: boolean }
+        createdByMemberName: { type: string, nullable: true }
+        updatedByMemberName: { type: string, nullable: true }
+        lastChangeReason: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StandardProductClassificationRulePreviewItem:
+      type: object
+      required: [id, name, normalizedName]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        normalizedName: { type: string }
+
+    StandardProductClassificationRulePreview:
+      type: object
+      required: [normalizedKeyword, matchedCount, items]
+      properties:
+        normalizedKeyword: { type: string }
+        matchedCount: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StandardProductClassificationRulePreviewItem' }
+
+    ProductClassificationReclassificationRunStatus:
+      type: string
+      enum: [completed, partial_failure]
+
+    ProductClassificationReclassificationItemOutcome:
+      type: string
+      enum: [updated, unchanged, failed]
+
+    CreateProductClassificationReclassificationRunRequest:
+      type: object
+      properties:
+        statuses:
+          type: array
+          description: 対象にする未確定状態。省略時は unclassified と needs_review。
+          minItems: 1
+          items:
+            type: string
+            enum: [unclassified, needs_review]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+
+    ProductClassificationReclassificationItemAudit:
+      type: object
+      required: [itemId, outcome, previousProductTypeStatus, nextProductTypeStatus, previousClassificationSource, nextClassificationSource, createdAt]
+      properties:
+        itemId:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/ProductClassificationReclassificationItemOutcome'
+        previousProductTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        nextProductTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        previousProductTypeId:
+          type: integer
+          nullable: true
+        nextProductTypeId:
+          type: integer
+          nullable: true
+        previousClassificationSource:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+          nullable: true
+        nextClassificationSource:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ProductClassificationReclassificationRun:
+      type: object
+      required: [id, statuses, limit, selectedCount, updatedCount, unchangedCount, failedCount, status, createdAt, completedAt, itemAudits]
+      properties:
+        id:
+          type: integer
+        statuses:
+          type: array
+          items:
+            type: string
+            enum: [unclassified, needs_review]
+        startDate:
+          type: string
+          format: date-time
+          nullable: true
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        limit:
+          type: integer
+        selectedCount:
+          type: integer
+        updatedCount:
+          type: integer
+        unchangedCount:
+          type: integer
+        failedCount:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ProductClassificationReclassificationRunStatus'
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        itemAudits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductClassificationReclassificationItemAudit'
+
+    ClassificationConfidence:
+      type: string
+      enum: [high, medium, low]
+
     ItemSplitSummary:
       type: object
       required: [id, itemId, familyMemberId, amount]
@@ -1160,7 +1684,9 @@ components:
 
     ReceiptItemDetail:
       type: object
-      required: [id, name, price, quantity, categoryId]
+      required:
+        [id, name, price, quantity, categoryId, standardCategoryId, productTypeId, productType,
+         productTypeStatus, classificationSource, classificationConfidence]
       properties:
         id:
           type: integer
@@ -1176,6 +1702,26 @@ components:
         category:
           oneOf:
             - $ref: '#/components/schemas/CategorySummary'
+            - type: 'null'
+        standardCategoryId:
+          type: integer
+          nullable: true
+        productTypeId:
+          type: integer
+          nullable: true
+        productType:
+          oneOf:
+            - $ref: '#/components/schemas/ProductTypeSummary'
+            - type: 'null'
+        productTypeStatus:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        classificationSource:
+          oneOf:
+            - $ref: '#/components/schemas/ClassificationSource'
+            - type: 'null'
+        classificationConfidence:
+          oneOf:
+            - $ref: '#/components/schemas/ClassificationConfidence'
             - type: 'null'
         splits:
           type: array
@@ -1208,6 +1754,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReceiptItemDetail'
+
+    ReceiptListPage:
+      type: object
+      required: [items, nextCursor, hasNext]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptDetail'
+        nextCursor:
+          type: string
+          nullable: true
+        hasNext:
+          type: boolean
 
     ManualReceiptRequest:
       type: object
@@ -1349,6 +1909,15 @@ components:
         failedReason:
           type: string
           nullable: true
+        retry:
+          type: object
+          description: 失敗ジョブの手動再実行可否。サーバー側ポリシーで判定する。
+          properties:
+            eligible:
+              type: boolean
+            remainingCount:
+              type: integer
+              minimum: 0
         parsedData:
           type: object
           properties:
@@ -1394,6 +1963,15 @@ components:
       properties:
         categoryId:
           type: integer
+
+    UpdateItemProductClassificationRequest:
+      type: object
+      required: [productTypeId, scope]
+      properties:
+        productTypeId:
+          type: integer
+        scope:
+          $ref: '#/components/schemas/ClassificationCorrectionScope'
 
     SaveItemSplitsRequest:
       type: object
@@ -1442,6 +2020,7 @@ components:
             - type: 'null'
 
     CategoryStatRow:
+      description: 月次カテゴリ集計。調整Categoryの負額は、同一レシートの通常Categoryへ統計時のみ比例配賦され、配賦対象がなければ調整Categoryとして返る。
       type: object
       properties:
         categoryId:
@@ -1456,6 +2035,63 @@ components:
         color:
           type: string
           nullable: true
+
+    ProductTypeStatRow:
+      type: object
+      required: [productTypeId, productTypeName, totalAmount, itemCount]
+      properties:
+        productTypeId:
+          type: integer
+        productTypeName:
+          type: string
+        totalAmount:
+          type: number
+        itemCount:
+          type: integer
+
+    ProductClassificationCategoryStatRow:
+      type: object
+      required: [standardCategoryId, standardCategoryName, parentCategoryName, totalAmount, productTypes]
+      properties:
+        standardCategoryId:
+          type: integer
+        standardCategoryName:
+          type: string
+        parentCategoryName:
+          type: string
+        totalAmount:
+          type: number
+        productTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductTypeStatRow'
+
+    ProductTypeStatusStatRow:
+      type: object
+      required: [status, totalAmount, itemCount]
+      properties:
+        status:
+          $ref: '#/components/schemas/ProductTypeStatus'
+        totalAmount:
+          type: number
+        itemCount:
+          type: integer
+
+    ProductClassificationStatsData:
+      type: object
+      required: [month, categoryStats, unresolved]
+      properties:
+        month:
+          type: string
+        categoryStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductClassificationCategoryStatRow'
+        unresolved:
+          type: array
+          description: ProductType 未設定の分類状態別集計。特定 ProductType の集計には含めない。
+          items:
+            $ref: '#/components/schemas/ProductTypeStatusStatRow'
 
     AdvancedStatsData:
       type: object
@@ -1579,71 +2215,6 @@ components:
           type: array
           items:
             type: string
-
-    CreateCategoryRequest:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-        color:
-          type: string
-          nullable: true
-
-    OptimizeCategoryResponse:
-      type: object
-      required: [addedCount, message]
-      properties:
-        addedCount:
-          type: integer
-        message:
-          type: string
-
-    ProductMaster:
-      type: object
-      required: [id, name, storeName, categoryId]
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        storeName:
-          type: string
-        categoryId:
-          type: integer
-        category:
-          $ref: '#/components/schemas/CategorySummary'
-        updatedAt:
-          type: string
-          format: date-time
-
-    UpdateProductMasterRequest:
-      type: object
-      properties:
-        name:
-          type: string
-        storeName:
-          type: string
-        categoryId:
-          type: integer
-
-    MergeStoreNamesRequest:
-      type: object
-      required: [sourceStoreName, targetStoreName]
-      properties:
-        sourceStoreName:
-          type: string
-        targetStoreName:
-          type: string
-
-    MergeStoreNamesResponse:
-      type: object
-      required: [message, count]
-      properties:
-        message:
-          type: string
-        count:
-          type: integer
 
     PromptTemplate:
       type: object

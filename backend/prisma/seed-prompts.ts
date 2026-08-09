@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  const familyGroups = await prisma.familyGroup.findMany({ orderBy: { id: 'asc' } });
+  if (familyGroups.length === 0) {
+    throw new Error('PromptTemplateを作成するFamilyGroupがありません。先に世帯を作成してください。');
+  }
+
   const analysisPrompt = {
     key: "RECEIPT_ANALYSIS",
     description: "レシート画像から店舗名、日付、品目、税額を抽出するための基本プロンプト",
@@ -39,13 +44,42 @@ async function main() {
     version: 1
   };
 
-  await prisma.promptTemplate.upsert({
-    where: { key: analysisPrompt.key },
-    update: analysisPrompt,
-    create: analysisPrompt,
-  });
+  const productClassificationPrompt = {
+    key: "PRODUCT_CLASSIFICATION",
+    description: "商品候補から商品種別を選択するための基本プロンプト",
+    systemPrompt: `あなたは家計簿レシートの商品分類を支援するアシスタントです。
+入力の各 item について、candidates に示された候補だけを用いて最も適切な productTypeId を選択してください。
+候補に適切なものがない、または判断できない場合は productTypeId を null にしてください。
+itemId は入力値をそのまま返し、confidence は high / medium / low のいずれかにしてください。
 
-  console.log('✅ PromptTemplate initial seed completed with optimized Tax logic.');
+出力形式（JSON のみ）:
+{
+  "items": [
+    { "itemId": 1, "productTypeId": 2, "confidence": "high" }
+  ]
+}`,
+    isActive: true,
+    version: 1,
+  };
+
+  const prompts = [analysisPrompt, productClassificationPrompt];
+
+  for (const familyGroup of familyGroups) {
+    for (const prompt of prompts) {
+      const existing = await prisma.promptTemplate.findFirst({
+        where: { familyGroupId: familyGroup.id, key: prompt.key },
+        orderBy: { id: 'asc' },
+      });
+
+      if (existing) {
+        await prisma.promptTemplate.update({ where: { id: existing.id }, data: prompt });
+      } else {
+        await prisma.promptTemplate.create({ data: { ...prompt, familyGroupId: familyGroup.id } });
+      }
+    }
+  }
+
+  console.log('✅ PromptTemplate initial seed completed.');
 }
 
 main()

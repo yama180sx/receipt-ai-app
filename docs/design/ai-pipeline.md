@@ -30,6 +30,25 @@ RecAIpt の AI パイプラインは、レシート画像を **Google Gemini** �
 
 ---
 
+## 1.1 商品分類 AI の契約境界
+
+商品分類はレシート画像解析とは別の AI 呼び出しとして扱う。画像や自由入力の分類候補を渡さず、類似検索などで絞り込んだ候補だけを Gemini に提示する。
+
+| 項目 | 内容 |
+|------|------|
+| プロンプトキー | `PRODUCT_CLASSIFICATION`（`PromptTemplate` の世帯別レコード） |
+| Provider | `ProductClassificationProvider` / `GeminiProductClassificationProvider` |
+| 入力 | `familyGroupId`、任意の店舗名、明細 ID・OCR 名・正規化名・候補の商品種別（標準カテゴリを含む） |
+| 出力 | 明細 ID、候補内の商品種別 ID または `null`、`high` / `medium` / `low` の確信度 |
+| 検証 | JSON スキーマ、明細 ID の重複・未知 ID、候補外商品種別、確信度を全件検証する。不正な応答はバッチ全体を拒否する。 |
+| 永続化 | Provider / 契約検証層は DB に保存しない。保存後の統合サービスが結果を反映し、利用量記録は別途の分類フローが担当する。 |
+
+実装は `backend/src/ai/productClassificationAiService.ts` を契約境界とする。Provider は Gemini の生テキストを返し、サービス層が契約検証済みの結果だけを後続処理へ渡す。これにより、AI が候補外の種別を返しても保存処理へ到達しない。
+
+`productClassificationAiIntegrationService.ts` は、レシート・明細の保存完了後に候補を持つ `needs_review` 明細だけを一括送信する。承認済みの明細名パターンに一致する負額の値引き・アプリ適用行は、候補作成前に `not_applicable` として保存されるため、AI入力に含まれない。`high` の候補内選択だけを `classified` / `ai` として確定し、それ以外・未返却結果は候補を残した `needs_review` とする。AI通信・検証・反映の失敗は記録して吸収し、レシート保存を失敗させない。失敗監査には設定モデル名と、`http_429`・`network_etimedout`・`prompt_not_found`・`response_validation` などの安全な固定コードだけを保存し、生の例外文や認証情報は保存しない。
+
+---
+
 ## 2. 3層正規化
 
 フェーズ1（[MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md)）で定義した設計思想を、現行実装に沿って整理する。3 層は **適用タイミング** が異なる。
@@ -196,6 +215,7 @@ sequenceDiagram
 | 確認トレイ | `ReceiptTrayContext` — 完了ジョブを一覧表示し、`ReceiptScanScreen` へ遷移 |
 | 重複警告 | 完了ジョブに `duplicateSuspected` / `existingReceiptId` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — キュー除去 + 未保存画像削除 |
+| 失敗ジョブの再実行 | `POST /api/receipts/jobs/:jobId/retry` — 元画像が残る本人の Gemini 日次クォータ超過だけを同じ画像で再投入。自動再試行はしない |
 
 #### 確認画面（`ReceiptScanScreen`）
 
@@ -272,6 +292,7 @@ flowchart TB
 | 404 秘匿 | 他世帯・他メンバーのジョブ ID は 404（存在を漏らさない） |
 | commit 後 | `removeReceiptJobAfterCommit` — キューから除去（画像は Receipt に紐づくため残す） |
 | 破棄 | `discardReceiptJobForMember` — キュー除去 + 未保存画像ファイル削除 |
+| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。既定は Gemini 日次クォータ超過のみ・手動再実行1回まで |
 
 ---
 
@@ -285,6 +306,8 @@ flowchart TB
 | `GEMINI_MODEL` | `gemini-2.0-flash` | 使用モデル |
 | `GEMINI_RETRY_COUNT` | `3` | 429 / 5xx リトライ回数 |
 | `GEMINI_RETRY_DELAY` | `2000` | 初回リトライ待機 ms（指数バックオフ） |
+| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要 |
+| `RECEIPT_MANUAL_RETRY_FAILURE_CODES` | `gemini_daily_quota` | 手動再実行を許可する失敗コード（カンマ区切り）。現行の候補は `gemini_daily_quota`、`http_429`、`http_5xx` |
 
 ### 6.2 解析処理（`analyzeReceiptImage`）
 
@@ -399,11 +422,12 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 
 | 対象 | 方針 | 根拠 |
 |------|------|------|
-| Gemini | 結合テストで `vi.mock('../services/geminiService')` 等 | [testing/plan.md §4](../testing/plan.md) |
-| BullMQ Worker | テスト時は `receiptWorker` を import しない | `app.ts` / `server.ts` 分離（#91-3） |
-| Redis / Queue | Supertest 結合テストは Worker なしで API のみ検証 | `app.integration.test.ts` |
+| Gemini | レシート解析フローは `ReceiptAnalysisProvider` を差し替え、直接依存のテストだけ `vi.mock()` を使う | [testing/plan.md §4](../testing/plan.md) |
+| BullMQ Worker | テスト時は `server.ts` / `receiptWorker` を import しない | `app.ts` / `server.ts` 分離（#91-3） |
+| Redis / Queue | Supertest結合テストはファイル先頭で `test/mockReceiptQueue` を import し、Redis接続なしで API のみ検証する | `mockReceiptQueue.ts` |
+| normalizer | `getCleanText` は単体テスト、Prisma依存の `normalizeStoreName` はDB結合テスト | [testing/plan.md §4](../testing/plan.md) |
 
-詳細なモック戦略は Should 優先の [#91-7 / Issue #284](https://github.com/yama180sx/receipt-ai-app/issues/284) で拡充予定。本パイプラインの E2E（実 OCR）は [testing/plan.md §3](../testing/plan.md) のスコープ外とする。
+実Gemini OCR・実Redis Workerを通すE2Eは [testing/plan.md §3](../testing/plan.md) のスコープ外とし、手動回帰で確認する。
 
 ---
 
@@ -415,7 +439,7 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 | `backend/src/services/receiptService.ts` | `analyzeOnly`, `saveParsedReceipt`, `saveConfirmedReceipt` |
 | `backend/src/workers/receiptWorker.ts` | BullMQ Worker |
 | `backend/src/queues/receiptQueue.ts` | キュー定義 |
-| `backend/src/services/receiptJobService.ts` | ジョブ一覧・enrich・破棄 |
+| `backend/src/services/receiptJobService.ts` | ジョブ一覧・enrich・破棄・失敗ジョブ再実行 |
 | `backend/src/utils/normalizer.ts` | 3層正規化（形式・表記） |
 | `backend/src/services/categoryService.ts` | カテゴリ推定 |
 | `backend/src/controllers/adminController.ts` | プロンプト CRUD |

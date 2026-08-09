@@ -50,23 +50,14 @@ describe.skipIf(!shouldRunDbIntegration())('Category tenant isolation (#93-4)', 
 
     expect(resA.status).toBe(200);
     expect(resB.status).toBe(200);
-    expect(resA.body.data).toHaveLength(10);
-    expect(resB.body.data).toHaveLength(10);
+    expect(resA.body.data).toHaveLength(11);
+    expect(resB.body.data).toHaveLength(11);
+    expect(resA.body.data).toContainEqual(expect.objectContaining({ name: '値引き等' }));
+    expect(resB.body.data).toContainEqual(expect.objectContaining({ name: '値引き等' }));
 
     const idsA = resA.body.data.map((c: { id: number }) => c.id);
     const idsB = resB.body.data.map((c: { id: number }) => c.id);
     expect(idsA.some((id: number) => idsB.includes(id))).toBe(false);
-  });
-
-  it('rejects cross-tenant category delete', async () => {
-    const tenantBCategoryId = await getTenantBCategoryId();
-    const tokenA = await loginAsTestMember(app, 1);
-
-    const res = await request(app)
-      .delete(`/api/categories/${tenantBCategoryId}`)
-      .set('Authorization', `Bearer ${tokenA}`);
-
-    expect(res.status).toBe(404);
   });
 
   it('rejects cross-tenant item category assignment', async () => {

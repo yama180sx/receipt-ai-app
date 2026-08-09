@@ -65,3 +65,5 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | [docs/testing/findings.md](../testing/findings.md) | テストで確定した挙動 |
 | [docs/specs/comparison-chatgpt-vs-design.md](../specs/comparison-chatgpt-vs-design.md) | ChatGPT 仕様との突合 |
 | [docs/reviews/issue-87/README.md](../reviews/issue-87/README.md) | 精算ドメイン詳細レビュー |
+| [docs/features/product-classification/README.md](../features/product-classification/README.md) | 商品単位AI自動分類の将来仕様（Issue #107） |
+| [docs/standards/10_設計・実装規約.md](../standards/10_設計・実装規約.md) | 全体で守る実装規約 |

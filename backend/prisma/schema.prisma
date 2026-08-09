@@ -10,39 +10,112 @@ datasource db {
 // [Issue #73] ユーザーの権限レベルを定義
 enum Role {
   ADMIN // 管理者 (プロンプト編集・コスト統計の閲覧が可能)
-  USER  // 一般ユーザー (レシートの登録・閲覧のみ)
+  USER // 一般ユーザー (レシートの登録・閲覧のみ)
+}
+
+enum ProductTypeStatus {
+  CLASSIFIED            @map("classified")
+  NEEDS_REVIEW          @map("needs_review")
+  UNCLASSIFIED          @map("unclassified")
+  OUTSIDE_INITIAL_SCOPE @map("outside_initial_scope")
+  NOT_APPLICABLE        @map("not_applicable")
+}
+
+enum ClassificationSource {
+  HISTORY              @map("history")
+  HOUSEHOLD_DICTIONARY @map("household_dictionary")
+  STANDARD_DICTIONARY  @map("standard_dictionary")
+  SIMILARITY           @map("similarity")
+  AI                   @map("ai")
+  MANUAL               @map("manual")
+}
+
+enum ClassificationConfidence {
+  HIGH   @map("high")
+  MEDIUM @map("medium")
+  LOW    @map("low")
+}
+
+enum ProductClassificationAiRunStatus {
+  SUCCEEDED         @map("succeeded")
+  INVALID_RESPONSE  @map("invalid_response")
+  PROVIDER_ERROR    @map("provider_error")
+  PERSISTENCE_ERROR @map("persistence_error")
+}
+
+enum ClassificationCorrectionScope {
+  ITEM_ONLY     @map("item_only")
+  SAME_OCR_NAME @map("same_ocr_name")
+}
+
+enum ProductClassificationCandidateSource {
+  HISTORY              @map("history")
+  HOUSEHOLD_DICTIONARY @map("household_dictionary")
+  STANDARD_DICTIONARY  @map("standard_dictionary")
+}
+
+enum ProductClassificationLearningDataType {
+  HOUSEHOLD_DICTIONARY @map("household_dictionary")
+}
+
+enum ProductClassificationReclassificationRunStatus {
+  COMPLETED       @map("completed")
+  PARTIAL_FAILURE @map("partial_failure")
+}
+
+enum ProductClassificationReclassificationItemOutcome {
+  UPDATED   @map("updated")
+  UNCHANGED @map("unchanged")
+  FAILED    @map("failed")
+}
+
+enum StandardProductClassificationRuleAuditAction {
+  CREATED     @map("created")
+  UPDATED     @map("updated")
+  DEACTIVATED @map("deactivated")
 }
 
 // [Issue #45] 世帯（テナント）最上位テーブル
 model FamilyGroup {
-  id                 Int                  @id @default(autoincrement())
-  name               String               // 世帯名 (例: 山本家)
-  inviteCode         String               @unique @default(cuid()) // 家族招待用のコード
-  members            FamilyMember[]
-  receipts           Receipt[]
-  productMasters     ProductMaster[]
-  categories         Category[]
-  stores             Store[]
-  promptTemplates    PromptTemplate[]
-  settlementTransfers SettlementTransfer[]
-  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  id                        Int                            @id @default(autoincrement())
+  name                      String // 世帯名 (例: 山本家)
+  inviteCode                String                         @unique @default(cuid()) // 家族招待用のコード
+  members                   FamilyMember[]
+  receipts                  Receipt[]
+  categories                Category[]
+  stores                    Store[]
+  promptTemplates           PromptTemplate[]
+  settlementTransfers       SettlementTransfer[]
+  productDictionaries       HouseholdProductDictionary[]
+  productHistories          ProductClassificationHistory[]
+  classificationCorrections ClassificationCorrection[]
+  productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
+  productClassificationAiRuns ProductClassificationAiRun[]
+  productClassificationReclassificationRuns ProductClassificationReclassificationRun[]
+  createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
 }
 
 // 家族構成
 model FamilyMember {
-  id            Int           @id @default(autoincrement())
-  name          String
-  password_hash String?
-  familyGroupId Int           // ★ 所属世帯
-  role          Role          @default(USER) // [Issue #73] デフォルトは一般ユーザー
-  totpSecret    String?       // [Issue #93-5] TOTP シークレット（暗号化保存）
-  totpEnabled   Boolean       @default(false)
-  totpVerifiedAt DateTime?    @db.Timestamptz(3)
-  familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
-  receipts      Receipt[]
-  apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
-  itemSplits    ItemSplit[]   // [Issue #78] 負担明細へのリレーション
-  
+  id                        Int                        @id @default(autoincrement())
+  name                      String
+  password_hash             String?
+  familyGroupId             Int // ★ 所属世帯
+  role                      Role                       @default(USER) // [Issue #73] デフォルトは一般ユーザー
+  totpSecret                String? // [Issue #93-5] TOTP シークレット（暗号化保存）
+  totpEnabled               Boolean                    @default(false)
+  totpVerifiedAt            DateTime?                  @db.Timestamptz(3)
+  familyGroup               FamilyGroup                @relation(fields: [familyGroupId], references: [id])
+  receipts                  Receipt[]
+  apiUsageLogs              ApiUsageLog[] // [Issue #59] トークンログとのリレーション
+  itemSplits                ItemSplit[] // [Issue #78] 負担明細へのリレーション
+  classificationCorrections ClassificationCorrection[]
+  productClassificationLearningDataAudits ProductClassificationLearningDataAudit[]
+  productClassificationReclassificationRuns ProductClassificationReclassificationRun[]
+  standardRulesCreated StandardProductClassificationRule[] @relation("StandardRuleCreatedBy")
+  standardRulesUpdated StandardProductClassificationRule[] @relation("StandardRuleUpdatedBy")
+  standardRuleAudits   StandardProductClassificationRuleAudit[] @relation("StandardRuleAuditActor")
+
   // ★ [Issue #81] 送金履歴リレーション
   sentTransfers     SettlementTransfer[] @relation("TransferSender")
   receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
@@ -52,17 +125,19 @@ model FamilyMember {
 
 // 費目カテゴリー (世帯別マスタ — Issue #93-4)
 model Category {
-  id             Int             @id @default(autoincrement())
-  name           String
-  familyGroupId  Int
-  familyGroup    FamilyGroup     @relation(fields: [familyGroupId], references: [id])
-  color          String?
-  keywords       Json            @default("[]")
-  items          Item[]
-  productMasters ProductMaster[]
+  id            Int         @id @default(autoincrement())
+  name          String
+  familyGroupId Int
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  color         String?
+  keywords      Json        @default("[]")
+  // 値引き・アプリ適用など、統計時にレシート内の通常Categoryへ配賦する調整明細用。
+  isAdjustment  Boolean     @default(false)
+  items         Item[]
 
   @@unique([name, familyGroupId])
   @@index([familyGroupId])
+  @@index([familyGroupId, isAdjustment])
 }
 
 // 店舗正規化マスタ (世帯別マスタ — Issue #93-4)
@@ -79,49 +154,288 @@ model Store {
 
 model Receipt {
   id            Int           @id @default(autoincrement())
-  familyGroupId Int           // ★ 世帯ID (論理分離の主軸)
+  familyGroupId Int // ★ 世帯ID (論理分離の主軸)
   familyGroup   FamilyGroup   @relation(fields: [familyGroupId], references: [id])
   memberId      Int
   member        FamilyMember  @relation(fields: [memberId], references: [id])
   storeName     String
+  normalizedStoreName String @default("")
   date          DateTime      @db.Timestamptz(3)
-  totalAmount   Int           // 支払合計（税込）
+  totalAmount   Int // 支払合計（税込）
   // [Issue #71] 外税額を保持するフィールド
   taxAmount     Float         @default(0.0)
   rawText       Json?
-  imagePath     String?       
+  imagePath     String?
   items         Item[]
   apiUsageLogs  ApiUsageLog[] // [Issue #59] トークンログとのリレーション
+  productClassificationAiRuns ProductClassificationAiRun[]
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyGroupId, date]) // 検索効率化
 }
 
 model Item {
-  id         Int         @id @default(autoincrement())
-  receiptId  Int
-  receipt    Receipt     @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  categoryId Int?
-  category   Category?   @relation(fields: [categoryId], references: [id])
-  name       String
-  price      Float
-  quantity   Float       @default(1.0)
-  
+  id                       Int                       @id @default(autoincrement())
+  receiptId                Int
+  receipt                  Receipt                   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  categoryId               Int?
+  category                 Category?                 @relation(fields: [categoryId], references: [id])
+  standardCategoryId       Int?
+  standardCategory         StandardCategory?         @relation(fields: [standardCategoryId], references: [id])
+  productTypeId            Int?
+  productType              ProductType?              @relation(fields: [productTypeId], references: [id])
+  productTypeStatus        ProductTypeStatus         @default(UNCLASSIFIED)
+  classificationSource     ClassificationSource?
+  classificationConfidence ClassificationConfidence?
+  name                     String
+  normalizedName           String                    @default("")
+  price                    Float
+  quantity                 Float                     @default(1.0)
+
   // [Issue #78] 負担割合の内訳（1対多）
-  splits     ItemSplit[] 
+  splits                    ItemSplit[]
+  classificationCorrections ClassificationCorrection[]
+  productClassificationCandidates ProductClassificationCandidate[]
+  productClassificationReclassificationAudits ProductClassificationReclassificationItemAudit[]
+
+  @@index([standardCategoryId])
+  @@index([productTypeId])
+  @@index([productTypeStatus])
+}
+
+// 共通の固定家計簿カテゴリ。世帯ごとのCategoryから段階的に移行する。
+model StandardCategory {
+  id           Int                @id @default(autoincrement())
+  code         String             @unique
+  name         String
+  parentId     Int?
+  parent       StandardCategory?  @relation("StandardCategoryHierarchy", fields: [parentId], references: [id])
+  children     StandardCategory[] @relation("StandardCategoryHierarchy")
+  displayOrder Int
+  isActive     Boolean            @default(true)
+  color        String?
+
+  productTypes      ProductType[]
+  classificationRules StandardProductClassificationRule[]
+  items             Item[]
+
+  @@unique([parentId, name])
+  @@index([parentId, displayOrder])
+}
+
+// 共通の商品種別。必ず標準カテゴリに属する。
+model ProductType {
+  id                 Int              @id @default(autoincrement())
+  code               String           @unique
+  name               String
+  standardCategoryId Int
+  standardCategory   StandardCategory @relation(fields: [standardCategoryId], references: [id])
+  displayOrder       Int
+  isActive           Boolean          @default(true)
+
+  items                     Item[]
+  standardClassificationRules StandardProductClassificationRule[]
+  householdDictionaries     HouseholdProductDictionary[]
+  classificationHistories   ProductClassificationHistory[]
+  previousCorrections       ClassificationCorrection[]     @relation("PreviousProductType")
+  nextCorrections           ClassificationCorrection[]     @relation("NextProductType")
+  productClassificationCandidates ProductClassificationCandidate[]
+
+  @@unique([standardCategoryId, name])
+  @@index([standardCategoryId, displayOrder])
+}
+
+// 全世帯共通の、正規化済み商品名に対する包含分類ルール。
+model StandardProductClassificationRule {
+  id                  Int                                   @id @default(autoincrement())
+  normalizedKeyword   String
+  standardCategoryId  Int
+  standardCategory    StandardCategory                      @relation(fields: [standardCategoryId], references: [id])
+  productTypeId       Int
+  productType         ProductType                           @relation(fields: [productTypeId], references: [id])
+  priority            Int
+  isActive            Boolean                               @default(true)
+  createdByMemberId   Int?
+  createdByMember     FamilyMember?                         @relation("StandardRuleCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  updatedByMemberId   Int?
+  updatedByMember     FamilyMember?                         @relation("StandardRuleUpdatedBy", fields: [updatedByMemberId], references: [id], onDelete: SetNull)
+  lastChangeReason    String
+  createdAt           DateTime                              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                              @updatedAt @db.Timestamptz(3)
+  audits              StandardProductClassificationRuleAudit[]
+
+  @@unique([normalizedKeyword, productTypeId])
+  @@index([isActive, priority])
+  @@index([productTypeId])
+}
+
+model StandardProductClassificationRuleAudit {
+  id                  Int                                        @id @default(autoincrement())
+  ruleId              Int
+  rule                StandardProductClassificationRule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  action              StandardProductClassificationRuleAuditAction
+  actorMemberId       Int?
+  actorMember         FamilyMember?                              @relation("StandardRuleAuditActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  normalizedKeyword   String
+  productTypeId       Int
+  productTypeName     String
+  priority            Int
+  isActive            Boolean
+  reason              String
+  createdAt           DateTime                                   @default(now()) @db.Timestamptz(3)
+
+  @@index([ruleId, createdAt])
+  @@index([actorMemberId])
+}
+
+// 以下は世帯固有の学習データ。すべてfamilyGroupIdで分離する。
+model HouseholdProductDictionary {
+  id             Int         @id @default(autoincrement())
+  familyGroupId  Int
+  familyGroup    FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  normalizedName String
+  productTypeId  Int
+  productType    ProductType @relation(fields: [productTypeId], references: [id])
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@unique([familyGroupId, normalizedName])
+  @@index([productTypeId])
+}
+
+model ProductClassificationHistory {
+  id             Int         @id @default(autoincrement())
+  familyGroupId  Int
+  familyGroup    FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  normalizedName String
+  productTypeId  Int
+  productType    ProductType @relation(fields: [productTypeId], references: [id])
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@unique([familyGroupId, normalizedName])
+  @@index([productTypeId])
+}
+
+model ClassificationCorrection {
+  id                    Int                           @id @default(autoincrement())
+  familyGroupId         Int
+  familyGroup           FamilyGroup                   @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  itemId                Int
+  item                  Item                          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  actorMemberId         Int?
+  actorMember           FamilyMember?                 @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  previousProductTypeId Int?
+  previousProductType   ProductType?                  @relation("PreviousProductType", fields: [previousProductTypeId], references: [id])
+  nextProductTypeId     Int?
+  nextProductType       ProductType?                  @relation("NextProductType", fields: [nextProductTypeId], references: [id])
+  scope                 ClassificationCorrectionScope
+  createdAt             DateTime                      @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, createdAt])
+  @@index([itemId])
+  @@index([actorMemberId])
+}
+
+// 世帯固有の辞書の無効化を、理由と対象世帯を含めて追跡する監査ログ。
+// ポリモーフィックな対象IDはスナップショットとして保持し、学習データ側を変更しても監査証跡を残す。
+model ProductClassificationLearningDataAudit {
+  id                    Int                                  @id @default(autoincrement())
+  familyGroupId         Int
+  familyGroup           FamilyGroup                          @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  actorMemberId         Int?
+  actorMember           FamilyMember?                        @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  learningDataType      ProductClassificationLearningDataType
+  learningDataId        Int
+  normalizedName        String
+  productTypeId         Int
+  productTypeName       String
+  reason                String
+  createdAt             DateTime                             @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, createdAt])
+  @@index([learningDataType, learningDataId])
+}
+
+// 既存明細の再分類実行と変更内容を世帯単位で追跡する監査ログ。
+model ProductClassificationReclassificationRun {
+  id             Int                                        @id @default(autoincrement())
+  familyGroupId  Int
+  familyGroup    FamilyGroup                                @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  actorMemberId  Int
+  actorMember    FamilyMember                               @relation(fields: [actorMemberId], references: [id], onDelete: Restrict)
+  targetStatuses ProductTypeStatus[]
+  startDate      DateTime?                                  @db.Timestamptz(3)
+  endDate        DateTime?                                  @db.Timestamptz(3)
+  limit          Int
+  selectedCount  Int                                        @default(0)
+  updatedCount   Int                                        @default(0)
+  unchangedCount Int                                        @default(0)
+  failedCount    Int                                        @default(0)
+  status         ProductClassificationReclassificationRunStatus
+  createdAt      DateTime                                   @default(now()) @db.Timestamptz(3)
+  completedAt    DateTime?                                  @db.Timestamptz(3)
+  itemAudits     ProductClassificationReclassificationItemAudit[]
+
+  @@index([familyGroupId, createdAt])
+  @@index([actorMemberId])
+}
+
+model ProductClassificationReclassificationItemAudit {
+  id                           Int                                              @id @default(autoincrement())
+  runId                        Int
+  run                          ProductClassificationReclassificationRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  itemId                       Int
+  item                         Item                                             @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  outcome                      ProductClassificationReclassificationItemOutcome
+  previousCategoryId           Int?
+  nextCategoryId               Int?
+  previousStandardCategoryId   Int?
+  nextStandardCategoryId       Int?
+  previousProductTypeId        Int?
+  nextProductTypeId            Int?
+  previousProductTypeStatus    ProductTypeStatus
+  nextProductTypeStatus        ProductTypeStatus
+  previousClassificationSource ClassificationSource?
+  nextClassificationSource     ClassificationSource?
+  errorMessage                 String?
+  createdAt                    DateTime                                         @default(now()) @db.Timestamptz(3)
+
+  @@unique([runId, itemId])
+  @@index([itemId])
+  @@index([outcome])
+}
+
+// 類似検索で得た候補。候補自体は商品種別の確定を意味しない。
+model ProductClassificationCandidate {
+  id                    Int                                  @id @default(autoincrement())
+  itemId                Int
+  item                  Item                                 @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  productTypeId         Int
+  productType           ProductType                          @relation(fields: [productTypeId], references: [id])
+  source                ProductClassificationCandidateSource
+  matchedNormalizedName String
+  similarity            Float
+  rank                  Int
+  createdAt             DateTime                             @default(now()) @db.Timestamptz(3)
+
+  @@unique([itemId, productTypeId])
+  @@unique([itemId, rank])
+  @@index([productTypeId])
 }
 
 // [Issue #78] レシート明細ごとの負担内訳
 // レコードが存在しない場合（0件）は「レシート登録者の全額負担」とみなす（暗黙的デフォルト）
 model ItemSplit {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   itemId         Int
   familyMemberId Int
-  amount         Int          // 精算用金額（端数を丸めた日本円のためInt）
-  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  amount         Int // 精算用金額（端数を丸めた日本円のためInt）
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
-  item           Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  familyMember   FamilyMember @relation(fields: [familyMemberId], references: [id])
+  item         Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  familyMember FamilyMember @relation(fields: [familyMemberId], references: [id])
 
   @@index([itemId])
   @@index([familyMemberId])
@@ -129,14 +443,14 @@ model ItemSplit {
 
 // ★ [Issue #81] 送金履歴（締め処理の実績管理）
 model SettlementTransfer {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   familyGroupId Int
-  familyGroup   FamilyGroup  @relation(fields: [familyGroupId], references: [id])
-  month         String       // 例: "2026-05" (精算対象月)
-  fromMemberId  Int          // 送金した人
-  toMemberId    Int          // 受け取った人
-  amount        Int          // 送金額
-  settledAt     DateTime     @default(now()) @db.Timestamptz(3)
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
+  month         String // 例: "2026-05" (精算対象月)
+  fromMemberId  Int // 送金した人
+  toMemberId    Int // 受け取った人
+  amount        Int // 送金額
+  settledAt     DateTime    @default(now()) @db.Timestamptz(3)
 
   sender   FamilyMember @relation("TransferSender", fields: [fromMemberId], references: [id])
   receiver FamilyMember @relation("TransferReceiver", fields: [toMemberId], references: [id])
@@ -147,35 +461,45 @@ model SettlementTransfer {
   @@index([familyGroupId])
 }
 
-// 学習マスタ (世帯ごとに学習結果を分離)
-model ProductMaster {
-  id            Int         @id @default(autoincrement())
-  name          String
-  storeName     String
-  categoryId    Int
-  familyGroupId Int
-  
-  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
-  category      Category    @relation(fields: [categoryId], references: [id])
-
-  @@unique([name, storeName, familyGroupId], name: "name_storeName_familyGroupId")
-}
-
 // [Issue #59] Gemini API トークン使用量トラッキング
 model ApiUsageLog {
   id               Int           @id @default(autoincrement())
-  familyMemberId   Int?          // 実行したユーザー
+  familyMemberId   Int? // 実行したユーザー
   familyMember     FamilyMember? @relation(fields: [familyMemberId], references: [id])
-  receiptId        Int?          // 関連するレシート
+  receiptId        Int? // 関連するレシート
   receipt          Receipt?      @relation(fields: [receiptId], references: [id])
-  modelId          String        // 例: "gemini-1.5-flash"
-  promptTokens     Int           // 入力トークン
-  candidatesTokens Int           // 出力トークン
-  totalTokens      Int           // 合計トークン
+  modelId          String // 例: "gemini-1.5-flash"
+  promptTokens     Int // 入力トークン
+  candidatesTokens Int // 出力トークン
+  totalTokens      Int // 合計トークン
   createdAt        DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyMemberId])
   @@index([createdAt])
+}
+
+// 商品分類AIの評価・障害分析用の実行ログ。OCR用ApiUsageLogとは分離する。
+model ProductClassificationAiRun {
+  id               Int                             @id @default(autoincrement())
+  familyGroupId    Int
+  familyGroup      FamilyGroup                     @relation(fields: [familyGroupId], references: [id])
+  receiptId        Int?
+  receipt          Receipt?                        @relation(fields: [receiptId], references: [id])
+  modelId          String
+  promptTokens     Int                             @default(0)
+  candidatesTokens Int                             @default(0)
+  totalTokens      Int                             @default(0)
+  targetItemCount  Int
+  classifiedCount  Int                             @default(0)
+  needsReviewCount Int                             @default(0)
+  unreturnedCount  Int                             @default(0)
+  status           ProductClassificationAiRunStatus
+  failureCode      String?                         @db.VarChar(64)
+  durationMs       Int
+  createdAt        DateTime                        @default(now()) @db.Timestamptz(3)
+
+  @@index([familyGroupId, createdAt])
+  @@index([receiptId])
 }
 
 // [Issue #72/76] AIプロンプト管理マスタ (世帯別 — Issue #93-4)
@@ -183,7 +507,7 @@ model PromptTemplate {
   id            Int         @id @default(autoincrement())
   familyGroupId Int
   familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id])
-  key           String      // 例: "RECEIPT_ANALYSIS"
+  key           String // 例: "RECEIPT_ANALYSIS"
   name          String      @default("デフォルトプロンプト")
   description   String?
   systemPrompt  String      @db.Text

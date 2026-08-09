@@ -5,6 +5,7 @@ import { analyzeOnly } from '../services/receiptService';
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 import { getErrorMessage, isRetryableHttpError } from '../utils/httpError';
+import { getReceiptAnalysisFailureCode } from '../config/receiptRetryPolicy';
 
 /**
  * [Issue #49-8 / #71]
@@ -34,6 +35,8 @@ const receiptWorker = new Worker(
 
       } catch (error: unknown) {
         const message = getErrorMessage(error);
+        const failureCode = getReceiptAnalysisFailureCode(error);
+        await job.updateData({ ...job.data, failureCode: failureCode ?? null });
         logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${message}`);
 
         // 日次枠切れなど、BullMQ 再試行しても回復しないエラーは即 failed にする

@@ -4,6 +4,422 @@
  */
 
 export interface paths {
+    "/product-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 有効な商品種別一覧取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductTypeSummary"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-classification/review-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 要確認・未分類の商品明細一覧取得
+         * @description 世帯内の needs_review、unclassified、outside_initial_scope の商品明細を取得する。商品種別対象外の not_applicable（対象外カテゴリおよび承認済みの値引き・アプリ適用行）は含めない。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description カンマ区切りの分類状態。省略時は要確認対象の全状態。 */
+                    status?: string;
+                    categoryId?: number;
+                    /** @description 対象月（YYYY-MM） */
+                    month?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationReviewItem"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-classification/learning-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 世帯の商品分類学習データ一覧取得
+         * @description 世帯辞書・確定履歴を取得する。標準ルールは返却せず、確定履歴は参照専用である。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationLearningData"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-classification/learning-data/{type}/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 世帯の商品分類学習データを無効化
+         * @description 世帯辞書のみ無効化できる。確定履歴と標準ルールは変更できない。
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    type: "household_dictionary";
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeactivateProductClassificationLearningDataRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationLearningData"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/product-classification/reclassification-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 世帯内の既存明細を再分類（管理者）
+         * @description 指定世帯の未分類・要確認明細を再評価する。承認済みの負額の値引き・アプリ適用行は、辞書・類似候補より先に商品種別対象外へ更新する。
+         *     手動確定済み明細は対象外で、実行条件と変更内容は監査ログに保存する。管理者権限と二要素認証が必要。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateProductClassificationReclassificationRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationReclassificationRun"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 標準分類ルール一覧取得（管理者） */
+        get: {
+            parameters: {
+                query?: {
+                    includeInactive?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** 標準分類ルール追加（管理者） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpsertStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 標準分類ルールの自世帯内プレビュー（管理者） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PreviewStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRulePreview"];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 標準分類ルール更新（管理者） */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpsertStandardProductClassificationRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/product-classification/standard-rules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 標準分類ルール無効化（管理者） */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeactivateProductClassificationLearningDataRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["StandardProductClassificationRule"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/auth/resolve-family": {
         parameters: {
             query?: never;
@@ -303,6 +719,12 @@ export interface paths {
                 query?: {
                     month?: string;
                     memberId?: string;
+                    /** @description 店舗名または明細名の類似検索語 */
+                    q?: string;
+                    /** @description 取得件数（省略時20、1〜50） */
+                    limit?: number;
+                    /** @description 次ページ取得用の署名付き不透明カーソル */
+                    cursor?: string;
                 };
                 header?: never;
                 path?: never;
@@ -317,7 +739,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["ReceiptDetail"][];
+                            data?: components["schemas"]["ReceiptListPage"];
                         };
                     };
                 };
@@ -404,7 +826,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** レシート詳細 1 件 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ReceiptDetail"];
+                        };
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** レシート削除 */
@@ -636,6 +1082,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receipts/jobs/{jobId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 失敗した解析ジョブを同じ画像で再実行
+         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["UploadJobResponse"];
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 再実行できないジョブ状態または元画像なし */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receipts/status/{jobId}": {
         parameters: {
             query?: never;
@@ -718,6 +1221,97 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/receipts/items/{itemId}/product-classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 明細商品種別修正 */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateItemProductClassificationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ReceiptItemDetail"];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/receipts/items/{itemId}/product-classification-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 明細の商品分類候補取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationCandidateSummary"][];
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/receipts/items/{itemId}/splits": {
@@ -869,6 +1463,46 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
                             data?: components["schemas"]["AdvancedStatsData"];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stats/product-classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 商品分類統計 */
+        get: {
+            parameters: {
+                query: {
+                    month: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["ProductClassificationStatsData"];
                         };
                     };
                 };
@@ -1037,258 +1671,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** カテゴリ新規作成 */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateCategoryRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["Category"];
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/categories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         post?: never;
-        /** カテゴリ削除 */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiMessageEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/categories/optimize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** ProductMaster からキーワード最適化 */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["OptimizeCategoryResponse"];
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/product-master": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 学習マスタ一覧 */
-        get: {
-            parameters: {
-                query?: {
-                    q?: string;
-                    store?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["ProductMaster"][];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/product-master/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** マスタ削除 */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiMessageEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        /** マスタ個別更新 */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateProductMasterRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["ProductMaster"];
-                        };
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/product-master/merge-stores": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 店舗名統合 */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["MergeStoreNamesRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
-                            data?: components["schemas"]["MergeStoreNamesResponse"];
-                        };
-                    };
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1642,6 +2025,143 @@ export interface components {
             name: string;
             color?: string | null;
         };
+        ProductTypeSummary: {
+            id: number;
+            code: string;
+            name: string;
+            standardCategoryId: number;
+        };
+        /**
+         * @description classified は商品種別確定、needs_review と unclassified は商品分類対象、outside_initial_scope は初期種別範囲外、not_applicable は商品種別対象外（対象外カテゴリまたは承認済みの値引き・アプリ適用行）。
+         * @enum {string}
+         */
+        ProductTypeStatus: "classified" | "needs_review" | "unclassified" | "outside_initial_scope" | "not_applicable";
+        /** @enum {string} */
+        ClassificationSource: "history" | "household_dictionary" | "standard_dictionary" | "similarity" | "ai" | "manual";
+        /** @enum {string} */
+        ClassificationCorrectionScope: "item_only" | "same_ocr_name";
+        /** @enum {string} */
+        ProductClassificationCandidateSource: "history" | "household_dictionary" | "standard_dictionary";
+        ProductClassificationCandidateSummary: {
+            productType: components["schemas"]["ProductTypeSummary"];
+            source: components["schemas"]["ProductClassificationCandidateSource"];
+            matchedNormalizedName: string;
+            /** Format: float */
+            similarity: number;
+            rank: number;
+        };
+        ProductClassificationReviewItem: {
+            item: components["schemas"]["ReceiptItemDetail"];
+            receiptId: number;
+            /** Format: date-time */
+            receiptDate: string | null;
+            storeName: string;
+        };
+        /** @enum {string} */
+        ProductClassificationLearningDataType: "household_dictionary" | "history";
+        ProductClassificationLearningData: {
+            id: number;
+            type: components["schemas"]["ProductClassificationLearningDataType"];
+            normalizedName: string;
+            productType: components["schemas"]["ProductTypeSummary"];
+            /** @description 確定履歴は参照専用のため null */
+            isActive: boolean | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lastDeactivationAudit: components["schemas"]["ProductClassificationLearningDataAudit"] | null;
+        };
+        ProductClassificationLearningDataAudit: {
+            reason: string;
+            actorMemberName: string | null;
+            familyGroupName: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DeactivateProductClassificationLearningDataRequest: {
+            reason: string;
+        };
+        UpsertStandardProductClassificationRuleRequest: {
+            keyword: string;
+            productTypeId: number;
+            priority: number;
+            reason: string;
+        };
+        PreviewStandardProductClassificationRuleRequest: {
+            keyword: string;
+        };
+        StandardProductClassificationRule: {
+            id: number;
+            keyword: string;
+            productType: components["schemas"]["ProductTypeSummary"];
+            priority: number;
+            isActive: boolean;
+            createdByMemberName: string | null;
+            updatedByMemberName: string | null;
+            lastChangeReason: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        StandardProductClassificationRulePreviewItem: {
+            id: number;
+            name: string;
+            normalizedName: string;
+        };
+        StandardProductClassificationRulePreview: {
+            normalizedKeyword: string;
+            matchedCount: number;
+            items: components["schemas"]["StandardProductClassificationRulePreviewItem"][];
+        };
+        /** @enum {string} */
+        ProductClassificationReclassificationRunStatus: "completed" | "partial_failure";
+        /** @enum {string} */
+        ProductClassificationReclassificationItemOutcome: "updated" | "unchanged" | "failed";
+        CreateProductClassificationReclassificationRunRequest: {
+            /** @description 対象にする未確定状態。省略時は unclassified と needs_review。 */
+            statuses?: ("unclassified" | "needs_review")[];
+            /** Format: date-time */
+            startDate?: string;
+            /** Format: date-time */
+            endDate?: string;
+            limit?: number;
+        };
+        ProductClassificationReclassificationItemAudit: {
+            itemId: number;
+            outcome: components["schemas"]["ProductClassificationReclassificationItemOutcome"];
+            previousProductTypeStatus: components["schemas"]["ProductTypeStatus"];
+            nextProductTypeStatus: components["schemas"]["ProductTypeStatus"];
+            previousProductTypeId?: number | null;
+            nextProductTypeId?: number | null;
+            previousClassificationSource: components["schemas"]["ClassificationSource"] | null;
+            nextClassificationSource: components["schemas"]["ClassificationSource"] | null;
+            errorMessage?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ProductClassificationReclassificationRun: {
+            id: number;
+            statuses: ("unclassified" | "needs_review")[];
+            /** Format: date-time */
+            startDate?: string | null;
+            /** Format: date-time */
+            endDate?: string | null;
+            limit: number;
+            selectedCount: number;
+            updatedCount: number;
+            unchangedCount: number;
+            failedCount: number;
+            status: components["schemas"]["ProductClassificationReclassificationRunStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            itemAudits: components["schemas"]["ProductClassificationReclassificationItemAudit"][];
+        };
+        /** @enum {string} */
+        ClassificationConfidence: "high" | "medium" | "low";
         ItemSplitSummary: {
             id: number;
             itemId: number;
@@ -1655,6 +2175,12 @@ export interface components {
             quantity: number;
             categoryId: number | null;
             category?: components["schemas"]["CategorySummary"] | null;
+            standardCategoryId: number | null;
+            productTypeId: number | null;
+            productType: components["schemas"]["ProductTypeSummary"] | null;
+            productTypeStatus: components["schemas"]["ProductTypeStatus"];
+            classificationSource: components["schemas"]["ClassificationSource"] | null;
+            classificationConfidence: components["schemas"]["ClassificationConfidence"] | null;
             splits?: components["schemas"]["ItemSplitSummary"][];
         };
         ReceiptDetail: {
@@ -1668,6 +2194,11 @@ export interface components {
             memberId?: number;
             familyGroupId?: number;
             items: components["schemas"]["ReceiptItemDetail"][];
+        };
+        ReceiptListPage: {
+            items: components["schemas"]["ReceiptDetail"][];
+            nextCursor: string | null;
+            hasNext: boolean;
         };
         ManualReceiptRequest: {
             date: string;
@@ -1728,6 +2259,11 @@ export interface components {
             imagePath: string | null;
             createdAt: number;
             failedReason?: string | null;
+            /** @description 失敗ジョブの手動再実行可否。サーバー側ポリシーで判定する。 */
+            retry?: {
+                eligible?: boolean;
+                remainingCount?: number;
+            };
             parsedData?: {
                 storeName?: string;
                 purchaseDate?: string;
@@ -1752,6 +2288,10 @@ export interface components {
         UpdateItemCategoryRequest: {
             categoryId: number;
         };
+        UpdateItemProductClassificationRequest: {
+            productTypeId: number;
+            scope: components["schemas"]["ClassificationCorrectionScope"];
+        };
         SaveItemSplitsRequest: {
             splits: components["schemas"]["ItemSplitInput"][];
         };
@@ -1770,11 +2310,36 @@ export interface components {
             stats: components["schemas"]["CategoryStatRow"][];
             latestReceipt: components["schemas"]["ReceiptDetail"] | null;
         };
+        /** @description 月次カテゴリ集計。調整Categoryの負額は、同一レシートの通常Categoryへ統計時のみ比例配賦され、配賦対象がなければ調整Categoryとして返る。 */
         CategoryStatRow: {
             categoryId?: number | null;
             categoryName?: string;
             totalAmount?: number | string;
             color?: string | null;
+        };
+        ProductTypeStatRow: {
+            productTypeId: number;
+            productTypeName: string;
+            totalAmount: number;
+            itemCount: number;
+        };
+        ProductClassificationCategoryStatRow: {
+            standardCategoryId: number;
+            standardCategoryName: string;
+            parentCategoryName: string;
+            totalAmount: number;
+            productTypes: components["schemas"]["ProductTypeStatRow"][];
+        };
+        ProductTypeStatusStatRow: {
+            status: components["schemas"]["ProductTypeStatus"];
+            totalAmount: number;
+            itemCount: number;
+        };
+        ProductClassificationStatsData: {
+            month: string;
+            categoryStats: components["schemas"]["ProductClassificationCategoryStatRow"][];
+            /** @description ProductType 未設定の分類状態別集計。特定 ProductType の集計には含めない。 */
+            unresolved: components["schemas"]["ProductTypeStatusStatRow"][];
         };
         AdvancedStatsData: {
             trend: components["schemas"]["TrendRow"][];
@@ -1827,36 +2392,6 @@ export interface components {
             color?: string | null;
             familyGroupId?: number;
             keywords?: string[];
-        };
-        CreateCategoryRequest: {
-            name: string;
-            color?: string | null;
-        };
-        OptimizeCategoryResponse: {
-            addedCount: number;
-            message: string;
-        };
-        ProductMaster: {
-            id: number;
-            name: string;
-            storeName: string;
-            categoryId: number;
-            category?: components["schemas"]["CategorySummary"];
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        UpdateProductMasterRequest: {
-            name?: string;
-            storeName?: string;
-            categoryId?: number;
-        };
-        MergeStoreNamesRequest: {
-            sourceStoreName: string;
-            targetStoreName: string;
-        };
-        MergeStoreNamesResponse: {
-            message: string;
-            count: number;
         };
         PromptTemplate: {
             id: number;

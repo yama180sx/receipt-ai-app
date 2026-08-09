@@ -7,6 +7,7 @@ export {
 export {
   type ListReceiptsParams,
   findReceipts,
+  findReceiptByIdForTenant,
   findLatestReceipt,
   findReceiptById,
   findReceiptByImagePath,
@@ -17,6 +18,9 @@ export {
   findReceiptByIdInTx,
   findReceiptByIdForTenantInTx,
   findItemWithReceiptInTx,
+  findProductClassificationAiTargets,
+  findProductClassificationAiTargetInTx,
+  findItemById,
   findCategoryByIdInTx,
   findItemSplitsInTx,
   findFamilyMembersByIdsInTx,
@@ -24,7 +28,7 @@ export {
 
 export {
   queryMonthlyReceiptTotal,
-  queryMonthlyCategoryStats,
+  findMonthlyCategoryStatItems,
   findLatestReceiptInMonth,
   queryReceiptTrend,
   queryParetoByCategory,
@@ -41,6 +45,7 @@ export {
   deleteItemsByReceiptIdInTx,
   createItemsInTx,
   updateItemCategoryInTx,
+  updateItemProductClassificationInTx,
   deleteItemSplitsInTx,
   createItemSplitsInTx,
 } from './receipt/receiptWriteRepository';

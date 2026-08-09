@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { receiptApi } from '../../../api/receiptApi';
+import type { ProductClassificationCorrectionScope } from '../../../api/receiptApi';
 import { useIsWideLayout } from '../../../hooks/useIsWideLayout';
-import type { CategorySummary, ReceiptDetail, ReceiptItemDetail } from '../../../types/receipt';
+import type { CategorySummary, ProductTypeSummary, ReceiptDetail, ReceiptItemDetail } from '../../../types/receipt';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { showAlert } from '../../../utils/alertMessage';
 import { useReceiptImageSource } from '../../../utils/receiptImageSource';
@@ -27,6 +28,11 @@ export function useReceiptDetail({
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editData, setEditData] = useState<ReceiptDetail | null>(null);
+  const [productTypes, setProductTypes] = useState<ProductTypeSummary[]>([]);
+  const [correctionItem, setCorrectionItem] = useState<ReceiptItemDetail | null>(null);
+  const [correctionProductTypeId, setCorrectionProductTypeId] = useState<number | null>(null);
+  const [correctionScope, setCorrectionScope] = useState<ProductClassificationCorrectionScope>('item_only');
+  const [correctionLoading, setCorrectionLoading] = useState(false);
 
   const cacheKey = useMemo(() => Date.now(), []);
   const imageSource = useReceiptImageSource(receipt?.imagePath);
@@ -111,6 +117,47 @@ export function useReceiptDetail({
     }
   };
 
+  const openProductClassificationCorrection = async (item: ReceiptItemDetail) => {
+    setCorrectionItem(item);
+    setCorrectionProductTypeId(item.productTypeId);
+    setCorrectionScope('item_only');
+    if (productTypes.length > 0) return;
+
+    try {
+      const res = await receiptApi.listProductTypes();
+      if (res.success) setProductTypes(res.data);
+    } catch (err: unknown) {
+      console.error('Failed to load product types', getApiErrorMessage(err));
+      showAlert('エラー', '商品種別の取得に失敗しました。');
+      setCorrectionItem(null);
+    }
+  };
+
+  const closeProductClassificationCorrection = () => {
+    if (!correctionLoading) setCorrectionItem(null);
+  };
+
+  const saveProductClassificationCorrection = async () => {
+    if (!correctionItem || !correctionProductTypeId) return;
+    setCorrectionLoading(true);
+    try {
+      const res = await receiptApi.updateItemProductClassification(correctionItem.id, {
+        productTypeId: correctionProductTypeId,
+        scope: correctionScope,
+      });
+      if (res.success) {
+        showAlert('成功', '商品種別を修正しました。');
+        setCorrectionItem(null);
+        onSaveSuccess?.();
+      }
+    } catch (err: unknown) {
+      console.error('Failed to correct product classification', getApiErrorMessage(err));
+      showAlert('エラー', '商品種別の修正に失敗しました。');
+    } finally {
+      setCorrectionLoading(false);
+    }
+  };
+
   return {
     isWide,
     isEditing,
@@ -124,6 +171,16 @@ export function useReceiptDetail({
     updateEditField,
     updateEditItem,
     handleSave,
+    productTypes,
+    correctionItem,
+    correctionProductTypeId,
+    correctionScope,
+    correctionLoading,
+    setCorrectionProductTypeId,
+    setCorrectionScope,
+    openProductClassificationCorrection,
+    closeProductClassificationCorrection,
+    saveProductClassificationCorrection,
   };
 }
 

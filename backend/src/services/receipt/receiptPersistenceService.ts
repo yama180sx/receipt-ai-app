@@ -1,5 +1,5 @@
 import logger from '../../utils/logger';
-import { normalizeStoreName, getCleanText } from '../../utils/normalizer';
+import { normalizeStoreName } from '../../utils/normalizer';
 import { runReceiptCommitTransaction } from '../../utils/prismaTransaction';
 import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptService';
 import type { ReceiptCommitPayload } from '../../types/receipt';
@@ -9,6 +9,7 @@ import {
 } from '../../repositories/receiptRepository';
 import { DuplicateReceiptError } from './receiptDuplicateError';
 import { persistReceiptCommitInTx } from './receiptCommitPersistence';
+import { applyProductClassificationAiToItems } from '../productClassification/productClassificationAiIntegrationService';
 
 /**
  * パース済みデータを DB に永続化（重複チェック ＋ 世帯別学習）
@@ -24,7 +25,6 @@ export async function saveParsedReceipt(
   warnings: string[]
 ) {
   const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
-  const cleanStore = getCleanText(officialStoreName);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
 
   const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
@@ -38,7 +38,7 @@ export async function saveParsedReceipt(
     if (existingByImage) {
       logger.info(`[Idempotent] imagePath 一致のため既存レシートを返却: ID ${existingByImage.id}`);
       return {
-        ...JSON.parse(JSON.stringify(existingByImage)),
+        ...existingByImage,
         isSuspicious,
         warnings,
       };
@@ -56,7 +56,6 @@ export async function saveParsedReceipt(
       familyGroupId,
       parsedData,
       officialStoreName,
-      cleanStore,
       jstDate,
       totalAmount,
       taxAmount,
@@ -67,9 +66,19 @@ export async function saveParsedReceipt(
     })
   );
 
-  const final = await findReceiptById(savedId);
+  // 外部AIはDB commit後に実行する。失敗時も保存済みレシートはそのまま返す。
+  const savedBeforeAi = await findReceiptById(savedId);
+  await applyProductClassificationAiToItems(
+    familyGroupId,
+    savedBeforeAi?.items.map((item) => item.id) ?? []
+  );
 
-  return { ...JSON.parse(JSON.stringify(final)), isSuspicious, warnings };
+  const final = await findReceiptById(savedId);
+  if (!final) {
+    throw new Error(`保存したレシートが取得できません: ${savedId}`);
+  }
+
+  return { ...final, isSuspicious, warnings };
 }
 
 /** ユーザー確認済みデータの永続化 */

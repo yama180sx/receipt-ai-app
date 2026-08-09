@@ -57,6 +57,31 @@ docker compose up -d --build
 
 ポート・CORS 等の一覧は [architecture.md §8.1](./architecture.md) を参照。
 
+### 2.2 バックエンド設定の変更
+
+`setup-env.sh` が初回作成する `backend/.env` には、コードの既定値と同じ非機密設定が出力される。既存環境へ新しい設定項目を追加しても、コード側の既定値がある限りは未設定のまま動作する。既定値以外へ変更する場合は、環境ごとに設定を変更して backend コンテナを再作成する。
+
+| 環境 | 設定場所 | 反映方法 |
+|------|----------|----------|
+| dev | `backend/.env` | `docker compose up -d --force-recreate backend` |
+| stable | GitHub Actions Variables | `main` への次回デプロイ（または値を反映した手動デプロイ） |
+
+例: 1レシートあたりの手動再実行を2回まで許可し、Gemini の日次クォータ超過だけを対象にする場合。
+
+```env
+RECEIPT_MANUAL_RETRY_LIMIT=2
+RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
+```
+
+`RECEIPT_MANUAL_RETRY_FAILURE_CODES` はカンマ区切りで指定する。現行で指定可能なコードは `gemini_daily_quota`、`http_429`、`http_5xx`。既定値は前者のみである。値を空にすると手動再実行は無効化される。
+
+新しい設定項目を導入する際は、以下を同じ変更に含める。
+
+1. コードに安全な既定値を実装する
+2. `backend/.env.example` と `setup-env.sh` の生成内容を更新する
+3. stable 用の値が必要なら GitHub Actions の `vars` から `backend/.env` へ渡す
+4. 本節と機能設計資料の環境変数表を更新する
+
 ---
 
 ## 3. バックアップ
@@ -114,22 +139,22 @@ cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する
 | スクリプト | 実際の実行方法 | 用途 | 影響 |
 |------------|----------------|------|------|
 | `backend/prisma/seed.ts` | `npm run prisma:seed`（`prisma db seed`） | 開発環境の初期化 | **全データ削除後、再投入** |
-| `backend/prisma/update-master.ts` | `npx tsx prisma/update-master.ts` | 運用中のマスタ更新 | **マスタのみ upsert**（Receipt 等は不変） |
+| `backend/prisma/update-master.ts` | `npm run prisma:update` | 運用中のマスタ更新 | **マスタのみ upsert**（Receipt 等は不変） |
 | `backend/prisma/run-sync-sequences.ts` | `npm run prisma:sync-sequences` | id シーケンス修復 | データ削除なし |
 
-> **注意:** [db-operations.md](../db-operations.md) では歴史的に `npm run prisma:init` / `prisma:update` と記載されているが、`backend/package.json` に該当 script は **未定義**。上表のコマンドが as-built の正。
+> **注意:** `npm run prisma:init` は `backend/package.json` に存在しない。開発環境の初期化には `npm run prisma:seed` を、非破壊のマスタ同期には `npm run prisma:update` を使用する。
 
 Docker 経由の例:
 
 ```bash
 docker compose exec backend npm run prisma:seed          # 開発のみ — 全削除
-docker compose exec backend npx tsx prisma/update-master.ts
+docker compose exec backend npm run prisma:update
 docker compose exec backend npm run prisma:sync-sequences
 ```
 
 ### 4.2 マスタ追加の流れ（要約）
 
-1. `update-master.ts` に upsert 定義を追加
+1. `standardProductClassificationSeed.ts` または `update-master.ts` にマスタ定義を追加
 2. `seed.ts` にも同内容を同期（新規参画者の初期化用）
 3. stable では `update-master.ts` のみ実行
 

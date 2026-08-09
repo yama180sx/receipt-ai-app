@@ -8,20 +8,20 @@ import { screenLayout } from '../theme/screenLayout';
 
 interface AdminMenuScreenProps {
   onBack: () => void;
-  onGoToCategories: () => void;
-  onGoToProductMaster: () => void;
   onGoToPromptEditor: () => void;
   onGoToAdminStats: () => void;
+  onGoToProductClassificationReclassification: () => void;
+  onGoToStandardProductClassificationRules: () => void;
 }
 
 const adm = colors.semantic.admin;
 
 export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onBack,
-  onGoToCategories,
-  onGoToProductMaster,
   onGoToPromptEditor,
   onGoToAdminStats,
+  onGoToProductClassificationReclassification,
+  onGoToStandardProductClassificationRules,
 }) => {
   return (
     <View style={[screenLayout.container, styles.containerAdmin]}>
@@ -33,35 +33,15 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
 
       <ScrollView contentContainerStyle={screenLayout.scrollContent}>
         <View style={cardStyles.section}>
-          <Text style={styles.sectionTitle}>マスタデータ管理</Text>
-
-          <AppListItem
-            variant="nav"
-            onPress={onGoToCategories}
-            title="カテゴリー設定"
-            subtitle="支出カテゴリの追加・編集・色変更"
-            left={
-              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.settings }]}>
-                <Text>⚙️</Text>
-              </View>
-            }
-          />
-
-          <AppListItem
-            variant="nav"
-            onPress={onGoToProductMaster}
-            title="学習マスタ管理"
-            subtitle="商品名からの自動カテゴリ分類の修正"
-            left={
-              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.product }]}>
-                <Text>🧠</Text>
-              </View>
-            }
-          />
-        </View>
-
-        <View style={cardStyles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
+
+          <AppListItem
+            variant="nav"
+            onPress={onGoToStandardProductClassificationRules}
+            title="標準分類ルール管理"
+            subtitle="全世帯共通のキーワード分類を管理"
+            left={<View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.prompt }]}><Text>🏷️</Text></View>}
+          />
 
           <AppListItem
             variant="nav"
@@ -71,6 +51,18 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
             left={
               <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.prompt }]}>
                 <Text>📝</Text>
+              </View>
+            }
+          />
+
+          <AppListItem
+            variant="nav"
+            onPress={onGoToProductClassificationReclassification}
+            title="既存明細の再分類"
+            subtitle="最新の辞書で未分類・要確認明細を再評価"
+            left={
+              <View style={[styles.iconWrapper, { backgroundColor: colors.semantic.warning.bg }]}>
+                <Text>🔄</Text>
               </View>
             }
           />

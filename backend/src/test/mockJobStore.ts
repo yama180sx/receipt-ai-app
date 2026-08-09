@@ -1,6 +1,6 @@
 export type MockReceiptJob = {
   id: string;
-  data: { memberId?: number; familyGroupId?: number; imagePath?: string };
+  data: { memberId?: number; familyGroupId?: number; imagePath?: string; failureCode?: string; manualRetryCount?: number };
   returnvalue: unknown;
   failedReason: string | null;
   timestamp: number;
@@ -12,7 +12,7 @@ export const mockReceiptJobs = new Map<string, MockReceiptJob>();
 
 export function registerMockReceiptJob(
   id: string,
-  data: { memberId: number; familyGroupId: number; imagePath?: string },
+  data: { memberId: number; familyGroupId: number; imagePath?: string; failureCode?: string; manualRetryCount?: number },
   options?: {
     state?: string;
     returnvalue?: unknown;

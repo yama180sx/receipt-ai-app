@@ -41,6 +41,8 @@ RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router*
 |--------|-------------------|----------------------|--------|
 | `/` | `HomeScreen` | `features/home` | — |
 | `/history` | `HistoryScreen` | `useReceiptHistory` | `/` |
+| `/product-classification-review` | `ProductClassificationReviewScreen` | `useProductClassificationReview` | `/` |
+| `/product-classification-learning-data` | `ProductClassificationLearningDataScreen` | `useProductClassificationLearningData` | `/` |
 | `/stats` | `StatisticsScreen` | `useStatistics` | `/` |
 | `/tray` | `ReceiptTrayScreen` | `ReceiptTrayContext` | `/` |
 | `/scan/[jobId]` | `ReceiptScanScreen` | `useReceiptScan` | query `returnTo`（`home` / `tray`） |
@@ -51,6 +53,7 @@ RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router*
 | `/admin/product-master` | `ProductMasterScreen` | — | `/admin` |
 | `/admin/prompts` | `PromptEditorScreen` | — | `/admin` |
 | `/admin/stats` | `AdminStatsScreen` | — | `/admin` |
+| `/admin/product-classification-reclassification` | `ProductClassificationReclassificationScreen` | `useProductClassificationReclassification` | `/admin` |
 | `/settings/totp` | `TotpSettingsScreen` | — | `/` |
 | `/login` | `LoginScreen` | `useLoginFlow` | ログイン後 `/` |
 
@@ -77,6 +80,7 @@ flowchart TD
 
   Routes --> Home["/ HomeScreen"]
   Routes --> Hist["/history"]
+  Routes --> ClassReview["/product-classification-review"]
   Routes --> Split["/history/.../split"]
   Routes --> Settle["/settlement"]
   Routes --> Stats["/stats"]
@@ -87,12 +91,13 @@ flowchart TD
   Routes --> Prod["/admin/product-master"]
   Routes --> Prompt["/admin/prompts"]
   Routes --> AdminS["/admin/stats"]
+  Routes --> Reclassification["/admin/product-classification-reclassification"]
   Routes --> Totp["/settings/totp"]
 
-  Home --> Hist & Stats & Tray & Settle & Admin
+  Home --> Hist & ClassReview & Stats & Tray & Settle & Admin
   Tray --> Scan
   Hist --> Split
-  Admin --> Cat & Prod & Prompt & AdminS
+  Admin --> Cat & Prod & Prompt & AdminS & Reclassification
 ```
 
 ### 2.3 セッション・ナビゲーション状態
@@ -133,9 +138,11 @@ SafeAreaProvider
 | 画面 | ファイル | 主な Hook | 主要 API（Hook 内） |
 |------|----------|-----------|---------------------|
 | **Home** | `screens/HomeScreen.tsx` | `useHomeDashboard`, `useReceiptUpload` | `GET /receipts/latest`, `GET /stats/monthly`, `POST /receipts/upload` |
-| **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`, `PATCH /receipts/items/:id` |
-| **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /categories`, `PATCH /receipts/items/:id` |
-| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `DELETE /receipts/jobs/:id` |
+| **History** | `screens/HistoryScreen.tsx` | `useReceiptHistory` | `GET /categories`, `GET /family-groups/members`, `GET /receipts`（カーソル追加読み込み）, `PATCH /receipts/items/:id` |
+| **ProductClassificationReview** | `screens/ProductClassificationReviewScreen.tsx` | `useProductClassificationReview` | `GET /product-classification/review-items`, `GET /categories`, `GET /product-types`, `PATCH /receipts/items/:id/product-classification` |
+| **ProductClassificationLearningData** | `screens/ProductClassificationLearningDataScreen.tsx` | `useProductClassificationLearningData` | `GET /product-classification/learning-data`, `PATCH /product-classification/learning-data/:type/:id/deactivate` |
+| **Statistics** | `screens/StatisticsScreen.tsx` | `useStatistics` | `GET /stats/monthly`, `GET /stats/advanced`, `GET /stats/product-classification`, `GET /categories`, `PATCH /receipts/items/:id` |
+| **ReceiptTray** | `screens/ReceiptTrayScreen.tsx` | `ReceiptTrayContext` | `GET /receipts/jobs`, `GET /receipts/status/:id`, `POST /receipts/jobs/:id/retry`, `DELETE /receipts/jobs/:id` |
 | **ReceiptScan** | `screens/ReceiptScanScreen.tsx` | `useReceiptScan` | `POST /receipts/commit` |
 | **SplitEditor** | `screens/SplitEditorScreen.tsx` | `useSplitEditor` | `GET /family-groups/members`, `POST /receipts/items/:id/splits` |
 | **Settlement** | `screens/SettlementSummaryScreen.tsx` | `useSettlementSummary` | `GET /stats/settlement`, `POST /stats/settlement/transfers`, `DELETE /stats/settlement/transfers/:id` |
@@ -149,6 +156,8 @@ SafeAreaProvider
 | **ProductMaster** | `screens/ProductMasterScreen.tsx` | 商品マスタ検索・削除・店舗マージ | `GET /product-master`, `DELETE /product-master/:id`, `POST /product-master/merge-stores` |
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
+| **ProductClassificationReclassification** | `screens/ProductClassificationReclassificationScreen.tsx` | 既存の未分類・要確認明細を安全に再評価し結果を表示 | `POST /admin/product-classification/reclassification-runs` |
+| **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワードルールの登録・無効化と自世帯プレビュー | `GET/POST/PATCH /admin/product-classification/standard-rules` |
 
 ### 3.3 認証・その他
 
@@ -295,7 +304,7 @@ sequenceDiagram
 | ホームから | `/` | `scanPath(jobId, 'home')` |
 | トレイから | `/tray` | `scanPath(jobId, 'tray')` |
 
-`ReceiptTrayProvider` はログイン後に `useReceiptJobs` でジョブをポーリングし、完了時にスキャン画面を開く。
+`ReceiptTrayProvider` はログイン後に `useReceiptJobs` でジョブをポーリングし、完了時にスキャン画面を開く。元画像が残る失敗ジョブには再実行操作を表示し、同じ画像で新規ジョブを投入する。
 
 ---
 

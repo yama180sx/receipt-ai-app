@@ -1,15 +1,17 @@
 import {
   findLatestReceiptInMonth,
-  queryMonthlyCategoryStats,
+  findMonthlyCategoryStatItems,
   queryMonthlyReceiptTotal,
   queryParetoByCategory,
   queryReceiptTrend,
 } from '../../repositories/receiptRepository';
+import { allocateAdjustmentsToCategories } from './adjustmentCategoryAllocation';
 
 /** 月別統計 */
 export async function getMonthlyStats(familyGroupId: number, month: string) {
   const totalAmount = await queryMonthlyReceiptTotal(familyGroupId, month);
-  const categoryStats = await queryMonthlyCategoryStats(familyGroupId, month);
+  const categoryStatItems = await findMonthlyCategoryStatItems(familyGroupId, month);
+  const categoryStats = allocateAdjustmentsToCategories(categoryStatItems);
   const latestReceipt = await findLatestReceiptInMonth(familyGroupId, month);
 
   return {

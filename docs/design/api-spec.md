@@ -257,17 +257,29 @@ sequenceDiagram
 | POST | `/receipts/upload` | JWT + tenant | 画像アップロード → WebP → BullMQ ジョブ（202） |
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
-| GET | `/receipts` | JWT + tenant | レシート一覧 |
+| GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の商品明細一覧（`not_applicable` は含めない） |
+| GET | `/product-classification/learning-data` | JWT + tenant | 世帯辞書・確定履歴の一覧（標準ルールは含めない） |
+| PATCH | `/product-classification/learning-data/:type/:id/deactivate` | JWT + tenant | 理由を記録して世帯辞書を無効化（確定履歴は参照専用） |
+| POST | `/admin/product-classification/reclassification-runs` | JWT + tenant + ADMIN + TOTP | 未分類・要確認の既存明細を世帯内で再評価し、値引き・アプリ適用の対象外化を含む実行・変更内容を監査保存 |
+| GET/POST/PATCH | `/admin/product-classification/standard-rules` | JWT + tenant + ADMIN + TOTP | 全世帯共通の標準分類ルールを一覧・追加・更新 |
+| POST | `/admin/product-classification/standard-rules/preview` | JWT + tenant + ADMIN + TOTP | 自世帯の明細だけを対象にキーワード命中を確認 |
+| PATCH | `/admin/product-classification/standard-rules/:id/deactivate` | JWT + tenant + ADMIN + TOTP | 理由を記録して標準分類ルールを無効化 |
+| GET | `/receipts` | JWT + tenant | カーソルページネーション付きレシート一覧 |
+| GET | `/receipts/:id` | JWT + tenant | 自世帯のレシート詳細 1 件 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
+| POST | `/receipts/jobs/:jobId/retry` | JWT + tenant | 本人の失敗ジョブを元画像から再投入 |
 | GET | `/receipts/latest` | JWT + tenant | 最新レシート 1 件 |
 | GET | `/receipts/status/:jobId` | JWT + tenant | 解析ジョブ状態 |
-| GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート） |
+| GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート）。調整Categoryの負額は同一レシートの通常Categoryへ統計時だけ比例配賦する |
 | GET | `/stats/advanced` | JWT + tenant | トレンド・パレート分析 |
+| GET | `/stats/product-classification` | JWT + tenant | 標準Category階層・確定ProductType・未確定状態別の月次集計 |
 | POST | `/receipts` | JWT + tenant | 手動レシート登録 |
 | DELETE | `/receipts/:id` | JWT + tenant | レシート削除 |
 | PATCH | `/receipts/:id` | JWT + tenant | レシート全体編集 |
 | PATCH | `/receipts/items/:id` | JWT + tenant | 明細カテゴリ更新 + 学習マスタ反映 |
+| PATCH | `/receipts/items/:itemId/product-classification` | JWT + tenant | 商品種別の手動修正 |
+| GET | `/receipts/items/:itemId/product-classification-candidates` | JWT + tenant | 商品分類候補一覧 |
 | POST | `/receipts/items/:itemId/splits` | JWT + tenant | 明細按分（ItemSplit）保存 |
 | POST | `/receipts/commit` | JWT + tenant | AI 解析結果の確定保存 |
 
@@ -277,7 +289,19 @@ sequenceDiagram
 |---------------|-----------|------|
 | `GET /receipts` | `month` | `YYYY-MM` フィルタ（任意） |
 | `GET /receipts` | `memberId` | 支払者フィルタ。空文字 `""` = 世帯全体 |
+| `GET /receipts` | `q` | 店舗名または明細名の `pg_trgm` 類似検索語（任意）。月・支払者フィルタと併用可能。画面は入力後300msで検索する |
+| `GET /receipts` | `limit` | 取得件数。省略時20、1〜50。範囲外は400 |
+| `GET /receipts` | `cursor` | 次ページ取得用の署名付き不透明カーソル。フィルタ条件が異なる場合や不正値は400 |
+
+`GET /receipts` は `date DESC, id DESC` の順で、`data.items`、`data.nextCursor`、`data.hasNext` を返す。総件数は返さず、画面は `hasNext` が真の間だけ追加読み込みを表示する。フィルタ変更時はカーソルを破棄して先頭ページを取得する。
+
+`GET /receipts/:id` は自世帯の `ReceiptDetail` を1件返す。存在しないIDと別世帯のIDはともに404とし、レシートの存在有無を世帯外へ公開しない。
+| `GET /product-classification/review-items` | `status` | カンマ区切りの `needs_review` / `unclassified` / `outside_initial_scope`。省略時は全状態 |
+| `GET /product-classification/review-items` | `categoryId` | 家計簿 Category による絞り込み（任意） |
+| `GET /product-classification/review-items` | `month` | `YYYY-MM` による期間絞り込み（任意） |
+| `POST /admin/product-classification/reclassification-runs` | body | `statuses`（`unclassified` / `needs_review`）、`startDate`、`endDate`、`limit`（1〜500、既定100）。管理者メニューから実行し、手動確定済み明細は対象外。 |
 | `GET /stats/monthly` | `month` | 対象月（省略時は当月 UTC 基準の `YYYY-MM`） |
+| `GET /stats/product-classification` | `month` | 対象月（必須、`YYYY-MM`） |
 
 ### 4.4 Stats（精算）— `/api/stats`
 
@@ -621,6 +645,7 @@ sequenceDiagram
 | ジョブ一覧 | ログインメンバー**本人**のジョブのみ（`memberId` 一致） |
 | 完了ジョブ | `duplicateSuspected`, `existingReceiptId`, `parsedData` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — 本人ジョブのみ |
+| 再実行 | `POST /api/receipts/jobs/:jobId/retry` — 本人の Gemini 日次クォータ超過ジョブだけを対象に、設定済み回数上限と元画像を確認して新規ジョブを投入し、元ジョブを除去 |
 | commit 後 | `jobId` 指定時、キューからジョブ削除を試行 |
 
 ---

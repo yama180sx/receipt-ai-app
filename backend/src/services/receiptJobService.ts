@@ -10,6 +10,7 @@ import {
 import { checkDuplicateReceipt } from './duplicateReceiptService';
 import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
 import { AppError } from '../utils/appError';
+import { getReceiptManualRetryInfo } from '../config/receiptRetryPolicy';
 
 const LIST_JOB_STATES = ['waiting', 'active', 'completed', 'failed', 'delayed', 'paused'] as const;
 
@@ -102,6 +103,26 @@ async function deletePendingJobImage(
   }
 }
 
+async function ensureRetryableJobImage(imagePath: unknown): Promise<string> {
+  if (typeof imagePath !== 'string') {
+    throw new AppError('元画像が見つかりません。再撮影してください。', 409);
+  }
+
+  const normalized = imagePath.replace(/\\/g, '/');
+  const uploadsDirectory = path.resolve('uploads');
+  const fullPath = path.resolve(normalized);
+  if (!fullPath.startsWith(`${uploadsDirectory}${path.sep}`)) {
+    throw new AppError('元画像が見つかりません。再撮影してください。', 409);
+  }
+
+  try {
+    await fs.access(fullPath);
+  } catch {
+    throw new AppError('元画像が見つかりません。再撮影してください。', 409);
+  }
+  return normalized;
+}
+
 /** commit 成功後: キューから除去（画像は保存済みのため残す） */
 export async function removeReceiptJobAfterCommit(
   jobId: string,
@@ -122,4 +143,44 @@ export async function discardReceiptJobForMember(
   const imagePath = job.data?.imagePath;
   await job.remove();
   await deletePendingJobImage(imagePath, familyGroupId);
+}
+
+/**
+ * 失敗した本人ジョブを、同じ未保存画像で新しいジョブとして再投入する。
+ * 元ジョブIDから決まるjobIdを使い、二重タップ・並行要求での重複投入を防ぐ。
+ */
+export async function retryFailedReceiptJobForMember(
+  jobId: string,
+  familyGroupId: number,
+  memberId: number
+) {
+  const job = await getOwnedReceiptJob(jobId, familyGroupId, memberId);
+  if (await job.getState() !== 'failed') {
+    throw new AppError('再実行できるのは失敗した解析ジョブのみです。', 409);
+  }
+
+  const imagePath = await ensureRetryableJobImage(job.data?.imagePath);
+  const retryInfo = getReceiptManualRetryInfo({
+    state: 'failed',
+    imagePath,
+    failureCode: typeof job.data?.failureCode === 'string' ? job.data.failureCode : null,
+    failedReason: job.failedReason,
+    manualRetryCount: job.data?.manualRetryCount,
+  });
+  if (!retryInfo.eligible) {
+    throw new AppError('この解析失敗は再実行できません。再撮影してください。', 409);
+  }
+
+  const retriedJob = await receiptQueue.add(
+    'analyze-receipt',
+    {
+      memberId,
+      familyGroupId,
+      imagePath,
+      manualRetryCount: Number(job.data?.manualRetryCount) + 1 || 1,
+    },
+    { jobId: `retry-${job.id}` }
+  );
+  await job.remove();
+  return retriedJob;
 }

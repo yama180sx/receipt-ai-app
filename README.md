@@ -144,7 +144,7 @@ PostgreSQL   BullMQ
 * テスト戦略
 * 運用設計
 
-詳細は `docs/` 配下を参照してください。
+詳細は [ドキュメント入口](docs/README.md)、[設計資料](docs/design/README.md)、[共通規約](docs/standards/10_設計・実装規約.md) を参照してください。
 
 ---
 

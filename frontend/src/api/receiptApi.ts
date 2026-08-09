@@ -7,14 +7,24 @@ import type {
   ItemSplitInput,
   ItemSplitSummary,
   ReceiptDetail,
+  ReceiptListPage,
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
+  UploadJobResponse,
+  ProductTypeSummary,
+  ProductClassificationCandidateSummary,
+  ProductClassificationReviewItem,
+  ProductClassificationLearningData,
+  ProductTypeStatus,
 } from './generated';
 
 export type ListReceiptsParams = {
   month?: string;
   memberId?: string;
+  q?: string;
+  limit?: number;
+  cursor?: string;
 };
 
 export type CommitReceiptPayload = {
@@ -25,11 +35,30 @@ export type CommitReceiptPayload = {
 };
 
 export type ReceiptJobStatusResponse = ApiSuccessResponse<ReceiptJobStatus>;
+export type ProductClassificationCorrectionScope =
+  | 'item_only'
+  | 'same_ocr_name';
+
+export type ProductClassificationCorrectionPayload = {
+  productTypeId: number;
+  scope: ProductClassificationCorrectionScope;
+};
+
+export type ListProductClassificationReviewItemsParams = {
+  statuses?: ProductTypeStatus[];
+  categoryId?: number;
+  month?: string;
+};
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
 export const receiptApi = {
-  async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptDetail[]>> {
+  async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptListPage>> {
     const res = await apiClient.get('/receipts', { params });
+    return res.data;
+  },
+
+  async getReceipt(receiptId: number): Promise<ApiSuccessResponse<ReceiptDetail>> {
+    const res = await apiClient.get(`/receipts/${receiptId}`);
     return res.data;
   },
 
@@ -51,6 +80,50 @@ export const receiptApi = {
     categoryId: number
   ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
     const res = await apiClient.patch(`/receipts/items/${itemId}`, { categoryId });
+    return res.data;
+  },
+
+  async listProductTypes(): Promise<ApiSuccessResponse<ProductTypeSummary[]>> {
+    const res = await apiClient.get('/product-types');
+    return res.data;
+  },
+
+  async updateItemProductClassification(
+    itemId: number,
+    payload: ProductClassificationCorrectionPayload
+  ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
+    const res = await apiClient.patch(`/receipts/items/${itemId}/product-classification`, payload);
+    return res.data;
+  },
+
+  async getItemProductClassificationCandidates(
+    itemId: number
+  ): Promise<ApiSuccessResponse<ProductClassificationCandidateSummary[]>> {
+    const res = await apiClient.get(`/receipts/items/${itemId}/product-classification-candidates`);
+    return res.data;
+  },
+
+  async listProductClassificationReviewItems(
+    params: ListProductClassificationReviewItemsParams = {}
+  ): Promise<ApiSuccessResponse<ProductClassificationReviewItem[]>> {
+    const { statuses, ...rest } = params;
+    const res = await apiClient.get('/product-classification/review-items', {
+      params: { ...rest, ...(statuses?.length ? { status: statuses.join(',') } : {}) },
+    });
+    return res.data;
+  },
+
+  async listProductClassificationLearningData(): Promise<ApiSuccessResponse<ProductClassificationLearningData[]>> {
+    const res = await apiClient.get('/product-classification/learning-data');
+    return res.data;
+  },
+
+  async deactivateProductClassificationLearningData(
+    type: 'household_dictionary',
+    id: number,
+    reason: string
+  ): Promise<ApiSuccessResponse<ProductClassificationLearningData>> {
+    const res = await apiClient.patch(`/product-classification/learning-data/${type}/${id}/deactivate`, { reason });
     return res.data;
   },
 
@@ -81,6 +154,11 @@ export const receiptApi = {
 
   async discardJob(jobId: string): Promise<ApiMessageResponse> {
     const res = await apiClient.delete(`/receipts/jobs/${jobId}`);
+    return res.data;
+  },
+
+  async retryJob(jobId: string): Promise<ApiSuccessResponse<UploadJobResponse>> {
+    const res = await apiClient.post(`/receipts/jobs/${jobId}/retry`);
     return res.data;
   },
 
