@@ -1,6 +1,6 @@
 import logger from '../../utils/logger';
 import { getReceiptAnalysisProvider } from '../../ai';
-import { estimateCategoryId } from '../categoryService';
+import { estimateCategoryId } from '../category/categoryEstimationService';
 import { validateReceiptItems } from '../validationService';
 import type { TenantContext } from '../../utils/context';
 import { runInTransaction } from '../../utils/prismaTransaction';
@@ -21,7 +21,7 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
       let initialCategoryId = null;
 
       if (familyGroupId) {
-        initialCategoryId = await estimateCategoryId(item.name, parsedData.storeName || '', familyGroupId);
+        initialCategoryId = await estimateCategoryId(item.name, familyGroupId);
       }
 
       return {
