@@ -4,13 +4,13 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 子 Issue: [#295 Issue #90-4](https://github.com/yama180sx/receipt-ai-app/issues/295)  
 計画: [plan.md](./plan.md)
 
-本ドキュメントは **実装準拠（as-built）** で記述する。Gemini 解析・BullMQ 非同期処理・Store / ProductMaster 正規化の挙動を正とし、API 詳細は [api-spec.md](./api-spec.md)（#90-3）、システム構成は [architecture.md](./architecture.md)（#90-1）を参照する。
+本ドキュメントは **実装準拠（as-built）** で記述する。Gemini 解析・BullMQ 非同期処理・Store 正規化と商品分類の挙動を正とし、API 詳細は [api-spec.md](./api-spec.md)（#90-3）、システム構成は [architecture.md](./architecture.md)（#90-1）を参照する。
 
 | 資料 | 内容 |
 |------|------|
 | [architecture.md](./architecture.md) §5.2 | 非同期解析のシーケンス概要（#90-1） |
 | [api-spec.md](./api-spec.md) §5.3, §6 | upload / commit / ジョブ API（#90-3） |
-| [domain-model.md](./domain-model.md) §3.4 | Store / ProductMaster の精算との関係（#90-2） |
+| [domain-model.md](./domain-model.md) §3.4 | Store と商品分類の精算との関係（#90-2） |
 | [MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md) | 3層正規化の設計起源 |
 
 ---
@@ -22,7 +22,7 @@ RecAIpt の AI パイプラインは、レシート画像を **Google Gemini** �
 | コンポーネント | 実装 | 役割 |
 |----------------|------|------|
 | Gemini API | `backend/src/services/geminiService.ts` | 画像 → JSON（店名・日付・明細・税額） |
-| 解析サービス | `backend/src/services/receiptService.ts` | `analyzeOnly` / `saveParsedReceipt` |
+| 解析サービス | `backend/src/services/receipt/receiptAnalysisService.ts` | `analyzeOnly` |
 | ジョブキュー | `backend/src/queues/receiptQueue.ts` | BullMQ キュー `receipt-analysis` |
 | Worker | `backend/src/workers/receiptWorker.ts` | 非同期で `analyzeOnly` を実行 |
 | 正規化 | `backend/src/utils/normalizer.ts` | NFKC・店舗名寄せ |
@@ -64,15 +64,15 @@ flowchart LR
     end
 
     subgraph layer3 [3. 意味の正規化]
-        PM["ProductMaster upsert<br/>カテゴリ学習"]
+        Classification["確定履歴 / 世帯別辞書 / 標準ルール<br/>商品種別分類"]
     end
 
     Gemini[Gemini 生出力] --> NFKC
     NFKC --> Analyze[analyzeOnly<br/>カテゴリ推定]
     Analyze --> Confirm[ユーザー確認画面]
     Confirm --> Store
-    Store --> PM
-    PM --> DB[(Receipt / Item)]
+    Store --> Classification
+    Classification --> DB[(Receipt / Item / 分類候補)]
 ```
 
 ### 2.1 形式の正規化（Automatic）
@@ -83,7 +83,7 @@ flowchart LR
 |------|------|
 | 実装 | `getCleanText` / `sanitize`（`normalizer.ts`） |
 | 処理 | Unicode **NFKC** → 小文字化 → 制御文字除去 → 連続空白を 1 つに |
-| 適用タイミング | 解析直後の店名・品名クリーニング、マスタ検索キー、commit 時の ProductMaster キー |
+| 適用タイミング | 解析直後の店名・品名クリーニング、店舗・商品分類の検索キー、commit 時の `Item.normalizedName` |
 
 ```typescript
 // normalizer.ts — 形式正規化の核心
@@ -98,27 +98,31 @@ flowchart LR
 |------|------|
 | モデル | `Store`（`officialName`, `aliases: Json`）— 世帯スコープ |
 | 実装 | `normalizeStoreName`（`normalizer.ts`） |
-| 適用タイミング | **`commit` 時**（`saveParsedReceipt` 内）。解析中は Gemini 生出力をそのまま UI に表示 |
+| 適用タイミング | **`commit` 時**（`saveConfirmedReceipt` 内）。解析中は Gemini 生出力をそのまま UI に表示 |
 | 照合ロジック | 正規化済み OCR 店名が、正規化済み `officialName` または `aliases` のいずれかを **部分一致** で含む場合、`officialName` を採用 |
 
-> Store マスタの CRUD は商品マスタ画面・管理 API 経由。精算計算には影響しない（[domain-model.md §3.4](./domain-model.md)）。
+> Store は世帯別マスタとしてseedされ、現行UIにはStore CRUD画面・APIはない。精算計算には影響しない（[domain-model.md §3.4](./domain-model.md)）。
 
-### 2.3 意味の正規化（Learning）
+### 2.3 意味の正規化（商品分類）
 
-**目的**: ユーザーが確定・修正したカテゴリを学習し、次回以降の AI 解析結果に反映する。
+**目的**: 商品名を根拠付きの商品種別へ分類し、世帯内の確定履歴・辞書を次回以降に再利用する。
 
 | 項目 | 内容 |
 |------|------|
-| モデル | `ProductMaster`（複合ユニーク: `name` + `storeName` + `familyGroupId`） |
-| キー | `getCleanText(品名)` + `getCleanText(店舗名)` — いずれも形式正規化済み |
-| 適用タイミング | **解析時**（既存マスタがあれば `categoryId` を事前付与）、**commit / 編集時**（`upsert` で学習更新） |
+| モデル | `ProductClassificationHistory`、`HouseholdProductDictionary`、`StandardProductClassificationRule`、`ProductClassificationCandidate` |
+| キー | `getCleanText(品名)` による `normalizedName`。世帯固有データは `familyGroupId` で分離 |
+| 適用タイミング | 解析画面表示時とcommit時に同じ分類優先順位で評価する。候補はcommit時に`Item`へ保存し、分類AIは保存後に要確認明細だけを処理する |
 
-**カテゴリ推定の優先順位**（`categoryService.estimateCategoryId`）:
+**商品種別分類の優先順位**（`productClassificationService`）:
 
-1. 同一店舗の ProductMaster 一致
-2. 店舗問わず ProductMaster 一致
-3. Category.keywords による部分一致
-4. フォールバック: カテゴリ「その他」
+1. 値引き・アプリ適用行を`not_applicable`として除外
+2. 世帯内の確定履歴
+3. 有効な世帯別辞書
+4. 有効な全世帯共通の標準分類ルール
+5. 類似検索候補（商品種別は確定せず`needs_review`）
+6. 保存後の分類AI（候補内かつhigh確信度だけ確定）
+
+家計簿の初期`categoryId`は、別途`categoryEstimationService`が世帯内`Category.keywords`の一致、なければ「その他」カテゴリで推定する。
 
 ---
 
@@ -131,21 +135,21 @@ Issue #49-8 / #71 により、**AI 解析（読み取り）** と **DB 保存（
 | 解析のみ | Worker → `analyzeOnly` | **なし** | Gemini 呼び出し、カテゴリ推定、バリデーション。結果は BullMQ `returnvalue` に保持 |
 | 結果参照 | `GET /api/receipts/status/:jobId` 等 | **なし** | 完了ジョブの `parsedData` をフロントへ返却 |
 | ユーザー確認 | `ReceiptScanScreen`（フロント） | **なし** | 店名・明細・税額・カテゴリを編集 |
-| 確定保存 | `POST /api/receipts/commit` → `saveConfirmedReceipt` | **あり** | 重複チェック、Store 正規化、ProductMaster 学習、Receipt / Item 作成、`ApiUsageLog` 紐付け |
+| 確定保存 | `POST /api/receipts/commit` → `commitReceipt` | **あり** | 重複チェック、Store正規化、Receipt / Item・商品分類候補作成、`ApiUsageLog`紐付け |
 
 **解析のみで行うこと**（`analyzeOnly`）:
 
 - Gemini API 呼び出し（`analyzeReceiptImage`）
-- 明細への初期 `categoryId` 付与（ProductMaster / キーワード推定）
+- 明細への初期`categoryId`付与（世帯内`Category.keywords`による推定）と、商品種別分類の表示用評価
 - 閾値ベースの警告生成（`validationService.validateReceiptItems`）
-- `ApiUsageLog` レコード作成（トークン記録。`receiptId` は未設定）
+- OCRの`ApiUsageLog`はGemini解析内で作成（`receiptId` はcommitまで未設定）
 
-**commit で初めて行うこと**（`saveParsedReceipt`）:
+**commit で初めて行うこと**（`saveConfirmedReceipt`）:
 
 - `normalizeStoreName` による店舗名寄せ
 - 重複レシート判定（409 `DUPLICATE`）
 - `Receipt` / `Item` のトランザクション作成
-- `ProductMaster.upsert`（確定カテゴリの学習）
+- `Item`と`ProductClassificationCandidate`を含むトランザクション保存
 - `ApiUsageLog.receiptId` の紐付け
 - 同一 `imagePath` の再 commit は **冪等**（既存 Receipt を返却）
 
@@ -279,7 +283,7 @@ flowchart TB
 | 起動 | `server.ts` の `import './workers/receiptWorker'`（本番・開発サーバーのみ） |
 | concurrency | 5 |
 | テナント | `runWithTenant({ familyGroupId, memberId })` で AsyncLocalStorage 設定 |
-| 処理 | `analyzeOnly(memberId, imagePath)` → 戻り値を `job.returnvalue` に格納 |
+| 処理 | `analyzeOnly({ familyGroupId, memberId }, imagePath)` → 戻り値を `job.returnvalue` に格納 |
 | テスト | `createApp()` 経路では **import しない**（Redis 未接続回避 — #91-3） |
 
 **責務**: Gemini 解析とカテゴリ推定。**Receipt テーブルへの書き込みは行わない**。
@@ -436,12 +440,14 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 | パス | 内容 |
 |------|------|
 | `backend/src/services/geminiService.ts` | Gemini 呼び出し・プロンプト・算術チェック |
-| `backend/src/services/receiptService.ts` | `analyzeOnly`, `saveParsedReceipt`, `saveConfirmedReceipt` |
+| `backend/src/services/receipt/receiptAnalysisService.ts` | OCR結果の初期カテゴリ・商品分類評価 |
+| `backend/src/services/receipt/receiptCommitService.ts` | commitとジョブ削除の編成 |
+| `backend/src/services/receipt/receiptCommitPersistence.ts` | Receipt / Item / 候補のトランザクション保存 |
 | `backend/src/workers/receiptWorker.ts` | BullMQ Worker |
 | `backend/src/queues/receiptQueue.ts` | キュー定義 |
 | `backend/src/services/receiptJobService.ts` | ジョブ一覧・enrich・破棄・失敗ジョブ再実行 |
 | `backend/src/utils/normalizer.ts` | 3層正規化（形式・表記） |
-| `backend/src/services/categoryService.ts` | カテゴリ推定 |
+| `backend/src/services/category/categoryEstimationService.ts` | 初期カテゴリ推定 |
 | `backend/src/controllers/adminController.ts` | プロンプト CRUD |
 | `frontend/src/contexts/ReceiptTrayContext.tsx` | 確認トレイ |
 | `frontend/src/screens/ReceiptScanScreen.tsx` | 確認・編集画面 |
@@ -452,6 +458,6 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 
 - [architecture.md](./architecture.md) — Docker / Redis / Worker 起動
 - [api-spec.md](./api-spec.md) — upload / commit / jobs API
-- [domain-model.md](./domain-model.md) — Store / ProductMaster / ApiUsageLog
+- [domain-model.md](./domain-model.md) — Store / 商品分類 / ApiUsageLog
 - [MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md) — 3層正規化の起源
 - [testing/plan.md](../testing/plan.md) — テスト計画・モック方針（#91）

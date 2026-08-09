@@ -44,7 +44,8 @@ erDiagram
     FamilyGroup ||--o{ Receipt : owns
     FamilyGroup ||--o{ Category : owns
     FamilyGroup ||--o{ Store : owns
-    FamilyGroup ||--o{ ProductMaster : owns
+    FamilyGroup ||--o{ HouseholdProductDictionary : owns
+    FamilyGroup ||--o{ ProductClassificationHistory : owns
     FamilyGroup ||--o{ SettlementTransfer : records
 
     FamilyMember ||--o{ Receipt : pays
@@ -54,7 +55,12 @@ erDiagram
 
     Receipt ||--|{ Item : contains
     Item ||--o{ ItemSplit : "0..n splits"
+    Item ||--o{ ProductClassificationCandidate : has
     Item }o--o| Category : categorized
+    Item }o--o| ProductType : classified_as
+    StandardCategory ||--o{ ProductType : groups
+    ProductType ||--o{ HouseholdProductDictionary : dictionary_target
+    ProductType ||--o{ ProductClassificationHistory : history_target
 
     FamilyGroup {
         int id PK
@@ -155,7 +161,7 @@ erDiagram
 | モデル | 精算への影響 |
 |--------|-------------|
 | `Category` | なし（家計統計用） |
-| `Store` / `ProductMaster` | なし（AI 正規化・学習用） |
+| `Store` / 商品分類学習データ | なし（AI 正規化・分類用） |
 
 ---
 
