@@ -20,7 +20,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | RDBMS | PostgreSQL 18 |
 | ORM | Prisma 6 |
 | テナントキー | `familyGroupId`（世帯単位の論理分離） |
-| モデル数 | 12（Enum `Role` 含む） |
+| モデル数 | 22（分類・監査モデルを含む。正確な定義はPrisma schemaを正とする） |
 
 ---
 
@@ -259,18 +259,22 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 
 ---
 
-### ProductMaster
+### 商品分類・学習データ
 
-| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
-|--------|-----|----------|---------|----|----|--------|-------|
-| id | Int | No | autoincrement() | Yes | — | — | — |
-| name | String | No | — | — | — | 複合 | — |
-| storeName | String | No | — | — | — | 複合 | — |
-| categoryId | Int | No | — | — | Category.id | — | — |
-| familyGroupId | Int | No | — | — | FamilyGroup.id | 複合 | — |
+`ProductMaster`はADR-003と`20260728095000_remove_product_master` migrationで廃止済みである。現行の役割は次のモデルに分離する。
 
-**FK:** `categoryId` → `Category.id`, `familyGroupId` → `FamilyGroup.id`  
-**Unique:** `(name, storeName, familyGroupId)` — 制約名 `name_storeName_familyGroupId`
+| モデル | 役割 | 主な制約・スコープ |
+|--------|------|-------------------|
+| `StandardCategory` | 全世帯共通のカテゴリ階層 | `code`一意、親子関係、表示順 |
+| `ProductType` | 標準カテゴリに属する商品種別 | `code`一意、`standardCategoryId + name`一意 |
+| `StandardProductClassificationRule` | 全世帯共通のキーワード分類ルール | `normalizedKeyword + productTypeId`一意、優先度・有効状態・変更理由 |
+| `HouseholdProductDictionary` | 世帯別の商品名→商品種別辞書 | `familyGroupId + normalizedName`一意 |
+| `ProductClassificationHistory` | 世帯内の確定履歴 | `familyGroupId + normalizedName`一意 |
+| `ClassificationCorrection` | 明細への手動修正履歴 | 世帯、操作メンバー、修正前後、適用範囲を保存 |
+| `ProductClassificationCandidate` | 類似検索候補 | `itemId + productTypeId`、`itemId + rank`が一意 |
+| `ProductClassificationLearningDataAudit` | 世帯辞書の無効化監査 | 世帯・対象・操作メンバー・理由を保存 |
+| `ProductClassificationAiRun` | 保存後の商品分類AI実行ログ | OCR用`ApiUsageLog`とは分離 |
+| `ProductClassificationReclassificationRun` / `ItemAudit` | 管理者による既存明細再分類の監査 | 世帯・実行者・対象・結果を保存 |
 
 ---
 
@@ -323,7 +327,8 @@ erDiagram
     FamilyGroup ||--o{ Receipt : has
     FamilyGroup ||--o{ Category : has
     FamilyGroup ||--o{ Store : has
-    FamilyGroup ||--o{ ProductMaster : has
+    FamilyGroup ||--o{ HouseholdProductDictionary : has
+    FamilyGroup ||--o{ ProductClassificationHistory : has
     FamilyGroup ||--o{ PromptTemplate : has
     FamilyGroup ||--o{ SettlementTransfer : has
 
@@ -335,7 +340,7 @@ erDiagram
     Receipt ||--o{ ApiUsageLog : related
 
     Category ||--o{ Item : classifies
-    Category ||--o{ ProductMaster : classifies
+    StandardCategory ||--o{ ProductType : has
 
     Item ||--o{ ItemSplit : split
 
@@ -352,10 +357,11 @@ erDiagram
 | 時期（migration） | 内容 |
 |-------------------|------|
 | 20260216〜 | マスタテーブル追加・統合 |
-| 20260324〜 | ProductMaster, imagePath |
+| 20260324〜 | ProductMaster, imagePath（ProductMasterは後続migrationで廃止） |
 | 20260406〜 | FamilyGroup 導入（マルチテナンシー） |
 | 20260513〜 | taxAmount |
 | 20260514〜 | PromptTemplate |
+| 20260728〜 | 商品分類モデル導入・ProductMaster廃止 |
 | 20260523〜 | ItemSplit |
 | 20260525〜 | SettlementTransfer |
 | 20260608〜 | マスタの世帯分離、TOTP |

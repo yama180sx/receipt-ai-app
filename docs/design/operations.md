@@ -182,7 +182,7 @@ docker compose exec backend npm run prisma:sync-sequences
 | dev | `~/dev/receipt-ai-app` | `receipt-dev-db` |
 | stable | `~/stable/receipt-ai-app` | `receipt-stable-db` |
 
-> [restore-manual.md §3](../restore-manual.md) の stable 手順 Step 1 は `~/dev/receipt-ai-app` となっているが、本番リストア時は **`~/stable/receipt-ai-app`** を使用する。
+> [restore-manual.md §3](../restore-manual.md) のstable手順は **`~/stable/receipt-ai-app`** を使用する。devとstableの作業ディレクトリ・Composeプロジェクトを混在させない。
 
 ### 5.3 復旧後チェックリスト
 

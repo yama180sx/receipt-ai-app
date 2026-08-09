@@ -1,8 +1,8 @@
-# Issue #90 — 設計資料・実装計画
+# Issue #90 — 設計資料・実装計画（履歴）
 
 Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
-本ドキュメントは **Issue #90** の成果物です。#90-1 以降の設計資料作成で共通参照してください。
+本ドキュメントは **Issue #90** の成果物であり、設計資料を整備した当時の計画を記録する履歴資料です。現在の仕様は [README.md](./README.md) 配下のas-built資料、公開APIは [OpenAPI](../openapi/openapi.yaml)、設計判断は [ADR](../adr/) を正とします。
 
 ## 1. 方針サマリー
 

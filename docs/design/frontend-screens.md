@@ -50,10 +50,10 @@ RecAIpt のフロントエンドは **Expo（React Native + Web）+ Expo Router*
 | `/settlement` | `SettlementSummaryScreen` | `useSettlementSummary` | `/` |
 | `/admin` | `AdminMenuScreen` | — | `/` |
 | `/admin/categories` | `CategoryManagementScreen` | `useCategoryManagement` | `/admin` |
-| `/admin/product-master` | `ProductMasterScreen` | — | `/admin` |
 | `/admin/prompts` | `PromptEditorScreen` | — | `/admin` |
 | `/admin/stats` | `AdminStatsScreen` | — | `/admin` |
 | `/admin/product-classification-reclassification` | `ProductClassificationReclassificationScreen` | `useProductClassificationReclassification` | `/admin` |
+| `/admin/product-classification-rules` | `StandardProductClassificationRulesScreen` | `useStandardProductClassificationRules` | `/admin` |
 | `/settings/totp` | `TotpSettingsScreen` | — | `/` |
 | `/login` | `LoginScreen` | `useLoginFlow` | ログイン後 `/` |
 
@@ -88,16 +88,16 @@ flowchart TD
   Routes --> Scan["/scan/jobId"]
   Routes --> Admin["/admin"]
   Routes --> Cat["/admin/categories"]
-  Routes --> Prod["/admin/product-master"]
   Routes --> Prompt["/admin/prompts"]
   Routes --> AdminS["/admin/stats"]
   Routes --> Reclassification["/admin/product-classification-reclassification"]
+  Routes --> Rules["/admin/product-classification-rules"]
   Routes --> Totp["/settings/totp"]
 
   Home --> Hist & ClassReview & Stats & Tray & Settle & Admin
   Tray --> Scan
   Hist --> Split
-  Admin --> Cat & Prod & Prompt & AdminS & Reclassification
+  Admin --> Cat & Prompt & AdminS & Reclassification & Rules
 ```
 
 ### 2.3 セッション・ナビゲーション状態
@@ -152,12 +152,11 @@ SafeAreaProvider
 | 画面 | ファイル | 主な責務 | 主要 API |
 |------|----------|----------|----------|
 | **AdminMenu** | `screens/AdminMenuScreen.tsx` | 管理機能へのナビゲーションハブ | なし |
-| **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | `useCategoryManagement` | `GET/POST/DELETE /categories`, `POST /categories/optimize` |
-| **ProductMaster** | `screens/ProductMasterScreen.tsx` | 商品マスタ検索・削除・店舗マージ | `GET /product-master`, `DELETE /product-master/:id`, `POST /product-master/merge-stores` |
+| **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | `useCategoryManagement` | `GET/POST/DELETE /categories` |
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
 | **ProductClassificationReclassification** | `screens/ProductClassificationReclassificationScreen.tsx` | 既存の未分類・要確認明細を安全に再評価し結果を表示 | `POST /admin/product-classification/reclassification-runs` |
-| **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワードルールの登録・無効化と自世帯プレビュー | `GET/POST/PATCH /admin/product-classification/standard-rules` |
+| **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワード分類ルールの管理 | `GET/POST/PATCH /admin/product-classification/standard-rules` |
 
 ### 3.3 認証・その他
 

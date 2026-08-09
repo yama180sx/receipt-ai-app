@@ -8,7 +8,7 @@
 |---|---|---|
 | 共通規約 | [standards/](./standards/) | 全作業で守るルール |
 | As-built設計資料 | [design/](./design/) | 実装・テストで確認された現行仕様の正本 |
-| 機能仕様 | [features/](./features/) | 機能ごとの要件・将来設計 |
+| 機能仕様 | [features/](./features/) | 機能ごとの要件・将来設計（実装前の比較資料は各資料内で履歴として明示） |
 | 設計判断 | [adr/](./adr/) | なぜその設計を採用したか |
 | テスト | [testing/](./testing/) | テスト戦略・findings・回帰チェック |
 | API契約 | [openapi/openapi.yaml](./openapi/openapi.yaml) | 公開APIの正本 |
@@ -23,7 +23,7 @@
 
 | 資料群 | 状態 | 方針 |
 |---|---|---|
-| `docs/design/` | 有効 | As-built正本として維持する |
+| `docs/design/` | 有効 | As-built正本として維持する（`design/plan.md`は作成計画の履歴） |
 | `docs/testing/` | 有効 | テストの正本・補助資料として維持する |
 | `docs/openapi/` | 有効 | 公開API契約の正本として維持する |
 | `docs/specs/chatgpt/` | 参考 | 原文監査ログ。変更・正本扱いをしない |
