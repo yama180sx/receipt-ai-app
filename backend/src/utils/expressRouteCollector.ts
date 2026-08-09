@@ -20,7 +20,6 @@ const DEFAULT_MOUNT_PROBE_PATHS = [
   '/api/admin/prompts',
   '/api/admin/product-classification/reclassification-runs',
   '/api/categories',
-  '/api/product-master',
   '/api/stats/settlement',
   '/api/receipts',
   '/api/receipts/upload',
