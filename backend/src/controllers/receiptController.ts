@@ -2,7 +2,6 @@ import path from 'path';
 import sharp from 'sharp';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
-import { findCategoriesByFamilyGroup } from '../repositories/categoryRepository';
 import {
   enrichCompletedJobPayload,
   listReceiptJobsForMember,
@@ -16,7 +15,6 @@ import { asyncHandler } from '../utils/asyncHandler';
 import logger from '../utils/logger';
 import type { ReceiptCommitPayload, ReceiptCreateItemInput } from '../types/receipt';
 import {
-  mapCategoriesToSummary,
   mapFamilyMembersToSummary,
   mapItemSplitsUpdateResult,
   mapJobToStatus,
@@ -124,12 +122,6 @@ export const retryReceiptJob = asyncHandler(async (req, res) => {
     ctx.memberId
   );
   sendSuccess(res, { jobId: String(job.id), status: 'queued' });
-});
-
-export const getCategories = asyncHandler(async (_req, res) => {
-  const { familyGroupId } = requireTenantContext();
-  const categories = await findCategoriesByFamilyGroup(familyGroupId);
-  sendSuccess(res, mapCategoriesToSummary(categories));
 });
 
 export const uploadReceipt = asyncHandler(async (req, res) => {
