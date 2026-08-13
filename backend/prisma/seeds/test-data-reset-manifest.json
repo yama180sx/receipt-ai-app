@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-13T17:12:38+09:00",
+  "expectedCounts": { "standardCategories": 18, "productTypes": 22, "standardProductClassificationRules": 40 },
+  "preservedUploadPaths": [
+    "uploads/tenant-isolation-fixture.webp",
+    "uploads/failed-preview-fixture.webp",
+    "uploads/pending-preview-fixture.webp"
+  ]
+}

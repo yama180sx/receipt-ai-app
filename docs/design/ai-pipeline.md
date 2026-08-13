@@ -370,7 +370,7 @@ Gemini へ渡すシステムプロンプトは **ハードコードではなく 
 | `isActive` | 同一 `key` で 1 件のみ `true`（activate API で切替） |
 | `familyGroupId` | 世帯スコープ（#93-4） |
 
-初期 seed: `backend/prisma/seed-prompts.ts`, `prisma/seeds/prompt_templates.json`
+初期 seed: `backend/prisma/seeds/household_settings.json`。管理画面の編集はDBだけに反映し、初期データへ反映する場合はレビューしたJSONを明示更新する。
 
 ### 7.2 取得ロジック
 
@@ -392,7 +392,7 @@ Gemini へ渡すシステムプロンプトは **ハードコードではなく 
 
 保護: JWT + tenant + `ADMIN` + TOTP（[api-spec.md §4.7](./api-spec.md)）
 
-変更時は `prisma/seeds/prompt_templates.json` へ同期ダンプされる（`adminController.syncPromptsToJson`）。
+管理画面の変更はJSONへ自動同期しない。
 
 ---
 

@@ -1,79 +1,30 @@
 import type { PrismaClient } from '@prisma/client';
-import {
-  INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES,
-  STANDARD_CATEGORIES,
-} from './standardProductClassificationSeed';
+import { loadInitialData } from './initialData';
 
-type StandardMasterClient = Pick<
-  PrismaClient,
-  'standardCategory' | 'productType' | 'standardProductClassificationRule'
->;
+type StandardMasterClient = Pick<PrismaClient, 'standardCategory' | 'productType' | 'standardProductClassificationRule'>;
 
-/**
- * 共通の商品分類マスタを定義どおりに追加・更新する。
- * 世帯データやレシートを削除・再分類せず、何度実行しても同じ状態に収束する。
- */
+/** JSONで固定した共通マスタを非破壊で同期する。JSON外の既存レコードは削除しない。 */
 export async function syncStandardProductClassificationMasters(prisma: StandardMasterClient) {
+  const { standard } = loadInitialData();
   const categoryIdByCode = new Map<string, number>();
-
-  for (const category of STANDARD_CATEGORIES) {
-    const parentId = category.parentCode
-      ? categoryIdByCode.get(category.parentCode)
-      : null;
-
-    if (category.parentCode && !parentId) {
-      throw new Error(`StandardCategory parent is missing: ${category.parentCode}`);
-    }
-
-    const data = {
-      name: category.name,
-      parentId,
-      displayOrder: category.displayOrder,
-      isActive: true,
-    };
-    const record = await prisma.standardCategory.upsert({
-      where: { code: category.code },
-      create: { code: category.code, ...data },
-      update: data,
-    });
+  for (const category of standard.standardCategories) {
+    const parentId = category.parentCode ? categoryIdByCode.get(category.parentCode) : null;
+    if (category.parentCode && !parentId) throw new Error(`StandardCategory parent is missing: ${category.parentCode}`);
+    const record = await prisma.standardCategory.upsert({ where: { code: category.code }, create: { code: category.code, name: category.name, parentId, displayOrder: category.displayOrder, isActive: true }, update: { name: category.name, parentId, displayOrder: category.displayOrder, isActive: true } });
     categoryIdByCode.set(category.code, record.id);
   }
-
   const productTypeIdByCode = new Map<string, number>();
-  for (const productType of INITIAL_PRODUCT_TYPES) {
+  for (const productType of standard.productTypes) {
     const standardCategoryId = categoryIdByCode.get(productType.standardCategoryCode);
-    if (!standardCategoryId) {
-      throw new Error(`ProductType category is missing: ${productType.standardCategoryCode}`);
-    }
-
-    const data = {
-      name: productType.name,
-      standardCategoryId,
-      displayOrder: productType.displayOrder,
-      isActive: true,
-    };
-    const record = await prisma.productType.upsert({
-      where: { code: productType.code },
-      create: { code: productType.code, ...data },
-      update: data,
-    });
+    if (!standardCategoryId) throw new Error(`ProductType category is missing: ${productType.standardCategoryCode}`);
+    const record = await prisma.productType.upsert({ where: { code: productType.code }, create: { code: productType.code, name: productType.name, standardCategoryId, displayOrder: productType.displayOrder, isActive: true }, update: { name: productType.name, standardCategoryId, displayOrder: productType.displayOrder, isActive: true } });
     productTypeIdByCode.set(productType.code, record.id);
   }
-
-  for (const entry of INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES) {
-    const standardCategoryId = categoryIdByCode.get(entry.standardCategoryCode);
-    const productTypeId = productTypeIdByCode.get(entry.productTypeCode);
-    if (!standardCategoryId || !productTypeId) {
-      throw new Error(`StandardProductClassificationRule reference is missing: ${entry.normalizedKeyword}`);
-    }
-
-    const data = { standardCategoryId, productTypeId, priority: entry.priority, isActive: true, lastChangeReason: entry.reason };
-    await prisma.standardProductClassificationRule.upsert({
-      where: { normalizedKeyword_productTypeId: { normalizedKeyword: entry.normalizedKeyword, productTypeId } },
-      create: { normalizedKeyword: entry.normalizedKeyword, ...data },
-      // 管理画面での優先度・有効状態・理由を、マスタ同期で上書きしない。
-      update: {},
-    });
+  for (const rule of standard.standardProductClassificationRules) {
+    const standardCategoryId = categoryIdByCode.get(rule.standardCategoryCode);
+    const productTypeId = productTypeIdByCode.get(rule.productTypeCode);
+    if (!standardCategoryId || !productTypeId) throw new Error(`StandardProductClassificationRule reference is missing: ${rule.normalizedKeyword}`);
+    const data = { standardCategoryId, productTypeId, priority: rule.priority, isActive: true, lastChangeReason: rule.reason };
+    await prisma.standardProductClassificationRule.upsert({ where: { normalizedKeyword_productTypeId: { normalizedKeyword: rule.normalizedKeyword, productTypeId } }, create: { normalizedKeyword: rule.normalizedKeyword, ...data }, update: data });
   }
 }
