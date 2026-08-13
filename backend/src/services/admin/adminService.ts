@@ -1,7 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { Prisma } from '@prisma/client';
-import logger from '../../utils/logger';
 import { AppError } from '../../utils/appError';
 import type { TenantContext } from '../../utils/context';
 import {
@@ -9,7 +6,6 @@ import {
   createPromptTemplateRecord,
   deactivatePromptTemplatesByKey,
   deletePromptTemplateById,
-  findAllPromptTemplatesForSync,
   findPromptTemplateById,
   findPromptTemplatesByFamilyGroup,
   updatePromptTemplateRecord,
@@ -30,22 +26,6 @@ function toDomainHints(value: unknown): Prisma.InputJsonValue | typeof Prisma.Js
   throw new AppError('Domain Hints はJSONオブジェクトで指定してください', 400);
 }
 
-const syncPromptsToJson = async (familyGroupId: number) => {
-  try {
-    const prompts = await findAllPromptTemplatesForSync(familyGroupId);
-    const seedsDir = path.join(__dirname, '../../../prisma/seeds');
-    const filePath = path.join(seedsDir, 'prompt_templates.json');
-
-    if (!fs.existsSync(seedsDir)) {
-      fs.mkdirSync(seedsDir, { recursive: true });
-    }
-
-    fs.writeFileSync(filePath, JSON.stringify(prompts, null, 2), 'utf-8');
-    logger.info(`[AdminAPI] Synced prompts to JSON: ${filePath}`);
-  } catch (error) {
-    logger.error(`[AdminAPI] syncPromptsToJson Error: ${error}`);
-  }
-};
 
 export async function listPromptTemplates(ctx: TenantContext) {
   return findPromptTemplatesByFamilyGroup(ctx.familyGroupId);
@@ -84,7 +64,6 @@ export async function createPromptTemplate(
     familyGroupId,
   });
 
-  await syncPromptsToJson(familyGroupId);
   return newPrompt;
 }
 
@@ -111,7 +90,6 @@ export async function updatePromptTemplate(
     version: { increment: 1 },
   });
 
-  await syncPromptsToJson(ctx.familyGroupId);
   return updated;
 }
 
@@ -122,7 +100,6 @@ export async function activatePromptTemplate(ctx: TenantContext, id: number) {
   }
 
   await activatePromptTemplateInTransaction(ctx.familyGroupId, target.id, target.key);
-  await syncPromptsToJson(ctx.familyGroupId);
 }
 
 export async function deletePromptTemplate(ctx: TenantContext, id: number) {
@@ -135,7 +112,6 @@ export async function deletePromptTemplate(ctx: TenantContext, id: number) {
   }
 
   await deletePromptTemplateById(target.id);
-  await syncPromptsToJson(ctx.familyGroupId);
 }
 
 type CostStatRow = AdminCostStatDomain;
