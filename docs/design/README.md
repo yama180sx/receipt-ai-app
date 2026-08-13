@@ -3,7 +3,7 @@
 Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)  
 計画: [plan.md](./plan.md)
 
-`docs/design/` は RecAIpt の **as-built 仕様書（正本）** である。コード・テスト済み挙動を根拠とし、ChatGPT 解析出力（[`docs/specs/chatgpt/`](../specs/chatgpt/)）は監査ログとして別途保管する。
+`docs/design/` は RecAIpt の **as-built 仕様書（正本）** である。コード・テスト済み挙動を根拠とし、ChatGPT 解析出力（[`docs/specs/chatgpt/`](../specs/chatgpt/)）は監査ログとして別途保管する。例外として [plan.md](./plan.md) は設計資料作成時の履歴計画であり、現行仕様の正本ではない。
 
 ---
 
@@ -28,7 +28,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 | 資料 | 内容 | 元 Issue |
 |------|------|----------|
-| [plan.md](./plan.md) | 設計資料全体の計画 | #90 |
+| [plan.md](./plan.md) | 設計資料全体の作成計画（履歴） | #90 |
 | [architecture.md](./architecture.md) | アーキテクチャ・デプロイ | #90-1 |
 | [database-schema.md](./database-schema.md) | DB 列定義・制約（Prisma 準拠） | 統合（ChatGPT Phase1 突合） |
 | [domain-model.md](./domain-model.md) | ドメイン意味・精算・按分 | #90-2 |

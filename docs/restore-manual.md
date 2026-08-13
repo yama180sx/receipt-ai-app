@@ -102,7 +102,7 @@ docker compose ps
 ### Step 1: 環境変数の定義
 
 ```bash
-cd ~/dev/receipt-ai-app
+cd ~/stable/receipt-ai-app
 DB_PASS=$(grep '^DB_PASSWORD=' .env | cut -d '=' -f 2-)
 # ★確認したタイムスタンプ（例: 20260519_061210）を以下に設定
 TARGET_TS="【ここにタイムスタンプを入力】"

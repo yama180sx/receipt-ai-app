@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { syncStandardProductClassificationMasters } from '../../../prisma/syncStandardProductClassificationMasters';
-import {
-  INITIAL_PRODUCT_TYPES,
-  INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES,
-  STANDARD_CATEGORIES,
-} from '../../../prisma/standardProductClassificationSeed';
+import { loadInitialData } from '../../../prisma/initialData';
 
 describe('syncStandardProductClassificationMasters', () => {
   it('upserts every global master entry without accessing household or receipt data', async () => {
+    const { standard } = loadInitialData();
     let nextCategoryId = 1;
     let nextProductTypeId = 101;
     const categoryIdByCode = new Map<string, number>();
@@ -33,10 +30,10 @@ describe('syncStandardProductClassificationMasters', () => {
     await syncStandardProductClassificationMasters(prisma as never);
     await syncStandardProductClassificationMasters(prisma as never);
 
-    expect(standardCategory.upsert).toHaveBeenCalledTimes(STANDARD_CATEGORIES.length * 2);
-    expect(productType.upsert).toHaveBeenCalledTimes(INITIAL_PRODUCT_TYPES.length * 2);
+    expect(standardCategory.upsert).toHaveBeenCalledTimes(standard.standardCategories.length * 2);
+    expect(productType.upsert).toHaveBeenCalledTimes(standard.productTypes.length * 2);
     expect(standardProductClassificationRule.upsert).toHaveBeenCalledTimes(
-      INITIAL_STANDARD_PRODUCT_CLASSIFICATION_RULES.length * 2
+      standard.standardProductClassificationRules.length * 2
     );
     expect(standardCategory.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -47,7 +44,7 @@ describe('syncStandardProductClassificationMasters', () => {
     expect(standardProductClassificationRule.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ normalizedKeyword_productTypeId: expect.objectContaining({ normalizedKeyword: 'zone' }) }),
-        update: {},
+        update: expect.objectContaining({ priority: 100, isActive: true }),
       })
     );
   });

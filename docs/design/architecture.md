@@ -264,7 +264,7 @@ Prisma への直接アクセスは **Repository に集約** する。Service は
 | `repositories/categoryRepository.ts` | カテゴリ CRUD・最適化 |
 | `repositories/memberRepository.ts` | メンバー・認証関連 |
 | `repositories/settlementRepository.ts` | 精算・送金 |
-| `repositories/productMasterRepository.ts` | 商品マスタ |
+| `repositories/productClassificationRepository.ts` | 商品分類・世帯辞書・確定履歴・類似検索 |
 | `repositories/promptRepository.ts` | プロンプトテンプレート |
 | `repositories/apiUsageLogRepository.ts` | AI 利用ログ |
 
@@ -465,8 +465,8 @@ Expo Router（`frontend/app/`）によるファイルベースルーティング
 | `features/stats` | `useStatistics` | 月次統計・グラフ |
 | `features/settlement` | `useSettlementSummary`, `useSplitEditor` | 精算・按分 |
 | `features/category` | `useCategoryManagement` | カテゴリ CRUD |
-| `features/productMaster` | `useProductMaster` | 学習マスタ |
-| `features/admin` | `usePromptEditor`, `useAdminStats` | プロンプト編集・コスト統計 |
+| `features/productClassification` | `useProductClassificationReview`, `useProductClassificationLearningData` | 商品分類の確認・世帯学習データ |
+| `features/admin` | `usePromptEditor`, `useAdminStats`, `useStandardProductClassificationRules` | プロンプト・コスト・標準分類ルール管理 |
 
 **domain/（#104-3）**: `domain/settlement/` に按分保存 payload 構築・明細小計・初期メンバー選定などの純関数を配置。Hook は domain を呼び出す。
 
@@ -647,7 +647,8 @@ sequenceDiagram
 |--------|------|
 | `FamilyGroup` / `FamilyMember` | 世帯・メンバー・権限・TOTP |
 | `Receipt` / `Item` / `ItemSplit` | レシート本体・明細・按分 |
-| `Category` / `Store` / `ProductMaster` | 世帯別マスタ・学習データ |
+| `Category` / `Store` | 世帯別マスタ |
+| `StandardCategory` / `ProductType` / 商品分類学習・監査モデル | 標準分類と世帯別学習データ |
 | `SettlementTransfer` | 月次精算の送金記録 |
 | `PromptTemplate` / `ApiUsageLog` | AI プロンプト・トークン使用量 |
 

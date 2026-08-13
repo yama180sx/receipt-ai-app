@@ -1,7 +1,7 @@
 import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { redisConnection } from '../config/redis';
 import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
-import { analyzeOnly } from '../services/receiptService'; 
+import { analyzeOnly } from '../services/receipt/receiptAnalysisService';
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 import { getErrorMessage, isRetryableHttpError } from '../utils/httpError';

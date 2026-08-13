@@ -21,11 +21,19 @@ export async function findCategoryIdByKeywordInTx(
   `;
 }
 
+export async function findCategoryIdsByKeyword(familyGroupId: number, itemName: string) {
+  return findCategoryIdByKeywordInTx(prisma, familyGroupId, itemName);
+}
+
 export async function findFallbackCategoryIdInTx(tx: PrismaTx, familyGroupId: number) {
   return tx.category.findFirst({
     where: { familyGroupId, name: 'その他' },
     select: { id: true },
   });
+}
+
+export async function findFallbackCategoryId(familyGroupId: number) {
+  return findFallbackCategoryIdInTx(prisma, familyGroupId);
 }
 
 export async function findOrCreateAdjustmentCategoryInTx(tx: PrismaTx, familyGroupId: number) {

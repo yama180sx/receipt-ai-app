@@ -13,10 +13,15 @@
 | **seed.ts** | `npm run prisma:seed` | 開発環境の初期化 | **全データ削除後、再投入** |
 | **update-master.ts** | `npm run prisma:update` | 運用・テスト環境の更新 | **マスタデータのみ更新 (upsert)** |
 | **reset-receipt-data-preserve-auth.ts** | `npm run prisma:reset-receipt-data` | 開発環境のレシート業務データ初期化 | **認証情報を保持** |
+| **reset-test-data-preserve-auth.ts** | `npm run prisma:reset-test-data` | 承認済みのdev/stableテスト運用データ再構築 | **FamilyGroup / FamilyMember以外を削除して固定JSONから再投入** |
 
 ---
 
 ## 3. 各スクリプトの詳細
+
+### C. 認証を保持した完全テストデータ初期化
+
+Issue #117-5の専用手順でのみ使用する。`RESET_TEST_DATA_CONFIRM`、`RESET_TEST_DATA_ENV`、`RESET_TEST_DATA_BACKUP_REFERENCE`が必須であり、`--dry-run`で世帯招待コード集合、件数、画像削除対象を確認してから実行する。詳細は[実施手順](./reviews/issue-117-5/implementation.md)を参照。
 
 ### A. `seed.ts` (初期化用)
 - **ファイルパス**: `backend/prisma/seed.ts`
@@ -28,7 +33,7 @@
 - **実行タイミング**:
   - 開発環境でデータ構成をリセットしたいとき。
   - プロジェクトに初めて参画し、ローカル環境を構築するとき。
-- **注意**: **実行すると、蓄積したレシートデータやユーザーデータはすべて失われます。**
+- **注意**: **実行すると、蓄積したレシート業務データ、世帯別の商品分類学習・監査データ、解析ジョブ、未保存レシート画像は失われます。** `FamilyGroup`と`FamilyMember`は保持するため、パスワードハッシュ、ロール、TOTP、招待コードは失われません。世帯別Category・Store・PromptTemplateと全世帯共通の標準分類ルールも保持されます。
 
 ### B. `update-master.ts` (安全な更新用)
 - **ファイルパス**: `backend/prisma/update-master.ts`

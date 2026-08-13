@@ -36,7 +36,7 @@ flowchart LR
     P["/api/*"] --> Protected["JWT + tenant"]
     Protected --> R[receipts / uploads / stats]
     Protected --> C[categories]
-    Protected --> PM[product-master]
+    Protected --> PC[product-types / product-classification]
     Protected --> S[stats/settlement]
 ```
 
@@ -45,9 +45,9 @@ flowchart LR
 | `/health` | なし | インライン |
 | `/api/auth` | なし（個別ルートで pending JWT / auth） | `authRoutes` |
 | `/api/admin` | `authMiddleware` → `tenantMiddleware` → `isAdmin` | `adminRoutes` |
-| `/api` | `authMiddleware` → `tenantMiddleware` | `receiptRoutes`（`/`）、`categoryRoutes`（`/categories`）、`productMasterRoutes`（`/product-master`）、`statsRoutes`（`/stats`） |
+| `/api` | `authMiddleware` → `tenantMiddleware` | `receiptRoutes`（`/`）、`categoryRoutes`（`/categories`）、`productTypeRoutes`（`/product-types`）、`statsRoutes`（`/stats`） |
 
-> **plan.md §8 との対応**: 認証・テナント保護の区分は plan.md の表と一致する。本書では全 40 エンドポイントを網羅する。
+> **plan.md §8 との対応**: 認証・テナント保護の区分は plan.md の表と一致する。公開契約の完全なendpoint一覧とschemaはOpenAPIを正とする。
 
 ---
 
@@ -327,27 +327,8 @@ sequenceDiagram
 | GET | `/` | JWT + tenant | カテゴリ一覧 |
 | POST | `/` | JWT + tenant | カテゴリ新規作成 |
 | DELETE | `/:id` | JWT + tenant | カテゴリ削除 |
-| POST | `/optimize` | JWT + tenant | ProductMaster からキーワード最適化 |
 
-### 4.6 Product Master — `/api/product-master`
-
-| Method | Path | 認証 | 説明 |
-|--------|------|------|------|
-| GET | `/` | JWT + tenant | 学習マスタ一覧 |
-| PATCH | `/:id` | JWT + tenant | マスタ個別更新 |
-| DELETE | `/:id` | JWT + tenant | マスタ削除 |
-| POST | `/merge-stores` | JWT + tenant | 店舗名統合 |
-
-**クエリ / ボディ**
-
-| エンドポイント | パラメータ | 説明 |
-|---------------|-----------|------|
-| `GET /` | `q` | 品名部分一致（case insensitive） |
-| `GET /` | `store` | 店舗名部分一致 |
-| `PATCH /:id` | body | `{ name?, storeName?, categoryId? }` |
-| `POST /merge-stores` | body | `{ sourceStoreName, targetStoreName }` |
-
-### 4.7 Admin — `/api/admin`
+### 4.6 Admin — `/api/admin`
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
@@ -357,6 +338,11 @@ sequenceDiagram
 | PATCH | `/prompts/:id` | 同上 | プロンプト更新 |
 | PATCH | `/prompts/:id/activate` | 同上 | デフォルトプロンプト切替 |
 | DELETE | `/prompts/:id` | 同上 | プロンプト削除 |
+| POST | `/product-classification/reclassification-runs` | 同上 | 既存の未分類・要確認明細を再分類 |
+| GET/POST | `/product-classification/standard-rules` | 同上 | 標準分類ルールの一覧・登録 |
+| POST | `/product-classification/standard-rules/preview` | 同上 | キーワードの分類候補をプレビュー |
+| PATCH | `/product-classification/standard-rules/:id` | 同上 | 標準分類ルールを更新 |
+| PATCH | `/product-classification/standard-rules/:id/deactivate` | 同上 | 標準分類ルールを無効化 |
 
 未マッチ Admin ルートは **404** `AppError`（`app.ts` 専用ハンドラ）。
 

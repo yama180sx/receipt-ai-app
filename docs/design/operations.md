@@ -182,7 +182,7 @@ docker compose exec backend npm run prisma:sync-sequences
 | dev | `~/dev/receipt-ai-app` | `receipt-dev-db` |
 | stable | `~/stable/receipt-ai-app` | `receipt-stable-db` |
 
-> [restore-manual.md §3](../restore-manual.md) の stable 手順 Step 1 は `~/dev/receipt-ai-app` となっているが、本番リストア時は **`~/stable/receipt-ai-app`** を使用する。
+> [restore-manual.md §3](../restore-manual.md) のstable手順は **`~/stable/receipt-ai-app`** を使用する。devとstableの作業ディレクトリ・Composeプロジェクトを混在させない。
 
 ### 5.3 復旧後チェックリスト
 
@@ -244,6 +244,7 @@ flowchart LR
 | `scripts/notify.sh` | 汎用 Discord 通知関数 |
 | `backend/prisma/seed.ts` | 全削除 + 初期データ投入 |
 | `backend/prisma/update-master.ts` | マスタ upsert（運用向け） |
+| `backend/prisma/reset-test-data-preserve-auth.ts` | 承認済みの認証保持テストデータ再構築（手動専用） |
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |

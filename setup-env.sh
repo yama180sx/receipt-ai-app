@@ -94,6 +94,7 @@ EOF
 
 # 6. backend/.env
 cat <<EOF > backend/.env
+ENV_NAME=$ENV_NAME
 DATABASE_URL="postgresql://$DB_USER:$DB_PASS@db:5432/$DB_NAME?schema=public"
 DB_PASSWORD=$DB_PASS
 PORT=3000
