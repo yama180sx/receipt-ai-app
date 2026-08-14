@@ -130,6 +130,43 @@ cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する
 
 詳細: [restore-manual.md §0](../restore-manual.md)
 
+### 3.5 PostgreSQL スロークエリログ
+
+PostgreSQL コンテナは、**500ms 以上**かかったSQLだけを標準出力へ記録する。
+全SQLの記録（`log_statement`）および全SQLの実行時間記録（`log_duration`）は無効である。
+
+| 項目 | 設定 |
+|------|------|
+| 対象 | 500ms 以上の完了SQL |
+| 出力先 | `db` コンテナの標準出力 |
+| 確認 | `docker compose logs db` |
+| Dockerログ保持 | 10MB × 3 世代（最大約30MB） |
+
+スロークエリログにはSQL本文が含まれ、検索語やレシート名などの値が記録され得る。ログは運用者だけが閲覧し、Issue #56-2 のIndex最適化の根拠確認にのみ利用する。
+
+`REINDEX` は定期実行しない。slow queryの継続、実行計画、Index肥大化などの証跡がある場合だけ、バックアップ取得後に対象Indexを個別に判断する。
+
+### 3.6 DB 読み取りベースライン（Issue #56-1）
+
+計測日: 2026-08-14（dev、PostgreSQL 18.3）
+データ量: FamilyGroup 2件、Receipt 22件、Item 95件、ItemSplit 0件、商品分類履歴 0件、世帯別辞書 1件。
+
+以下は実データを変更しない代表SQLの `EXPLAIN (ANALYZE, BUFFERS)` 結果である。データ量が小さいため、Planner がIndexではなくSeq Scanを選ぶことは正常であり、**追加Indexの根拠にはしない**。slow query logとデータ量の蓄積後に、Issue #56-2で再測定する。
+
+| 処理 | 現行の主な条件 | 実行時間 | 計画の要点 | 関連する既存Index |
+|------|----------------|---------:|------------|------------------|
+| レシート履歴 | `familyGroupId`、`date DESC, id DESC`、limit | 0.198ms | Receipt Seq Scan + sort | `Receipt_familyGroupId_date_idx` |
+| 月次合計 | `familyGroupId`、`TO_CHAR(date, 'YYYY-MM')` | 0.270ms | Receipt Seq Scan。月条件が関数式のため日時範囲Indexの利用は未確認 | `Receipt_familyGroupId_date_idx` |
+| 月次精算の明細取得 | Receiptの世帯・月範囲 → Item結合 | 0.277ms | Receipt / Item Seq Scan + Hash Join | `Receipt_familyGroupId_date_idx`、`ItemSplit_itemId_idx` |
+| 商品名の類似検索 | `Item.normalizedName % query` | 3.160ms | Item Seq Scan。95件ではtrigram Indexを選ばない | `Item_normalizedName_trgm_idx` |
+
+Index対応の補足:
+
+- 履歴の店舗名検索には `Receipt_normalizedStoreName_trgm_idx`、明細名検索には `Item_normalizedName_trgm_idx` を利用できる。
+- 商品分類の世帯別辞書・確定履歴には、`(familyGroupId, normalizedName)` のUnique Indexがある。世帯別辞書にはtrigram Indexもある。
+- `Item.receiptId` 単独Indexは現時点で存在しない。この追加要否は、精算・統計のslow queryと実行計画を根拠にIssue #56-2で判断する。
+- 商品分類履歴は0件のため、分類候補検索の実データベースラインは今後のデータ蓄積後に再測定する。
+
 ---
 
 ## 4. データベース運用（マスタ）
