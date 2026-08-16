@@ -16,6 +16,7 @@ export async function incrementApiUsageLogTokens(
     promptTokens: number;
     candidatesTokens: number;
     totalTokens: number;
+    selfRepairRetryCount?: number;
   }
 ) {
   return prisma.apiUsageLog.update({
@@ -24,6 +25,9 @@ export async function incrementApiUsageLogTokens(
       promptTokens: { increment: tokens.promptTokens },
       candidatesTokens: { increment: tokens.candidatesTokens },
       totalTokens: { increment: tokens.totalTokens },
+      ...(tokens.selfRepairRetryCount
+        ? { selfRepairRetryCount: { increment: tokens.selfRepairRetryCount } }
+        : {}),
     },
   });
 }

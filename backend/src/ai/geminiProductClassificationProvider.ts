@@ -5,9 +5,10 @@ import {
   PRODUCT_CLASSIFICATION_PROMPT_KEY,
   type ProductClassificationAiRequest,
 } from './productClassificationContract';
+import { getConfiguredProductClassificationModelId as getConfiguredModelId } from '../config/geminiModel';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = getConfiguredModelId();
 
 /** 失敗監査にも利用する、分類AIの設定済みモデル名。 */
 export function getConfiguredProductClassificationModelId(): string {

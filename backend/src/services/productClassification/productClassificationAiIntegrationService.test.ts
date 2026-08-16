@@ -112,7 +112,7 @@ describe('applyProductClassificationAiToItems', () => {
     expect(receiptRepositoryMocks.updateItemProductClassificationInTx).not.toHaveBeenCalled();
     expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        modelId: 'gemini-3.5-flash-lite',
         status: ProductClassificationAiRunStatus.PROVIDER_ERROR,
         failureCode: 'http_429',
       })

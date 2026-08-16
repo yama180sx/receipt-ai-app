@@ -65,7 +65,8 @@ jobs:
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           JWT_EXPIRES_IN="30d"
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL="${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}"
+          GEMINI_RECEIPT_MODEL="${{ vars.GEMINI_RECEIPT_MODEL || 'gemini-3.5-flash-lite' }}"
+          GEMINI_PRODUCT_CLASSIFICATION_MODEL="${{ vars.GEMINI_PRODUCT_CLASSIFICATION_MODEL || 'gemini-3.5-flash-lite' }}"
           GEMINI_RETRY_COUNT=3
           GEMINI_RETRY_DELAY=2000
           RECEIPT_MANUAL_RETRY_LIMIT=${{ vars.RECEIPT_MANUAL_RETRY_LIMIT || '1' }}
