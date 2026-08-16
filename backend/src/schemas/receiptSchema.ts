@@ -67,9 +67,9 @@ export const productClassificationReclassificationSchema = z
   }));
 
 export const standardProductClassificationRuleSchema = z.object({
-  keyword: z.string().trim().min(1).max(100),
-  productTypeId: z.coerce.number().int().positive(),
-  priority: z.coerce.number().int().min(0).max(100000),
+  keyword: z.string().trim().min(1, 'キーワードを入力してください').max(100, 'キーワードは100文字以内で入力してください'),
+  productTypeId: z.coerce.number().int('商品種別を選択してください').positive('商品種別を選択してください'),
+  priority: z.coerce.number().int('優先度は整数で入力してください').min(0, '優先度は0以上で入力してください').max(100000, '優先度は100000以下で入力してください'),
   reason: z.string().trim().min(1, '変更理由は必須です').max(500),
 });
 
