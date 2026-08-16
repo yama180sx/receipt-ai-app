@@ -8,6 +8,19 @@ function readStringField(data: unknown, key: 'error' | 'message'): string | unde
   return typeof value === 'string' ? value : undefined;
 }
 
+function readValidationDetails(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const details = (data as Record<string, unknown>).details;
+  if (!Array.isArray(details)) return undefined;
+
+  const messages = details.flatMap((detail) => {
+    if (!detail || typeof detail !== 'object') return [];
+    const message = (detail as Record<string, unknown>).message;
+    return typeof message === 'string' ? [message] : [];
+  });
+  return messages.length > 0 ? messages.join('\n') : undefined;
+}
+
 /** Axios レスポンス body（存在する場合） */
 export function getApiErrorResponseData(error: unknown): unknown {
   if (error instanceof OpenApiHttpError) {
@@ -40,7 +53,10 @@ export function getApiErrorMessage(
   if (fromError) return fromError;
 
   const fromMessage = readStringField(data, 'message');
-  if (fromMessage) return fromMessage;
+  if (fromMessage) {
+    const validationDetails = readValidationDetails(data);
+    return validationDetails ? `${fromMessage}\n${validationDetails}` : fromMessage;
+  }
 
   if (error instanceof Error && error.message) {
     return error.message;
@@ -55,6 +71,12 @@ export function showApiErrorAlert(
   error: unknown,
   fallback = '通信エラーが発生しました。'
 ): void {
-  console.error(`[API Error] ${title}:`, error);
+  // 4xx は利用者が修正できる想定内の入力・状態エラーであり、Expo の
+  // 開発用 Console Error 画面を出さない。5xx と通信障害だけを error として記録する。
+  if ((getApiErrorStatus(error) ?? 0) >= 500 || getApiErrorStatus(error) === undefined) {
+    console.error(`[API Error] ${title}:`, error);
+  } else {
+    console.warn(`[API Warning] ${title}:`, getApiErrorMessage(error, fallback));
+  }
   showAlert(title, getApiErrorMessage(error, fallback));
 }
