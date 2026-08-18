@@ -27,6 +27,7 @@ vi.mock('bullmq', () => ({
 }));
 vi.mock('../config/redis', () => ({ redisConnection: {} }));
 vi.mock('../queues/receiptQueue', () => ({ RECEIPT_QUEUE_NAME: 'receipt-analysis' }));
+vi.mock('../repositories/receiptAnalysisJobRepository', () => ({ updateReceiptAnalysisJob: vi.fn() }));
 vi.mock('../services/receipt/receiptAnalysisService', () => ({ analyzeOnly: mocks.analyzeOnly }));
 vi.mock('../utils/context', () => ({ runWithTenant: mocks.runWithTenant }));
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), error: mocks.loggerError } }));

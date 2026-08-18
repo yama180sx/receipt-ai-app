@@ -6,6 +6,8 @@ import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 import { getErrorMessage, isRetryableHttpError } from '../utils/httpError';
 import { getReceiptAnalysisFailureCode } from '../config/receiptRetryPolicy';
+import { ReceiptAnalysisJobStatus } from '@prisma/client';
+import { updateReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
 
 /**
  * [Issue #49-8 / #71]
@@ -16,6 +18,7 @@ const receiptWorker = new Worker(
   RECEIPT_QUEUE_NAME,
   async (job: Job) => {
     const { memberId, familyGroupId, imagePath } = job.data;
+    await updateReceiptAnalysisJob(String(job.id), { status: ReceiptAnalysisJobStatus.PROCESSING });
     logger.info(`[Worker] ジョブ開始 (解析のみ): ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 
     // テナントコンテキスト（familyGroupId）内で実行し、データ分離を担保
@@ -31,12 +34,14 @@ const receiptWorker = new Worker(
 
         // この戻り値は BullMQ の job.returnvalue となり、
         // フロントエンドのポーリングエンドポイント経由でユーザーに渡されます。
+        await updateReceiptAnalysisJob(String(job.id), { status: ReceiptAnalysisJobStatus.AWAITING_CONFIRMATION });
         return result;
 
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         const failureCode = getReceiptAnalysisFailureCode(error);
         await job.updateData({ ...job.data, failureCode: failureCode ?? null });
+        await updateReceiptAnalysisJob(String(job.id), { status: ReceiptAnalysisJobStatus.FAILED, failureCode: failureCode ?? null, failureReason: message });
         logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${message}`);
 
         // 日次枠切れなど、BullMQ 再試行しても回復しないエラーは即 failed にする

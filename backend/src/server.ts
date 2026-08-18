@@ -4,6 +4,8 @@ dotenv.config();
 
 // Worker は本番・開発サーバー起動時のみ（テストでは import しない）
 import './workers/receiptWorker';
+import { recoverReceiptAnalysisJobs } from './services/receiptJobService';
+import { receiptQueue } from './queues/receiptQueue';
 
 import { createApp } from './app';
 import logger from './utils/logger';
@@ -23,3 +25,12 @@ app.listen(Number(port), host, () => {
   logger.info(`🔗 URL: http://${host}:${port}`);
   logger.info(`🌐 CORS: ${JSON.stringify(allowedOrigins)}`);
 });
+
+const recoverQueuedJobs = (force = false) => recoverReceiptAnalysisJobs(force).catch((error) => {
+  logger.error(`キュー台帳の復旧確認に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+});
+
+// 起動時・接続復帰時に全件照合し、定期照合は取り逃し対策として上限付きで行う。
+recoverQueuedJobs(true);
+void receiptQueue.client.then((connection) => connection.on('ready', () => recoverQueuedJobs(true)));
+setInterval(recoverQueuedJobs, 10 * 60_000).unref();

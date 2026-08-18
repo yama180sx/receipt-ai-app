@@ -13,6 +13,13 @@ enum Role {
   USER // 一般ユーザー (レシートの登録・閲覧のみ)
 }
 
+enum ReceiptAnalysisJobStatus {
+  QUEUED
+  PROCESSING
+  AWAITING_CONFIRMATION
+  FAILED
+}
+
 enum ProductTypeStatus {
   CLASSIFIED            @map("classified")
   NEEDS_REVIEW          @map("needs_review")
@@ -82,6 +89,7 @@ model FamilyGroup {
   inviteCode                String                         @unique @default(cuid()) // 家族招待用のコード
   members                   FamilyMember[]
   receipts                  Receipt[]
+  receiptAnalysisJobs       ReceiptAnalysisJob[]
   categories                Category[]
   stores                    Store[]
   promptTemplates           PromptTemplate[]
@@ -107,6 +115,7 @@ model FamilyMember {
   totpVerifiedAt            DateTime?                  @db.Timestamptz(3)
   familyGroup               FamilyGroup                @relation(fields: [familyGroupId], references: [id])
   receipts                  Receipt[]
+  receiptAnalysisJobs       ReceiptAnalysisJob[]
   apiUsageLogs              ApiUsageLog[] // [Issue #59] トークンログとのリレーション
   itemSplits                ItemSplit[] // [Issue #78] 負担明細へのリレーション
   classificationCorrections ClassificationCorrection[]
@@ -121,6 +130,26 @@ model FamilyMember {
   receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
+}
+
+/// キューストア喪失時に未確定レシート解析を再投入するための永続台帳。
+model ReceiptAnalysisJob {
+  id               String                   @id @default(cuid())
+  familyGroupId    Int
+  familyGroup      FamilyGroup              @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  memberId         Int
+  member           FamilyMember             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  imagePath        String
+  status           ReceiptAnalysisJobStatus @default(QUEUED)
+  failureCode      String?
+  failureReason    String?
+  manualRetryCount Int                      @default(0)
+  lastEnqueuedAt   DateTime?                @db.Timestamptz(3)
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
+
+  @@index([familyGroupId, memberId, createdAt])
+  @@index([status, updatedAt])
 }
 
 // 費目カテゴリー (世帯別マスタ — Issue #93-4)

@@ -54,7 +54,7 @@ export const errorHandler = (
   }
 
   const safeMessage =
-    statusCode >= 500
+    statusCode >= 500 && !(normalized instanceof AppError && normalized.isOperational)
       ? 'サーバー内部でエラーが発生しました。時間をおいて再度お試しください。'
       : message;
 

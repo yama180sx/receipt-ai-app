@@ -74,6 +74,8 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 ```
 
 `RECEIPT_MANUAL_RETRY_FAILURE_CODES` はカンマ区切りで指定する。現行で指定可能なコードは `gemini_daily_quota`、`http_429`、`http_5xx`。既定値は前者のみである。値を空にすると手動再実行は無効化される。
+
+`RECEIPT_ANALYSIS_MAINTENANCE_MODE=true` はキューストア移行時の一時停止用である。新規解析投入と手動再実行だけを停止し、履歴閲覧と確定保存は継続する。切替確認後は必ず `false` に戻す。
 `gemini_daily_quota` は、GoogleのRPDリセット（太平洋時間の次の午前0時）まで再実行ボタンを表示しない。自動で翌日に再投入することはない。
 
 新しい設定項目を導入する際は、以下を同じ変更に含める。
@@ -121,6 +123,7 @@ OCR と商品分類はそれぞれ `GEMINI_RECEIPT_MODEL` と
 | スクリプト | `scripts/backup.sh {dev\|stable}` |
 | DB 形式 | `pg_dump` → gzip（`db_backup_YYYYMMDD_HHMMSS.sql.gz`） |
 | 画像形式 | `backend/uploads` を tar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
+| 未完了解析 | PostgreSQL `ReceiptAnalysisJob` を正本として復元後に再投入 |
 | 保存先（stable） | `/mnt/raid_1t/backups/receipt-app/{db,uploads}/` |
 | 保存先（dev） | `/mnt/raid_1t/backups/receipt-app-dev/{db,uploads}/` |
 | 世代管理 | **7 日**超のファイルを自動削除（`RETENTION_DAYS=7`） |

@@ -20,7 +20,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | RDBMS | PostgreSQL 18 |
 | ORM | Prisma 6 |
 | テナントキー | `familyGroupId`（世帯単位の論理分離） |
-| モデル数 | 22（分類・監査モデルを含む。正確な定義はPrisma schemaを正とする） |
+| モデル数 | 23（分類・監査モデルを含む。正確な定義はPrisma schemaを正とする） |
 
 ---
 
@@ -32,6 +32,15 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 |----|------|
 | `ADMIN` | 管理者（プロンプト編集・コスト統計など） |
 | `USER` | 一般ユーザー（レシート登録・閲覧） |
+
+### ReceiptAnalysisJobStatus
+
+| 値 | 用途 |
+|----|------|
+| `QUEUED` | キューストアへの投入待ち、または投入済み |
+| `PROCESSING` | Workerが解析処理中 |
+| `AWAITING_CONFIRMATION` | 解析完了、利用者の確認・保存待ち |
+| `FAILED` | 解析失敗。再実行ポリシーの対象になり得る |
 
 ---
 
@@ -67,6 +76,29 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 **FK:** `familyGroupId` → `FamilyGroup.id`  
 **Unique:** `(name, familyGroupId)`
+
+---
+
+### ReceiptAnalysisJob
+
+キューストア喪失時に、未確定レシート解析を同じjobIdで再投入するための永続台帳。BullMQ/Redis/Valkeyは実行キューであり、このテーブルが未完了状態の正本である。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | String | No | cuid() | Yes | — | — | — |
+| familyGroupId | Int | No | — | — | FamilyGroup.id | — | 複合 |
+| memberId | Int | No | — | — | FamilyMember.id | — | 複合 |
+| imagePath | String | No | — | — | — | — | — |
+| status | ReceiptAnalysisJobStatus | No | QUEUED | — | — | — | 複合 |
+| failureCode | String | Yes | — | — | — | — | — |
+| failureReason | String | Yes | — | — | — | — | — |
+| manualRetryCount | Int | No | 0 | — | — | — | — |
+| lastEnqueuedAt | DateTime | Yes | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | 複合 |
+| updatedAt | DateTime | No | @updatedAt | — | — | — | 複合 |
+
+**FK:** `familyGroupId` → `FamilyGroup.id` (**onDelete: Cascade**), `memberId` → `FamilyMember.id` (**onDelete: Cascade**)
+**Index:** `(familyGroupId, memberId, createdAt)`, `(status, updatedAt)`
 
 ---
 
@@ -327,6 +359,7 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 erDiagram
     FamilyGroup ||--o{ FamilyMember : has
     FamilyGroup ||--o{ Receipt : has
+    FamilyGroup ||--o{ ReceiptAnalysisJob : has
     FamilyGroup ||--o{ Category : has
     FamilyGroup ||--o{ Store : has
     FamilyGroup ||--o{ HouseholdProductDictionary : has
@@ -335,6 +368,7 @@ erDiagram
     FamilyGroup ||--o{ SettlementTransfer : has
 
     FamilyMember ||--o{ Receipt : creates
+    FamilyMember ||--o{ ReceiptAnalysisJob : requests
     FamilyMember ||--o{ ApiUsageLog : executes
     FamilyMember ||--o{ ItemSplit : owns
 
@@ -363,6 +397,7 @@ erDiagram
 | 20260406〜 | FamilyGroup 導入（マルチテナンシー） |
 | 20260513〜 | taxAmount |
 | 20260514〜 | PromptTemplate |
+| 20260818 | ReceiptAnalysisJob（キュー復旧台帳） |
 | 20260728〜 | 商品分類モデル導入・ProductMaster廃止 |
 | 20260523〜 | ItemSplit |
 | 20260525〜 | SettlementTransfer |
