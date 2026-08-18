@@ -74,6 +74,7 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 ```
 
 `RECEIPT_MANUAL_RETRY_FAILURE_CODES` はカンマ区切りで指定する。現行で指定可能なコードは `gemini_daily_quota`、`http_429`、`http_5xx`。既定値は前者のみである。値を空にすると手動再実行は無効化される。
+`gemini_daily_quota` は、GoogleのRPDリセット（太平洋時間の次の午前0時）まで再実行ボタンを表示しない。自動で翌日に再投入することはない。
 
 新しい設定項目を導入する際は、以下を同じ変更に含める。
 
@@ -81,6 +82,26 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 2. `backend/.env.example` と `setup-env.sh` の生成内容を更新する
 3. stable 用の値が必要なら GitHub Actions の `vars` から `backend/.env` へ渡す
 4. 本節と機能設計資料の環境変数表を更新する
+
+### 2.3 Gemini モデルの切替
+
+OCR と商品分類はそれぞれ `GEMINI_RECEIPT_MODEL` と
+`GEMINI_PRODUCT_CLASSIFICATION_MODEL` で固定モデルIDを指定する。既定値はどちらも
+`gemini-3.5-flash-lite` である。`gemini-flash-latest` のような別名は、提供側による
+参照先の自動変更を防ぐため使用できない。
+
+モデルを切り替えるときは、対象モデルの実レシート検証と商品分類の契約検証を完了してから、
+環境変数を変更して backend を再デプロイする。OCRだけ・商品分類だけの切替もでき、
+アプリケーションコードの変更は不要である。切替後に問題が起きた場合は、提供終了前の
+直前の固定モデルIDへ戻す。戻せない場合は自動フォールバックせず、手入力で登録する。
+
+### 2.4 Gemini の定期確認
+
+毎月、Google AI Studio と公式のモデル・料金・廃止予定情報を確認する。確認対象は、
+設定済みモデルの利用可否、Free Tier のクォータ、料金表、廃止日である。廃止予定が確認された
+場合は、少なくとも30日前までに代替候補を実レシートと商品分類契約で検証し、環境変数の変更と
+再デプロイを別途承認して行う。個人情報を含むレシート画像・プロンプト・応答本文は、調査記録へ
+転記しない。
 
 ---
 

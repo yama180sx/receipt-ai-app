@@ -166,8 +166,12 @@ export async function retryFailedReceiptJobForMember(
     failureCode: typeof job.data?.failureCode === 'string' ? job.data.failureCode : null,
     failedReason: job.failedReason,
     manualRetryCount: job.data?.manualRetryCount,
+    failedAt: job.finishedOn ?? job.timestamp,
   });
   if (!retryInfo.eligible) {
+    if (retryInfo.availableAt) {
+      throw new AppError('Geminiの日次無料枠が回復するまで再実行できません。手入力するか、次回リセット後に再実行してください。', 409);
+    }
     throw new AppError('この解析失敗は再実行できません。再撮影してください。', 409);
   }
 

@@ -296,7 +296,7 @@ flowchart TB
 | 404 秘匿 | 他世帯・他メンバーのジョブ ID は 404（存在を漏らさない） |
 | commit 後 | `removeReceiptJobAfterCommit` — キューから除去（画像は Receipt に紐づくため残す） |
 | 破棄 | `discardReceiptJobForMember` — キュー除去 + 未保存画像ファイル削除 |
-| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。既定は Gemini 日次クォータ超過のみ・手動再実行1回まで |
+| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。Gemini 日次クォータ超過時は次の太平洋時間午前0時以後だけ手動再実行できる。自動再投入はしない |
 
 ---
 
@@ -307,10 +307,11 @@ flowchart TB
 | 環境変数 | デフォルト | 用途 |
 |----------|------------|------|
 | `GEMINI_API_KEY` | — | API キー（必須） |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | 使用モデル |
+| `GEMINI_RECEIPT_MODEL` | `gemini-3.5-flash-lite` | レシート画像OCR・構造化に使う固定モデルID。`*-latest` の別名は禁止 |
+| `GEMINI_PRODUCT_CLASSIFICATION_MODEL` | `gemini-3.5-flash-lite` | 商品分類に使う固定モデルID。OCRとは独立に切替可能 |
 | `GEMINI_RETRY_COUNT` | `3` | 429 / 5xx リトライ回数 |
 | `GEMINI_RETRY_DELAY` | `2000` | 初回リトライ待機 ms（指数バックオフ） |
-| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要 |
+| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要。Gemini 日次クォータ超過は次の太平洋時間午前0時以後に限る |
 | `RECEIPT_MANUAL_RETRY_FAILURE_CODES` | `gemini_daily_quota` | 手動再実行を許可する失敗コード（カンマ区切り）。現行の候補は `gemini_daily_quota`、`http_429`、`http_5xx` |
 
 ### 6.2 解析処理（`analyzeReceiptImage`）
@@ -347,7 +348,7 @@ flowchart TB
 | タイミング | 操作 |
 |------------|------|
 | 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`） |
-| 自己修復リトライ | 同一レコードへ `increment` で累積 |
+| 自己修復リトライ | 同一レコードへtokenを`increment`で累積し、`selfRepairRetryCount`を加算 |
 | commit 成功 | `ApiUsageLog.receiptId` を更新（1 対 1 紐付け） |
 | 手動登録 | `usageLogId` なし（AI コスト対象外） |
 

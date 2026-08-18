@@ -418,6 +418,7 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     }, {
       state: 'failed',
       failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.parse('2026-08-15T07:00:00.000Z'),
     });
 
     try {
@@ -477,6 +478,7 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     }, {
       state: 'failed',
       failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.parse('2026-08-15T07:00:00.000Z'),
     });
 
     try {

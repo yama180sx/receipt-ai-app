@@ -1918,6 +1918,10 @@ components:
             remainingCount:
               type: integer
               minimum: 0
+            availableAt:
+              type: number
+              format: double
+              description: Gemini日次無料枠の失敗時に、再実行可能になる時刻（epoch milliseconds）。未待機時は省略。
         parsedData:
           type: object
           properties:

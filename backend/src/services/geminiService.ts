@@ -9,12 +9,13 @@ import {
   createApiUsageLog,
   incrementApiUsageLogTokens,
 } from "../repositories/apiUsageLogRepository";
+import { getConfiguredReceiptModelId } from '../config/geminiModel';
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = getConfiguredReceiptModelId();
 const RETRY_COUNT = parseInt(process.env.GEMINI_RETRY_COUNT || "3", 10);
 const RETRY_DELAY = parseInt(process.env.GEMINI_RETRY_DELAY || "2000", 10);
 
@@ -131,6 +132,7 @@ export const analyzeReceiptImage = async (
             promptTokens: usage.promptTokenCount ?? 0,
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
+            selfRepairRetryCount: retryWithCorrection ? 1 : 0,
           });
           logger.info(`[Gemini_Log] 自己修復リトライ分のトークンを合算しました (LogID: ${existingLogId})`);
         } else {
@@ -163,9 +165,12 @@ export const analyzeReceiptImage = async (
 
     // 算術整合性チェック
     const { isValid, diff } = validateArithmetic(data);
-    if (!isValid && !retryWithCorrection) {
-      logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
-      return await processAnalysis(true, text, usageLogId);
+    if (!isValid) {
+      if (!retryWithCorrection) {
+        logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
+        return await processAnalysis(true, text, usageLogId);
+      }
+      throw new Error(`Gemini解析結果の算術整合性を確認できませんでした（差分:${diff}円）。`);
     }
 
     return data;

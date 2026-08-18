@@ -2263,6 +2263,11 @@ export interface components {
             retry?: {
                 eligible?: boolean;
                 remainingCount?: number;
+                /**
+                 * Format: double
+                 * @description Gemini日次無料枠の失敗時に、再実行可能になる時刻（epoch milliseconds）。未待機時は省略。
+                 */
+                availableAt?: number;
             };
             parsedData?: {
                 storeName?: string;
