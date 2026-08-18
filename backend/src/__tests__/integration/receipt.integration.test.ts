@@ -437,6 +437,34 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     }
   });
 
+  it('POST /receipts/jobs/:jobId/retry blocks a daily quota failure until the next RPD reset', async () => {
+    const imagePath = 'uploads/retry-quota-wait.webp';
+    fs.writeFileSync(imagePath, 'fixture');
+    registerMockReceiptJob('retry-quota-wait', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath,
+      manualRetryCount: 0,
+    }, {
+      state: 'failed',
+      failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.now(),
+    });
+
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const res = await request(app)
+        .post('/api/receipts/jobs/retry-quota-wait/retry')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toContain('日次無料枠が回復するまで');
+      expect(mockReceiptJobs.has('retry-quota-wait')).toBe(true);
+    } finally {
+      fs.unlinkSync(imagePath);
+    }
+  });
+
   it('POST /receipts/jobs/:jobId/retry rejects a missing source image', async () => {
     registerMockReceiptJob('retry-missing-image', {
       memberId: 1,

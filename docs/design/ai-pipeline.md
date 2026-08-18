@@ -347,8 +347,8 @@ flowchart TB
 
 | タイミング | 操作 |
 |------------|------|
-| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`） |
-| 自己修復リトライ | 同一レコードへtokenを`increment`で累積し、`selfRepairRetryCount`を加算 |
+| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`） |
+| 自己修復リトライ | 同一レコードへtokenと`durationMs`を`increment`で累積し、`selfRepairRetryCount`を加算 |
 | commit 成功 | `ApiUsageLog.receiptId` を更新（1 対 1 紐付け） |
 | 手動登録 | `usageLogId` なし（AI コスト対象外） |
 

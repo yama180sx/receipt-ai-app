@@ -119,8 +119,10 @@ export const analyzeReceiptImage = async (
       },
     };
 
+    const startedAt = Date.now();
     const result = await model.generateContent([prompt, imageData]);
     const response = await result.response;
+    const durationMs = Date.now() - startedAt;
     
     // トークンログ記録
     let usageLogId: number | undefined = existingLogId;
@@ -133,6 +135,7 @@ export const analyzeReceiptImage = async (
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
             selfRepairRetryCount: retryWithCorrection ? 1 : 0,
+            durationMs,
           });
           logger.info(`[Gemini_Log] 自己修復リトライ分のトークンを合算しました (LogID: ${existingLogId})`);
         } else {
@@ -142,6 +145,7 @@ export const analyzeReceiptImage = async (
             promptTokens: usage.promptTokenCount ?? 0,
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
+            durationMs,
           });
           usageLogId = log.id;
         }

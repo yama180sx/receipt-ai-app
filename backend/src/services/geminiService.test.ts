@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   generateContent: vi.fn(),
@@ -57,7 +57,16 @@ describe('analyzeReceiptImage', () => {
     mocks.createApiUsageLog.mockResolvedValue({ id: 123 });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('rejects a result that remains arithmetically inconsistent after self-repair', async () => {
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_025)
+      .mockReturnValueOnce(2_000)
+      .mockReturnValueOnce(2_040);
     mocks.generateContent
       .mockResolvedValueOnce(resultFor(invalidReceipt))
       .mockResolvedValueOnce(resultFor(invalidReceipt));
@@ -70,6 +79,9 @@ describe('analyzeReceiptImage', () => {
       candidatesTokens: 2,
       totalTokens: 12,
       selfRepairRetryCount: 1,
+      durationMs: 40,
     });
+
+    expect(mocks.createApiUsageLog).toHaveBeenCalledWith(expect.objectContaining({ durationMs: 25 }));
   });
 });

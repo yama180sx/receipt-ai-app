@@ -473,6 +473,7 @@ model ApiUsageLog {
   candidatesTokens Int // 出力トークン
   totalTokens      Int // 合計トークン
   selfRepairRetryCount Int @default(0) // 算術不整合の自己修復再解析回数
+  durationMs       Int           @default(0) // Gemini API応答時間（自己修復分を累積）
   createdAt        DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([familyMemberId])
