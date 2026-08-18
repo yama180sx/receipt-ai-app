@@ -103,6 +103,13 @@ OCR と商品分類はそれぞれ `GEMINI_RECEIPT_MODEL` と
 再デプロイを別途承認して行う。個人情報を含むレシート画像・プロンプト・応答本文は、調査記録へ
 転記しない。
 
+### 2.5 Free Tier の実測
+
+モデルの切替判断や無料枠運用に使う実測は、
+[Gemini Free Tier実測手順](../testing/gemini-free-tier-measurement.md)に従う。固定のRPDを
+アプリケーション設定へ持ち込まず、実施時点のGoogle AI Studio表示と`ApiUsageLog`の集計値を
+記録する。Paid Tierの料金試算・予算管理は Issue #120-1 のスコープである。
+
 ---
 
 ## 3. バックアップ
