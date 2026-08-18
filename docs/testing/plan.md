@@ -54,7 +54,7 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 | 対象 | 理由 |
 |------|------|
 | カメラ・画像クロップ | デバイス依存、自動化コスト高 |
-| Gemini 実 OCR | 外部 API・非決定論 |
+| Gemini 実 OCR | 外部 API・非決定論。実施・集計は [Gemini Free Tier実測手順](./gemini-free-tier-measurement.md) に従う |
 | 全画面フロー回帰 | #87-5 を拡張（#91-5） |
 
 ### Should / Later
