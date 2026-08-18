@@ -290,6 +290,7 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | candidatesTokens | Int | No | — | — | — | — | — |
 | totalTokens | Int | No | — | — | — | — | — |
 | selfRepairRetryCount | Int | No | 0 | — | — | — | — |
+| durationMs | Int | No | 0 | — | — | — | — |
 | createdAt | DateTime | No | now() | — | — | — | Yes |
 
 **FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`  

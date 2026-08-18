@@ -6,6 +6,7 @@ export async function createApiUsageLog(data: {
   promptTokens: number;
   candidatesTokens: number;
   totalTokens: number;
+  durationMs: number;
 }) {
   return prisma.apiUsageLog.create({ data });
 }
@@ -17,6 +18,7 @@ export async function incrementApiUsageLogTokens(
     candidatesTokens: number;
     totalTokens: number;
     selfRepairRetryCount?: number;
+    durationMs?: number;
   }
 ) {
   return prisma.apiUsageLog.update({
@@ -27,6 +29,9 @@ export async function incrementApiUsageLogTokens(
       totalTokens: { increment: tokens.totalTokens },
       ...(tokens.selfRepairRetryCount
         ? { selfRepairRetryCount: { increment: tokens.selfRepairRetryCount } }
+        : {}),
+      ...(tokens.durationMs !== undefined
+        ? { durationMs: { increment: tokens.durationMs } }
         : {}),
     },
   });

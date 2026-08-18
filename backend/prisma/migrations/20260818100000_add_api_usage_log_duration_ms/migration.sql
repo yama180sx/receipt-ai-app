@@ -1,0 +1,2 @@
+ALTER TABLE "ApiUsageLog"
+  ADD COLUMN "durationMs" INTEGER NOT NULL DEFAULT 0;
