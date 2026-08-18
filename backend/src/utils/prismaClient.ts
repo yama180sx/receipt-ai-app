@@ -37,6 +37,7 @@ export const prisma = basePrisma.$extends({
           'Store',
           'PromptTemplate',
           'SettlementTransfer',
+          'ReceiptAnalysisJob',
         ];
         
         if (!tenantModels.includes(model)) {

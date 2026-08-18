@@ -102,6 +102,8 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 実Gemini OCR、実Redis Worker、実画像アップロードを通す確認は自動テストの対象外とし、
 `regression-checklist.md` に従う手動確認で扱う。
 
+Issue #119では`ReceiptAnalysisJob`台帳を正本とし、空のキューストアへ同一jobIdで再投入できることを結合テストと手動確認で検証する。
+
 ## 5. CI 方針
 
 | トリガー | 内容 | ランナー |

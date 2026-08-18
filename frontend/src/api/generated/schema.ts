@@ -998,6 +998,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description キューストア移行中のため新規解析投入を停止中 */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -1093,7 +1100,7 @@ export interface paths {
         put?: never;
         /**
          * 失敗した解析ジョブを同じ画像で再実行
-         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に同じjobIdで解析ジョブを再投入する。日次クォータ超過時の自動再試行は行わない。
          */
         post: {
             parameters: {
@@ -1126,6 +1133,13 @@ export interface paths {
                 };
                 /** @description 再実行できないジョブ状態または元画像なし */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description キューストア移行中のため手動再実行を停止中 */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };

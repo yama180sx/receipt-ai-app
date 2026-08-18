@@ -73,7 +73,7 @@ flowchart TB
 | Frontend | Expo ~54, React 19, React Native 0.81, TypeScript, Axios |
 | Backend | Node.js 20, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
-| Queue | BullMQ 5 + Redis 7 |
+| Queue | BullMQ 5 + Redis 7（Valkey移行は Issue #119 で検証中） |
 | AI | `@google/generative-ai`（Gemini） |
 | 画像 | sharp（WebP 変換）, multer（アップロード） |
 | 認証 | JWT, bcrypt, otplib（TOTP）, AES-256-GCM |
@@ -426,6 +426,7 @@ sequenceDiagram
 | concurrency | 5 |
 | 完了ジョブ保持 | 30 分（ポーリング用） |
 | リトライ | attempts: 3, exponential backoff 5s |
+| 復旧台帳 | `ReceiptAnalysisJob`（PostgreSQL）。キュー喪失時は未完了ジョブを同じjobIdで再投入する。 |
 
 Worker の実装: `backend/src/workers/receiptWorker.ts`  
 キュー定義: `backend/src/queues/receiptQueue.ts`
