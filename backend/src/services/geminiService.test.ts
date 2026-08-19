@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   findActivePromptTemplateByKey: vi.fn(),
   createApiUsageLog: vi.fn(),
   incrementApiUsageLogTokens: vi.fn(),
+  findEffectiveAiPricingRevision: vi.fn(),
 }));
 
 vi.mock('@google/generative-ai', () => ({
@@ -27,6 +28,10 @@ vi.mock('../repositories/promptRepository', () => ({
 vi.mock('../repositories/apiUsageLogRepository', () => ({
   createApiUsageLog: mocks.createApiUsageLog,
   incrementApiUsageLogTokens: mocks.incrementApiUsageLogTokens,
+}));
+
+vi.mock('../repositories/aiPricingRevisionRepository', () => ({
+  findEffectiveAiPricingRevision: mocks.findEffectiveAiPricingRevision,
 }));
 
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
@@ -55,6 +60,7 @@ describe('analyzeReceiptImage', () => {
     vi.clearAllMocks();
     mocks.findActivePromptTemplateByKey.mockResolvedValue({ systemPrompt: 'prompt', domainHints: null });
     mocks.createApiUsageLog.mockResolvedValue({ id: 123 });
+    mocks.findEffectiveAiPricingRevision.mockResolvedValue({ id: 77 });
   });
 
   afterEach(() => {
@@ -82,6 +88,6 @@ describe('analyzeReceiptImage', () => {
       durationMs: 40,
     });
 
-    expect(mocks.createApiUsageLog).toHaveBeenCalledWith(expect.objectContaining({ durationMs: 25 }));
+    expect(mocks.createApiUsageLog).toHaveBeenCalledWith(expect.objectContaining({ durationMs: 25, pricingRevisionId: 77 }));
   });
 });

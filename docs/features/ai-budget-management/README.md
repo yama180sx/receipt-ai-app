@@ -51,9 +51,9 @@ TOTP有効化済みであることも必須とする。全体AI予算管理者�
 
 | 順序 | Issue | 役割 |
 | --- | --- | --- |
-| 1 | [#644 Issue #124](https://github.com/yama180sx/receipt-ai-app/issues/644) | 全体設定、監査、外部AI停止判定、BullMQ連携 |
-| 2 | [#645 Issue #125](https://github.com/yama180sx/receipt-ai-app/issues/645) | 管理設定画面、Discord／メール通知、秘密情報運用 |
-| 3 | [#646 Issue #126](https://github.com/yama180sx/receipt-ai-app/issues/646) | OCR・分類AIの全体集計、単価履歴、管理表示 |
+| 1 | [#646 Issue #126](https://github.com/yama180sx/receipt-ai-app/issues/646) | OCR・分類AIの全体集計、単価履歴、利用ログへの単価ID付与。全体表示の公開は#124の専用権限後に接続 |
+| 2 | [#644 Issue #124](https://github.com/yama180sx/receipt-ai-app/issues/644) | 全体設定、監査、外部AI停止判定、BullMQ連携 |
+| 3 | [#645 Issue #125](https://github.com/yama180sx/receipt-ai-app/issues/645) | 管理設定画面、Discord／メール通知、秘密情報運用 |
 | 4 | [#647 Issue #127](https://github.com/yama180sx/receipt-ai-app/issues/647) | 料金・モデル・Free Tier確認の月次レビューと切替時検査 |
 
 Issue #124〜#126が実装されるまでは、この資料は将来仕様であり、as-built資料ではない。

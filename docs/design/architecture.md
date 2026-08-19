@@ -267,6 +267,7 @@ Prisma への直接アクセスは **Repository に集約** する。Service は
 | `repositories/productClassificationRepository.ts` | 商品分類・世帯辞書・確定履歴・類似検索 |
 | `repositories/promptRepository.ts` | プロンプトテンプレート |
 | `repositories/apiUsageLogRepository.ts` | AI 利用ログ |
+| `repositories/aiPricingRevisionRepository.ts` | 用途・モデル別単価改定の解決 |
 
 テナントスコープは Prisma Client Extension（`$extends`）で Repository 内部から適用する。UseCase 物理層（`usecases/` フォルダ）は設けず、**Service メソッド = Application 操作** とする（[plan.md](../refactor/plan.md) §7）。
 

@@ -7,7 +7,7 @@ import {
 } from '@prisma/client';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 
-const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks } = vi.hoisted(() => ({
+const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks, pricingRevisionMocks } = vi.hoisted(() => ({
   aiMocks: { classifyProductsWithAi: vi.fn() },
   receiptRepositoryMocks: {
     findItemById: vi.fn(),
@@ -20,12 +20,14 @@ const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMo
     findCategoryForProductTypeInTx: vi.fn(),
   },
   runRepositoryMocks: { createProductClassificationAiRun: vi.fn().mockResolvedValue({}) },
+  pricingRevisionMocks: { findEffectiveAiPricingRevision: vi.fn().mockResolvedValue({ id: 88 }) },
 }));
 
 vi.mock('../../ai', () => aiMocks);
 vi.mock('../../repositories/receiptRepository', () => receiptRepositoryMocks);
 vi.mock('../../repositories/productClassificationRepository', () => productRepositoryMocks);
 vi.mock('../../repositories/productClassificationAiRunRepository', () => runRepositoryMocks);
+vi.mock('../../repositories/aiPricingRevisionRepository', () => pricingRevisionMocks);
 vi.mock('../../utils/prismaTransaction', () => ({
   runInTransaction: (fn: (tx: object) => Promise<unknown>) => fn({}),
 }));
@@ -76,6 +78,9 @@ describe('applyProductClassificationAiToItems', () => {
         classificationSource: ClassificationSource.AI,
         classificationConfidence: ClassificationConfidence.HIGH,
       })
+    );
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({ pricingRevisionId: 88 })
     );
   });
 

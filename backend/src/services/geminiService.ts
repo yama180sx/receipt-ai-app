@@ -9,6 +9,8 @@ import {
   createApiUsageLog,
   incrementApiUsageLogTokens,
 } from "../repositories/apiUsageLogRepository";
+import { findEffectiveAiPricingRevision } from '../repositories/aiPricingRevisionRepository';
+import { AiUsagePurpose } from '@prisma/client';
 import { getConfiguredReceiptModelId } from '../config/geminiModel';
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
@@ -93,6 +95,17 @@ export const analyzeReceiptImage = async (
   imagePath: string, 
   familyMemberId?: number
 ): Promise<ParsedReceipt> => {
+  // #124 がPaid Tier有効時の「単価未登録なら停止」を担当するまで、単価解決失敗は既存OCRを阻害しない。
+  // 有効な改定があれば開始時点のIDだけをログへ固定し、後からの単価変更で過去額を変えない。
+  let pricingRevisionId: number | undefined;
+  try {
+    pricingRevisionId = (await findEffectiveAiPricingRevision(
+      AiUsagePurpose.OCR,
+      GEMINI_MODEL
+    ))?.id;
+  } catch (error) {
+    logger.error('❌ AI単価改定の取得に失敗しました:', error);
+  }
 
   const processAnalysis = async (
     retryWithCorrection: boolean = false, 
@@ -146,6 +159,7 @@ export const analyzeReceiptImage = async (
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
             durationMs,
+            pricingRevisionId,
           });
           usageLogId = log.id;
         }

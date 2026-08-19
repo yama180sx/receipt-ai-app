@@ -1,4 +1,5 @@
 import {
+  AiUsagePurpose,
   ClassificationConfidence,
   ClassificationSource,
   ProductTypeStatus,
@@ -8,6 +9,7 @@ import { classifyProductsWithAi } from '../../ai';
 import { getConfiguredProductClassificationModelId } from '../../ai/geminiProductClassificationProvider';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 import { createProductClassificationAiRun } from '../../repositories/productClassificationAiRunRepository';
+import { findEffectiveAiPricingRevision } from '../../repositories/aiPricingRevisionRepository';
 import logger from '../../utils/logger';
 import { getHttpStatusFromError, getNodeErrorCode } from '../../utils/httpError';
 import { runInTransaction } from '../../utils/prismaTransaction';
@@ -69,6 +71,17 @@ export async function applyProductClassificationAiToItems(
   }
   if (targets.length === 0) return;
 
+  let pricingRevisionId: number | undefined;
+  try {
+    pricingRevisionId = (await findEffectiveAiPricingRevision(
+      AiUsagePurpose.PRODUCT_CLASSIFICATION,
+      getConfiguredProductClassificationModelId()
+    ))?.id;
+  } catch (error) {
+    // #124 の有効化後はガードがフェイルクローズする。先行導入中は既存分類を止めない。
+    logger.error('[ProductClassificationAI] AI単価改定の取得に失敗しました。');
+  }
+
   let aiResult;
   try {
     aiResult = await classifyProductsWithAi({
@@ -101,6 +114,7 @@ export async function applyProductClassificationAiToItems(
       status: isInvalidResponse ? ProductClassificationAiRunStatus.INVALID_RESPONSE : ProductClassificationAiRunStatus.PROVIDER_ERROR,
       failureCode: toSafeProviderFailureCode(error),
       durationMs: Date.now() - startedAt,
+      pricingRevisionId,
     }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] 分類AIを適用できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
@@ -162,9 +176,9 @@ export async function applyProductClassificationAiToItems(
     });
     const returnedIds = new Set(aiResult.response.items.map((item) => item.itemId));
     const classifiedCount = aiResult.response.items.filter((item) => item.productTypeId !== null && item.confidence === 'high').length;
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount, needsReviewCount: aiResult.response.items.length - classifiedCount, unreturnedCount: targets.length - returnedIds.size, status: ProductClassificationAiRunStatus.SUCCEEDED, durationMs: Date.now() - startedAt }).catch(() => undefined);
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount, needsReviewCount: aiResult.response.items.length - classifiedCount, unreturnedCount: targets.length - returnedIds.size, status: ProductClassificationAiRunStatus.SUCCEEDED, durationMs: Date.now() - startedAt, pricingRevisionId }).catch(() => undefined);
   } catch (error) {
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, failureCode: 'persistence_error', durationMs: Date.now() - startedAt }).catch(() => undefined);
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, failureCode: 'persistence_error', durationMs: Date.now() - startedAt, pricingRevisionId }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] AI分類結果を保存できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
       itemIds: targets.map((item) => item.id),
