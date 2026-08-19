@@ -18,7 +18,7 @@ export const errorHandler = (
     err instanceof ZodError ? zodErrorToAppError(err) : err;
 
   const isDev = process.env.NODE_ENV === 'development';
-  const error = normalized as Error & { statusCode?: number; details?: unknown; stack?: string };
+  const error = normalized as Error & { statusCode?: number; details?: unknown; code?: string; stack?: string };
 
   const statusCode =
     normalized instanceof AppError ? normalized.statusCode : (error.statusCode || 500);
@@ -58,10 +58,11 @@ export const errorHandler = (
       ? 'サーバー内部でエラーが発生しました。時間をおいて再度お試しください。'
       : message;
 
-  const responseBody: { success: false; message: string; details?: unknown } = {
+  const responseBody: { success: false; message: string; code?: string; details?: unknown } = {
     success: false,
     message: safeMessage,
   };
+  if (normalized instanceof AppError && normalized.code) responseBody.code = normalized.code;
   if (details !== undefined) {
     responseBody.details = details;
   }

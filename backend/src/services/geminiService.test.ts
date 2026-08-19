@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   createApiUsageLog: vi.fn(),
   incrementApiUsageLogTokens: vi.fn(),
   findEffectiveAiPricingRevision: vi.fn(),
+  reserveAiBudget: vi.fn(),
+  releaseAiBudgetReservation: vi.fn(),
 }));
 
 vi.mock('@google/generative-ai', () => ({
@@ -33,6 +35,7 @@ vi.mock('../repositories/apiUsageLogRepository', () => ({
 vi.mock('../repositories/aiPricingRevisionRepository', () => ({
   findEffectiveAiPricingRevision: mocks.findEffectiveAiPricingRevision,
 }));
+vi.mock('./aiBudget/aiBudgetGuardService', () => ({ reserveAiBudget: mocks.reserveAiBudget, releaseAiBudgetReservation: mocks.releaseAiBudgetReservation }));
 
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -60,7 +63,7 @@ describe('analyzeReceiptImage', () => {
     vi.clearAllMocks();
     mocks.findActivePromptTemplateByKey.mockResolvedValue({ systemPrompt: 'prompt', domainHints: null });
     mocks.createApiUsageLog.mockResolvedValue({ id: 123 });
-    mocks.findEffectiveAiPricingRevision.mockResolvedValue({ id: 77 });
+    mocks.findEffectiveAiPricingRevision.mockResolvedValue({ id: 77, maxInputTokens: 4096, maxOutputTokens: 1024, inputPriceJpyPerMillion: '48', outputPriceJpyPerMillion: '394' });
   });
 
   afterEach(() => {

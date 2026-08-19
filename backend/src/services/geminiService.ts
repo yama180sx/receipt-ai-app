@@ -10,7 +10,9 @@ import {
   incrementApiUsageLogTokens,
 } from "../repositories/apiUsageLogRepository";
 import { findEffectiveAiPricingRevision } from '../repositories/aiPricingRevisionRepository';
-import { AiUsagePurpose } from '@prisma/client';
+import { AiUsagePurpose, type AiPricingRevision } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { releaseAiBudgetReservation, reserveAiBudget } from './aiBudget/aiBudgetGuardService';
 import { getConfiguredReceiptModelId } from '../config/geminiModel';
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
@@ -97,12 +99,12 @@ export const analyzeReceiptImage = async (
 ): Promise<ParsedReceipt> => {
   // #124 がPaid Tier有効時の「単価未登録なら停止」を担当するまで、単価解決失敗は既存OCRを阻害しない。
   // 有効な改定があれば開始時点のIDだけをログへ固定し、後からの単価変更で過去額を変えない。
-  let pricingRevisionId: number | undefined;
+  let pricingRevision: AiPricingRevision | null | undefined;
   try {
-    pricingRevisionId = (await findEffectiveAiPricingRevision(
+    pricingRevision = await findEffectiveAiPricingRevision(
       AiUsagePurpose.OCR,
       GEMINI_MODEL
-    ))?.id;
+    );
   } catch (error) {
     logger.error('❌ AI単価改定の取得に失敗しました:', error);
   }
@@ -159,7 +161,7 @@ export const analyzeReceiptImage = async (
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
             durationMs,
-            pricingRevisionId,
+            pricingRevisionId: pricingRevision?.id,
           });
           usageLogId = log.id;
         }
@@ -194,5 +196,20 @@ export const analyzeReceiptImage = async (
     return data;
   };
 
-  return await withRetry(() => processAnalysis());
+  const jobKey = `ocr:${imagePath}:${Math.random()}`;
+  const maxCostJpy = pricingRevision
+    ? new Prisma.Decimal(pricingRevision.maxInputTokens)
+      .mul(pricingRevision.inputPriceJpyPerMillion)
+      .plus(new Prisma.Decimal(pricingRevision.maxOutputTokens).mul(pricingRevision.outputPriceJpyPerMillion))
+      .div(1_000_000)
+      // 通信リトライ3回と自己修復再解析を保守的に含める。
+      .mul(8)
+    : new Prisma.Decimal(0);
+  // 有効化時は単価取得失敗もガードへ渡し、設定不備としてフェイルクローズする。
+  await reserveAiBudget({ purpose: AiUsagePurpose.OCR, pricingRevisionId: pricingRevision?.id, maxCostJpy, jobKey });
+  try {
+    return await withRetry(() => processAnalysis());
+  } finally {
+    await releaseAiBudgetReservation(jobKey);
+  }
 };

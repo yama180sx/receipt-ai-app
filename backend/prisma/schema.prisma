@@ -56,6 +56,13 @@ enum AiUsagePurpose {
   PRODUCT_CLASSIFICATION @map("product_classification")
 }
 
+enum AiBudgetReservationStatus {
+  RESERVED
+  SETTLED
+  RELEASED
+  EXPIRED
+}
+
 enum ClassificationCorrectionScope {
   ITEM_ONLY     @map("item_only")
   SAME_OCR_NAME @map("same_ocr_name")
@@ -130,12 +137,67 @@ model FamilyMember {
   standardRulesCreated                      StandardProductClassificationRule[]        @relation("StandardRuleCreatedBy")
   standardRulesUpdated                      StandardProductClassificationRule[]        @relation("StandardRuleUpdatedBy")
   standardRuleAudits                        StandardProductClassificationRuleAudit[]   @relation("StandardRuleAuditActor")
+  globalAiBudgetManager                     GlobalAiBudgetManager?
+  globalAiBudgetAudits                      GlobalAiBudgetAudit[]
 
   // ★ [Issue #81] 送金履歴リレーション
   sentTransfers     SettlementTransfer[] @relation("TransferSender")
   receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
+}
+
+// [Issue #124] FamilyGroupとは独立した、全体AI予算操作を許可する利用者。
+model GlobalAiBudgetManager {
+  id        Int          @id @default(autoincrement())
+  memberId  Int          @unique
+  member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+}
+
+// [Issue #124] アプリケーション全体で一意なAI予算設定。id=1だけを使用する。
+model GlobalAiBudgetSetting {
+  id                Int      @id @default(1)
+  isEnabled         Boolean  @default(false)
+  monthlyBudgetJpy  Decimal? @db.Decimal(18, 6)
+  warningPercent    Int      @default(50)
+  criticalPercent   Int      @default(80)
+  stopPercent       Int      @default(100)
+  isStopped         Boolean  @default(false)
+  stoppedReason     String?  @db.VarChar(64)
+  stoppedAt         DateTime? @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// 設定変更・停止・再開を追記で保持する。秘密値は保存しない。
+model GlobalAiBudgetAudit {
+  id            Int           @id @default(autoincrement())
+  actorMemberId Int?
+  actorMember   FamilyMember? @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  action        String        @db.VarChar(64)
+  reason        String?       @db.Text
+  beforeValue   Json?
+  afterValue    Json?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+}
+
+// Gemini呼出し前に確保する全体予算の予約。ジョブ単位で、期限切れは後続Workerが解放する。
+model AiBudgetReservation {
+  id                Int                       @id @default(autoincrement())
+  purpose           AiUsagePurpose
+  pricingRevisionId Int
+  pricingRevision   AiPricingRevision         @relation(fields: [pricingRevisionId], references: [id], onDelete: Restrict)
+  jobKey            String                    @unique
+  reservedCostJpy   Decimal                   @db.Decimal(18, 6)
+  actualCostJpy     Decimal?                  @db.Decimal(18, 6)
+  status            AiBudgetReservationStatus @default(RESERVED)
+  expiresAt         DateTime                  @db.Timestamptz(3)
+  settledAt         DateTime?                 @db.Timestamptz(3)
+  createdAt         DateTime                  @default(now()) @db.Timestamptz(3)
+
+  @@index([status, expiresAt])
 }
 
 /// キューストア喪失時に未確定レシート解析を再投入するための永続台帳。
@@ -560,6 +622,7 @@ model AiPricingRevision {
 
   apiUsageLogs              ApiUsageLog[]                @relation("ApiUsageLogPricingRevision")
   productClassificationRuns ProductClassificationAiRun[] @relation("ProductClassificationAiRunPricingRevision")
+  budgetReservations        AiBudgetReservation[]
 
   @@unique([purpose, modelId, effectiveFrom])
   @@index([purpose, modelId, effectiveFrom])
