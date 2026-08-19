@@ -1775,6 +1775,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ai-budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全体 AI 予算の設定・利用状況を取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetOverview"];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** 全体 AI 予算を更新 */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateGlobalAiBudgetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 入力不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/prompts": {
         parameters: {
             query?: never;
@@ -2449,6 +2530,21 @@ export interface components {
             totalPromptTokens: number;
             totalCandidatesTokens: number;
             estimatedCostJpy: number;
+        };
+        UpdateGlobalAiBudgetRequest: {
+            isEnabled: boolean;
+            monthlyBudgetJpy: number;
+            /** @default 50 */
+            warningPercent: number;
+            /** @default 80 */
+            criticalPercent: number;
+            /** @default 100 */
+            stopPercent: number;
+            reason: string;
+        };
+        GlobalAiBudgetOverview: {
+            setting?: Record<string, never> | null;
+            usage?: components["schemas"]["AdminCostStatRow"][];
         };
         HealthResponse: {
             status: string;
