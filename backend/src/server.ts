@@ -6,6 +6,7 @@ dotenv.config();
 import './workers/receiptWorker';
 import { recoverReceiptAnalysisJobs } from './services/receiptJobService';
 import { receiptQueue } from './queues/receiptQueue';
+import { expireBudgetReservations } from './repositories/globalAiBudgetRepository';
 
 import { createApp } from './app';
 import logger from './utils/logger';
@@ -34,3 +35,9 @@ const recoverQueuedJobs = (force = false) => recoverReceiptAnalysisJobs(force).c
 recoverQueuedJobs(true);
 void receiptQueue.client.then((connection) => connection.on('ready', () => recoverQueuedJobs(true)));
 setInterval(recoverQueuedJobs, 10 * 60_000).unref();
+
+const recoverExpiredAiBudgetReservations = () => expireBudgetReservations().catch((error) => {
+  logger.error(`AI予算予約の期限切れ回収に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+});
+recoverExpiredAiBudgetReservations();
+setInterval(recoverExpiredAiBudgetReservations, 60_000).unref();

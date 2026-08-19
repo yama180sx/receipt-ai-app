@@ -16,6 +16,7 @@ import {
   deletePromptTemplate,
   getAdminCostStats,
 } from '../services/admin/adminService';
+import { getGlobalAiBudgetOverview, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
 
 function parsePromptId(req: Parameters<typeof getRouteParam>[0]): number {
   const id = getRouteParam(req, 'id');
@@ -57,4 +58,15 @@ export const deletePrompt = asyncHandler(async (req, res) => {
 export const getCostStats = asyncHandler(async (_req, res) => {
   const result = await getAdminCostStats(requireTenantContext());
   sendSuccess(res, mapAdminCostStatsToApi(result));
+});
+
+/** Issue #124: 世帯単位ではない全体AI予算。専用ミドルウェアで保護される。 */
+export const getGlobalAiBudget = asyncHandler(async (_req, res) => {
+  sendSuccess(res, await getGlobalAiBudgetOverview());
+});
+
+export const updateGlobalAiBudget = asyncHandler(async (req, res) => {
+  const memberId = req.user?.id;
+  if (!memberId) throw new AppError('認証情報が見つかりません。', 401);
+  sendSuccess(res, await updateGlobalAiBudgetSetting(memberId, req.body));
 });

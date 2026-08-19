@@ -7,7 +7,7 @@ import {
 } from '@prisma/client';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 
-const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks, pricingRevisionMocks } = vi.hoisted(() => ({
+const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks, pricingRevisionMocks, budgetMocks } = vi.hoisted(() => ({
   aiMocks: { classifyProductsWithAi: vi.fn() },
   receiptRepositoryMocks: {
     findItemById: vi.fn(),
@@ -20,7 +20,8 @@ const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMo
     findCategoryForProductTypeInTx: vi.fn(),
   },
   runRepositoryMocks: { createProductClassificationAiRun: vi.fn().mockResolvedValue({}) },
-  pricingRevisionMocks: { findEffectiveAiPricingRevision: vi.fn().mockResolvedValue({ id: 88 }) },
+  pricingRevisionMocks: { findEffectiveAiPricingRevision: vi.fn().mockResolvedValue({ id: 88, maxInputTokens: 4096, maxOutputTokens: 1024, inputPriceJpyPerMillion: '48', outputPriceJpyPerMillion: '394' }) },
+  budgetMocks: { reserveAiBudget: vi.fn(), releaseAiBudgetReservation: vi.fn() },
 }));
 
 vi.mock('../../ai', () => aiMocks);
@@ -28,6 +29,7 @@ vi.mock('../../repositories/receiptRepository', () => receiptRepositoryMocks);
 vi.mock('../../repositories/productClassificationRepository', () => productRepositoryMocks);
 vi.mock('../../repositories/productClassificationAiRunRepository', () => runRepositoryMocks);
 vi.mock('../../repositories/aiPricingRevisionRepository', () => pricingRevisionMocks);
+vi.mock('../aiBudget/aiBudgetGuardService', () => budgetMocks);
 vi.mock('../../utils/prismaTransaction', () => ({
   runInTransaction: (fn: (tx: object) => Promise<unknown>) => fn({}),
 }));

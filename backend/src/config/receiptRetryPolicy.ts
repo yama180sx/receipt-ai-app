@@ -1,13 +1,16 @@
 import { getHttpStatusFromError, isGeminiDailyQuotaError } from '../utils/httpError';
+import { AppError } from '../utils/appError';
 
 export const GEMINI_DAILY_QUOTA_FAILURE_CODE = 'gemini_daily_quota';
 export const HTTP_429_FAILURE_CODE = 'http_429';
 export const HTTP_5XX_FAILURE_CODE = 'http_5xx';
+export const AI_BUDGET_STOPPED_FAILURE_CODE = 'ai_budget_stopped';
 
 type ReceiptRetryFailureCode =
   | typeof GEMINI_DAILY_QUOTA_FAILURE_CODE
   | typeof HTTP_429_FAILURE_CODE
-  | typeof HTTP_5XX_FAILURE_CODE;
+  | typeof HTTP_5XX_FAILURE_CODE
+  | typeof AI_BUDGET_STOPPED_FAILURE_CODE;
 
 type ReceiptManualRetryInput = {
   state: string;
@@ -69,11 +72,12 @@ function getManualRetryLimit(): number {
 
 function getRetryableFailureCodes(): Set<string> {
   const configured = process.env.RECEIPT_MANUAL_RETRY_FAILURE_CODES
-    ?? GEMINI_DAILY_QUOTA_FAILURE_CODE;
+    ?? `${GEMINI_DAILY_QUOTA_FAILURE_CODE},${AI_BUDGET_STOPPED_FAILURE_CODE}`;
   return new Set(configured.split(',').map((code) => code.trim()).filter(Boolean));
 }
 
 export function getReceiptAnalysisFailureCode(error: unknown): ReceiptRetryFailureCode | undefined {
+  if (error instanceof AppError && error.code === 'AI_BUDGET_STOPPED') return AI_BUDGET_STOPPED_FAILURE_CODE;
   if (isGeminiDailyQuotaError(error)) return GEMINI_DAILY_QUOTA_FAILURE_CODE;
 
   const status = getHttpStatusFromError(error);

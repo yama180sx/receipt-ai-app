@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as adminController from '../controllers/adminController';
 import { isAdmin } from '../middleware/authMiddleware';
+import { requireGlobalAiBudgetManager } from '../middleware/globalAiBudgetManagerMiddleware';
 import {
   createProductClassificationReclassificationRun,
   createStandardProductClassificationRules,
@@ -20,6 +21,10 @@ router.use(isAdmin);
 
 // --- [Issue #73] AIコスト統計管理 ---
 router.get('/stats', adminController.getCostStats);
+
+// Issue #124: 通常の世帯ADMINではなく、TOTP有効な全体AI予算管理者だけに開放する。
+router.get('/ai-budget', requireGlobalAiBudgetManager, adminController.getGlobalAiBudget);
+router.put('/ai-budget', requireGlobalAiBudgetManager, adminController.updateGlobalAiBudget);
 
 // --- [Issue #72/76] プロンプト管理 ---
 router.get('/prompts', adminController.getPrompts);
