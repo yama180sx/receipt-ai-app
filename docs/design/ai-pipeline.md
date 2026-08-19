@@ -142,7 +142,7 @@ Issue #49-8 / #71 により、**AI 解析（読み取り）** と **DB 保存（
 - Gemini API 呼び出し（`analyzeReceiptImage`）
 - 明細への初期`categoryId`付与（世帯内`Category.keywords`による推定）と、商品種別分類の表示用評価
 - 閾値ベースの警告生成（`validationService.validateReceiptItems`）
-- OCRの`ApiUsageLog`はGemini解析内で作成（`receiptId` はcommitまで未設定）
+- OCRの`ApiUsageLog`はGemini解析内で作成（`receiptId` はcommitまで未設定）。有効な`AiPricingRevision`が登録済みなら、呼出し開始時点のIDも保存する
 
 **commit で初めて行うこと**（`saveConfirmedReceipt`）:
 
@@ -347,7 +347,7 @@ flowchart TB
 
 | タイミング | 操作 |
 |------------|------|
-| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`） |
+| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`, 有効なら`pricingRevisionId`） |
 | 自己修復リトライ | 同一レコードへtokenと`durationMs`を`increment`で累積し、`selfRepairRetryCount`を加算 |
 | commit 成功 | `ApiUsageLog.receiptId` を更新（1 対 1 紐付け） |
 | 手動登録 | `usageLogId` なし（AI コスト対象外） |

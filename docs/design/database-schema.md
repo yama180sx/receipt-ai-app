@@ -306,6 +306,7 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | `ProductClassificationCandidate` | 類似検索候補 | `itemId + productTypeId`、`itemId + rank`が一意 |
 | `ProductClassificationLearningDataAudit` | 世帯辞書の無効化監査 | 世帯・対象・操作メンバー・理由を保存 |
 | `ProductClassificationAiRun` | 保存後の商品分類AI実行ログ | OCR用`ApiUsageLog`とは分離 |
+| `AiPricingRevision` | 外部AIの用途・モデル別単価改定履歴 | 追記専用、全世帯共通 |
 | `ProductClassificationReclassificationRun` / `ItemAudit` | 管理者による既存明細再分類の監査 | 世帯・実行者・対象・結果を保存 |
 
 ---
@@ -323,10 +324,36 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | totalTokens | Int | No | — | — | — | — | — |
 | selfRepairRetryCount | Int | No | 0 | — | — | — | — |
 | durationMs | Int | No | 0 | — | — | — | — |
+| pricingRevisionId | Int | Yes | — | — | AiPricingRevision.id | — | — |
 | createdAt | DateTime | No | now() | — | — | — | Yes |
 
-**FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`  
+**FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`, `pricingRevisionId` → `AiPricingRevision.id`
 **Index:** `familyMemberId`, `createdAt`
+
+`pricingRevisionId` はGemini呼出し開始時点で有効な単価改定を記録する。実装前の行と単価未登録時の行は
+`null`であり、過去ログを単価から推測して補完しない。
+
+---
+
+### AiPricingRevision
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| purpose | AiUsagePurpose | No | — | — | — | `modelId + purpose + effectiveFrom` | 複合 |
+| modelId | String | No | — | — | — | 複合 | 複合 |
+| inputPriceJpyPerMillion | Decimal(18,6) | No | — | — | — | — | — |
+| outputPriceJpyPerMillion | Decimal(18,6) | No | — | — | — | — | — |
+| maxInputTokens | Int | No | — | — | — | — | — |
+| maxOutputTokens | Int | No | — | — | — | — | — |
+| effectiveFrom | DateTime | No | — | — | — | 複合 | 複合 |
+| sourceUrl | String (Text) | No | — | — | — | — | — |
+| verifiedAt / verifiedBy | DateTime / String | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | — |
+
+用途は`ocr`と`product_classification`。単価改定は更新・削除せず追加のみとし、各AI利用ログは
+参照用Indexなしで改定IDだけを保持する。全世帯横断集計はこのIDを結合し、`America/Los_Angeles`の月単位で
+推定額を計算する。
 
 ---
 

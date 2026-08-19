@@ -110,7 +110,21 @@ OCR と商品分類はそれぞれ `GEMINI_RECEIPT_MODEL` と
 モデルの切替判断や無料枠運用に使う実測は、
 [Gemini Free Tier実測手順](../testing/gemini-free-tier-measurement.md)に従う。固定のRPDを
 アプリケーション設定へ持ち込まず、実施時点のGoogle AI Studio表示と`ApiUsageLog`の集計値を
-記録する。Paid Tierの料金試算・予算管理は Issue #120-1 のスコープである。
+記録する。Paid Tierの料金試算・予算管理は Issue #120-1 のスコープである。単価の初回登録・改定は通常UIではなく、
+デプロイ担当者が公式料金URL、確認日時・確認者、用途別の最大トークンを確認してから、次の追記専用CLIで行う。
+
+```bash
+cd backend
+npm run ai-pricing:add -- \
+  --purpose ocr --model-id gemini-3.5-flash-lite \
+  --input-price-jpy-per-million <JPY_PER_MILLION> \
+  --output-price-jpy-per-million <JPY_PER_MILLION> \
+  --max-input-tokens <MAX_INPUT_TOKENS> --max-output-tokens <MAX_OUTPUT_TOKENS> \
+  --effective-from <ISO_TIMESTAMP> --source-url <OFFICIAL_HTTPS_URL> \
+  --verified-at <ISO_TIMESTAMP> --verified-by <OPERATOR>
+```
+
+OCRと商品分類AIを別々に登録する。登録済み改定の更新・削除は行わず、新しい適用開始日時で追加する。
 
 ---
 
