@@ -16,7 +16,7 @@ import {
   deletePromptTemplate,
   getAdminCostStats,
 } from '../services/admin/adminService';
-import { getGlobalAiBudgetOverview, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
+import { addAiBudgetManager, getGlobalAiBudgetManagers, getGlobalAiBudgetOverview, removeAiBudgetManager, resumeAiBudget, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
 
 function parsePromptId(req: Parameters<typeof getRouteParam>[0]): number {
   const id = getRouteParam(req, 'id');
@@ -69,4 +69,20 @@ export const updateGlobalAiBudget = asyncHandler(async (req, res) => {
   const memberId = req.user?.id;
   if (!memberId) throw new AppError('認証情報が見つかりません。', 401);
   sendSuccess(res, await updateGlobalAiBudgetSetting(memberId, req.body));
+});
+
+export const resumeGlobalAiBudget = asyncHandler(async (req, res) => {
+  if (!req.user?.id) throw new AppError('認証情報が見つかりません。', 401);
+  sendSuccess(res, await resumeAiBudget(req.user.id, req.body.reason));
+});
+
+export const listGlobalAiBudgetManagers = asyncHandler(async (_req, res) => sendSuccess(res, await getGlobalAiBudgetManagers()));
+export const addGlobalAiBudgetManager = asyncHandler(async (req, res) => {
+  if (!req.user?.id) throw new AppError('認証情報が見つかりません。', 401);
+  sendSuccess(res, await addAiBudgetManager(req.user.id, req.body.memberId, req.body.reason));
+});
+export const removeGlobalAiBudgetManager = asyncHandler(async (req, res) => {
+  if (!req.user?.id) throw new AppError('認証情報が見つかりません。', 401);
+  await removeAiBudgetManager(req.user.id, Number(req.params.memberId), req.body.reason);
+  sendMessage(res, '全体AI予算管理者を削除しました。');
 });
