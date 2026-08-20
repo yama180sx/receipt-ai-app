@@ -5,6 +5,7 @@ import {
   findGlobalAiBudgetSetting,
   listActiveBudgetReservations,
   releaseBudgetReservation,
+  stopGlobalAiBudget,
 } from '../../repositories/globalAiBudgetRepository';
 import { AppError } from '../../utils/appError';
 
@@ -39,6 +40,7 @@ export async function reserveAiBudget(input: {
     const used = total(usage.filter((row) => row.month === currentPacificMonth()));
     const reserved = reservations.reduce((sum, row) => sum.plus(row.reservedCostJpy), new Prisma.Decimal(0));
     if (used.plus(reserved).plus(input.maxCostJpy).greaterThanOrEqualTo(setting.monthlyBudgetJpy)) {
+      await stopGlobalAiBudget('monthly_budget_reached');
       throw new AppError('AI_BUDGET_STOPPED', 503, undefined, 'AI_BUDGET_STOPPED');
     }
     return createBudgetReservation({ ...input, pricingRevisionId: input.pricingRevisionId, reservedCostJpy: input.maxCostJpy, expiresAt: new Date(Date.now() + RESERVATION_TTL_MS) });

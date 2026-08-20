@@ -56,7 +56,8 @@ TOTP有効化済みであることも必須とする。全体AI予算管理者�
 | 3 | [#645 Issue #125](https://github.com/yama180sx/receipt-ai-app/issues/645) | 管理設定画面、Discord／メール通知、秘密情報運用 |
 | 4 | [#647 Issue #127](https://github.com/yama180sx/receipt-ai-app/issues/647) | 料金・モデル・Free Tier確認の月次レビューと切替時検査 |
 
-Issue #124〜#126が実装されるまでは、この資料は将来仕様であり、as-built資料ではない。
+Issue #124 の基盤と専用管理者・理由付き再開 API は実装済みである。通知・管理画面は #125、
+全体推定額の管理表示は #126 で扱うため、この資料全体は引き続き将来仕様を含む。
 
 ## Paid Tier切替前チェックリスト
 

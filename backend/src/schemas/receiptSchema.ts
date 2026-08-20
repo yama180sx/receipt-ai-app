@@ -77,6 +77,15 @@ export const standardProductClassificationRulePreviewSchema = z.object({
   keyword: z.string().trim().min(1).max(100),
 });
 
+export const globalAiBudgetReasonSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+export const globalAiBudgetManagerSchema = globalAiBudgetReasonSchema.extend({ memberId: z.coerce.number().int().positive() });
+export const updateGlobalAiBudgetSchema = globalAiBudgetReasonSchema.extend({
+  isEnabled: z.boolean(), monthlyBudgetJpy: z.coerce.number().positive(),
+  warningPercent: z.coerce.number().int().min(1).max(99).optional(),
+  criticalPercent: z.coerce.number().int().min(1).max(99).optional(),
+  stopPercent: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 /**
  * 3. 最終的な保存・更新用のバリデーション
  * DB保存時に整合性をチェックするために使用

@@ -1180,6 +1180,68 @@ paths:
         '403':
           description: 全体AI予算管理者ではない
 
+  /admin/ai-budget/resume:
+    post:
+      tags: [admin]
+      summary: 停止した全体 AI 予算を理由付きで再開
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+      responses:
+        '200': { description: OK }
+        '400': { description: 入力不正 }
+        '403': { description: 全体AI予算管理者ではない }
+
+  /admin/ai-budget/managers:
+    get:
+      tags: [admin]
+      summary: 全体 AI 予算管理者一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: OK }
+        '403': { description: 全体AI予算管理者ではない }
+    post:
+      tags: [admin]
+      summary: 全体 AI 予算管理者を追加
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetManagerRequest'
+      responses:
+        '200': { description: OK }
+        '400': { description: 入力不正 }
+        '409': { description: 重複 }
+
+  /admin/ai-budget/managers/{memberId}:
+    delete:
+      tags: [admin]
+      summary: 全体 AI 予算管理者を削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+      responses:
+        '200': { description: OK }
+        '409': { description: 最後の管理者は削除不可 }
   /admin/prompts:
     get:
       tags: [admin]
@@ -2356,6 +2418,20 @@ components:
           default: 100
         reason:
           type: string
+
+    GlobalAiBudgetReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    GlobalAiBudgetManagerRequest:
+      allOf:
+        - $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+        - type: object
+          required: [memberId]
+          properties:
+            memberId: { type: integer, minimum: 1 }
 
     GlobalAiBudgetOverview:
       type: object

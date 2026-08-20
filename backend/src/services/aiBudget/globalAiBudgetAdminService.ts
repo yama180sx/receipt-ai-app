@@ -1,10 +1,35 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../utils/appError';
-import { createGlobalAiBudgetAudit, findGlobalAiBudgetSetting, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
+import { addGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
 import { getGlobalAiCostStats } from './globalAiCostService';
 
 export async function getGlobalAiBudgetOverview() {
   return { setting: await findGlobalAiBudgetSetting(), usage: await getGlobalAiCostStats() };
+}
+
+export async function getGlobalAiBudgetManagers() { return listGlobalAiBudgetManagers(); }
+
+export async function addAiBudgetManager(actorMemberId: number, memberId: number, reason: string) {
+  if (!reason.trim()) throw new AppError('変更理由は必須です。', 400);
+  const member = await findEligibleGlobalAiBudgetManagerMember(memberId);
+  if (!member) throw new AppError('対象者はTOTP有効なADMINである必要があります。', 400);
+  try {
+    const manager = await addGlobalAiBudgetManager(memberId);
+    await createGlobalAiBudgetAudit({ actorMemberId, action: 'manager_added', reason, afterValue: { memberId } });
+    return manager;
+  } catch { throw new AppError('対象者は既に全体AI予算管理者です。', 409); }
+}
+
+export async function removeAiBudgetManager(actorMemberId: number, memberId: number, reason: string) {
+  if (!reason.trim()) throw new AppError('変更理由は必須です。', 400);
+  const removed = await removeGlobalAiBudgetManager(memberId);
+  if (!removed) throw new AppError('最後の全体AI予算管理者は削除できません。', 409);
+  await createGlobalAiBudgetAudit({ actorMemberId, action: 'manager_removed', reason, beforeValue: { memberId } });
+}
+
+export async function resumeAiBudget(actorMemberId: number, reason: string) {
+  if (!reason.trim()) throw new AppError('再開理由は必須です。', 400);
+  return resumeGlobalAiBudget(actorMemberId, reason);
 }
 
 export async function updateGlobalAiBudgetSetting(actorMemberId: number, input: { isEnabled: boolean; monthlyBudgetJpy: number; warningPercent?: number; criticalPercent?: number; stopPercent?: number; reason: string }) {

@@ -23,6 +23,55 @@ export async function isGlobalAiBudgetManager(memberId: number) {
   return Boolean(manager && manager.member.role === 'ADMIN' && manager.member.totpEnabled);
 }
 
+export async function listGlobalAiBudgetManagers() {
+  return prisma.globalAiBudgetManager.findMany({
+    include: { member: { select: { id: true, name: true, familyGroupId: true, role: true, totpEnabled: true } } },
+    orderBy: { id: 'asc' },
+  });
+}
+
+export async function addGlobalAiBudgetManager(memberId: number) {
+  return prisma.globalAiBudgetManager.create({ data: { memberId } });
+}
+
+export async function removeGlobalAiBudgetManager(memberId: number) {
+  return prisma.$transaction(async (tx) => {
+    const count = await tx.globalAiBudgetManager.count();
+    if (count <= 1) return false;
+    const result = await tx.globalAiBudgetManager.deleteMany({ where: { memberId } });
+    return result.count > 0;
+  });
+}
+
+export async function findEligibleGlobalAiBudgetManagerMember(memberId: number) {
+  return prisma.familyMember.findFirst({
+    where: { id: memberId, role: 'ADMIN', totpEnabled: true },
+    select: { id: true, name: true, familyGroupId: true, role: true, totpEnabled: true },
+  });
+}
+
+export async function resumeGlobalAiBudget(actorMemberId: number, reason: string) {
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.globalAiBudgetSetting.findUnique({ where: { id: 1 } });
+    if (!before) throw new Error('Global AI budget setting is not configured.');
+    const setting = await tx.globalAiBudgetSetting.update({
+      where: { id: 1 },
+      data: { isStopped: false, stoppedAt: null, stoppedReason: null },
+    });
+    await tx.globalAiBudgetAudit.create({
+      data: { actorMemberId, action: 'resumed', reason, beforeValue: JSON.parse(JSON.stringify(before)), afterValue: JSON.parse(JSON.stringify(setting)) },
+    });
+    return setting;
+  });
+}
+
+export async function stopGlobalAiBudget(reason: string) {
+  return prisma.globalAiBudgetSetting.updateMany({
+    where: { id: 1, isStopped: false },
+    data: { isStopped: true, stoppedReason: reason, stoppedAt: new Date() },
+  });
+}
+
 export async function listActiveBudgetReservations() {
   return prisma.aiBudgetReservation.findMany({
     where: { status: AiBudgetReservationStatus.RESERVED, expiresAt: { gt: new Date() } },
