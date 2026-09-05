@@ -17,7 +17,7 @@ fi
 source "$SECRET_FILE"
 
 # 2. 共通定数
-HOST_IP="192.168.1.32"
+HOST_IP="192.168.1.30"
 UID_VAL=$(id -u)
 GID_VAL=$(id -g)
 DB_USER="cntadm"

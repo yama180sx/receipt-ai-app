@@ -14,7 +14,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
 # ★ Discord 設定
-WEBHOOK_URL="https://discord.com/api/webhooks/1494659784304230442/Hh4scCNNv0hga2AtqMbUufCdaAaZUmmRrltAo4Ke5Pjq7QlS1iO1PIDIz5MAK399sY2Z"
+WEBHOOK_URL=""  # 新しいWebhookを設定するまで無効
 
 # DB基本設定
 DB_USER="cntadm"
@@ -22,7 +22,7 @@ DB_NAME="receipt_db"
 
 # --- 環境別の動的分岐設定 ---
 if [ "$ENV" = "stable" ]; then
-    BACKUP_DIR="/mnt/raid_1t/backups/receipt-app"
+    BACKUP_DIR="/mnt/receipt-backups/receipt-app"
     CONTAINER_NAME="receipt-stable-db"
     ENV_LABEL="PROD"
 else

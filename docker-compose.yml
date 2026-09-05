@@ -12,8 +12,6 @@ services:
       - ./backend:/app
       - /etc/localtime:/etc/localtime:ro
       - ./backend/uploads:/app/uploads
-    ports:
-      - "${BACKEND_PORT}:3000"
     stdin_open: true
     tty: true
     env_file:
@@ -97,8 +95,6 @@ services:
     volumes:
       - ./pgdata:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "${DB_PORT}:5432"
     logging:
       driver: json-file
       options:
@@ -120,8 +116,6 @@ services:
     volumes:
       - ./redisdata:/data
       - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "${REDIS_PORT}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
