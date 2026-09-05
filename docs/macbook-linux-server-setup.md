@@ -275,8 +275,10 @@ git stash push -u -m "wip: current MacBook configuration"
 git fetch origin
 git switch -c wip/issue-128-macbook-server-setup \
   --track origin/wip/issue-128-macbook-server-setup
-git stash pop
+git stash show --stat stash@{0}
 ```
+
+このWIPブランチには、Compose・バックアップ・IP設定のMacBook向け変更も既に含まれる。`stash@{0}` をすぐにpopしない。ブランチ上のファイルと退避内容が同じであることを確認してから、不要なら `git stash drop stash@{0}` で退避だけを削除する。別の未コミット作業が含まれる場合だけ、対象ファイルを確認して手動で復元する。
 
 次に、通常のbackend依存関係を導入した後、MacBookだけでWebAssembly部品を追加する。
 
