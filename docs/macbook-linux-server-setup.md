@@ -292,6 +292,23 @@ docker compose run --rm --no-deps backend \
 
 `Sharp: ready` が表示された場合だけ、backendを再作成して動作確認する。
 
+`@img/sharp-wasm32` はnpm上で `wasm32` 専用として扱われるため、x64環境で通常の`npm install`を実行すると除外される。`install:sharp-wasm` は公式パッケージをローカルの`node_modules`へ展開し、旧CPUで使えないx64版を退避してSharpのWasmフォールバックを選択させる。`npm ci`を再実行した場合は、このコマンドと`prisma generate`も再実行する。
+
+### 8.10 Android（Expo Go）実機確認
+
+Expo Goは`frontend/.env`の`EXPO_PUBLIC_API_URL`へ接続する。MacBookではbackendをLAN公開せず、Web frontendのNginxプロキシを経由させる。Git管理外の`frontend/.env`で、MacBookのLAN内IPを使った次の値を設定する。
+
+```env
+EXPO_PUBLIC_API_URL="http://192.168.1.30/api"
+```
+
+```bash
+docker compose up -d --force-recreate frontend-dev
+docker compose logs --tail=100 frontend-dev
+```
+
+Expo GoでQRコードを読み取る。接続先は`exp://HOST_IP:DEV_PORT`（MacBookのstable設定では`exp://192.168.1.30:8082`）である。AndroidとMacBookは同じWi-Fiへ接続する。
+
 ```bash
 docker compose up -d --force-recreate backend
 sleep 10
