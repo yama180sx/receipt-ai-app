@@ -265,6 +265,8 @@ sequenceDiagram
 | POST | `/admin/product-classification/standard-rules/preview` | JWT + tenant + ADMIN + TOTP | 自世帯の明細だけを対象にキーワード命中を確認 |
 | PATCH | `/admin/product-classification/standard-rules/:id/deactivate` | JWT + tenant + ADMIN + TOTP | 理由を記録して標準分類ルールを無効化 |
 | GET/PUT | `/admin/ai-budget` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 全体予算の参照・理由付き更新 |
+| POST | `/admin/ai-budget/notifications/test` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 選択済みDiscord／メール通知先への試験送信 |
+| GET | `/admin/ai-budget/notifications` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 通知配送履歴（秘密情報・本文は含めない） |
 | POST | `/admin/ai-budget/resume` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 停止状態を理由付きで明示再開（自動再投入なし） |
 | GET/POST/DELETE | `/admin/ai-budget/managers` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 専用管理者の一覧・追加・削除。最後の1名は削除不可 |
 | GET | `/receipts` | JWT + tenant | カーソルページネーション付きレシート一覧 |

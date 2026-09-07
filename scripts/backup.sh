@@ -13,8 +13,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
-# ★ Discord 設定
-WEBHOOK_URL="https://discord.com/api/webhooks/1494659784304230442/Hh4scCNNv0hga2AtqMbUufCdaAaZUmmRrltAo4Ke5Pjq7QlS1iO1PIDIz5MAK399sY2Z"
+# Discord Webhookは環境変数で渡す。秘密値はGit管理しない。
+WEBHOOK_URL="${BACKUP_DISCORD_WEBHOOK_URL:-}"
 
 # DB基本設定
 DB_USER="cntadm"
@@ -38,6 +38,7 @@ send_discord_alert() {
     local color=32768  # 緑 (Success)
     [ "$status" = "ERROR" ] && color=16711680 # 赤 (Error)
 
+    [ -n "$WEBHOOK_URL" ] || return 0
     curl -H "Content-Type: application/json" \
             -X POST \
             -d "{
@@ -59,6 +60,8 @@ mkdir -p "${BACKUP_DIR}/uploads"
 DOTENV_FILE="${PROJECT_ROOT}/.env"
 if [ -f "${DOTENV_FILE}" ]; then
     DB_PASS=$(grep '^DB_PASSWORD=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
+    BACKUP_WEBHOOK=$(grep '^BACKUP_DISCORD_WEBHOOK_URL=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
+    WEBHOOK_URL="${BACKUP_WEBHOOK:-$WEBHOOK_URL}"
 else
     msg="[ERROR] .env file not found at ${DOTENV_FILE}"
     echo "[$(date)] $msg"

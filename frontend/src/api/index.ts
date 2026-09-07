@@ -14,6 +14,7 @@ export type {
   StandardProductClassificationRulePreview,
   UpsertStandardProductClassificationRuleRequest,
   PromptTemplate,
+  AiBudgetNotificationDelivery,
 } from './adminApi';
 export { statsApi } from './statsApi';
 export type { MonthlyStatsData, AdvancedStatsData } from './statsApi';

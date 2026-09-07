@@ -1908,6 +1908,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ai-budget/notifications/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 全体 AI 予算の通知を試験送信 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AiBudgetTestNotificationRequest"];
+                };
+            };
+            responses: {
+                /** @description 受付済み */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 入力不正または通知先未設定 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全体 AI 予算の通知配送履歴を取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["AiBudgetNotificationDelivery"][];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ai-budget/managers": {
         parameters: {
             query?: never;
@@ -2716,7 +2813,31 @@ export interface components {
             criticalPercent: number;
             /** @default 100 */
             stopPercent: number;
+            /** @default true */
+            notifyDiscord: boolean;
+            notificationEmails?: string[];
             reason: string;
+        };
+        AiBudgetTestNotificationRequest: {
+            channels: ("DISCORD" | "EMAIL")[];
+        };
+        AiBudgetNotificationDelivery: {
+            id: number;
+            /** @enum {string} */
+            kind: "THRESHOLD" | "TEST";
+            month: string;
+            thresholdPercent: number;
+            /** @enum {string} */
+            channel: "DISCORD" | "EMAIL";
+            recipient: string;
+            /** @enum {string} */
+            status: "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED";
+            attempts: number;
+            /** Format: date-time */
+            sentAt?: string | null;
+            lastError?: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         GlobalAiBudgetReasonRequest: {
             reason: string;

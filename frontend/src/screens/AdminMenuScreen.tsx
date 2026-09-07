@@ -12,6 +12,7 @@ interface AdminMenuScreenProps {
   onGoToAdminStats: () => void;
   onGoToProductClassificationReclassification: () => void;
   onGoToStandardProductClassificationRules: () => void;
+  onGoToAiBudget: () => void;
 }
 
 const adm = colors.semantic.admin;
@@ -22,6 +23,7 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onGoToAdminStats,
   onGoToProductClassificationReclassification,
   onGoToStandardProductClassificationRules,
+  onGoToAiBudget,
 }) => {
   return (
     <View style={[screenLayout.container, styles.containerAdmin]}>
@@ -35,6 +37,11 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
         <View style={cardStyles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
 
+          <AppListItem
+            variant="nav" onPress={onGoToAiBudget} title="全体AI予算・通知管理"
+            subtitle="予算、通知先、試験通知、配送状況を管理"
+            left={<View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.stats }]}><Text>🔔</Text></View>}
+          />
           <AppListItem
             variant="nav"
             onPress={onGoToStandardProductClassificationRules}

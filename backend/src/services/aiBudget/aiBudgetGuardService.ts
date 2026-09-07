@@ -1,13 +1,14 @@
 import { AiUsagePurpose, Prisma } from '@prisma/client';
 import { queryGlobalAiCostStats } from '../../repositories/apiUsageLogRepository';
 import {
-  createBudgetReservation,
+  createBudgetReservationWithNotificationDeliveries,
   findGlobalAiBudgetSetting,
   listActiveBudgetReservations,
   releaseBudgetReservation,
   stopGlobalAiBudget,
 } from '../../repositories/globalAiBudgetRepository';
 import { AppError } from '../../utils/appError';
+import { buildThresholdNotificationDeliveries, createThresholdNotifications, enqueuePendingAiBudgetNotifications } from './aiBudgetNotificationService';
 
 const RESERVATION_TTL_MS = 15 * 60_000;
 
@@ -39,11 +40,19 @@ export async function reserveAiBudget(input: {
     const [usage, reservations] = await Promise.all([queryGlobalAiCostStats(), listActiveBudgetReservations()]);
     const used = total(usage.filter((row) => row.month === currentPacificMonth()));
     const reserved = reservations.reduce((sum, row) => sum.plus(row.reservedCostJpy), new Prisma.Decimal(0));
-    if (used.plus(reserved).plus(input.maxCostJpy).greaterThanOrEqualTo(setting.monthlyBudgetJpy)) {
+    const projected = used.plus(reserved).plus(input.maxCostJpy);
+    const percent = projected.dividedBy(setting.monthlyBudgetJpy).times(100);
+    const reached = [setting.warningPercent, setting.criticalPercent, setting.stopPercent].filter((threshold) => percent.greaterThanOrEqualTo(threshold));
+    if (projected.greaterThanOrEqualTo(setting.monthlyBudgetJpy)) {
       await stopGlobalAiBudget('monthly_budget_reached');
+      await Promise.all(reached.map((threshold) => createThresholdNotifications(setting, currentPacificMonth(), threshold).catch(() => undefined)));
       throw new AppError('AI_BUDGET_STOPPED', 503, undefined, 'AI_BUDGET_STOPPED');
     }
-    return createBudgetReservation({ ...input, pricingRevisionId: input.pricingRevisionId, reservedCostJpy: input.maxCostJpy, expiresAt: new Date(Date.now() + RESERVATION_TTL_MS) });
+    const month = currentPacificMonth();
+    const deliveries = reached.flatMap((threshold) => buildThresholdNotificationDeliveries(setting, month, threshold));
+    const reservation = await createBudgetReservationWithNotificationDeliveries({ ...input, pricingRevisionId: input.pricingRevisionId, reservedCostJpy: input.maxCostJpy, expiresAt: new Date(Date.now() + RESERVATION_TTL_MS) }, deliveries);
+    await enqueuePendingAiBudgetNotifications().catch(() => undefined);
+    return reservation;
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError('AI_BUDGET_CONFIGURATION_UNAVAILABLE', 503, undefined, 'AI_BUDGET_CONFIGURATION_UNAVAILABLE');

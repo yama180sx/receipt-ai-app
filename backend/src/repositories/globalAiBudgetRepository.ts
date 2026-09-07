@@ -6,12 +6,12 @@ export async function findGlobalAiBudgetSetting() {
 }
 
 export async function upsertGlobalAiBudgetSetting(data: {
-  isEnabled: boolean; monthlyBudgetJpy: Prisma.Decimal | null; warningPercent: number; criticalPercent: number; stopPercent: number;
+  isEnabled: boolean; monthlyBudgetJpy: Prisma.Decimal | null; warningPercent: number; criticalPercent: number; stopPercent: number; notifyDiscord: boolean; notificationEmails: string[];
 }) {
   return prisma.globalAiBudgetSetting.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
 }
 
-export async function createGlobalAiBudgetAudit(input: { actorMemberId: number; action: string; reason?: string; beforeValue?: Prisma.InputJsonValue; afterValue?: Prisma.InputJsonValue }) {
+export async function createGlobalAiBudgetAudit(input: { actorMemberId?: number; action: string; reason?: string; beforeValue?: Prisma.InputJsonValue; afterValue?: Prisma.InputJsonValue }) {
   return prisma.globalAiBudgetAudit.create({ data: input });
 }
 
@@ -87,6 +87,17 @@ export async function createBudgetReservation(input: {
   expiresAt: Date;
 }) {
   return prisma.aiBudgetReservation.create({ data: input });
+}
+
+/** 予約と通知候補を同じDBトランザクションで永続化する。配送自体は後続Workerの責務。 */
+export async function createBudgetReservationWithNotificationDeliveries(input: {
+  purpose: AiUsagePurpose; pricingRevisionId: number; jobKey: string; reservedCostJpy: Prisma.Decimal; expiresAt: Date;
+}, deliveries: Array<{ dedupeKey: string; kind: 'THRESHOLD'; month: string; thresholdPercent: number; channel: 'DISCORD' | 'EMAIL'; recipient: string }>) {
+  return prisma.$transaction(async (tx) => {
+    const reservation = await tx.aiBudgetReservation.create({ data: input });
+    if (deliveries.length) await tx.aiBudgetNotificationDelivery.createMany({ data: deliveries, skipDuplicates: true });
+    return reservation;
+  });
 }
 
 export async function releaseBudgetReservation(jobKey: string) {
