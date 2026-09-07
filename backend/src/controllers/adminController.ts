@@ -16,7 +16,7 @@ import {
   deletePromptTemplate,
   getAdminCostStats,
 } from '../services/admin/adminService';
-import { addAiBudgetManager, getGlobalAiBudgetManagers, getGlobalAiBudgetOverview, removeAiBudgetManager, resumeAiBudget, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
+import { addAiBudgetManager, getAiBudgetNotificationDeliveries, getGlobalAiBudgetManagers, getGlobalAiBudgetOverview, removeAiBudgetManager, resumeAiBudget, sendAiBudgetTestNotification, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
 
 function parsePromptId(req: Parameters<typeof getRouteParam>[0]): number {
   const id = getRouteParam(req, 'id');
@@ -70,6 +70,11 @@ export const updateGlobalAiBudget = asyncHandler(async (req, res) => {
   if (!memberId) throw new AppError('認証情報が見つかりません。', 401);
   sendSuccess(res, await updateGlobalAiBudgetSetting(memberId, req.body));
 });
+export const testGlobalAiBudgetNotification = asyncHandler(async (req, res) => {
+  await sendAiBudgetTestNotification(req.body.channels);
+  sendMessage(res, '試験通知を受け付けました。');
+});
+export const listGlobalAiBudgetNotificationDeliveries = asyncHandler(async (_req, res) => sendSuccess(res, await getAiBudgetNotificationDeliveries()));
 
 export const resumeGlobalAiBudget = asyncHandler(async (req, res) => {
   if (!req.user?.id) throw new AppError('認証情報が見つかりません。', 401);

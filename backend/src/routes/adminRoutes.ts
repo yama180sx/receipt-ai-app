@@ -11,7 +11,7 @@ import {
   updateStandardProductClassificationRules,
 } from '../controllers/productClassificationController';
 import { validate } from '../middleware/validate';
-import { deactivateProductClassificationLearningDataSchema, globalAiBudgetManagerSchema, globalAiBudgetReasonSchema, productClassificationReclassificationSchema, standardProductClassificationRulePreviewSchema, standardProductClassificationRuleSchema, updateGlobalAiBudgetSchema } from '../schemas/receiptSchema';
+import { aiBudgetTestNotificationSchema, deactivateProductClassificationLearningDataSchema, globalAiBudgetManagerSchema, globalAiBudgetReasonSchema, productClassificationReclassificationSchema, standardProductClassificationRulePreviewSchema, standardProductClassificationRuleSchema, updateGlobalAiBudgetSchema } from '../schemas/receiptSchema';
 
 const router = Router();
 
@@ -25,6 +25,8 @@ router.get('/stats', adminController.getCostStats);
 // Issue #124: 通常の世帯ADMINではなく、TOTP有効な全体AI予算管理者だけに開放する。
 router.get('/ai-budget', requireGlobalAiBudgetManager, adminController.getGlobalAiBudget);
 router.put('/ai-budget', requireGlobalAiBudgetManager, validate(updateGlobalAiBudgetSchema), adminController.updateGlobalAiBudget);
+router.post('/ai-budget/notifications/test', requireGlobalAiBudgetManager, validate(aiBudgetTestNotificationSchema), adminController.testGlobalAiBudgetNotification);
+router.get('/ai-budget/notifications', requireGlobalAiBudgetManager, adminController.listGlobalAiBudgetNotificationDeliveries);
 router.post('/ai-budget/resume', requireGlobalAiBudgetManager, validate(globalAiBudgetReasonSchema), adminController.resumeGlobalAiBudget);
 router.get('/ai-budget/managers', requireGlobalAiBudgetManager, adminController.listGlobalAiBudgetManagers);
 router.post('/ai-budget/managers', requireGlobalAiBudgetManager, validate(globalAiBudgetManagerSchema), adminController.addGlobalAiBudgetManager);

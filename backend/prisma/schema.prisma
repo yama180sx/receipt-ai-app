@@ -63,6 +63,23 @@ enum AiBudgetReservationStatus {
   EXPIRED
 }
 
+enum AiBudgetNotificationChannel {
+  DISCORD
+  EMAIL
+}
+
+enum AiBudgetNotificationKind {
+  THRESHOLD
+  TEST
+}
+
+enum AiBudgetNotificationStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
 enum ClassificationCorrectionScope {
   ITEM_ONLY     @map("item_only")
   SAME_OCR_NAME @map("same_ocr_name")
@@ -166,6 +183,8 @@ model GlobalAiBudgetSetting {
   isStopped         Boolean  @default(false)
   stoppedReason     String?  @db.VarChar(64)
   stoppedAt         DateTime? @db.Timestamptz(3)
+  notifyDiscord     Boolean   @default(true)
+  notificationEmails String[] @default([])
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 }
 
@@ -181,6 +200,27 @@ model GlobalAiBudgetAudit {
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
 
   @@index([createdAt])
+}
+
+// AI予算通知の配送台帳。DBを正本として、BullMQ障害後も未完了通知を回復する。
+model AiBudgetNotificationDelivery {
+  id               Int                            @id @default(autoincrement())
+  dedupeKey        String                         @unique @db.VarChar(512)
+  kind             AiBudgetNotificationKind
+  month            String                         @db.VarChar(7)
+  thresholdPercent Int
+  channel          AiBudgetNotificationChannel
+  recipient        String                         @db.VarChar(320)
+  status           AiBudgetNotificationStatus     @default(PENDING)
+  attempts         Int                            @default(0)
+  nextAttemptAt    DateTime?                      @db.Timestamptz(3)
+  sentAt           DateTime?                      @db.Timestamptz(3)
+  lastError        String?                        @db.Text
+  createdAt        DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                       @updatedAt @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([month, thresholdPercent])
 }
 
 // Gemini呼出し前に確保する全体予算の予約。ジョブ単位で、期限切れは後続Workerが解放する。

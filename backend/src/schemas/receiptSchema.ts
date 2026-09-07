@@ -84,7 +84,10 @@ export const updateGlobalAiBudgetSchema = globalAiBudgetReasonSchema.extend({
   warningPercent: z.coerce.number().int().min(1).max(99).optional(),
   criticalPercent: z.coerce.number().int().min(1).max(99).optional(),
   stopPercent: z.coerce.number().int().min(1).max(100).optional(),
+  notifyDiscord: z.boolean().default(true),
+  notificationEmails: z.array(z.string().trim().email().max(320)).max(20).default([]),
 });
+export const aiBudgetTestNotificationSchema = z.object({ channels: z.array(z.enum(['DISCORD', 'EMAIL'])).min(1) });
 
 /**
  * 3. 最終的な保存・更新用のバリデーション

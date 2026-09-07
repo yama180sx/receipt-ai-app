@@ -4,9 +4,11 @@ dotenv.config();
 
 // Worker は本番・開発サーバー起動時のみ（テストでは import しない）
 import './workers/receiptWorker';
+import './workers/aiBudgetNotificationWorker';
 import { recoverReceiptAnalysisJobs } from './services/receiptJobService';
 import { receiptQueue } from './queues/receiptQueue';
 import { expireBudgetReservations } from './repositories/globalAiBudgetRepository';
+import { enqueuePendingAiBudgetNotifications } from './services/aiBudget/aiBudgetNotificationService';
 
 import { createApp } from './app';
 import logger from './utils/logger';
@@ -41,3 +43,9 @@ const recoverExpiredAiBudgetReservations = () => expireBudgetReservations().catc
 });
 recoverExpiredAiBudgetReservations();
 setInterval(recoverExpiredAiBudgetReservations, 60_000).unref();
+
+const recoverPendingAiBudgetNotifications = () => enqueuePendingAiBudgetNotifications().catch((error) => {
+  logger.error(`AI予算通知の回復に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+});
+recoverPendingAiBudgetNotifications();
+setInterval(recoverPendingAiBudgetNotifications, 60_000).unref();

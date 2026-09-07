@@ -67,6 +67,14 @@ jobs:
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           GEMINI_RECEIPT_MODEL="${{ vars.GEMINI_RECEIPT_MODEL || 'gemini-3.5-flash-lite' }}"
           GEMINI_PRODUCT_CLASSIFICATION_MODEL="${{ vars.GEMINI_PRODUCT_CLASSIFICATION_MODEL || 'gemini-3.5-flash-lite' }}"
+          AI_BUDGET_DISCORD_WEBHOOK_URL=${{ secrets.AI_BUDGET_DISCORD_WEBHOOK_URL }}
+          BACKUP_DISCORD_WEBHOOK_URL=${{ secrets.BACKUP_DISCORD_WEBHOOK_URL }}
+          SMTP_HOST=${{ vars.SMTP_HOST }}
+          SMTP_PORT=${{ vars.SMTP_PORT || '587' }}
+          SMTP_SECURE=${{ vars.SMTP_SECURE || 'false' }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM=${{ secrets.SMTP_FROM }}
           GEMINI_RETRY_COUNT=3
           GEMINI_RETRY_DELAY=2000
           RECEIPT_MANUAL_RETRY_LIMIT=${{ vars.RECEIPT_MANUAL_RETRY_LIMIT || '1' }}

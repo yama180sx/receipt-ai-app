@@ -165,6 +165,11 @@ tail logs/backup_stable.log
 
 `scripts/notify.sh` は汎用通知関数のみ定義されており、**現行の定期バックアップ通知は `backup.sh` が担う**。手動障害通知用のテンプレートとして利用可能。
 
+Discord Webhook、SMTP資格情報、送信元アドレスはGitへ保存しない。バックアップ通知は
+`BACKUP_DISCORD_WEBHOOK_URL`、AI予算通知は`AI_BUDGET_DISCORD_WEBHOOK_URL`を別々に設定する。
+SMTPは`SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`で設定する。
+Webhookを誤ってGitへ記録した場合は、履歴削除だけでなくDiscord側で旧Webhookを直ちに無効化・再発行する。
+
 ### 3.4 バックアップが増えないとき
 
 cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する（[Issue #89]）。対処:
