@@ -1,5 +1,5 @@
 import { AiBudgetReservationStatus, AiUsagePurpose, Prisma } from '@prisma/client';
-import { prisma } from '../utils/prismaClient';
+import { globalPrisma, prisma } from '../utils/prismaClient';
 
 export async function findGlobalAiBudgetSetting() {
   return prisma.globalAiBudgetSetting.findUnique({ where: { id: 1 } });
@@ -11,7 +11,7 @@ export async function upsertGlobalAiBudgetSetting(data: {
   return prisma.globalAiBudgetSetting.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
 }
 
-export async function createGlobalAiBudgetAudit(input: { actorMemberId?: number; action: string; reason?: string; beforeValue?: Prisma.InputJsonValue; afterValue?: Prisma.InputJsonValue }) {
+export async function createGlobalAiBudgetAudit(input: { actorMemberId?: number; operatorName?: string; action: string; reason?: string; beforeValue?: Prisma.InputJsonValue; afterValue?: Prisma.InputJsonValue }) {
   return prisma.globalAiBudgetAudit.create({ data: input });
 }
 
@@ -30,24 +30,83 @@ export async function listGlobalAiBudgetManagers() {
   });
 }
 
+/** 既存の全体AI予算管理者が、画面から追加できる候補だけを返す。 */
+export async function listGlobalAiBudgetManagerCandidates() {
+  return globalPrisma.familyMember.findMany({
+    where: { role: 'ADMIN', totpEnabled: true, globalAiBudgetManager: null },
+    select: {
+      id: true,
+      name: true,
+      familyGroupId: true,
+      role: true,
+      totpEnabled: true,
+      familyGroup: { select: { name: true } },
+    },
+    orderBy: [{ familyGroup: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
+  });
+}
+
 export async function addGlobalAiBudgetManager(memberId: number) {
   return prisma.globalAiBudgetManager.create({ data: { memberId } });
 }
 
-export async function removeGlobalAiBudgetManager(memberId: number) {
+export type RemoveGlobalAiBudgetManagerResult = 'removed' | 'not_found' | 'last_effective_manager';
+
+/**
+ * 管理者行だけでなく、ADMINかつTOTP有効な「実効管理者」を基準に最後の一人を守る。
+ * SERIALIZABLE により、並行した削除で実効管理者が0人になることも防ぐ。
+ */
+export async function removeGlobalAiBudgetManager(memberId: number): Promise<RemoveGlobalAiBudgetManagerResult> {
   return prisma.$transaction(async (tx) => {
-    const count = await tx.globalAiBudgetManager.count();
-    if (count <= 1) return false;
-    const result = await tx.globalAiBudgetManager.deleteMany({ where: { memberId } });
-    return result.count > 0;
-  });
+    const target = await tx.globalAiBudgetManager.findUnique({
+      where: { memberId },
+      include: { member: { select: { role: true, totpEnabled: true } } },
+    });
+    if (!target) return 'not_found';
+    const targetIsEffective = target.member.role === 'ADMIN' && target.member.totpEnabled;
+    if (targetIsEffective) {
+      const effectiveCount = await tx.globalAiBudgetManager.count({
+        where: { member: { is: { role: 'ADMIN', totpEnabled: true } } },
+      });
+      if (effectiveCount <= 1) return 'last_effective_manager';
+    }
+    await tx.globalAiBudgetManager.delete({ where: { memberId } });
+    return 'removed';
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function findEligibleGlobalAiBudgetManagerMember(memberId: number) {
-  return prisma.familyMember.findFirst({
+  return globalPrisma.familyMember.findFirst({
     where: { id: memberId, role: 'ADMIN', totpEnabled: true },
     select: { id: true, name: true, familyGroupId: true, role: true, totpEnabled: true },
   });
+}
+
+/**
+ * 初期登録・復旧登録専用。通常APIとは分離し、有効な管理者が0人の場合だけ実行を許可する。
+ */
+export async function bootstrapGlobalAiBudgetManager(input: { memberId: number; operatorName: string; reason: string }) {
+  return prisma.$transaction(async (tx) => {
+    const effectiveManagerCount = await tx.globalAiBudgetManager.count({
+      where: { member: { is: { role: 'ADMIN', totpEnabled: true } } },
+    });
+    if (effectiveManagerCount > 0) throw new Error('有効な全体AI予算管理者は既に登録されています。通常の管理画面から追加してください。');
+    const member = await tx.familyMember.findFirst({
+      where: { id: input.memberId, role: 'ADMIN', totpEnabled: true },
+      select: { id: true, name: true, familyGroupId: true, role: true, totpEnabled: true },
+    });
+    if (!member) throw new Error('対象者はTOTP有効なADMINである必要があります。');
+    const manager = await tx.globalAiBudgetManager.create({ data: { memberId: member.id } });
+    await tx.globalAiBudgetAudit.create({
+      data: {
+        operatorName: input.operatorName,
+        action: 'initial_manager_bootstrapped',
+        reason: input.reason,
+        afterValue: { memberId: member.id, executionPath: 'deployment-cli' },
+      },
+    });
+    return { manager, member };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function resumeGlobalAiBudget(actorMemberId: number, reason: string) {

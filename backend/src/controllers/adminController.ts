@@ -16,7 +16,7 @@ import {
   deletePromptTemplate,
   getAdminCostStats,
 } from '../services/admin/adminService';
-import { addAiBudgetManager, getAiBudgetNotificationDeliveries, getGlobalAiBudgetManagers, getGlobalAiBudgetOverview, removeAiBudgetManager, resumeAiBudget, sendAiBudgetTestNotification, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
+import { addAiBudgetManager, getAiBudgetNotificationDeliveries, getGlobalAiBudgetManagerCandidates, getGlobalAiBudgetManagers, getGlobalAiBudgetOverview, removeAiBudgetManager, resumeAiBudget, sendAiBudgetTestNotification, updateGlobalAiBudgetSetting } from '../services/aiBudget/globalAiBudgetAdminService';
 
 function parsePromptId(req: Parameters<typeof getRouteParam>[0]): number {
   const id = getRouteParam(req, 'id');
@@ -82,6 +82,7 @@ export const resumeGlobalAiBudget = asyncHandler(async (req, res) => {
 });
 
 export const listGlobalAiBudgetManagers = asyncHandler(async (_req, res) => sendSuccess(res, await getGlobalAiBudgetManagers()));
+export const listGlobalAiBudgetManagerCandidates = asyncHandler(async (_req, res) => sendSuccess(res, await getGlobalAiBudgetManagerCandidates()));
 export const addGlobalAiBudgetManager = asyncHandler(async (req, res) => {
   if (!req.user?.id) throw new AppError('認証情報が見つかりません。', 401);
   sendSuccess(res, await addAiBudgetManager(req.user.id, req.body.memberId, req.body.reason));

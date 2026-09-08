@@ -307,6 +307,8 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | `ProductClassificationLearningDataAudit` | 世帯辞書の無効化監査 | 世帯・対象・操作メンバー・理由を保存 |
 | `ProductClassificationAiRun` | 保存後の商品分類AI実行ログ | OCR用`ApiUsageLog`とは分離 |
 | `AiPricingRevision` | 外部AIの用途・モデル別単価改定履歴 | 追記専用、全世帯共通 |
+| `GlobalAiBudgetManager` | 全世帯横断のAI予算操作を許可する利用者 | `memberId`一意。ADMINかつTOTP有効の実効管理者を少なくとも1名保持 |
+| `GlobalAiBudgetAudit` | 全体AI予算の設定・管理者変更・初期登録の追記型監査 | 通常操作の利用者と、CLI初期登録の実行者名を別列で記録。秘密情報は保存しない |
 | `ProductClassificationReclassificationRun` / `ItemAudit` | 管理者による既存明細再分類の監査 | 世帯・実行者・対象・結果を保存 |
 
 ---

@@ -2027,7 +2027,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManager"][];
+                        };
+                    };
                 };
                 /** @description 全体AI予算管理者ではない */
                 403: {
@@ -2058,7 +2062,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManager"];
+                        };
+                    };
                 };
                 /** @description 入力不正 */
                 400: {
@@ -2076,6 +2084,54 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/manager-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 全体 AI 予算管理者に追加可能な候補を取得
+         * @description 既存の全体AI予算管理者だけが利用できる。ADMINかつTOTP有効な未登録者のみを返す。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManagerCandidate"][];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2844,6 +2900,26 @@ export interface components {
         };
         GlobalAiBudgetManagerRequest: components["schemas"]["GlobalAiBudgetReasonRequest"] & {
             memberId: number;
+        };
+        GlobalAiBudgetManager: {
+            id: number;
+            memberId: number;
+            /** Format: date-time */
+            createdAt: string;
+            member: components["schemas"]["GlobalAiBudgetManagerMember"];
+        };
+        GlobalAiBudgetManagerCandidate: components["schemas"]["GlobalAiBudgetManagerMember"] & {
+            familyGroup: {
+                name: string;
+            };
+        };
+        GlobalAiBudgetManagerMember: {
+            id: number;
+            name: string;
+            familyGroupId: number;
+            /** @enum {string} */
+            role: "ADMIN" | "USER";
+            totpEnabled: boolean;
         };
         GlobalAiBudgetOverview: {
             setting?: Record<string, never> | null;

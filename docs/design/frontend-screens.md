@@ -155,6 +155,7 @@ SafeAreaProvider
 | **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | `useCategoryManagement` | `GET/POST/DELETE /categories` |
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
+| **GlobalAiBudget** | `screens/GlobalAiBudgetScreen.tsx` | 全体AI予算・通知の設定、配送履歴、全体AI予算管理者の一覧・追加・削除 | `GET/PUT /admin/ai-budget`、`GET/POST/DELETE /admin/ai-budget/managers`、`GET /admin/ai-budget/manager-candidates` |
 | **ProductClassificationReclassification** | `screens/ProductClassificationReclassificationScreen.tsx` | 既存の未分類・要確認明細を安全に再評価し結果を表示 | `POST /admin/product-classification/reclassification-runs` |
 | **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワード分類ルールの管理 | `GET/POST/PATCH /admin/product-classification/standard-rules` |
 

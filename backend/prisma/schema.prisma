@@ -193,6 +193,7 @@ model GlobalAiBudgetAudit {
   id            Int           @id @default(autoincrement())
   actorMemberId Int?
   actorMember   FamilyMember? @relation(fields: [actorMemberId], references: [id], onDelete: SetNull)
+  operatorName  String?       @db.VarChar(128) // デプロイ時CLIの実行者。通常の画面操作では null。
   action        String        @db.VarChar(64)
   reason        String?       @db.Text
   beforeValue   Json?
