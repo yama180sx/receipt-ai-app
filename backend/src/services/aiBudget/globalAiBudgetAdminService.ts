@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../utils/appError';
-import { addGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
+import { addGlobalAiBudgetManager, bootstrapGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagerCandidates, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
 import { getGlobalAiCostStats } from './globalAiCostService';
 import { createTestNotifications, validNotificationEmail } from './aiBudgetNotificationService';
 import { AiBudgetNotificationChannel } from '@prisma/client';
@@ -11,6 +11,7 @@ export async function getGlobalAiBudgetOverview() {
 }
 
 export async function getGlobalAiBudgetManagers() { return listGlobalAiBudgetManagers(); }
+export async function getGlobalAiBudgetManagerCandidates() { return listGlobalAiBudgetManagerCandidates(); }
 
 export async function addAiBudgetManager(actorMemberId: number, memberId: number, reason: string) {
   if (!reason.trim()) throw new AppError('変更理由は必須です。', 400);
@@ -25,8 +26,9 @@ export async function addAiBudgetManager(actorMemberId: number, memberId: number
 
 export async function removeAiBudgetManager(actorMemberId: number, memberId: number, reason: string) {
   if (!reason.trim()) throw new AppError('変更理由は必須です。', 400);
-  const removed = await removeGlobalAiBudgetManager(memberId);
-  if (!removed) throw new AppError('最後の全体AI予算管理者は削除できません。', 409);
+  const result = await removeGlobalAiBudgetManager(memberId);
+  if (result === 'not_found') throw new AppError('対象者は全体AI予算管理者ではありません。', 404);
+  if (result === 'last_effective_manager') throw new AppError('最後の有効な全体AI予算管理者は削除できません。', 409);
   await createGlobalAiBudgetAudit({ actorMemberId, action: 'manager_removed', reason, beforeValue: { memberId } });
 }
 
@@ -56,3 +58,10 @@ export async function sendAiBudgetTestNotification(channels: AiBudgetNotificatio
   await createTestNotifications(setting, channels);
 }
 export async function getAiBudgetNotificationDeliveries() { return listNotificationDeliveries(); }
+
+/** デプロイ担当者が実行する初期・復旧登録CLI専用のサービス。通常APIからは呼び出さない。 */
+export async function bootstrapAiBudgetManager(input: { memberId: number; operatorName: string; reason: string }) {
+  if (!input.operatorName.trim()) throw new AppError('実行者は必須です。', 400);
+  if (!input.reason.trim()) throw new AppError('登録理由は必須です。', 400);
+  return bootstrapGlobalAiBudgetManager(input);
+}

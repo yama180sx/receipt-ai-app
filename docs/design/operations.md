@@ -126,6 +126,21 @@ npm run ai-pricing:add -- \
 
 OCRと商品分類AIを別々に登録する。登録済み改定の更新・削除は行わず、新しい適用開始日時で追加する。
 
+### 2.6 全体AI予算管理者の初期・復旧登録
+
+初回登録、または事故対応で全体AI予算管理者が0名になった場合だけ、デプロイ担当者がT320で次のCLIを実行する。通常の追加・削除はアプリの「全体AI予算・通知管理」画面から行う。対象利用者は事前にADMIN権限とTOTP有効化を完了していなければならない。
+
+```bash
+cd backend
+npm run ai-budget:bootstrap-manager -- \
+  --member-id <MEMBER_ID> \
+  --operator <DEPLOYMENT_OPERATOR> \
+  --reason <REASON> \
+  --confirm bootstrap-global-ai-budget-manager
+```
+
+このCLIは有効な管理者が既に存在する場合に失敗する。出力や操作記録に秘密情報を含めず、監査記録へ対象者、実行者、理由、実行経路を追記する。実行前にDB migrationが適用済みであることを確認する。
+
 ---
 
 ## 3. バックアップ

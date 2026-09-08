@@ -29,6 +29,7 @@ router.post('/ai-budget/notifications/test', requireGlobalAiBudgetManager, valid
 router.get('/ai-budget/notifications', requireGlobalAiBudgetManager, adminController.listGlobalAiBudgetNotificationDeliveries);
 router.post('/ai-budget/resume', requireGlobalAiBudgetManager, validate(globalAiBudgetReasonSchema), adminController.resumeGlobalAiBudget);
 router.get('/ai-budget/managers', requireGlobalAiBudgetManager, adminController.listGlobalAiBudgetManagers);
+router.get('/ai-budget/manager-candidates', requireGlobalAiBudgetManager, adminController.listGlobalAiBudgetManagerCandidates);
 router.post('/ai-budget/managers', requireGlobalAiBudgetManager, validate(globalAiBudgetManagerSchema), adminController.addGlobalAiBudgetManager);
 router.delete('/ai-budget/managers/:memberId', requireGlobalAiBudgetManager, validate(globalAiBudgetReasonSchema), adminController.removeGlobalAiBudgetManager);
 

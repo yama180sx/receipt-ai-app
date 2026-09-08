@@ -268,7 +268,8 @@ sequenceDiagram
 | POST | `/admin/ai-budget/notifications/test` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 選択済みDiscord／メール通知先への試験送信 |
 | GET | `/admin/ai-budget/notifications` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 通知配送履歴（秘密情報・本文は含めない） |
 | POST | `/admin/ai-budget/resume` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 停止状態を理由付きで明示再開（自動再投入なし） |
-| GET/POST/DELETE | `/admin/ai-budget/managers` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 専用管理者の一覧・追加・削除。最後の1名は削除不可 |
+| GET/POST/DELETE | `/admin/ai-budget/managers` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 専用管理者の一覧・追加・削除。最後の有効な管理者は削除不可 |
+| GET | `/admin/ai-budget/manager-candidates` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | ADMINかつTOTP有効で、まだ専用管理者ではない追加候補を最小情報で返す |
 | GET | `/receipts` | JWT + tenant | カーソルページネーション付きレシート一覧 |
 | GET | `/receipts/:id` | JWT + tenant | 自世帯のレシート詳細 1 件 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
