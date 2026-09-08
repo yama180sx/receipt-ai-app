@@ -2099,7 +2099,7 @@ export interface paths {
         };
         /**
          * 全体 AI 予算管理者に追加可能な候補を取得
-         * @description 既存の全体AI予算管理者だけが利用できる。ADMINかつTOTP有効な未登録者のみを返す。
+         * @description 既存の全体AI予算管理者だけが利用できる。全世帯からADMINかつTOTP有効な未登録者のみを返す。
          */
         get: {
             parameters: {
