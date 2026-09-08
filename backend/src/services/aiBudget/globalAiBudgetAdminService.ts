@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../utils/appError';
-import { addGlobalAiBudgetManager, bootstrapGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagerCandidates, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
+import { addGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagerCandidates, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
 import { getGlobalAiCostStats } from './globalAiCostService';
 import { createTestNotifications, validNotificationEmail } from './aiBudgetNotificationService';
 import { AiBudgetNotificationChannel } from '@prisma/client';
@@ -58,10 +58,3 @@ export async function sendAiBudgetTestNotification(channels: AiBudgetNotificatio
   await createTestNotifications(setting, channels);
 }
 export async function getAiBudgetNotificationDeliveries() { return listNotificationDeliveries(); }
-
-/** デプロイ担当者が実行する初期・復旧登録CLI専用のサービス。通常APIからは呼び出さない。 */
-export async function bootstrapAiBudgetManager(input: { memberId: number; operatorName: string; reason: string }) {
-  if (!input.operatorName.trim()) throw new AppError('実行者は必須です。', 400);
-  if (!input.reason.trim()) throw new AppError('登録理由は必須です。', 400);
-  return bootstrapGlobalAiBudgetManager(input);
-}

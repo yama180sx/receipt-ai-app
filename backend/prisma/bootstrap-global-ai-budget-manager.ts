@@ -1,5 +1,5 @@
 import { parseGlobalAiBudgetManagerBootstrapArgs, globalAiBudgetManagerBootstrapConfirmation } from '../src/services/aiBudget/globalAiBudgetManagerBootstrapInput';
-import { bootstrapAiBudgetManager } from '../src/services/aiBudget/globalAiBudgetAdminService';
+import { bootstrapAiBudgetManager } from '../src/services/aiBudget/globalAiBudgetManagerBootstrapService';
 import { prisma } from '../src/utils/prismaClient';
 
 const usage = `Usage: npm run ai-budget:bootstrap-manager -- --member-id MEMBER_ID --operator OPERATOR --reason REASON --confirm ${globalAiBudgetManagerBootstrapConfirmation}`;
