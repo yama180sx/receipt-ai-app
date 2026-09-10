@@ -5,17 +5,17 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${project_root}"
 
-if rg -n '\$\{\{\s*secrets\.' .github/workflows/deploy.yml; then
+if grep -En '\$\{\{[[:space:]]*secrets\.' .github/workflows/deploy.yml; then
   echo "[ERROR] deploy workflow must not reference GitHub Secrets." >&2
   exit 1
 fi
 
-if rg -n 'docker compose|rsync|npm install|prisma migrate' .github/workflows/deploy.yml; then
+if grep -En 'docker compose|rsync|npm install|prisma migrate' .github/workflows/deploy.yml; then
   echo "[ERROR] deploy workflow must not operate Docker or runtime files directly." >&2
   exit 1
 fi
 
-rg -q 'sudo -n /usr/bin/systemctl start receipt-deploy-stable.service' .github/workflows/deploy.yml
+grep -Fq 'sudo -n /usr/bin/systemctl start receipt-deploy-stable.service' .github/workflows/deploy.yml
 
 for file in \
   ops/systemd/libexec/receipt-deploy \
