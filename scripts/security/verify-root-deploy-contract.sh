@@ -111,6 +111,7 @@ for expected_line in \
 done
 
 for expected_line in \
+  'run_compose up -d --wait --force-recreate db redis' \
   'run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev' \
   'readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"' \
   'if (!statSync(databaseUrlFile).isFile()) process.exit(21);' \
