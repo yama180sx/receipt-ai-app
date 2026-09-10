@@ -1,5 +1,5 @@
-# 安定版のNode.jsを使用
-FROM node:20-slim
+# Expo SDK 57 の要件を満たす Node.js を使用
+FROM node:22-slim
 
 # OSの依存パッケージをインストール
 RUN apt-get update && apt-get install -y \
@@ -7,12 +7,6 @@ RUN apt-get update && apt-get install -y \
     openssl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# Expo CLIをグローバルにインストール
-RUN npm config set fetch-retries 5 \
-  && npm config set fetch-retry-mintimeout 20000 \
-  && npm config set fetch-retry-maxtimeout 120000 \
-  && npm install -g expo-cli
 
 WORKDIR /app
 
