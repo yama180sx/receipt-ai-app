@@ -153,7 +153,9 @@ git -C "${APP_DIRECTORY}" checkout --detach --force FETCH_HEAD
 git -C "${APP_DIRECTORY}" clean -ffdqx
 
 readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
+readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
 install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
 for credential in backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password; do
   copy_credential "${credential}" "${SECRET_DIRECTORY}"
 done
@@ -161,7 +163,8 @@ done
 write_runtime_env "${RUNTIME_DIRECTORY}" "${ENVIRONMENT}" "${PROJECT_NAME}" "${NODE_ENV_VALUE}" "${BACKEND_COMMAND_VALUE}" "${DATA_DIRECTORY}"
 
 run_compose() {
-  env RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
+  env DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}" \
+    RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
     docker compose --ansi never --project-directory "${APP_DIRECTORY}" \
       --env-file "${RUNTIME_DIRECTORY}/compose.env" \
       -f "${APP_DIRECTORY}/docker-compose.yml" \

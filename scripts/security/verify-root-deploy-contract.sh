@@ -59,4 +59,9 @@ for compose_file in docker-compose.yml docker-compose.secrets.yml docker-compose
   fi
 done
 
+if ! grep -Fq 'DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must keep Docker CLI state out of the protected home directory." >&2
+  exit 1
+fi
+
 echo "[OK] root deployment contract is structurally valid."
