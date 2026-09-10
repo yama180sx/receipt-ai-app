@@ -34,4 +34,22 @@ for helper in ops/systemd/libexec/receipt-deploy ops/systemd/libexec/receipt-bac
   bash -n "${helper}"
 done
 
+require_exact_line() {
+  local expected_line="$1"
+  local file="$2"
+  if ! grep -Fqx "${expected_line}" "${file}"; then
+    echo "[ERROR] missing runtime directory contract: ${file}" >&2
+    exit 1
+  fi
+}
+
+require_exact_line 'RuntimeDirectory=receipt-ai-app-dev' \
+  ops/systemd/units/receipt-deploy-dev.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-stable' \
+  ops/systemd/units/receipt-deploy-stable.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-dev' \
+  ops/systemd/units/receipt-backup-dev.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-stable' \
+  ops/systemd/units/receipt-backup-stable.service
+
 echo "[OK] root deployment contract is structurally valid."
