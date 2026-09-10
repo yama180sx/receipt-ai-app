@@ -63,7 +63,10 @@ copy_credential() {
   local destination="$2"
   local source="${CREDENTIALS_DIRECTORY:-}/${name}"
   [ -r "${source}" ] || die "required credential is unavailable: ${name}"
-  install -m 0400 -o root -g root "${source}" "${destination}/${name}"
+  # Docker Composeはhost上のSecretファイルを各サービスへread-only mountする。
+  # backend／dbは非root UIDで動作するため、host側のroot専用ディレクトリ（0700）内で
+  # ファイルを0444にし、mountされたサービスだけがコンテナ内で読めるようにする。
+  install -m 0444 -o root -g root "${source}" "${destination}/${name}"
 }
 
 write_runtime_env() {
