@@ -199,6 +199,7 @@
 | # | 確認項目 | 結果 | 備考 |
 |---|----------|------|------|
 | 9.1 | `cd frontend && npx tsc --noEmit` | | |
+| 9.1a | `cd frontend && npx expo-doctor@latest` | | Expo SDK・設定・ネイティブ依存の整合性 |
 | 9.2 | `cd backend && npm test` | | #91-2 |
 | 9.3 | `cd frontend && npm test` | | #91-4 |
 

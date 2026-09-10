@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { tenantMiddleware } from '../middleware/tenantMiddleware';
+import { restoreTenantContextMiddleware, tenantMiddleware } from '../middleware/tenantMiddleware';
 import { validate } from '../middleware/validate';
 import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
 import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
@@ -60,6 +60,7 @@ router.post(
   tenantMiddleware,
   rejectReceiptAnalysisDuringMaintenance,
   upload.single('image'),
+  restoreTenantContextMiddleware,
   validate(uploadReceiptSchema),
   uploadReceipt
 );
