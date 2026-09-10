@@ -1,0 +1,7 @@
+title = "RecAIpt secret scanning configuration"
+
+[extend]
+useDefault = true
+
+# テスト用の固定値を含め、除外はスキャン結果を確認してから完全一致で追加する。
+# パス全体やルール全体を無効化してはならない。
