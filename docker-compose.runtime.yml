@@ -5,7 +5,9 @@ services:
     build:
       dockerfile: Dockerfile.runtime
     user: "1000:1000"
-    command: npm run start
+    # dev はtsx watch、stable はtsx の通常起動をroot helperが明示する。
+    # ここで固定すると、devでもts-node経由となり .js 拡張子のTS読込に失敗する。
+    command: ${BACKEND_COMMAND:?BACKEND_COMMAND is required}
     # root helperが生成する非機密設定だけを渡す。SecretはCompose Secret mountだけを使う。
     env_file: !override
       - ${RECAIPT_BACKEND_ENV_FILE:?RECAIPT_BACKEND_ENV_FILE is required}
