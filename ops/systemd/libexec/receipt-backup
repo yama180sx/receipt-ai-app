@@ -18,11 +18,13 @@ esac
 readonly APP_DIRECTORY="/srv/receipt-ai-app/${ENVIRONMENT}"
 readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-backup-${ENVIRONMENT}"
 readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
+readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
 
 [ -d "${APP_DIRECTORY}" ] || die "managed application directory is unavailable"
 [ "$(stat -c '%u:%g' "${APP_DIRECTORY}")" = "0:0" ] || die "managed application directory ownership is invalid"
 
 install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
 for credential in db_password backup_discord_webhook_url; do
   source="${CREDENTIALS_DIRECTORY:-}/${credential}"
   [ -r "${source}" ] || die "required credential is unavailable: ${credential}"
@@ -30,4 +32,5 @@ for credential in db_password backup_discord_webhook_url; do
 done
 
 cd "${APP_DIRECTORY}"
+export DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"
 RECAIPT_BACKUP_SECRET_DIR="${SECRET_DIRECTORY}" ./scripts/backup.sh "${ENVIRONMENT}"

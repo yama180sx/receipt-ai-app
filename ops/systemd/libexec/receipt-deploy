@@ -91,6 +91,7 @@ write_runtime_env() {
     printf 'RECAIPT_UPLOADS_DIR=%s/uploads\n' "${data_directory}"
     printf 'RECAIPT_PGDATA_DIR=%s/pgdata\n' "${data_directory}"
     printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
+    printf 'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env\n' "${APP_DIRECTORY}"
   } > "${destination}/compose.env"
 
   {
@@ -200,7 +201,15 @@ run_prisma_migration() {
   '
 }
 
+verify_backend_port() {
+  if ! run_compose port backend 3000 >/dev/null 2>&1; then
+    die "backend public port is unavailable after deployment"
+  fi
+}
+
 run_compose build backend frontend frontend-dev
 run_compose up -d --wait db redis
 run_prisma_migration
-run_compose up -d --remove-orphans
+# runtime設定・image更新を確実に反映する。DB／Redisは直前のhealthcheck済みのため再作成しない。
+run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev
+verify_backend_port

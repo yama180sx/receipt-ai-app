@@ -6,7 +6,9 @@ services:
       dockerfile: Dockerfile.runtime
     user: "1000:1000"
     command: npm run start
-    env_file: !reset []
+    # root helperが生成する非機密設定だけを渡す。SecretはCompose Secret mountだけを使う。
+    env_file: !override
+      - ${RECAIPT_BACKEND_ENV_FILE:?RECAIPT_BACKEND_ENV_FILE is required}
     volumes: !override
       - ${RECAIPT_UPLOADS_DIR}:/app/uploads
       - /etc/localtime:/etc/localtime:ro
