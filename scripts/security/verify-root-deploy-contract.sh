@@ -64,6 +64,11 @@ if ! grep -Fq 'DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"' ops/systemd/libexec/r
   exit 1
 fi
 
+if ! grep -Fq 'export DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"' ops/systemd/libexec/receipt-backup; then
+  echo "[ERROR] root backup helper must keep Docker CLI state out of the protected home directory." >&2
+  exit 1
+fi
+
 if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy; then
   echo "[ERROR] root deploy helper must preserve container ownership of runtime data directories." >&2
   exit 1
@@ -87,5 +92,23 @@ if grep -Fq 'EXPO_PUBLIC_API_TOKEN' docker-compose.runtime.yml; then
   echo "[ERROR] runtime frontend must not receive an API token." >&2
   exit 1
 fi
+
+for expected_line in \
+  'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env' \
+  '${RECAIPT_BACKEND_ENV_FILE:?RECAIPT_BACKEND_ENV_FILE is required}'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-deploy docker-compose.runtime.yml; then
+    echo "[ERROR] runtime backend must receive its generated non-secret configuration." >&2
+    exit 1
+  fi
+done
+
+for expected_line in \
+  'run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev' \
+  'run_compose port backend 3000 >/dev/null 2>&1'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-deploy; then
+    echo "[ERROR] root deploy helper must recreate and verify runtime application services." >&2
+    exit 1
+  fi
+done
 
 echo "[OK] root deployment contract is structurally valid."
