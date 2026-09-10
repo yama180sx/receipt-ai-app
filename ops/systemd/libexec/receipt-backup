@@ -27,8 +27,8 @@ install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
 install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
 for credential in db_password backup_discord_webhook_url; do
   source="${CREDENTIALS_DIRECTORY:-}/${credential}"
-  [ -r "${source}" ] || die "required credential is unavailable: ${credential}"
-  install -m 0400 -o root -g root "${source}" "${SECRET_DIRECTORY}/${credential}"
+  [ -f "${source}" ] && [ -r "${source}" ] || die "required credential is unavailable: ${credential}"
+  install -T -m 0400 -o root -g root "${source}" "${SECRET_DIRECTORY}/${credential}"
 done
 
 cd "${APP_DIRECTORY}"

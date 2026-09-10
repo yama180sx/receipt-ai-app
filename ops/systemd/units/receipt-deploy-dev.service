@@ -11,6 +11,7 @@ Group=root
 UMask=0077
 RuntimeDirectory=receipt-ai-app-dev
 RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
 LoadCredentialEncrypted=backend_database_url:/etc/receipt-ai-app/credentials/dev/backend_database_url.cred
 LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/dev/backend_jwt_secret.cred
 LoadCredentialEncrypted=backend_gemini_api_key:/etc/receipt-ai-app/credentials/dev/backend_gemini_api_key.cred

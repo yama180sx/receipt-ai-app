@@ -74,10 +74,18 @@ if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy
   exit 1
 fi
 
-if ! grep -Fq 'install -m 0444 -o root -g root "${source}" "${destination}/${name}"' ops/systemd/libexec/receipt-deploy; then
-  echo "[ERROR] root deploy helper must make mounted credentials readable by service users." >&2
+if ! grep -Fq 'install -T -m 0444 -o root -g root "${source}" "${destination}/${name}"' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must stage credentials as files, not directory contents." >&2
   exit 1
 fi
+
+for unit in ops/systemd/units/receipt-deploy-dev.service ops/systemd/units/receipt-deploy-stable.service; do
+  require_exact_line 'RuntimeDirectoryPreserve=yes' "${unit}"
+  if [ "$(grep -Fc '[Install]' "${unit}")" -ne 1 ]; then
+    echo "[ERROR] root deploy unit must contain exactly one [Install] section: ${unit}" >&2
+    exit 1
+  fi
+done
 
 for expected_line in \
   'EXPO_PUBLIC_APP_ENV: ${ENV_NAME}' \
@@ -104,9 +112,12 @@ done
 
 for expected_line in \
   'run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev' \
-  'run_compose port backend 3000 >/dev/null 2>&1'; do
+  'readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"' \
+  'if (!statSync(databaseUrlFile).isFile()) process.exit(21);' \
+  'fetch("http://127.0.0.1:3000/health")' \
+  'cleanup_retired_runtime_secrets'; do
   if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-deploy; then
-    echo "[ERROR] root deploy helper must recreate and verify runtime application services." >&2
+    echo "[ERROR] root deploy helper is missing the runtime lifecycle contract." >&2
     exit 1
   fi
 done

@@ -62,11 +62,28 @@ copy_credential() {
   local name="$1"
   local destination="$2"
   local source="${CREDENTIALS_DIRECTORY:-}/${name}"
-  [ -r "${source}" ] || die "required credential is unavailable: ${name}"
+  [ -f "${source}" ] && [ -r "${source}" ] || die "required credential is unavailable: ${name}"
   # Docker Composeはhost上のSecretファイルを各サービスへread-only mountする。
   # backend／dbは非root UIDで動作するため、host側のroot専用ディレクトリ（0700）内で
   # ファイルを0444にし、mountされたサービスだけがコンテナ内で読めるようにする。
-  install -m 0444 -o root -g root "${source}" "${destination}/${name}"
+  # -T はdestinationを常にファイルとして扱う。Dockerが過去のmount失敗で
+  # 同名ディレクトリを残していても、その中へ秘密を誤配置しない。
+  install -T -m 0444 -o root -g root "${source}" "${destination}/${name}"
+}
+
+cleanup_retired_runtime_secrets() {
+  local credential legacy_target
+
+  # 新しいコンテナを正常にrecreateした後だけ、旧世代を削除する。
+  # 削除対象はこのhelperが管理するroot専用のruntimeディレクトリに限定する。
+  find "${SECRET_ROOT}" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' \
+    ! -path "${SECRET_DIRECTORY}" -exec rm -rf -- {} +
+
+  # 世代管理導入前にDockerが残した既知の同名targetだけを、この時点で回収する。
+  for credential in "${CREDENTIALS[@]}"; do
+    legacy_target="${SECRET_ROOT}/${credential}"
+    [ ! -e "${legacy_target}" ] || rm -rf -- "${legacy_target}"
+  done
 }
 
 write_runtime_env() {
@@ -162,11 +179,14 @@ git -C "${APP_DIRECTORY}" fetch --depth 1 origin "${GIT_REF}"
 git -C "${APP_DIRECTORY}" checkout --detach --force FETCH_HEAD
 git -C "${APP_DIRECTORY}" clean -ffdqx
 
-readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
+readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
 readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
-install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+install -d -o root -g root -m 0700 "${SECRET_ROOT}"
 install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
-for credential in backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password; do
+readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
+readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"
+chmod 0700 "${SECRET_DIRECTORY}"
+for credential in "${CREDENTIALS[@]}"; do
   copy_credential "${credential}" "${SECRET_DIRECTORY}"
 done
 
@@ -186,25 +206,42 @@ run_compose() {
 # Prisma CLIは *_FILE を解決しないため、コンテナ内だけでDATABASE_URLを設定して実行する。
 # 値をhostの引数・ログ・作業ディレクトリへ出さない。
 run_prisma_migration() {
-  run_compose run --rm --no-deps backend node -e '
+  if ! run_compose run --rm --no-deps backend node -e '
     const { readFileSync } = require("node:fs");
+    const { statSync } = require("node:fs");
     const { spawnSync } = require("node:child_process");
     const databaseUrlFile = process.env.DATABASE_URL_FILE;
-    if (!databaseUrlFile) process.exit(1);
+    if (!databaseUrlFile) process.exit(20);
+    try {
+      if (!statSync(databaseUrlFile).isFile()) process.exit(21);
+    } catch {
+      process.exit(21);
+    }
     const databaseUrl = readFileSync(databaseUrlFile, "utf8").replace(/\r?\n$/, "");
-    if (!databaseUrl) process.exit(1);
+    if (!databaseUrl) process.exit(22);
     const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
       stdio: "inherit",
       env: { ...process.env, DATABASE_URL: databaseUrl },
     });
     process.exit(result.status === null ? 1 : result.status);
-  '
+  '; then
+    die "database migration preflight or migration failed"
+  fi
 }
 
-verify_backend_port() {
-  if ! run_compose port backend 3000 >/dev/null 2>&1; then
-    die "backend public port is unavailable after deployment"
-  fi
+verify_backend_health() {
+  local attempt
+  for attempt in $(seq 1 30); do
+    if run_compose exec -T backend node -e '
+      fetch("http://127.0.0.1:3000/health")
+        .then((response) => process.exit(response.ok ? 0 : 1))
+        .catch(() => process.exit(1));
+    ' >/dev/null 2>&1; then
+      return
+    fi
+    sleep 1
+  done
+  die "backend health check failed after deployment"
 }
 
 run_compose build backend frontend frontend-dev
@@ -212,4 +249,5 @@ run_compose up -d --wait db redis
 run_prisma_migration
 # runtime設定・image更新を確実に反映する。DB／Redisは直前のhealthcheck済みのため再作成しない。
 run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev
-verify_backend_port
+verify_backend_health
+cleanup_retired_runtime_secrets

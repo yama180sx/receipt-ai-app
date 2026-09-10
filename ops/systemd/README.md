@@ -8,7 +8,7 @@
 - root unitは公開リポジトリの固定ref（dev=`develop`、stable=`main`）だけを取得する。
 - runner／開発ユーザーの `~/dev`、`~/stable`、Actions workspaceはroot unitの入力にしない。
 - runnerに許可するのは、sudoersで固定したunit開始だけである。Docker socket、任意のsystemctl操作、任意パス・任意refは許可しない。
-- app Secretはsystemd encrypted credentialからruntimeのroot専用一時ディレクトリへコピーする。Git、ワークツリー、`.env`、frontend、runner環境には書かない。
+- app Secretはsystemd encrypted credentialからruntimeのroot専用世代ディレクトリへコピーする。Git、ワークツリー、`.env`、frontend、runner環境には書かない。デプロイが成功してコンテナを再作成した後にだけ旧世代を削除する。
 
 `docker-compose.runtime.yml` は開発用Composeと併用しない。実行用imageを作り、ユーザー所有ソースのbind mountを、root管理のimageと`/var/lib/receipt-ai-app/{env}`の永続データへ置換する。
 
@@ -22,9 +22,10 @@
 4. root専用の `/etc/receipt-ai-app/credentials/{dev,stable}` に、各環境で別々のencrypted credentialを作成する。平文は端末表示、Git、作業ディレクトリ、shell履歴へ残さない。
 5. helper、unit、sudoersをroot所有の所定位置へinstallし、`systemctl daemon-reload`する。
 6. 合成credentialでunitの読取り・失敗時の値なしエラーを確認する。
-7. 現行devのDB・Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。
-8. dev確認後にだけDocker groupから開発ユーザー／runnerを外し、新しいログインセッションでDocker socketが直接読めないことを確認する。
-9. stableは別途承認されたメンテナンス時間に移行する。
+7. `scripts/security/test-runtime-secret-staging.sh` を成功させ、同名ディレクトリへcredentialを誤配置しないことを確認する。
+8. 現行devのDB・Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
+9. dev確認後にだけDocker groupから開発ユーザー／runnerを外し、新しいログインセッションでDocker socketが直接読めないことを確認する。
+10. stableは別途承認されたメンテナンス時間に移行する。
 
 ## 設置対象
 
@@ -37,6 +38,8 @@
 | `sudoers.d/receipt-deploy` | `/etc/sudoers.d/receipt-deploy` | root:root / 0440 |
 
 credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_secret`、`backend_gemini_api_key`、`backend_ai_budget_discord_webhook`、`backend_smtp_user`、`backend_smtp_password`、`backend_smtp_from`、`postgres_password`、backupでは`db_password`、`backup_discord_webhook_url`に固定する。devとstableはcredentialを共有しない。
+
+deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
 ## ロールバックと停止条件
 
