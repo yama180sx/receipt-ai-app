@@ -164,7 +164,9 @@ run_compose() {
   env RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
     docker compose --ansi never --project-directory "${APP_DIRECTORY}" \
       --env-file "${RUNTIME_DIRECTORY}/compose.env" \
-      -f docker-compose.yml -f docker-compose.secrets.yml -f docker-compose.runtime.yml \
+      -f "${APP_DIRECTORY}/docker-compose.yml" \
+      -f "${APP_DIRECTORY}/docker-compose.secrets.yml" \
+      -f "${APP_DIRECTORY}/docker-compose.runtime.yml" \
       "$@"
 }
 
