@@ -17,6 +17,18 @@ services:
     user: "1000:1000"
     command: sh /app/scripts/expo-dev-server.sh
     env_file: !reset []
+    # runtime imageはfrontend/.envを含めない。Expo bundleに必要な公開設定だけを渡す。
+    # Secretはここへ追加しない。
+    environment: !override
+      TZ: Asia/Tokyo
+      ENV_NAME: ${ENV_NAME}
+      HOST_IP: ${HOST_IP}
+      DEV_PORT: ${DEV_PORT}
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_IP}
+      EXPO_PACKAGER_PROXY_URL: http://${HOST_IP}:${DEV_PORT}
+      EXPO_PUBLIC_APP_ENV: ${ENV_NAME}
+      EXPO_PUBLIC_API_URL: http://${HOST_IP}:${BACKEND_PORT}/api
     volumes: !override
       - /etc/localtime:/etc/localtime:ro
 
