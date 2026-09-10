@@ -52,4 +52,11 @@ require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-dev' \
 require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-stable' \
   ops/systemd/units/receipt-backup-stable.service
 
+for compose_file in docker-compose.yml docker-compose.secrets.yml docker-compose.runtime.yml; do
+  if ! grep -Fq -- "-f \"\${APP_DIRECTORY}/${compose_file}\"" ops/systemd/libexec/receipt-deploy; then
+    echo "[ERROR] root deploy helper must use an absolute Compose path: ${compose_file}" >&2
+    exit 1
+  fi
+done
+
 echo "[OK] root deployment contract is structurally valid."
