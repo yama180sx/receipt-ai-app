@@ -1,0 +1,192 @@
+#!/bin/bash
+# root所有で /usr/local/libexec/receipt-deploy として設置する固定デプロイヘルパー。
+# 任意の環境名、作業ディレクトリ、Git ref、Compose引数は受け取らない。
+set -euo pipefail
+
+readonly REPOSITORY_URL="https://github.com/yama180sx/receipt-ai-app.git"
+readonly CONFIG_ROOT="/etc/receipt-ai-app"
+readonly APP_ROOT="/srv/receipt-ai-app"
+readonly DATA_ROOT="/var/lib/receipt-ai-app"
+
+die() {
+  echo "[receipt-deploy] $1" >&2
+  exit 1
+}
+
+require_root() {
+  [ "$(id -u)" -eq 0 ] || die "must run as root"
+}
+
+require_root_owned_directory() {
+  local directory="$1"
+  if [ -e "${directory}" ]; then
+    [ -d "${directory}" ] || die "managed path is not a directory"
+    [ "$(stat -c '%u:%g' "${directory}")" = "0:0" ] || die "managed directory ownership is invalid"
+    [ $((8#$(stat -c '%a' "${directory}") & 8#022)) -eq 0 ] || die "managed directory is writable by group or others"
+    return
+  fi
+  install -d -o root -g root -m 0750 "${directory}"
+}
+
+load_non_secret_config() {
+  local config_file="$1"
+  [ -r "${config_file}" ] || die "non-secret config is unavailable"
+
+  local line key value
+  while IFS= read -r line || [ -n "${line}" ]; do
+    case "${line}" in
+      ''|'#'*) continue ;;
+    esac
+    case "${line}" in
+      *=*)
+        key="${line%%=*}"
+        value="${line#*=}"
+        ;;
+      *) die "non-secret config has an invalid line" ;;
+    esac
+    case "${key}" in
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL)
+        printf -v "${key}" '%s' "${value}"
+        export "${key}"
+        ;;
+      *) die "non-secret config contains a disallowed key" ;;
+    esac
+  done < "${config_file}"
+
+  for key in HOST_IP WEB_PORT BACKEND_PORT DEV_PORT DB_PORT REDIS_PORT EXPO_PORT_1 EXPO_PORT_2 REDIS_PORT_INTERNAL SMTP_HOST SMTP_PORT SMTP_SECURE GEMINI_RECEIPT_MODEL GEMINI_PRODUCT_CLASSIFICATION_MODEL RECEIPT_MANUAL_RETRY_LIMIT RECEIPT_MANUAL_RETRY_FAILURE_CODES RECEIPT_ANALYSIS_MAINTENANCE_MODE LOG_LEVEL; do
+    [ -n "${!key:-}" ] || die "non-secret config is missing a required key"
+  done
+}
+
+copy_credential() {
+  local name="$1"
+  local destination="$2"
+  local source="${CREDENTIALS_DIRECTORY:-}/${name}"
+  [ -r "${source}" ] || die "required credential is unavailable: ${name}"
+  install -m 0400 -o root -g root "${source}" "${destination}/${name}"
+}
+
+write_runtime_env() {
+  local destination="$1"
+  local environment="$2"
+  local project_name="$3"
+  local node_env="$4"
+  local command="$5"
+  local data_directory="$6"
+
+  umask 077
+  {
+    printf 'ENV_NAME=%s\n' "${environment}"
+    printf 'COMPOSE_PROJECT_NAME=%s\n' "${project_name}"
+    printf 'UID=1000\nGID=1000\n'
+    printf 'BACKEND_COMMAND=%s\nNODE_ENV=%s\n' "${command}" "${node_env}"
+    printf 'HOST_IP=%s\nWEB_PORT=%s\nBACKEND_PORT=%s\nDEV_PORT=%s\n' "${HOST_IP}" "${WEB_PORT}" "${BACKEND_PORT}" "${DEV_PORT}"
+    printf 'DB_PORT=%s\nREDIS_PORT=%s\nEXPO_PORT_1=%s\nEXPO_PORT_2=%s\n' "${DB_PORT}" "${REDIS_PORT}" "${EXPO_PORT_1}" "${EXPO_PORT_2}"
+    printf 'DB_USER=cntadm\nDB_NAME=receipt_db\n'
+    # docker-compose.yml の旧補間を満たすだけの無効値。runtime overrideでコンテナへは渡さない。
+    printf 'DB_PASSWORD=__managed_by_file__\n'
+    printf 'RECAIPT_UPLOADS_DIR=%s/uploads\n' "${data_directory}"
+    printf 'RECAIPT_PGDATA_DIR=%s/pgdata\n' "${data_directory}"
+    printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
+  } > "${destination}/compose.env"
+
+  {
+    printf 'PORT=3000\nREDIS_HOST=redis\nREDIS_PORT_INTERNAL=%s\nJWT_EXPIRES_IN=30d\n' "${REDIS_PORT_INTERNAL}"
+    printf 'GEMINI_RECEIPT_MODEL=%s\nGEMINI_PRODUCT_CLASSIFICATION_MODEL=%s\n' "${GEMINI_RECEIPT_MODEL}" "${GEMINI_PRODUCT_CLASSIFICATION_MODEL}"
+    printf 'SMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_SECURE=%s\n' "${SMTP_HOST}" "${SMTP_PORT}" "${SMTP_SECURE}"
+    printf 'RECEIPT_MANUAL_RETRY_LIMIT=%s\nRECEIPT_MANUAL_RETRY_FAILURE_CODES=%s\nRECEIPT_ANALYSIS_MAINTENANCE_MODE=%s\nLOG_LEVEL=%s\n' "${RECEIPT_MANUAL_RETRY_LIMIT}" "${RECEIPT_MANUAL_RETRY_FAILURE_CODES}" "${RECEIPT_ANALYSIS_MAINTENANCE_MODE}" "${LOG_LEVEL}"
+    printf 'CORS_ORIGIN=http://%s,http://%s:%s,http://%s:%s,exp://%s:%s,http://localhost:%s,http://127.0.0.1:%s\n' "${HOST_IP}" "${HOST_IP}" "${WEB_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${DEV_PORT}" "${DEV_PORT}" "${DEV_PORT}"
+  } > "${APP_DIRECTORY}/backend/.env"
+
+  {
+    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${environment}" "${HOST_IP}" "${BACKEND_PORT}"
+  } > "${APP_DIRECTORY}/frontend/.env"
+
+  chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
+}
+
+require_root
+[ "$#" -eq 1 ] || die "environment is fixed by the systemd unit"
+
+case "$1" in
+  dev)
+    readonly ENVIRONMENT="dev"
+    readonly GIT_REF="refs/heads/develop"
+    readonly PROJECT_NAME="receipt-dev"
+    readonly NODE_ENV_VALUE="development"
+    readonly BACKEND_COMMAND_VALUE="npm run dev"
+    ;;
+  stable)
+    readonly ENVIRONMENT="stable"
+    readonly GIT_REF="refs/heads/main"
+    readonly PROJECT_NAME="receipt-stable"
+    readonly NODE_ENV_VALUE="production"
+    readonly BACKEND_COMMAND_VALUE="npm run start"
+    ;;
+  *) die "unknown fixed environment" ;;
+esac
+
+readonly APP_DIRECTORY="${APP_ROOT}/${ENVIRONMENT}"
+readonly DATA_DIRECTORY="${DATA_ROOT}/${ENVIRONMENT}"
+readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${ENVIRONMENT}"
+readonly CONFIG_FILE="${CONFIG_ROOT}/${ENVIRONMENT}.env"
+
+require_root_owned_directory "${APP_ROOT}"
+require_root_owned_directory "${APP_DIRECTORY}"
+require_root_owned_directory "${DATA_ROOT}"
+require_root_owned_directory "${DATA_DIRECTORY}"
+require_root_owned_directory "${RUNTIME_DIRECTORY}"
+load_non_secret_config "${CONFIG_FILE}"
+
+for directory in "${DATA_DIRECTORY}/uploads" "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata"; do
+  install -d -m 0750 "${directory}"
+done
+chown 1000:1000 "${DATA_DIRECTORY}/uploads"
+
+if [ ! -d "${APP_DIRECTORY}/.git" ]; then
+  git -C "${APP_DIRECTORY}" init
+  git -C "${APP_DIRECTORY}" remote add origin "${REPOSITORY_URL}"
+fi
+git -C "${APP_DIRECTORY}" remote set-url origin "${REPOSITORY_URL}"
+git -C "${APP_DIRECTORY}" fetch --depth 1 origin "${GIT_REF}"
+git -C "${APP_DIRECTORY}" checkout --detach --force FETCH_HEAD
+git -C "${APP_DIRECTORY}" clean -ffdqx
+
+readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
+install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+for credential in backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password; do
+  copy_credential "${credential}" "${SECRET_DIRECTORY}"
+done
+
+write_runtime_env "${RUNTIME_DIRECTORY}" "${ENVIRONMENT}" "${PROJECT_NAME}" "${NODE_ENV_VALUE}" "${BACKEND_COMMAND_VALUE}" "${DATA_DIRECTORY}"
+
+run_compose() {
+  env RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
+    docker compose --ansi never --project-directory "${APP_DIRECTORY}" \
+      --env-file "${RUNTIME_DIRECTORY}/compose.env" \
+      -f docker-compose.yml -f docker-compose.secrets.yml -f docker-compose.runtime.yml \
+      "$@"
+}
+
+# Prisma CLIは *_FILE を解決しないため、コンテナ内だけでDATABASE_URLを設定して実行する。
+# 値をhostの引数・ログ・作業ディレクトリへ出さない。
+run_prisma_migration() {
+  run_compose run --rm --no-deps backend node -e '
+    const { readFileSync } = require("node:fs");
+    const { spawnSync } = require("node:child_process");
+    const databaseUrlFile = process.env.DATABASE_URL_FILE;
+    if (!databaseUrlFile) process.exit(1);
+    const databaseUrl = readFileSync(databaseUrlFile, "utf8").replace(/\r?\n$/, "");
+    if (!databaseUrl) process.exit(1);
+    const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+    });
+    process.exit(result.status === null ? 1 : result.status);
+  '
+}
+
+run_compose build backend frontend frontend-dev
+run_compose up -d --wait db redis
+run_prisma_migration
+run_compose up -d --remove-orphans

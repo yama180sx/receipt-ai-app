@@ -1,0 +1,33 @@
+#!/bin/bash
+# root所有で /usr/local/libexec/receipt-backup として設置する固定バックアップヘルパー。
+set -euo pipefail
+
+die() {
+  echo "[receipt-backup] $1" >&2
+  exit 1
+}
+
+[ "$(id -u)" -eq 0 ] || die "must run as root"
+[ "$#" -eq 1 ] || die "environment is fixed by the systemd unit"
+
+case "$1" in
+  dev|stable) readonly ENVIRONMENT="$1" ;;
+  *) die "unknown fixed environment" ;;
+esac
+
+readonly APP_DIRECTORY="/srv/receipt-ai-app/${ENVIRONMENT}"
+readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-backup-${ENVIRONMENT}"
+readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
+
+[ -d "${APP_DIRECTORY}" ] || die "managed application directory is unavailable"
+[ "$(stat -c '%u:%g' "${APP_DIRECTORY}")" = "0:0" ] || die "managed application directory ownership is invalid"
+
+install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+for credential in db_password backup_discord_webhook_url; do
+  source="${CREDENTIALS_DIRECTORY:-}/${credential}"
+  [ -r "${source}" ] || die "required credential is unavailable: ${credential}"
+  install -m 0400 -o root -g root "${source}" "${SECRET_DIRECTORY}/${credential}"
+done
+
+cd "${APP_DIRECTORY}"
+RECAIPT_BACKUP_SECRET_DIR="${SECRET_DIRECTORY}" ./scripts/backup.sh "${ENVIRONMENT}"

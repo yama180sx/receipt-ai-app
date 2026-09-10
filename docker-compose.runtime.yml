@@ -1,0 +1,31 @@
+# Issue #131-3-2: root管理runtime専用。通常の開発Composeには重ねない。
+# root所有のイメージを実行し、runner所有のソースbind mountを完全に置換する。
+services:
+  backend:
+    build:
+      dockerfile: Dockerfile.runtime
+    user: "1000:1000"
+    command: npm run start
+    env_file: !reset []
+    volumes: !override
+      - ${RECAIPT_UPLOADS_DIR}:/app/uploads
+      - /etc/localtime:/etc/localtime:ro
+
+  frontend-dev:
+    build:
+      dockerfile: Dockerfile.runtime-dev
+    user: "1000:1000"
+    command: sh /app/scripts/expo-dev-server.sh
+    env_file: !reset []
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
+
+  db:
+    volumes: !override
+      - ${RECAIPT_PGDATA_DIR}:/var/lib/postgresql
+      - /etc/localtime:/etc/localtime:ro
+
+  redis:
+    volumes: !override
+      - ${RECAIPT_REDISDATA_DIR}:/data
+      - /etc/localtime:/etc/localtime:ro
