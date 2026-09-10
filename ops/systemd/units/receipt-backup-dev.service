@@ -1,0 +1,18 @@
+[Unit]
+Description=RecAIpt dev root-managed backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+LoadCredentialEncrypted=db_password:/etc/receipt-ai-app/credentials/dev/db_password.cred
+LoadCredentialEncrypted=backup_discord_webhook_url:/etc/receipt-ai-app/credentials/dev/backup_discord_webhook_url.cred
+ExecStart=/usr/local/libexec/receipt-backup dev
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-backup-dev /mnt/raid_1t/backups/receipt-app-dev
