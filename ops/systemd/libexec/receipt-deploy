@@ -245,7 +245,10 @@ verify_backend_health() {
 }
 
 run_compose build backend frontend frontend-dev
-run_compose up -d --wait db redis
+# DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
+# 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
+# 永続データはRECAIPT_PGDATA_DIRとRECAIPT_REDISDATA_DIRのbind mountに残るため削除しない。
+run_compose up -d --wait --force-recreate db redis
 run_prisma_migration
 # runtime設定・image更新を確実に反映する。DB／Redisは直前のhealthcheck済みのため再作成しない。
 run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev

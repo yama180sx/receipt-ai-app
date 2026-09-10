@@ -41,6 +41,8 @@ credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_se
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
+deployはDBとRedisを現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
+
 ## ロールバックと停止条件
 
 - dev移行中にDB接続、TOTP、ログイン、レシート解析、通知、バックアップのいずれかが失敗した場合、stableへは進めない。
