@@ -64,4 +64,9 @@ if ! grep -Fq 'DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"' ops/systemd/libexec/r
   exit 1
 fi
 
+if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must preserve container ownership of runtime data directories." >&2
+  exit 1
+fi
+
 echo "[OK] root deployment contract is structurally valid."

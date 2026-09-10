@@ -138,10 +138,16 @@ require_root_owned_directory "${DATA_DIRECTORY}"
 require_root_owned_directory "${RUNTIME_DIRECTORY}"
 load_non_secret_config "${CONFIG_FILE}"
 
-for directory in "${DATA_DIRECTORY}/uploads" "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata"; do
-  install -d -m 0750 "${directory}"
-done
+install -d -m 0750 "${DATA_DIRECTORY}/uploads"
 chown 1000:1000 "${DATA_DIRECTORY}/uploads"
+
+# postgres:18 と redis:7-alpine は、永続データの所有者としてUID 999を使用する。
+# root helperが移行済みデータの親ディレクトリをroot専用へ変更しないよう、
+# コンテナが書込み可能な所有者・modeを明示する。
+for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata"; do
+  install -d -m 0700 "${directory}"
+  chown 999:root "${directory}"
+done
 
 if [ ! -d "${APP_DIRECTORY}/.git" ]; then
   git -C "${APP_DIRECTORY}" init
