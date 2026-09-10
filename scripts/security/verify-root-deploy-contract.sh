@@ -74,4 +74,18 @@ if ! grep -Fq 'install -m 0444 -o root -g root "${source}" "${destination}/${nam
   exit 1
 fi
 
+for expected_line in \
+  'EXPO_PUBLIC_APP_ENV: ${ENV_NAME}' \
+  'EXPO_PUBLIC_API_URL: http://${HOST_IP}:${BACKEND_PORT}/api'; do
+  if ! grep -Fq "${expected_line}" docker-compose.runtime.yml; then
+    echo "[ERROR] runtime frontend must receive its required public configuration." >&2
+    exit 1
+  fi
+done
+
+if grep -Fq 'EXPO_PUBLIC_API_TOKEN' docker-compose.runtime.yml; then
+  echo "[ERROR] runtime frontend must not receive an API token." >&2
+  exit 1
+fi
+
 echo "[OK] root deployment contract is structurally valid."
