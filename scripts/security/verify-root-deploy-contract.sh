@@ -69,4 +69,9 @@ if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy
   exit 1
 fi
 
+if ! grep -Fq 'install -m 0444 -o root -g root "${source}" "${destination}/${name}"' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must make mounted credentials readable by service users." >&2
+  exit 1
+fi
+
 echo "[OK] root deployment contract is structurally valid."
