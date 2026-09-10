@@ -13,8 +13,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
-# Discord Webhookは環境変数で渡す。秘密値はGit管理しない。
+# Discord Webhookは環境変数またはroot管理のSecretファイルで渡す。秘密値はGit管理しない。
 WEBHOOK_URL="${BACKUP_DISCORD_WEBHOOK_URL:-}"
+SECRET_DIR="${RECAIPT_BACKUP_SECRET_DIR:-}"
 
 # DB基本設定
 DB_USER="cntadm"
@@ -56,17 +57,34 @@ send_discord_alert() {
 mkdir -p "${BACKUP_DIR}/db"
 mkdir -p "${BACKUP_DIR}/uploads"
 
-# 2. .env からパスワードを抽出
-DOTENV_FILE="${PROJECT_ROOT}/.env"
-if [ -f "${DOTENV_FILE}" ]; then
+# 2. root管理Secretファイル、または段階移行中の旧.envから認証情報を取得
+if [ -n "${SECRET_DIR}" ]; then
+    DB_SECRET_FILE="${SECRET_DIR}/db_password"
+    WEBHOOK_SECRET_FILE="${SECRET_DIR}/backup_discord_webhook_url"
+    if [ ! -r "${DB_SECRET_FILE}" ]; then
+        echo "[$(date)] [ERROR] Backup secret files are unavailable."
+        exit 1
+    fi
+    DB_PASS=$(<"${DB_SECRET_FILE}")
+    if [ -z "${DB_PASS}" ]; then
+        echo "[$(date)] [ERROR] Backup secret files are unavailable."
+        exit 1
+    fi
+    if [ -r "${WEBHOOK_SECRET_FILE}" ]; then
+        BACKUP_WEBHOOK=$(<"${WEBHOOK_SECRET_FILE}")
+        WEBHOOK_URL="${BACKUP_WEBHOOK}"
+    fi
+else
+    DOTENV_FILE="${PROJECT_ROOT}/.env"
+    if [ ! -f "${DOTENV_FILE}" ]; then
+        msg="[ERROR] .env file not found at ${DOTENV_FILE}"
+        echo "[$(date)] $msg"
+        send_discord_alert "ERROR" "$msg"
+        exit 1
+    fi
     DB_PASS=$(grep '^DB_PASSWORD=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
     BACKUP_WEBHOOK=$(grep '^BACKUP_DISCORD_WEBHOOK_URL=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
     WEBHOOK_URL="${BACKUP_WEBHOOK:-$WEBHOOK_URL}"
-else
-    msg="[ERROR] .env file not found at ${DOTENV_FILE}"
-    echo "[$(date)] $msg"
-    send_discord_alert "ERROR" "$msg"
-    exit 1
 fi
 
 SOURCE_UPLOADS_DIR="${PROJECT_ROOT}/backend/uploads"

@@ -92,7 +92,6 @@ EOF
 cat <<EOF > frontend/.env
 EXPO_PUBLIC_APP_ENV="$ENV_NAME"
 EXPO_PUBLIC_API_URL="http://$HOST_IP:$BACKEND_PORT/api"
-EXPO_PUBLIC_API_TOKEN="$API_TOKEN"
 EOF
 
 # 6. backend/.env
