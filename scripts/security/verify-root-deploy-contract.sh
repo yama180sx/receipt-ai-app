@@ -15,7 +15,13 @@ if grep -En 'docker compose|rsync|npm install|prisma migrate' .github/workflows/
   exit 1
 fi
 
+grep -Fq 'workflow_dispatch:' .github/workflows/deploy.yml
+grep -Fq 'environment: stable' .github/workflows/deploy.yml
 grep -Fq 'sudo -n /usr/bin/systemctl start receipt-deploy-stable.service' .github/workflows/deploy.yml
+if grep -Eq '^  push:' .github/workflows/deploy.yml; then
+  echo "[ERROR] stable deployment must not start from a push event." >&2
+  exit 1
+fi
 
 for file in \
   ops/systemd/libexec/receipt-deploy \
@@ -133,6 +139,17 @@ for expected_line in \
   'cleanup_retired_runtime_secrets'; do
   if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-deploy; then
     echo "[ERROR] root deploy helper is missing the runtime lifecycle contract." >&2
+    exit 1
+  fi
+done
+
+for expected_line in \
+  'STABLE_RELEASE_SHA=<approved-40-character-lowercase-commit-sha>' \
+  '[[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"' \
+  'if [ "${ENVIRONMENT}" = "stable" ] && [ "${CHECKED_OUT_SHA}" != "${GIT_REF}" ]; then' \
+  'echo "[receipt-deploy] stable release commit: ${CHECKED_OUT_SHA}"'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/config/stable.env.example ops/systemd/libexec/receipt-deploy; then
+    echo "[ERROR] stable deployment must use a root-managed approved commit." >&2
     exit 1
   fi
 done

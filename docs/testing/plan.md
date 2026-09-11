@@ -108,9 +108,9 @@ Issue #119では`ReceiptAnalysisJob`台帳を正本とし、空のキュース�
 
 | トリガー | 内容 | ランナー |
 |----------|------|----------|
-| PR → `develop` | `npm test`（backend + frontend unit） | `ubuntu-latest` — `.github/workflows/test.yml` |
-| PR → `develop` | API 結合（`npm run test:integration`） | 同上ジョブ `backend-integration`（Postgres service） |
-| push → `main` | 既存 deploy workflow（変更なし） | self-hosted (T320) |
+| PR → `develop` / リリース同期PR → `main` | `npm test`（backend + frontend unit）、OpenAPI生成整合 | `ubuntu-latest` — `.github/workflows/test.yml` |
+| PR → `develop` / リリース同期PR → `main` | API 結合（`npm run test:integration`） | 同上ジョブ `backend-integration`（Postgres service） |
+| GitHub `stable` Environment承認後の手動実行 | 固定SHAのstable root管理デプロイ（Issue #131-3-3受入を含む） | self-hosted (T320) |
 
 **スコープ外:** ESLint / Prettier（未導入のため別 Issue）
 

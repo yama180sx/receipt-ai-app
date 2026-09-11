@@ -319,14 +319,14 @@ docker compose exec backend npm run prisma:sync-sequences
 
 ## 6. デプロイ（stable）
 
-`main` ブランチ push で self-hosted runner（T320）が `.github/workflows/deploy.yml` を実行する。
+`main`へのpushはstableをデプロイしない。stableはGitHub `stable` Environmentのrequired reviewer承認後、self-hosted runner（T320）から手動実行する`.github/workflows/deploy.yml`でのみ反映する。runnerは固定名のroot管理unit開始だけを要求し、Docker、credential、任意refを直接操作しない。
 
-1. `rsync` で `~/stable/receipt-ai-app/` に同期（`pgdata`, `uploads`, `logs` 等は除外）
-2. GitHub Secrets / Vars から `.env` 生成
-3. `prisma migrate deploy`
-4. `docker compose up -d --build`
+1. リリース担当者が、dev受入済みでmainに含まれる対象コミットSHAをroot所有`/etc/receipt-ai-app/stable.env`の`STABLE_RELEASE_SHA`へ設定する。
+2. required reviewerの承認後、workflowが`receipt-deploy-stable.service`を開始する。
+3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Redis healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
+4. backend health、ログイン、TOTP、既存データ・uploads、新規解析、通知、backupを確認する。
 
-コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計。マイグレーションのみ自動適用。
+stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時間、復旧担当者を満たした人間承認済みの作業に限定する。コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計であり、migration失敗時は追加変更を停止してロールバック判断へ進む。
 
 詳細: [architecture.md §8.3](./architecture.md)
 
@@ -343,10 +343,12 @@ flowchart LR
   end
 
   subgraph deploy [デプロイ]
-    MainPush[push to main] --> GHA[deploy.yml]
-    GHA --> Rsync[rsync to ~/stable/]
-    GHA --> Migrate[prisma migrate deploy]
-    GHA --> Compose[docker compose up]
+    Main[承認済み main commit SHA] --> RootConfig[root所有 stable.env]
+    Approval[stable Environment 承認] --> GHA[手動 deploy.yml]
+    GHA --> Unit[receipt-deploy-stable.service]
+    RootConfig --> Unit
+    Unit --> Migrate[container内 prisma migrate deploy]
+    Unit --> Compose[root管理 docker compose up]
   end
 
   subgraph recovery [障害時]

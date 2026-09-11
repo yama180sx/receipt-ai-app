@@ -45,7 +45,7 @@ load_non_secret_config() {
       *) die "non-secret config has an invalid line" ;;
     esac
     case "${key}" in
-      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL)
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|STABLE_RELEASE_SHA)
         printf -v "${key}" '%s' "${value}"
         export "${key}"
         ;;
@@ -139,13 +139,21 @@ case "$1" in
     ;;
   stable)
     readonly ENVIRONMENT="stable"
-    readonly GIT_REF="refs/heads/main"
+    # stable の対象は移動する main ref ではなく、root 所有設定に登録した
+    # 承認済みの完全長コミット SHA に固定する。runner はこの値を与えられない。
+    [ -n "${STABLE_RELEASE_SHA:-}" ] || die "stable release commit is unavailable"
+    [[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"
+    readonly GIT_REF="${STABLE_RELEASE_SHA}"
     readonly PROJECT_NAME="receipt-stable"
     readonly NODE_ENV_VALUE="production"
     readonly BACKEND_COMMAND_VALUE="npm run start"
     ;;
   *) die "unknown fixed environment" ;;
 esac
+
+if [ "${ENVIRONMENT}" = "dev" ] && [ -n "${STABLE_RELEASE_SHA:-}" ]; then
+  die "dev configuration must not select a stable release commit"
+fi
 
 readonly APP_DIRECTORY="${APP_ROOT}/${ENVIRONMENT}"
 readonly DATA_DIRECTORY="${DATA_ROOT}/${ENVIRONMENT}"
@@ -176,8 +184,15 @@ if [ ! -d "${APP_DIRECTORY}/.git" ]; then
 fi
 git -C "${APP_DIRECTORY}" remote set-url origin "${REPOSITORY_URL}"
 git -C "${APP_DIRECTORY}" fetch --depth 1 origin "${GIT_REF}"
-git -C "${APP_DIRECTORY}" checkout --detach --force FETCH_HEAD
+readonly CHECKED_OUT_SHA="$(git -C "${APP_DIRECTORY}" rev-parse --verify FETCH_HEAD^{commit})"
+if [ "${ENVIRONMENT}" = "stable" ] && [ "${CHECKED_OUT_SHA}" != "${GIT_REF}" ]; then
+  die "stable release commit does not match the approved commit"
+fi
+git -C "${APP_DIRECTORY}" checkout --detach --force "${CHECKED_OUT_SHA}"
 git -C "${APP_DIRECTORY}" clean -ffdqx
+if [ "${ENVIRONMENT}" = "stable" ]; then
+  echo "[receipt-deploy] stable release commit: ${CHECKED_OUT_SHA}"
+fi
 
 readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
 readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
