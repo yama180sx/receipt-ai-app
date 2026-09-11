@@ -16,6 +16,7 @@ case "$1" in
 esac
 
 readonly APP_DIRECTORY="/srv/receipt-ai-app/${ENVIRONMENT}"
+readonly DATA_DIRECTORY="/var/lib/receipt-ai-app/${ENVIRONMENT}"
 readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-backup-${ENVIRONMENT}"
 readonly SECRET_DIRECTORY="${RUNTIME_DIRECTORY}/secrets"
 readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
@@ -33,4 +34,6 @@ done
 
 cd "${APP_DIRECTORY}"
 export DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"
-RECAIPT_BACKUP_SECRET_DIR="${SECRET_DIRECTORY}" ./scripts/backup.sh "${ENVIRONMENT}"
+RECAIPT_BACKUP_SECRET_DIR="${SECRET_DIRECTORY}" \
+RECAIPT_BACKUP_UPLOADS_DIR="${DATA_DIRECTORY}/uploads" \
+./scripts/backup.sh "${ENVIRONMENT}"

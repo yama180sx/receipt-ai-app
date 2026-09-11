@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 
 # --- 環境判定ロジック ---
 ENV=$1
@@ -16,6 +17,7 @@ RETENTION_DAYS=7
 # Discord Webhookは環境変数またはroot管理のSecretファイルで渡す。秘密値はGit管理しない。
 WEBHOOK_URL="${BACKUP_DISCORD_WEBHOOK_URL:-}"
 SECRET_DIR="${RECAIPT_BACKUP_SECRET_DIR:-}"
+RUNTIME_UPLOADS_DIR="${RECAIPT_BACKUP_UPLOADS_DIR:-}"
 
 # DB基本設定
 DB_USER="cntadm"
@@ -87,7 +89,19 @@ else
     WEBHOOK_URL="${BACKUP_WEBHOOK:-$WEBHOOK_URL}"
 fi
 
-SOURCE_UPLOADS_DIR="${PROJECT_ROOT}/backend/uploads"
+if [ -n "${SECRET_DIR}" ]; then
+    # root管理runtimeでは、uploadsはソースツリーではなくroot管理の永続領域にある。
+    SOURCE_UPLOADS_DIR="${RUNTIME_UPLOADS_DIR}"
+    if [ -z "${SOURCE_UPLOADS_DIR}" ]; then
+        echo "[$(date)] [ERROR] Root-managed uploads directory is not configured."
+        exit 1
+    fi
+else
+    # 段階移行中の旧Composeでは従来のソースツリーを使う。
+    SOURCE_UPLOADS_DIR="${PROJECT_ROOT}/backend/uploads"
+fi
+UPLOADS_PARENT_DIR="$(dirname "${SOURCE_UPLOADS_DIR}")"
+UPLOADS_DIRECTORY_NAME="$(basename "${SOURCE_UPLOADS_DIR}")"
 
 echo "[$(date)] ($ENV_LABEL) Backup started."
 
@@ -102,9 +116,7 @@ if [ ! "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
     DETAILS="${DETAILS}- DB Backup: FAILED (Container down)\n"
     ((ERROR_COUNT++))
 else
-    docker exec -e PGPASSWORD="${DB_PASS}" ${CONTAINER_NAME} pg_dump -U ${DB_USER} ${DB_NAME} | gzip > "${BACKUP_DIR}/db/db_backup_${TIMESTAMP}.sql.gz"
-    
-    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    if docker exec -e PGPASSWORD="${DB_PASS}" "${CONTAINER_NAME}" pg_dump -U "${DB_USER}" "${DB_NAME}" | gzip > "${BACKUP_DIR}/db/db_backup_${TIMESTAMP}.sql.gz"; then
         echo "  -> ($ENV_LABEL) DB Backup SUCCESS."
         DETAILS="${DETAILS}- DB Backup: SUCCESS\n"
     else
@@ -117,7 +129,7 @@ fi
 
 # 4. 画像バックアップ
 if [ -d "${SOURCE_UPLOADS_DIR}" ]; then
-    tar -czf "${BACKUP_DIR}/uploads/uploads_backup_${TIMESTAMP}.tar.gz" -C "${PROJECT_ROOT}/backend" "uploads"
+    tar -czf "${BACKUP_DIR}/uploads/uploads_backup_${TIMESTAMP}.tar.gz" -C "${UPLOADS_PARENT_DIR}" "${UPLOADS_DIRECTORY_NAME}"
     
     if [ $? -eq 0 ]; then
         echo "  -> ($ENV_LABEL) Uploads Backup SUCCESS."
@@ -147,4 +159,5 @@ if [ $ERROR_COUNT -eq 0 ]; then
     send_discord_alert "SUCCESS" "Backup completed successfully.\n\n**Details:**\n$DETAILS"
 else
     send_discord_alert "ERROR" "Backup finished with $ERROR_COUNT error(s).\n\n**Details:**\n$DETAILS"
+    exit 1
 fi

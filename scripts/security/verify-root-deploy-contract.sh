@@ -69,6 +69,20 @@ if ! grep -Fq 'export DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}"' ops/systemd/li
   exit 1
 fi
 
+for expected_line in \
+  'RECAIPT_BACKUP_UPLOADS_DIR="${DATA_DIRECTORY}/uploads"' \
+  'RUNTIME_UPLOADS_DIR="${RECAIPT_BACKUP_UPLOADS_DIR:-}"'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-backup scripts/backup.sh; then
+    echo "[ERROR] root backup must use managed uploads and fail on incomplete backups." >&2
+    exit 1
+  fi
+done
+
+if ! tail -n 5 scripts/backup.sh | grep -Fqx '    exit 1'; then
+  echo "[ERROR] root backup must return a failure status after an incomplete backup." >&2
+  exit 1
+fi
+
 if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy; then
   echo "[ERROR] root deploy helper must preserve container ownership of runtime data directories." >&2
   exit 1
