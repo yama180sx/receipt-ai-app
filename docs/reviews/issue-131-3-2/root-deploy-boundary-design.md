@@ -25,9 +25,9 @@ GitHub Actions runner（Docker非所属・Secret非保持）
 | 環境 | 固定ref | root所有ソース | root所有データ | Compose project |
 | --- | --- | --- | --- | --- |
 | dev | `refs/heads/develop` | `/srv/receipt-ai-app/dev` | `/var/lib/receipt-ai-app/dev` | `receipt-dev` |
-| stable | `refs/heads/main` | `/srv/receipt-ai-app/stable` | `/var/lib/receipt-ai-app/stable` | `receipt-stable` |
+| stable | root所有設定の`STABLE_RELEASE_SHA`で承認したmainコミット | `/srv/receipt-ai-app/stable` | `/var/lib/receipt-ai-app/stable` | `receipt-stable` |
 
-リポジトリはpublicであり、root unitの取得に追加のGit認証Secretを使わない。rootが取得するrefとURLはhelperへ固定し、runnerから引数で与えない。
+リポジトリはpublicであり、root unitの取得に追加のGit認証Secretを使わない。devのref、stableの承認済みcommit SHA、URLはroot管理helper／設定に固定し、runnerから引数で与えない。stable SHAは取得結果と完全一致する場合だけcheckoutする。
 
 ## runtimeイメージと永続データ
 
@@ -39,7 +39,7 @@ PostgreSQL migrationは、Prisma CLIが`DATABASE_URL_FILE`を直接扱えない�
 
 1. 本Issueではテンプレート、静的契約検証、workflowのSecret排除を実装する。T320のroot設定や稼働サービスを変更しない。
 2. Issue #131-3-3で人間が合成credentialによりunitを検証し、devデータ移行・回帰確認・Docker group除外を行う。
-3. stableは承認済みメンテナンス時間だけに移行する。旧cron、旧作業ディレクトリ、旧Secret経路は両環境の確認完了後に廃止する。
+3. stableはGitHub `stable` Environmentのrequired reviewer承認後、承認済みメンテナンス時間だけに移行する。旧cron、旧作業ディレクトリ、旧Secret経路は両環境の確認完了後に廃止する。
 
 ## 制約と停止条件
 

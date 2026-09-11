@@ -8,13 +8,13 @@ GitHub Issue: [#675](https://github.com/yama180sx/receipt-ai-app/issues/675)<br>
 
 この手順はstableだけをroot管理のencrypted credential・固定systemd unitへ移すためのものである。devの成功をもって自動実行してはならない。main、stableの利用者データ、通知先、復旧可能性に影響するため、人間が承認したメンテナンス時間にだけ実施する。
 
-stableの切替後の信頼境界はdevと同じだが、取得refは`main`に固定する。
+stableの切替後の信頼境界はdevと同じだが、投入対象はroot所有設定に登録した承認済みmainコミットの完全長SHAに固定する。`main`の後続更新を自動取得してはならない。
 
 ```text
 利用者／GitHub Actions runner（Docker非所属・Secret非保持）
   → 限定sudoで receipt-deploy-stable.service の開始だけを要求
     → root所有の固定helper
-      → /srv/receipt-ai-app/stable（main固定ref）
+      → /srv/receipt-ai-app/stable（承認済み固定SHA）
       → /run/receipt-ai-app-stable の一時Secret
       → receipt-stable Compose project
 ```
@@ -29,7 +29,8 @@ stableの切替後の信頼境界はdevと同じだが、取得refは`main`に�
 - [ ] 作業担当者と復旧担当者が、メンテナンス時間中に対応可能である。
 - [ ] stableの直近バックアップ（DB・uploads）の成功と作成時刻だけを確認した。
 - [ ] stableのログイン、TOTP、既存レシート閲覧、解析、Discord／メール通知、backupが切替前に正常である。
-- [ ] `main`が承認済みリリース内容であり、root helperが取得するrefと一致する。
+- [ ] 対象mainコミットSHAが承認済みリリース内容であり、`/etc/receipt-ai-app/stable.env`の`STABLE_RELEASE_SHA`と一致する。値はGitHub workflowの入力に置かない。
+- [ ] GitHub `stable` Environmentでrequired reviewerが設定され、承認済みの手動workflowだけがstable deploy unitを開始できる。
 - [ ] stable専用の非機密設定とencrypted credentialを用意している。devのcredentialを複写・共有しない。
 - [ ] 問題発生時はstableの旧経路に復旧し、追加調査・main変更は別途判断することを合意した。
 
@@ -53,7 +54,7 @@ stable deploy unitを合成値で起動してはならない。実行はstable�
 2. stableだけのコンテナ名、health、バックアップ時刻を値なしで記録する。devのCompose projectには触れない。
 3. stable Composeだけを停止する。
 4. root管理者が旧stableの`pgdata`、`redisdata`、`backend/uploads`を、`/var/lib/receipt-ai-app/stable/`配下へ属性を保持してコピーする。旧データは削除・上書きしない。
-5. `receipt-deploy-stable.service`を1回だけ実行する。helperは`main`固定ref、runtime image build、DB／Redis healthcheck、Prisma migration、Compose起動を行う。
+5. required reviewer承認後の手動workflowから`receipt-deploy-stable.service`を1回だけ実行する。helperは承認済み固定SHA、runtime image build、DB／Redis healthcheck、Prisma migration、Compose起動を行う。
 6. stableのhealth、ログイン、管理者TOTP、既存レシート・画像、新規レシート解析、Discord試験通知、メール試験通知を確認する。
 7. `receipt-backup-stable.service`を1回実行し、DB・uploadsバックアップと通知を確認する。
 8. 成功後にだけstable backup timerを有効化し、旧stable cronを無効化する。devのunit、timer、cron、データは変更しない。
@@ -62,7 +63,7 @@ stable deploy unitを合成値で起動してはならない。実行はstable�
 
 - [ ] frontend、runner、通常ユーザー、Git作業ツリーからstable Secretを読めない。
 - [ ] stableのログイン、TOTP、既存データ、新規解析、Discord、メール、backupが成功する。
-- [ ] stable deployはroot unitの`main`固定refで成功し、DB migrationも同じ経路で完了する。
+- [ ] stable deployはroot unitの承認済み固定SHAで成功し、ログ記録したSHA、root設定、リリース記録が一致する。DB migrationも同じ経路で完了する。
 - [ ] GitHub Actions runnerはDocker socketを直接読めず、固定stable unitの開始以外を要求できない。
 - [ ] 旧stableデータ、旧cron、旧`.env`複写経路はロールバック期限中は保持する。
 

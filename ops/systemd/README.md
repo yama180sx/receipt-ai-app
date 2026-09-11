@@ -5,7 +5,7 @@
 ## 目的と境界
 
 - root所有の `/srv/receipt-ai-app/{dev,stable}` だけをruntimeソースとする。
-- root unitは公開リポジトリの固定ref（dev=`develop`、stable=`main`）だけを取得する。
+- root unitは公開リポジトリの固定入力だけを取得する。devは`develop`、stableはroot所有`stable.env`の`STABLE_RELEASE_SHA`で承認した完全長コミットSHAとし、runner入力は受け取らない。
 - runner／開発ユーザーの `~/dev`、`~/stable`、Actions workspaceはroot unitの入力にしない。
 - runnerに許可するのは、sudoersで固定したunit開始だけである。Docker socket、任意のsystemctl操作、任意パス・任意refは許可しない。
 - app Secretはsystemd encrypted credentialからruntimeのroot専用世代ディレクトリへコピーする。Git、ワークツリー、`.env`、frontend、runner環境には書かない。デプロイが成功してコンテナを再作成した後にだけ旧世代を削除する。
@@ -25,7 +25,7 @@
 7. `scripts/security/test-runtime-secret-staging.sh` を成功させ、同名ディレクトリへcredentialを誤配置しないことを確認する。
 8. 現行devのDB・Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
 9. dev確認後にだけDocker groupから開発ユーザー／runnerを外し、新しいログインセッションでDocker socketが直接読めないことを確認する。
-10. stableは別途承認されたメンテナンス時間に移行する。
+10. stableは、GitHub `stable` Environmentのrequired reviewer承認と別途承認されたメンテナンス時間が揃った時だけ移行する。`main`へのpushはstableを自動デプロイしない。
 
 ## 設置対象
 

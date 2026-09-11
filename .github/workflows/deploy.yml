@@ -1,11 +1,17 @@
 name: T320 CD Pipeline
 
 on:
-  push:
-    branches: [ main ]
+  # stable への反映は main の更新とは独立した、人間承認済みの操作とする。
+  # 実際の取得対象は runner 入力ではなく、root 管理設定の固定コミット SHA である。
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
+    # GitHub 側で required reviewer を設定する。設定がない環境は stable へ反映してはならない。
+    environment: stable
     runs-on: [self-hosted, linux, t320]
 
     steps:
