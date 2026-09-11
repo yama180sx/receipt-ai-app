@@ -64,13 +64,16 @@ export function useReceiptUpload({
         registerLocalUploadFailure('サーバーが受付を拒否しました。');
         showAlert('エラー', 'レシートの受付に失敗しました。');
       } catch (err) {
-        if (getApiErrorStatus(err) !== 503) {
+        const maintenance = getApiErrorStatus(err) === 503;
+        if (!maintenance) {
           registerLocalUploadFailure('画像のアップロードに失敗しました。');
         }
         showApiErrorAlert(
-          getApiErrorStatus(err) === 503 ? '解析基盤を更新中' : 'エラー',
+          maintenance ? '解析基盤を更新中' : 'エラー',
           err,
-          '画像のアップロードに失敗しました。'
+          '画像のアップロードに失敗しました。',
+          // 計画メンテナンスの503は利用者向け案内であり、DEVの赤いconsole errorにしない。
+          maintenance ? { log: false } : undefined
         );
       } finally {
         setUploadingCount((count) => Math.max(0, count - 1));
