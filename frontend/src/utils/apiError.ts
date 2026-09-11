@@ -69,8 +69,14 @@ export function getApiErrorMessage(
 export function showApiErrorAlert(
   title: string,
   error: unknown,
-  fallback = '通信エラーが発生しました。'
+  fallback = '通信エラーが発生しました。',
+  options?: { log?: boolean }
 ): void {
+  if (options?.log === false) {
+    showAlert(title, getApiErrorMessage(error, fallback));
+    return;
+  }
+
   // 4xx は利用者が修正できる想定内の入力・状態エラーであり、Expo の
   // 開発用 Console Error 画面を出さない。5xx と通信障害だけを error として記録する。
   if ((getApiErrorStatus(error) ?? 0) >= 500 || getApiErrorStatus(error) === undefined) {

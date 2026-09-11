@@ -138,4 +138,27 @@ describe('apiError', () => {
 
     expect(showAlert).toHaveBeenCalledWith('エラー', '一覧の取得に失敗しました。');
   });
+
+  it('can notify an expected maintenance error without a console error', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = new axios.AxiosError(
+      'Request failed',
+      'ERR_BAD_RESPONSE',
+      undefined,
+      undefined,
+      {
+        status: 503,
+        data: { message: '解析基盤を更新中です。しばらくしてから再試行してください。' },
+        statusText: 'Service Unavailable',
+        headers: {},
+        config: {} as never,
+      }
+    );
+
+    showApiErrorAlert('解析基盤を更新中', error, undefined, { log: false });
+
+    expect(showAlert).toHaveBeenCalledWith('解析基盤を更新中', '解析基盤を更新中です。しばらくしてから再試行してください。');
+    expect(console.error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
 });
