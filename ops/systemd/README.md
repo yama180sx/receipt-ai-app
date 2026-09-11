@@ -43,6 +43,8 @@ deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照
 
 deployはDBとRedisを現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
 
+root管理backupは`/var/lib/receipt-ai-app/{env}/uploads`をアーカイブする。DBまたはuploadsのどちらかが失敗した場合、通知後に非0で終了するためsystemdは成功扱いにしない。
+
 ## ロールバックと停止条件
 
 - dev移行中にDB接続、TOTP、ログイン、レシート解析、通知、バックアップのいずれかが失敗した場合、stableへは進めない。
