@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import axios from 'axios';
 import { showAlert } from './alertMessage';
 import { buildAuthHeaders } from './apiAuth';
+import { shouldClearSessionAfterUnauthorized } from './unauthorizedResponse';
 
 /**
  * 401エラー時にセッション Context / ルート側でログアウト処理を発火させるためのハンドラ
@@ -71,7 +72,7 @@ apiClient.interceptors.response.use(
 
       error.message = serverMessage;
 
-      if (error.response.status === 401) {
+      if (error.response.status === 401 && shouldClearSessionAfterUnauthorized(error.config?.url)) {
         console.warn(`[API] Unauthorized: ${errorCode || 'TOKEN_EXPIRED'}`);
         if (onUnauthorizedHandler) {
           onUnauthorizedHandler();
