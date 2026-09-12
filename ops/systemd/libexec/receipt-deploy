@@ -132,28 +132,18 @@ require_root
 case "$1" in
   dev)
     readonly ENVIRONMENT="dev"
-    readonly GIT_REF="refs/heads/develop"
     readonly PROJECT_NAME="receipt-dev"
     readonly NODE_ENV_VALUE="development"
     readonly BACKEND_COMMAND_VALUE="npm run dev"
     ;;
   stable)
     readonly ENVIRONMENT="stable"
-    # stable の対象は移動する main ref ではなく、root 所有設定に登録した
-    # 承認済みの完全長コミット SHA に固定する。runner はこの値を与えられない。
-    [ -n "${STABLE_RELEASE_SHA:-}" ] || die "stable release commit is unavailable"
-    [[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"
-    readonly GIT_REF="${STABLE_RELEASE_SHA}"
     readonly PROJECT_NAME="receipt-stable"
     readonly NODE_ENV_VALUE="production"
     readonly BACKEND_COMMAND_VALUE="npm run start"
     ;;
   *) die "unknown fixed environment" ;;
 esac
-
-if [ "${ENVIRONMENT}" = "dev" ] && [ -n "${STABLE_RELEASE_SHA:-}" ]; then
-  die "dev configuration must not select a stable release commit"
-fi
 
 readonly APP_DIRECTORY="${APP_ROOT}/${ENVIRONMENT}"
 readonly DATA_DIRECTORY="${DATA_ROOT}/${ENVIRONMENT}"
@@ -166,6 +156,22 @@ require_root_owned_directory "${DATA_ROOT}"
 require_root_owned_directory "${DATA_DIRECTORY}"
 require_root_owned_directory "${RUNTIME_DIRECTORY}"
 load_non_secret_config "${CONFIG_FILE}"
+
+case "${ENVIRONMENT}" in
+  dev)
+    if [ -n "${STABLE_RELEASE_SHA:-}" ]; then
+      die "dev configuration must not select a stable release commit"
+    fi
+    readonly GIT_REF="refs/heads/develop"
+    ;;
+  stable)
+    # stable の対象は移動する main ref ではなく、root 所有設定に登録した
+    # 承認済みの完全長コミット SHA に固定する。runner はこの値を与えられない。
+    [ -n "${STABLE_RELEASE_SHA:-}" ] || die "stable release commit is unavailable"
+    [[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"
+    readonly GIT_REF="${STABLE_RELEASE_SHA}"
+    ;;
+esac
 
 install -d -m 0750 "${DATA_DIRECTORY}/uploads"
 chown 1000:1000 "${DATA_DIRECTORY}/uploads"

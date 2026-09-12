@@ -154,4 +154,14 @@ for expected_line in \
   fi
 done
 
+config_load_line=$(grep -nF 'load_non_secret_config "${CONFIG_FILE}"' \
+  ops/systemd/libexec/receipt-deploy | head -n 1 | cut -d: -f1)
+stable_sha_check_line=$(grep -nF 'stable release commit is unavailable' \
+  ops/systemd/libexec/receipt-deploy | head -n 1 | cut -d: -f1)
+if [ -z "${config_load_line}" ] || [ -z "${stable_sha_check_line}" ] || \
+  [ "${config_load_line}" -ge "${stable_sha_check_line}" ]; then
+  echo "[ERROR] stable release SHA must be loaded from root config before validation." >&2
+  exit 1
+fi
+
 echo "[OK] root deployment contract is structurally valid."
