@@ -70,8 +70,8 @@ export function GlobalAiBudgetScreen({ onBack }: { onBack: () => void }) {
     <AppFormField label="停止しきい値（%）"><AppTextInput value={String(form.stopPercent)} keyboardType="numeric" onChangeText={(value) => number('stopPercent', value)} /></AppFormField>
     <AppFormField label="メール通知先（1行またはカンマ区切り）"><AppTextInput variant="textarea" value={emails} onChangeText={setEmails} autoCapitalize="none" /></AppFormField>
     <AppFormField label="変更理由"><AppTextInput value={form.reason} onChangeText={(reason) => setForm({ ...form, reason })} /></AppFormField>
-    <AppButton title={form.isEnabled ? '予算停止機能を有効' : '予算停止機能を無効'} onPress={() => setForm({ ...form, isEnabled: !form.isEnabled })} variant="outline" fullWidth />
-    <AppButton title={form.notifyDiscord ? 'Discord通知を有効' : 'Discord通知を無効'} onPress={() => setForm({ ...form, notifyDiscord: !form.notifyDiscord })} variant="outline" fullWidth />
+    <AppButton title={form.isEnabled ? '予算停止機能を無効にする' : '予算停止機能を有効にする'} onPress={() => setForm({ ...form, isEnabled: !form.isEnabled })} variant="outline" fullWidth />
+    <AppButton title={form.notifyDiscord ? 'Discord通知を無効にする' : 'Discord通知を有効にする'} onPress={() => setForm({ ...form, notifyDiscord: !form.notifyDiscord })} variant="outline" fullWidth />
     <AppButton title="設定を保存" onPress={save} fullWidth />
     <AppButton title="Discordへ試験通知" onPress={() => test(['DISCORD'])} variant="outline" fullWidth />
     <AppButton title="メールへ試験通知" onPress={() => test(['EMAIL'])} variant="outline" fullWidth />

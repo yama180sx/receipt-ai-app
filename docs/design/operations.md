@@ -18,7 +18,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 | やりたいこと | 最初に読む場所 | 詳細 |
 |--------------|----------------|------|
-| 環境の初回構築・cron 登録 | 本書 §2 | [setup-env.sh](../../setup-env.sh) |
+| root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
 | 定期バックアップの確認・手動実行 | 本書 §3 | [restore-manual.md §0](../restore-manual.md) |
 | 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | dev / stable 別手順 |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
@@ -32,29 +32,21 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ## 2. 環境構築（T320）
 
-同一ホスト（T320）上に **dev** と **stable** の 2 系統を独立した Compose プロジェクトとして運用する。
+同一ホスト（T320）上に **dev** と **stable** の 2 系統を独立したroot管理Composeプロジェクトとして運用する。runnerと通常利用者はDocker socket、秘密情報、任意のデプロイ操作を直接扱わない。
 
 | 項目 | dev | stable |
 |------|-----|--------|
 | プロジェクト名 | `receipt-dev` | `receipt-stable` |
-| 作業ディレクトリ例 | `~/dev/receipt-ai-app` | `~/stable/receipt-ai-app` |
+| root管理作業ディレクトリ | `/srv/receipt-ai-app/dev` | `/srv/receipt-ai-app/stable` |
+| 永続データ | `/var/lib/receipt-ai-app/dev` | `/var/lib/receipt-ai-app/stable` |
 | DB コンテナ | `receipt-dev-db` | `receipt-stable-db` |
-| バックアップ cron | 毎日 3:00 + `@reboot`（120s 後） | 毎日 4:00 + `@reboot`（120s 後） |
+| バックアップ | `receipt-backup-dev.timer` | `receipt-backup-stable.timer` |
 
 ### 2.1 初回セットアップ
 
-```bash
-# リポジトリルートで .env.secret を用意（git 管理外）
-./setup-env.sh dev    # または stable
-docker compose up -d --build
-```
+root管理unit、root所有の非機密設定、encrypted credentialを使用する。設置先・所有者・mode・credential論理名は[ops/systemd/README.md](../../ops/systemd/README.md)を正本とする。秘密値を`.env`、Git、shell履歴、Issue、PR、端末ログへ書かない。
 
-`setup-env.sh` が行うこと:
-
-1. `.env.secret` から秘密情報（`DB_PASS`, `JWT_SECRET`, `GEMINI_API_KEY` 等）を読み込み
-2. ルート / `frontend` / `backend` の `.env` を環境別に生成
-3. **cron 登録** — `scripts/backup.sh {dev|stable}` を定期実行および `@reboot` で登録（[Issue #41], [Issue #89]）
-4. `logs/` ディレクトリ作成（cron リダイレクト失敗防止）
+stableの初回切替は[Issue #131-3-3の段階移行手順](../reviews/issue-131-3-3/stable-staged-migration-runbook.md)に従い、承認済みの停止時間だけで行う。stableはroot所有`stable.env`の承認済み完全長SHAに固定し、`main`更新だけでは自動反映しない。
 
 ポート・CORS 等の一覧は [architecture.md §8.1](./architecture.md) を参照。
 
@@ -64,8 +56,8 @@ docker compose up -d --build
 
 | 環境 | 設定場所 | 反映方法 |
 |------|----------|----------|
-| dev | `backend/.env` | `docker compose up -d --force-recreate backend` |
-| stable | GitHub Actions Variables | `main` への次回デプロイ（または値を反映した手動デプロイ） |
+| dev | root所有`/etc/receipt-ai-app/dev.env` | root管理deploy unit |
+| stable | root所有`/etc/receipt-ai-app/stable.env` | 承認済みの手動stable deploy |
 
 例: 1レシートあたりの手動再実行を2回まで許可し、Gemini の日次クォータ超過だけを対象にする場合。
 
@@ -82,8 +74,8 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 新しい設定項目を導入する際は、以下を同じ変更に含める。
 
 1. コードに安全な既定値を実装する
-2. `backend/.env.example` と `setup-env.sh` の生成内容を更新する
-3. stable 用の値が必要なら GitHub Actions の `vars` から `backend/.env` へ渡す
+2. `backend/.env.example` とroot管理用設定例の許可キーを更新する
+3. root管理環境では、許可された非機密キーだけを`/etc/receipt-ai-app/{dev,stable}.env`へ追加する
 4. 本節と機能設計資料の環境変数表を更新する
 
 ### 2.3 Gemini モデルの切替
@@ -129,11 +121,11 @@ OCRと商品分類AIを別々に登録する。登録済み改定の更新・削
 
 ### 2.6 全体AI予算管理者の初期・復旧登録
 
-初回登録、または事故対応で全体AI予算管理者が0名になった場合だけ、デプロイ担当者がT320で次のCLIを実行する。通常の追加・削除はアプリの「全体AI予算・通知管理」画面から行う。対象利用者は事前にADMIN権限とTOTP有効化を完了していなければならない。
+初回登録、または事故対応で全体AI予算管理者が0名になった場合だけ、デプロイ担当者がT320で次のCLIを実行する。通常の追加・削除はアプリの「全体AI予算・通知管理」画面から行う。対象利用者は事前にADMIN権限とTOTP有効化を完了していなければならない。root管理環境では稼働中backendコンテナ内から実行し、`*_FILE`の秘密値をCLI自身が解決する。
 
 ```bash
-cd backend
-npm run ai-budget:bootstrap-manager -- \
+sudo docker exec receipt-stable-backend \
+  npm run ai-budget:bootstrap-manager -- \
   --member-id <MEMBER_ID> \
   --operator <DEPLOYMENT_OPERATOR> \
   --reason <REASON> \
@@ -176,16 +168,18 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 | 保存先（stable） | `/mnt/raid_1t/backups/receipt-app/{db,uploads}/` |
 | 保存先（dev） | `/mnt/raid_1t/backups/receipt-app-dev/{db,uploads}/` |
 | 世代管理 | **7 日**超のファイルを自動削除（`RETENTION_DAYS=7`） |
-| ログ | `{プロジェクト}/logs/backup_{env}.log` |
+| 実行経路 | root管理`receipt-backup-{dev,stable}.service` |
+| 定期実行 | `receipt-backup-{dev,stable}.timer`（起動後と毎日） |
 
 ### 3.2 手動実行・確認
 
 ```bash
-cd ~/stable/receipt-ai-app   # または ~/dev/receipt-ai-app
-mkdir -p logs
-./scripts/backup.sh stable   # dev の場合は dev
-tail logs/backup_stable.log
+sudo systemctl start receipt-backup-stable.service
+sudo systemctl show receipt-backup-stable.service \
+  -p Result -p ExecMainStatus -p ActiveState -p SubState
 ```
+
+定期実行は`systemctl is-enabled receipt-backup-stable.timer`と`systemctl list-timers receipt-backup-stable.timer`で確認する。`systemctl status -l`やプロセス詳細は秘密値を含み得るため、通常の確認には使わない。
 
 バックアップ一覧の確認は [restore-manual.md §1](../restore-manual.md) を参照。
 
@@ -207,11 +201,11 @@ Webhookを誤ってGitへ記録した場合は、履歴削除だけでなくDisc
 
 ### 3.4 バックアップが増えないとき
 
-cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する（[Issue #89]）。対処:
+root管理unitの結果とjournalを、秘密値を出さない範囲で確認する。対処:
 
-1. `mkdir -p logs` を確認
-2. `./scripts/backup.sh {env}` を手動実行してログ確認
-3. 必要なら `./setup-env.sh {env}` を再実行して cron 行を更新
+1. `systemctl show receipt-backup-{env}.service -p Result -p ExecMainStatus`を確認
+2. `journalctl -u receipt-backup-{env}.service`から成功・失敗分類だけを確認
+3. root管理uploads領域、DBコンテナ、encrypted credentialの論理名を確認する
 
 詳細: [restore-manual.md §0](../restore-manual.md)
 
@@ -301,10 +295,10 @@ docker compose exec backend npm run prisma:sync-sequences
 
 | 環境 | `cd` 先 | DB コンテナ |
 |------|---------|-------------|
-| dev | `~/dev/receipt-ai-app` | `receipt-dev-db` |
-| stable | `~/stable/receipt-ai-app` | `receipt-stable-db` |
+| dev | `/srv/receipt-ai-app/dev` | `receipt-dev-db` |
+| stable | `/srv/receipt-ai-app/stable` | `receipt-stable-db` |
 
-> [restore-manual.md §3](../restore-manual.md) のstable手順は **`~/stable/receipt-ai-app`** を使用する。devとstableの作業ディレクトリ・Composeプロジェクトを混在させない。
+> root管理環境の復旧は、対象環境のdeploy unitを止めた上でroot管理作業ディレクトリと`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。旧手順書のユーザー所有パスはロールバック期限中の旧経路にだけ使用する。
 
 ### 5.3 復旧後チェックリスト
 
@@ -337,7 +331,7 @@ stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時
 ```mermaid
 flowchart LR
   subgraph daily [定期運用]
-    Cron[cron / @reboot] --> Backup[scripts/backup.sh]
+    Timer[systemd timer] --> Backup[root backup service]
     Backup --> RAID["/mnt/raid_1t/backups/"]
     Backup --> Discord[Discord Webhook]
   end
@@ -363,7 +357,7 @@ flowchart LR
 
 | パス | 内容 |
 |------|------|
-| `setup-env.sh` | 環境別 `.env` 生成・cron 登録 |
+| `ops/systemd/` | root管理deploy／backup unit、timer、設定例、設置契約 |
 | `scripts/backup.sh` | DB / 画像バックアップ・世代管理・Discord 通知 |
 | `scripts/notify.sh` | 汎用 Discord 通知関数 |
 | `backend/prisma/seed.ts` | 全削除 + 初期データ投入 |

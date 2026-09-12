@@ -67,6 +67,16 @@ stable deploy unitを合成値で起動してはならない。実行はstable�
 - [ ] GitHub Actions runnerはDocker socketを直接読めず、固定stable unitの開始以外を要求できない。
 - [ ] 旧stableデータ、旧cron、旧`.env`複写経路はロールバック期限中は保持する。
 
+## 5.1 2026-09-12 実施記録（値を含まない）
+
+- [x] stableをroot管理の承認済み固定SHAでdeployし、DB migration 39件、backend health、DB／Redis healthを確認した。
+- [x] 管理者ログイン、TOTP、AI予算通知のメール・Discord試験送信、root管理backup（DB・uploads）を確認した。
+- [x] `receipt-backup-stable.timer`と`receipt-deploy-stable.service`を有効化し、再起動後のroot管理deployと起動後backupを確認した。
+- [x] 旧stable backup cronを無効化し、root専用のロールバック控えを保持した。
+- [x] 旧stableデータ、旧`.env`、旧cron控えはロールバック期限中に削除しないことを確認した。
+
+後続コード修正（UI文言、root管理credential環境での初期登録CLI、backupの秘密値をプロセス引数へ渡さない対応）は、移行結果を変更せずdevelopでレビュー・検証してから次の承認済みstableリリースに含める。
+
 上記が全て成功し、人間がロールバック期限の終了を承認するまで、旧経路を削除しない。削除対象と実施日時は値なしでIssueに記録する。devとstableの旧経路を一括で削除してはならない。
 
 ## 6. ロールバックと停止条件

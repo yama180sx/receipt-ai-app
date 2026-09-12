@@ -42,7 +42,11 @@ send_discord_alert() {
     [ "$status" = "ERROR" ] && color=16711680 # 赤 (Error)
 
     [ -n "$WEBHOOK_URL" ] || return 0
-    curl -H "Content-Type: application/json" \
+    # Webhook URLをcurlの引数に置くと、実行中プロセスの表示で秘密値が見える。
+    # curl設定を標準入力で渡し、URLをargv・journalへ出さない。
+    printf 'url = "%s"\n' "$WEBHOOK_URL" \
+        | curl --config - \
+            -H "Content-Type: application/json" \
             -X POST \
             -d "{
                 \"embeds\": [{
@@ -51,8 +55,7 @@ send_discord_alert() {
                     \"color\": $color,
                     \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
                 }]
-                }" \
-            "$WEBHOOK_URL" > /dev/null 2>&1
+                }" > /dev/null 2>&1
 }
 
 # 1. バックアップ先ディレクトリ作成
@@ -116,7 +119,14 @@ if [ ! "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
     DETAILS="${DETAILS}- DB Backup: FAILED (Container down)\n"
     ((ERROR_COUNT++))
 else
-    if docker exec -e PGPASSWORD="${DB_PASS}" "${CONTAINER_NAME}" pg_dump -U "${DB_USER}" "${DB_NAME}" | gzip > "${BACKUP_DIR}/db/db_backup_${TIMESTAMP}.sql.gz"; then
+    # DB passwordもdocker execの引数へ置かず、標準入力からコンテナ内だけで環境変数化する。
+    if printf '%s\n' "${DB_PASS}" \
+        | docker exec -i "${CONTAINER_NAME}" sh -c '
+            IFS= read -r PGPASSWORD || exit 1
+            export PGPASSWORD
+            exec pg_dump -U "$1" "$2"
+          ' sh "${DB_USER}" "${DB_NAME}" \
+        | gzip > "${BACKUP_DIR}/db/db_backup_${TIMESTAMP}.sql.gz"; then
         echo "  -> ($ENV_LABEL) DB Backup SUCCESS."
         DETAILS="${DETAILS}- DB Backup: SUCCESS\n"
     else

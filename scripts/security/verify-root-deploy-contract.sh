@@ -89,6 +89,21 @@ if ! tail -n 5 scripts/backup.sh | grep -Fqx '    exit 1'; then
   exit 1
 fi
 
+if grep -Fq 'docker exec -e PGPASSWORD=' scripts/backup.sh || \
+  grep -Fq '            "$WEBHOOK_URL" > /dev/null 2>&1' scripts/backup.sh; then
+  echo "[ERROR] root backup must not pass secret values through process arguments." >&2
+  exit 1
+fi
+
+for expected_line in \
+  "printf 'url = \"%s\"\\n' \"\$WEBHOOK_URL\"" \
+  "docker exec -i \"\${CONTAINER_NAME}\" sh -c"; do
+  if ! grep -Fq "${expected_line}" scripts/backup.sh; then
+    echo "[ERROR] root backup must pass secret values through stdin only." >&2
+    exit 1
+  fi
+done
+
 if ! grep -Fq 'chown 999:root "${directory}"' ops/systemd/libexec/receipt-deploy; then
   echo "[ERROR] root deploy helper must preserve container ownership of runtime data directories." >&2
   exit 1
