@@ -254,7 +254,7 @@ sequenceDiagram
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| POST | `/receipts/upload` | JWT + tenant | 画像アップロード → WebP → BullMQ ジョブ（202） |
+| POST | `/receipts/upload` | JWT + tenant | 画像アップロード → WebP → 復旧台帳とBullMQジョブ（202、メンテナンス中は503） |
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の商品明細一覧（`not_applicable` は含めない） |
@@ -264,11 +264,17 @@ sequenceDiagram
 | GET/POST/PATCH | `/admin/product-classification/standard-rules` | JWT + tenant + ADMIN + TOTP | 全世帯共通の標準分類ルールを一覧・追加・更新 |
 | POST | `/admin/product-classification/standard-rules/preview` | JWT + tenant + ADMIN + TOTP | 自世帯の明細だけを対象にキーワード命中を確認 |
 | PATCH | `/admin/product-classification/standard-rules/:id/deactivate` | JWT + tenant + ADMIN + TOTP | 理由を記録して標準分類ルールを無効化 |
+| GET/PUT | `/admin/ai-budget` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 全体予算の参照・理由付き更新 |
+| POST | `/admin/ai-budget/notifications/test` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 選択済みDiscord／メール通知先への試験送信 |
+| GET | `/admin/ai-budget/notifications` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 通知配送履歴（秘密情報・本文は含めない） |
+| POST | `/admin/ai-budget/resume` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 停止状態を理由付きで明示再開（自動再投入なし） |
+| GET/POST/DELETE | `/admin/ai-budget/managers` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | 専用管理者の一覧・追加・削除。最後の有効な管理者は削除不可 |
+| GET | `/admin/ai-budget/manager-candidates` | JWT + tenant + ADMIN + TOTP + 全体AI予算管理者 | ADMINかつTOTP有効で、まだ専用管理者ではない追加候補を最小情報で返す |
 | GET | `/receipts` | JWT + tenant | カーソルページネーション付きレシート一覧 |
 | GET | `/receipts/:id` | JWT + tenant | 自世帯のレシート詳細 1 件 |
 | GET | `/receipts/jobs` | JWT + tenant | ログインメンバー本人の解析ジョブ一覧 |
 | DELETE | `/receipts/jobs/:jobId` | JWT + tenant | 未取り込みジョブ破棄 |
-| POST | `/receipts/jobs/:jobId/retry` | JWT + tenant | 本人の失敗ジョブを元画像から再投入 |
+| POST | `/receipts/jobs/:jobId/retry` | JWT + tenant | 本人の失敗ジョブを元画像から同じjobIdで再投入（メンテナンス中は503） |
 | GET | `/receipts/latest` | JWT + tenant | 最新レシート 1 件 |
 | GET | `/receipts/status/:jobId` | JWT + tenant | 解析ジョブ状態 |
 | GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート）。調整Categoryの負額は同一レシートの通常Categoryへ統計時だけ比例配賦する |
@@ -612,9 +618,12 @@ memberId=1
 sequenceDiagram
     participant C as Client
     participant API as Backend
+    participant L as PostgreSQL台帳
     participant Q as BullMQ
 
     C->>API: POST /api/receipts/upload
+    API->>L: 未完了解析を記録
+    API->>Q: 同じjobIdで投入
     API-->>C: 202 { jobId }
 
     loop ポーリング
@@ -631,8 +640,10 @@ sequenceDiagram
 | ジョブ一覧 | ログインメンバー**本人**のジョブのみ（`memberId` 一致） |
 | 完了ジョブ | `duplicateSuspected`, `existingReceiptId`, `parsedData` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — 本人ジョブのみ |
-| 再実行 | `POST /api/receipts/jobs/:jobId/retry` — 本人の Gemini 日次クォータ超過ジョブだけを対象に、設定済み回数上限と元画像を確認して新規ジョブを投入し、元ジョブを除去 |
-| commit 後 | `jobId` 指定時、キューからジョブ削除を試行 |
+| 再実行 | `POST /api/receipts/jobs/:jobId/retry` — 本人の Gemini 日次クォータ超過ジョブだけを対象に、設定済み回数上限と元画像を確認して同じjobIdで再投入 |
+| キュー喪失時 | 未完了の`ReceiptAnalysisJob`台帳から同じjobIdで再投入する。状態取得・一覧・画像参照・破棄・再実行は台帳をフォールバックする。 |
+| メンテナンス | `RECEIPT_ANALYSIS_MAINTENANCE_MODE=true` の間はアップロードと手動再実行を503で停止し、閲覧と確定保存は継続する。 |
+| commit 後 | `jobId` 指定時、キューと復旧台帳からジョブを削除する |
 
 ---
 

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi, receiptApi, type ProductTypeSummary, type StandardProductClassificationRule } from '../../../api';
 import { showApiErrorAlert } from '../../../utils/apiError';
+import { showAlert } from '../../../utils/alertMessage';
+
+const unsafeKeywords = new Set(['茶', '水', '炭酸', '飲料', 'ポテト']);
+
+function getNormalizedKeyword(keyword: string): string {
+  return keyword.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+}
 
 export function useStandardProductClassificationRules() {
   const [rules, setRules] = useState<StandardProductClassificationRule[]>([]);
@@ -36,7 +43,27 @@ export function useStandardProductClassificationRules() {
   }, [keyword]);
   const create = useCallback(async () => {
     const parsedPriority = Number(priority);
-    if (!productTypeId || !Number.isInteger(parsedPriority) || !reason.trim()) return;
+    const normalizedKeyword = getNormalizedKeyword(keyword);
+    if (!normalizedKeyword) {
+      showAlert('入力エラー', 'キーワードを入力してください。');
+      return;
+    }
+    if (normalizedKeyword.length < 2 || unsafeKeywords.has(normalizedKeyword)) {
+      showAlert('入力エラー', 'キーワードは2文字以上で、広すぎる語（茶、水、炭酸、飲料、ポテト）は登録できません。');
+      return;
+    }
+    if (!productTypeId) {
+      showAlert('入力エラー', '商品種別を選択してください。');
+      return;
+    }
+    if (!Number.isInteger(parsedPriority) || parsedPriority < 0 || parsedPriority > 100000) {
+      showAlert('入力エラー', '優先度は0から100000までの整数で入力してください。');
+      return;
+    }
+    if (!reason.trim()) {
+      showAlert('入力エラー', '変更理由を入力してください。');
+      return;
+    }
     try {
       if (editingId) await adminApi.updateStandardProductClassificationRule(editingId, { keyword, productTypeId, priority: parsedPriority, reason });
       else await adminApi.createStandardProductClassificationRule({ keyword, productTypeId, priority: parsedPriority, reason });

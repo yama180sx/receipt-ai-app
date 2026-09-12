@@ -20,7 +20,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | RDBMS | PostgreSQL 18 |
 | ORM | Prisma 6 |
 | テナントキー | `familyGroupId`（世帯単位の論理分離） |
-| モデル数 | 22（分類・監査モデルを含む。正確な定義はPrisma schemaを正とする） |
+| モデル数 | 23（分類・監査モデルを含む。正確な定義はPrisma schemaを正とする） |
 
 ---
 
@@ -32,6 +32,15 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 |----|------|
 | `ADMIN` | 管理者（プロンプト編集・コスト統計など） |
 | `USER` | 一般ユーザー（レシート登録・閲覧） |
+
+### ReceiptAnalysisJobStatus
+
+| 値 | 用途 |
+|----|------|
+| `QUEUED` | キューストアへの投入待ち、または投入済み |
+| `PROCESSING` | Workerが解析処理中 |
+| `AWAITING_CONFIRMATION` | 解析完了、利用者の確認・保存待ち |
+| `FAILED` | 解析失敗。再実行ポリシーの対象になり得る |
 
 ---
 
@@ -67,6 +76,29 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 **FK:** `familyGroupId` → `FamilyGroup.id`  
 **Unique:** `(name, familyGroupId)`
+
+---
+
+### ReceiptAnalysisJob
+
+キューストア喪失時に、未確定レシート解析を同じjobIdで再投入するための永続台帳。BullMQ/Redis/Valkeyは実行キューであり、このテーブルが未完了状態の正本である。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | String | No | cuid() | Yes | — | — | — |
+| familyGroupId | Int | No | — | — | FamilyGroup.id | — | 複合 |
+| memberId | Int | No | — | — | FamilyMember.id | — | 複合 |
+| imagePath | String | No | — | — | — | — | — |
+| status | ReceiptAnalysisJobStatus | No | QUEUED | — | — | — | 複合 |
+| failureCode | String | Yes | — | — | — | — | — |
+| failureReason | String | Yes | — | — | — | — | — |
+| manualRetryCount | Int | No | 0 | — | — | — | — |
+| lastEnqueuedAt | DateTime | Yes | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | 複合 |
+| updatedAt | DateTime | No | @updatedAt | — | — | — | 複合 |
+
+**FK:** `familyGroupId` → `FamilyGroup.id` (**onDelete: Cascade**), `memberId` → `FamilyMember.id` (**onDelete: Cascade**)
+**Index:** `(familyGroupId, memberId, createdAt)`, `(status, updatedAt)`
 
 ---
 
@@ -274,6 +306,9 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | `ProductClassificationCandidate` | 類似検索候補 | `itemId + productTypeId`、`itemId + rank`が一意 |
 | `ProductClassificationLearningDataAudit` | 世帯辞書の無効化監査 | 世帯・対象・操作メンバー・理由を保存 |
 | `ProductClassificationAiRun` | 保存後の商品分類AI実行ログ | OCR用`ApiUsageLog`とは分離 |
+| `AiPricingRevision` | 外部AIの用途・モデル別単価改定履歴 | 追記専用、全世帯共通 |
+| `GlobalAiBudgetManager` | 全世帯横断のAI予算操作を許可する利用者 | `memberId`一意。ADMINかつTOTP有効の実効管理者を少なくとも1名保持 |
+| `GlobalAiBudgetAudit` | 全体AI予算の設定・管理者変更・初期登録の追記型監査 | 通常操作の利用者と、CLI初期登録の実行者名を別列で記録。秘密情報は保存しない |
 | `ProductClassificationReclassificationRun` / `ItemAudit` | 管理者による既存明細再分類の監査 | 世帯・実行者・対象・結果を保存 |
 
 ---
@@ -289,10 +324,38 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | promptTokens | Int | No | — | — | — | — | — |
 | candidatesTokens | Int | No | — | — | — | — | — |
 | totalTokens | Int | No | — | — | — | — | — |
+| selfRepairRetryCount | Int | No | 0 | — | — | — | — |
+| durationMs | Int | No | 0 | — | — | — | — |
+| pricingRevisionId | Int | Yes | — | — | AiPricingRevision.id | — | — |
 | createdAt | DateTime | No | now() | — | — | — | Yes |
 
-**FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`  
+**FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`, `pricingRevisionId` → `AiPricingRevision.id`
 **Index:** `familyMemberId`, `createdAt`
+
+`pricingRevisionId` はGemini呼出し開始時点で有効な単価改定を記録する。実装前の行と単価未登録時の行は
+`null`であり、過去ログを単価から推測して補完しない。
+
+---
+
+### AiPricingRevision
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| purpose | AiUsagePurpose | No | — | — | — | `modelId + purpose + effectiveFrom` | 複合 |
+| modelId | String | No | — | — | — | 複合 | 複合 |
+| inputPriceJpyPerMillion | Decimal(18,6) | No | — | — | — | — | — |
+| outputPriceJpyPerMillion | Decimal(18,6) | No | — | — | — | — | — |
+| maxInputTokens | Int | No | — | — | — | — | — |
+| maxOutputTokens | Int | No | — | — | — | — | — |
+| effectiveFrom | DateTime | No | — | — | — | 複合 | 複合 |
+| sourceUrl | String (Text) | No | — | — | — | — | — |
+| verifiedAt / verifiedBy | DateTime / String | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | — |
+
+用途は`ocr`と`product_classification`。単価改定は更新・削除せず追加のみとし、各AI利用ログは
+参照用Indexなしで改定IDだけを保持する。全世帯横断集計はこのIDを結合し、`America/Los_Angeles`の月単位で
+推定額を計算する。
 
 ---
 
@@ -325,6 +388,7 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 erDiagram
     FamilyGroup ||--o{ FamilyMember : has
     FamilyGroup ||--o{ Receipt : has
+    FamilyGroup ||--o{ ReceiptAnalysisJob : has
     FamilyGroup ||--o{ Category : has
     FamilyGroup ||--o{ Store : has
     FamilyGroup ||--o{ HouseholdProductDictionary : has
@@ -333,6 +397,7 @@ erDiagram
     FamilyGroup ||--o{ SettlementTransfer : has
 
     FamilyMember ||--o{ Receipt : creates
+    FamilyMember ||--o{ ReceiptAnalysisJob : requests
     FamilyMember ||--o{ ApiUsageLog : executes
     FamilyMember ||--o{ ItemSplit : owns
 
@@ -361,6 +426,7 @@ erDiagram
 | 20260406〜 | FamilyGroup 導入（マルチテナンシー） |
 | 20260513〜 | taxAmount |
 | 20260514〜 | PromptTemplate |
+| 20260818 | ReceiptAnalysisJob（キュー復旧台帳） |
 | 20260728〜 | 商品分類モデル導入・ProductMaster廃止 |
 | 20260523〜 | ItemSplit |
 | 20260525〜 | SettlementTransfer |

@@ -2,6 +2,9 @@ import path from 'path';
 import sharp from 'sharp';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
+import { createReceiptAnalysisJob, findReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
+import { enqueueReceiptAnalysisJob } from '../services/receiptJobService';
+import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
 import {
   enrichCompletedJobPayload,
   listReceiptJobsForMember,
@@ -84,8 +87,15 @@ function parseLimit(value: string | undefined): number {
 
 export const getJobStatus = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();
-  const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
-  if (!job) throw new AppError('ジョブが見つかりません。', 404);
+  const jobId = getRouteParam(req, 'jobId');
+  const job = await receiptQueue.getJob(jobId);
+  if (!job) {
+    const ledger = await findReceiptAnalysisJob(jobId, familyGroupId);
+    if (!ledger) throw new AppError('ジョブが見つかりません。', 404);
+    const state = ledger.status === 'FAILED' ? 'failed' : 'waiting';
+    sendSuccess(res, { id: ledger.id, state, error: ledger.failureReason ?? undefined });
+    return;
+  }
 
   const jobFamilyGroupId = Number(job.data?.familyGroupId);
   if (!jobFamilyGroupId || jobFamilyGroupId !== familyGroupId) {
@@ -115,6 +125,7 @@ export const discardReceiptJob = asyncHandler(async (req, res) => {
 });
 
 export const retryReceiptJob = asyncHandler(async (req, res) => {
+  if (isReceiptAnalysisMaintenanceMode()) throw new AppError('解析基盤を更新中です。しばらくしてから再実行してください。', 503);
   const ctx = requireTenantContext();
   const job = await retryFailedReceiptJobForMember(
     getRouteParam(req, 'jobId'),
@@ -125,6 +136,7 @@ export const retryReceiptJob = asyncHandler(async (req, res) => {
 });
 
 export const uploadReceipt = asyncHandler(async (req, res) => {
+  if (isReceiptAnalysisMaintenanceMode()) throw new AppError('解析基盤を更新中です。しばらくしてから再試行してください。', 503);
   const file = req.file as Express.Multer.File | undefined;
   if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
@@ -142,11 +154,8 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
     .webp({ quality: 75, effort: 6 })
     .toFile(imagePath);
 
-  const job = await receiptQueue.add('analyze-receipt', {
-    memberId,
-    familyGroupId,
-    imagePath,
-  });
+  const job = await createReceiptAnalysisJob({ memberId, familyGroupId, imagePath });
+  await enqueueReceiptAnalysisJob({ id: job.id, memberId, familyGroupId, imagePath });
 
   logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 

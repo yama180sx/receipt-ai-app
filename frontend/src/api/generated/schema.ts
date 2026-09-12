@@ -998,6 +998,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description キューストア移行中のため新規解析投入を停止中 */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -1093,7 +1100,7 @@ export interface paths {
         put?: never;
         /**
          * 失敗した解析ジョブを同じ画像で再実行
-         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+         * @description 本人の失敗ジョブだけを対象に、元画像が残っている場合に同じjobIdで解析ジョブを再投入する。日次クォータ超過時の自動再試行は行わない。
          */
         post: {
             parameters: {
@@ -1126,6 +1133,13 @@ export interface paths {
                 };
                 /** @description 再実行できないジョブ状態または元画像なし */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description キューストア移行中のため手動再実行を停止中 */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1761,6 +1775,416 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ai-budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全体 AI 予算の設定・利用状況を取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetOverview"];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** 全体 AI 予算を更新 */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateGlobalAiBudgetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 入力不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 停止した全体 AI 予算を理由付きで再開 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GlobalAiBudgetReasonRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 入力不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/notifications/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 全体 AI 予算の通知を試験送信 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AiBudgetTestNotificationRequest"];
+                };
+            };
+            responses: {
+                /** @description 受付済み */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 入力不正または通知先未設定 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全体 AI 予算の通知配送履歴を取得 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["AiBudgetNotificationDelivery"][];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/managers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全体 AI 予算管理者一覧 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManager"][];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** 全体 AI 予算管理者を追加 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GlobalAiBudgetManagerRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManager"];
+                        };
+                    };
+                };
+                /** @description 入力不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 重複 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/manager-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 全体 AI 予算管理者に追加可能な候補を取得
+         * @description 既存の全体AI予算管理者だけが利用できる。全世帯からADMINかつTOTP有効な未登録者のみを返す。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: components["schemas"]["GlobalAiBudgetManagerCandidate"][];
+                        };
+                    };
+                };
+                /** @description 全体AI予算管理者ではない */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ai-budget/managers/{memberId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 全体 AI 予算管理者を削除 */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    memberId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GlobalAiBudgetReasonRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 最後の管理者は削除不可 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/prompts": {
         parameters: {
             query?: never;
@@ -2263,6 +2687,11 @@ export interface components {
             retry?: {
                 eligible?: boolean;
                 remainingCount?: number;
+                /**
+                 * Format: double
+                 * @description Gemini日次無料枠の失敗時に、再実行可能になる時刻（epoch milliseconds）。未待機時は省略。
+                 */
+                availableAt?: number;
             };
             parsedData?: {
                 storeName?: string;
@@ -2430,6 +2859,71 @@ export interface components {
             totalPromptTokens: number;
             totalCandidatesTokens: number;
             estimatedCostJpy: number;
+        };
+        UpdateGlobalAiBudgetRequest: {
+            isEnabled: boolean;
+            monthlyBudgetJpy: number;
+            /** @default 50 */
+            warningPercent: number;
+            /** @default 80 */
+            criticalPercent: number;
+            /** @default 100 */
+            stopPercent: number;
+            /** @default true */
+            notifyDiscord: boolean;
+            notificationEmails?: string[];
+            reason: string;
+        };
+        AiBudgetTestNotificationRequest: {
+            channels: ("DISCORD" | "EMAIL")[];
+        };
+        AiBudgetNotificationDelivery: {
+            id: number;
+            /** @enum {string} */
+            kind: "THRESHOLD" | "TEST";
+            month: string;
+            thresholdPercent: number;
+            /** @enum {string} */
+            channel: "DISCORD" | "EMAIL";
+            recipient: string;
+            /** @enum {string} */
+            status: "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED";
+            attempts: number;
+            /** Format: date-time */
+            sentAt?: string | null;
+            lastError?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        GlobalAiBudgetReasonRequest: {
+            reason: string;
+        };
+        GlobalAiBudgetManagerRequest: components["schemas"]["GlobalAiBudgetReasonRequest"] & {
+            memberId: number;
+        };
+        GlobalAiBudgetManager: {
+            id: number;
+            memberId: number;
+            /** Format: date-time */
+            createdAt: string;
+            member: components["schemas"]["GlobalAiBudgetManagerMember"];
+        };
+        GlobalAiBudgetManagerCandidate: components["schemas"]["GlobalAiBudgetManagerMember"] & {
+            familyGroup: {
+                name: string;
+            };
+        };
+        GlobalAiBudgetManagerMember: {
+            id: number;
+            name: string;
+            familyGroupId: number;
+            /** @enum {string} */
+            role: "ADMIN" | "USER";
+            totpEnabled: boolean;
+        };
+        GlobalAiBudgetOverview: {
+            setting?: Record<string, never> | null;
+            usage?: components["schemas"]["AdminCostStatRow"][];
         };
         HealthResponse: {
             status: string;

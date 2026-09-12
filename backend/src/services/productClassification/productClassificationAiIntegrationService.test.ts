@@ -7,7 +7,7 @@ import {
 } from '@prisma/client';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 
-const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks } = vi.hoisted(() => ({
+const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks, pricingRevisionMocks, budgetMocks } = vi.hoisted(() => ({
   aiMocks: { classifyProductsWithAi: vi.fn() },
   receiptRepositoryMocks: {
     findItemById: vi.fn(),
@@ -20,12 +20,16 @@ const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMo
     findCategoryForProductTypeInTx: vi.fn(),
   },
   runRepositoryMocks: { createProductClassificationAiRun: vi.fn().mockResolvedValue({}) },
+  pricingRevisionMocks: { findEffectiveAiPricingRevision: vi.fn().mockResolvedValue({ id: 88, maxInputTokens: 4096, maxOutputTokens: 1024, inputPriceJpyPerMillion: '48', outputPriceJpyPerMillion: '394' }) },
+  budgetMocks: { reserveAiBudget: vi.fn(), releaseAiBudgetReservation: vi.fn() },
 }));
 
 vi.mock('../../ai', () => aiMocks);
 vi.mock('../../repositories/receiptRepository', () => receiptRepositoryMocks);
 vi.mock('../../repositories/productClassificationRepository', () => productRepositoryMocks);
 vi.mock('../../repositories/productClassificationAiRunRepository', () => runRepositoryMocks);
+vi.mock('../../repositories/aiPricingRevisionRepository', () => pricingRevisionMocks);
+vi.mock('../aiBudget/aiBudgetGuardService', () => budgetMocks);
 vi.mock('../../utils/prismaTransaction', () => ({
   runInTransaction: (fn: (tx: object) => Promise<unknown>) => fn({}),
 }));
@@ -77,6 +81,9 @@ describe('applyProductClassificationAiToItems', () => {
         classificationConfidence: ClassificationConfidence.HIGH,
       })
     );
+    expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
+      expect.objectContaining({ pricingRevisionId: 88 })
+    );
   });
 
   it.each([
@@ -112,7 +119,7 @@ describe('applyProductClassificationAiToItems', () => {
     expect(receiptRepositoryMocks.updateItemProductClassificationInTx).not.toHaveBeenCalled();
     expect(runRepositoryMocks.createProductClassificationAiRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        modelId: 'gemini-3.5-flash-lite',
         status: ProductClassificationAiRunStatus.PROVIDER_ERROR,
         failureCode: 'http_429',
       })

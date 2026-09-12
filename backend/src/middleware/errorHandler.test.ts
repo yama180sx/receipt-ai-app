@@ -53,6 +53,22 @@ describe('errorHandler', () => {
     process.env.NODE_ENV = prev;
   });
 
+  it('keeps an operational 503 message in production', () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    const res = createMockRes();
+    errorHandler(new AppError('解析基盤を更新中です。しばらくしてから再試行してください。', 503), req, res, next);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      success: false,
+      message: '解析基盤を更新中です。しばらくしてから再試行してください。',
+    });
+
+    process.env.NODE_ENV = prev;
+  });
+
   it('formats ZodError with validation details in production', () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';

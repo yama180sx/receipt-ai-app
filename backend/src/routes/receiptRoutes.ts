@@ -1,9 +1,11 @@
 import express from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { tenantMiddleware } from '../middleware/tenantMiddleware';
+import { restoreTenantContextMiddleware, tenantMiddleware } from '../middleware/tenantMiddleware';
 import { validate } from '../middleware/validate';
 import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
+import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
+import { AppError } from '../utils/appError';
 
 import {
   getReceipts,
@@ -40,11 +42,25 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+function rejectReceiptAnalysisDuringMaintenance(
+  _req: express.Request,
+  _res: express.Response,
+  next: express.NextFunction
+) {
+  if (isReceiptAnalysisMaintenanceMode()) {
+    next(new AppError('解析基盤を更新中です。しばらくしてから再試行してください。', 503));
+    return;
+  }
+  next();
+}
+
 router.post(
   '/receipts/upload',
-  upload.single('image'),
   authMiddleware,
   tenantMiddleware,
+  rejectReceiptAnalysisDuringMaintenance,
+  upload.single('image'),
+  restoreTenantContextMiddleware,
   validate(uploadReceiptSchema),
   uploadReceipt
 );

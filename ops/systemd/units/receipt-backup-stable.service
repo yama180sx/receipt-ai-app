@@ -1,0 +1,20 @@
+[Unit]
+Description=RecAIpt stable root-managed backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-backup-stable
+RuntimeDirectoryMode=0700
+LoadCredentialEncrypted=db_password:/etc/receipt-ai-app/credentials/stable/db_password.cred
+LoadCredentialEncrypted=backup_discord_webhook_url:/etc/receipt-ai-app/credentials/stable/backup_discord_webhook_url.cred
+ExecStart=/usr/local/libexec/receipt-backup stable
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-backup-stable /mnt/raid_1t/backups/receipt-app

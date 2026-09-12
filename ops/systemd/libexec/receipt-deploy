@@ -1,0 +1,271 @@
+#!/bin/bash
+# root所有で /usr/local/libexec/receipt-deploy として設置する固定デプロイヘルパー。
+# 任意の環境名、作業ディレクトリ、Git ref、Compose引数は受け取らない。
+set -euo pipefail
+
+readonly REPOSITORY_URL="https://github.com/yama180sx/receipt-ai-app.git"
+readonly CONFIG_ROOT="/etc/receipt-ai-app"
+readonly APP_ROOT="/srv/receipt-ai-app"
+readonly DATA_ROOT="/var/lib/receipt-ai-app"
+
+die() {
+  echo "[receipt-deploy] $1" >&2
+  exit 1
+}
+
+require_root() {
+  [ "$(id -u)" -eq 0 ] || die "must run as root"
+}
+
+require_root_owned_directory() {
+  local directory="$1"
+  if [ -e "${directory}" ]; then
+    [ -d "${directory}" ] || die "managed path is not a directory"
+    [ "$(stat -c '%u:%g' "${directory}")" = "0:0" ] || die "managed directory ownership is invalid"
+    [ $((8#$(stat -c '%a' "${directory}") & 8#022)) -eq 0 ] || die "managed directory is writable by group or others"
+    return
+  fi
+  install -d -o root -g root -m 0750 "${directory}"
+}
+
+load_non_secret_config() {
+  local config_file="$1"
+  [ -r "${config_file}" ] || die "non-secret config is unavailable"
+
+  local line key value
+  while IFS= read -r line || [ -n "${line}" ]; do
+    case "${line}" in
+      ''|'#'*) continue ;;
+    esac
+    case "${line}" in
+      *=*)
+        key="${line%%=*}"
+        value="${line#*=}"
+        ;;
+      *) die "non-secret config has an invalid line" ;;
+    esac
+    case "${key}" in
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|STABLE_RELEASE_SHA)
+        printf -v "${key}" '%s' "${value}"
+        export "${key}"
+        ;;
+      *) die "non-secret config contains a disallowed key" ;;
+    esac
+  done < "${config_file}"
+
+  for key in HOST_IP WEB_PORT BACKEND_PORT DEV_PORT DB_PORT REDIS_PORT EXPO_PORT_1 EXPO_PORT_2 REDIS_PORT_INTERNAL SMTP_HOST SMTP_PORT SMTP_SECURE GEMINI_RECEIPT_MODEL GEMINI_PRODUCT_CLASSIFICATION_MODEL RECEIPT_MANUAL_RETRY_LIMIT RECEIPT_MANUAL_RETRY_FAILURE_CODES RECEIPT_ANALYSIS_MAINTENANCE_MODE LOG_LEVEL; do
+    [ -n "${!key:-}" ] || die "non-secret config is missing a required key"
+  done
+}
+
+copy_credential() {
+  local name="$1"
+  local destination="$2"
+  local source="${CREDENTIALS_DIRECTORY:-}/${name}"
+  [ -f "${source}" ] && [ -r "${source}" ] || die "required credential is unavailable: ${name}"
+  # Docker Composeはhost上のSecretファイルを各サービスへread-only mountする。
+  # backend／dbは非root UIDで動作するため、host側のroot専用ディレクトリ（0700）内で
+  # ファイルを0444にし、mountされたサービスだけがコンテナ内で読めるようにする。
+  # -T はdestinationを常にファイルとして扱う。Dockerが過去のmount失敗で
+  # 同名ディレクトリを残していても、その中へ秘密を誤配置しない。
+  install -T -m 0444 -o root -g root "${source}" "${destination}/${name}"
+}
+
+cleanup_retired_runtime_secrets() {
+  local credential legacy_target
+
+  # 新しいコンテナを正常にrecreateした後だけ、旧世代を削除する。
+  # 削除対象はこのhelperが管理するroot専用のruntimeディレクトリに限定する。
+  find "${SECRET_ROOT}" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' \
+    ! -path "${SECRET_DIRECTORY}" -exec rm -rf -- {} +
+
+  # 世代管理導入前にDockerが残した既知の同名targetだけを、この時点で回収する。
+  for credential in "${CREDENTIALS[@]}"; do
+    legacy_target="${SECRET_ROOT}/${credential}"
+    [ ! -e "${legacy_target}" ] || rm -rf -- "${legacy_target}"
+  done
+}
+
+write_runtime_env() {
+  local destination="$1"
+  local environment="$2"
+  local project_name="$3"
+  local node_env="$4"
+  local command="$5"
+  local data_directory="$6"
+
+  umask 077
+  {
+    printf 'ENV_NAME=%s\n' "${environment}"
+    printf 'COMPOSE_PROJECT_NAME=%s\n' "${project_name}"
+    printf 'UID=1000\nGID=1000\n'
+    printf 'BACKEND_COMMAND=%s\nNODE_ENV=%s\n' "${command}" "${node_env}"
+    printf 'HOST_IP=%s\nWEB_PORT=%s\nBACKEND_PORT=%s\nDEV_PORT=%s\n' "${HOST_IP}" "${WEB_PORT}" "${BACKEND_PORT}" "${DEV_PORT}"
+    printf 'DB_PORT=%s\nREDIS_PORT=%s\nEXPO_PORT_1=%s\nEXPO_PORT_2=%s\n' "${DB_PORT}" "${REDIS_PORT}" "${EXPO_PORT_1}" "${EXPO_PORT_2}"
+    printf 'DB_USER=cntadm\nDB_NAME=receipt_db\n'
+    # docker-compose.yml の旧補間を満たすだけの無効値。runtime overrideでコンテナへは渡さない。
+    printf 'DB_PASSWORD=__managed_by_file__\n'
+    printf 'RECAIPT_UPLOADS_DIR=%s/uploads\n' "${data_directory}"
+    printf 'RECAIPT_PGDATA_DIR=%s/pgdata\n' "${data_directory}"
+    printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
+    printf 'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env\n' "${APP_DIRECTORY}"
+  } > "${destination}/compose.env"
+
+  {
+    printf 'PORT=3000\nREDIS_HOST=redis\nREDIS_PORT_INTERNAL=%s\nJWT_EXPIRES_IN=30d\n' "${REDIS_PORT_INTERNAL}"
+    printf 'GEMINI_RECEIPT_MODEL=%s\nGEMINI_PRODUCT_CLASSIFICATION_MODEL=%s\n' "${GEMINI_RECEIPT_MODEL}" "${GEMINI_PRODUCT_CLASSIFICATION_MODEL}"
+    printf 'SMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_SECURE=%s\n' "${SMTP_HOST}" "${SMTP_PORT}" "${SMTP_SECURE}"
+    printf 'RECEIPT_MANUAL_RETRY_LIMIT=%s\nRECEIPT_MANUAL_RETRY_FAILURE_CODES=%s\nRECEIPT_ANALYSIS_MAINTENANCE_MODE=%s\nLOG_LEVEL=%s\n' "${RECEIPT_MANUAL_RETRY_LIMIT}" "${RECEIPT_MANUAL_RETRY_FAILURE_CODES}" "${RECEIPT_ANALYSIS_MAINTENANCE_MODE}" "${LOG_LEVEL}"
+    printf 'CORS_ORIGIN=http://%s,http://%s:%s,http://%s:%s,exp://%s:%s,http://localhost:%s,http://127.0.0.1:%s\n' "${HOST_IP}" "${HOST_IP}" "${WEB_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${DEV_PORT}" "${DEV_PORT}" "${DEV_PORT}"
+  } > "${APP_DIRECTORY}/backend/.env"
+
+  {
+    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${environment}" "${HOST_IP}" "${BACKEND_PORT}"
+  } > "${APP_DIRECTORY}/frontend/.env"
+
+  chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
+}
+
+require_root
+[ "$#" -eq 1 ] || die "environment is fixed by the systemd unit"
+
+case "$1" in
+  dev)
+    readonly ENVIRONMENT="dev"
+    readonly GIT_REF="refs/heads/develop"
+    readonly PROJECT_NAME="receipt-dev"
+    readonly NODE_ENV_VALUE="development"
+    readonly BACKEND_COMMAND_VALUE="npm run dev"
+    ;;
+  stable)
+    readonly ENVIRONMENT="stable"
+    # stable の対象は移動する main ref ではなく、root 所有設定に登録した
+    # 承認済みの完全長コミット SHA に固定する。runner はこの値を与えられない。
+    [ -n "${STABLE_RELEASE_SHA:-}" ] || die "stable release commit is unavailable"
+    [[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"
+    readonly GIT_REF="${STABLE_RELEASE_SHA}"
+    readonly PROJECT_NAME="receipt-stable"
+    readonly NODE_ENV_VALUE="production"
+    readonly BACKEND_COMMAND_VALUE="npm run start"
+    ;;
+  *) die "unknown fixed environment" ;;
+esac
+
+if [ "${ENVIRONMENT}" = "dev" ] && [ -n "${STABLE_RELEASE_SHA:-}" ]; then
+  die "dev configuration must not select a stable release commit"
+fi
+
+readonly APP_DIRECTORY="${APP_ROOT}/${ENVIRONMENT}"
+readonly DATA_DIRECTORY="${DATA_ROOT}/${ENVIRONMENT}"
+readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${ENVIRONMENT}"
+readonly CONFIG_FILE="${CONFIG_ROOT}/${ENVIRONMENT}.env"
+
+require_root_owned_directory "${APP_ROOT}"
+require_root_owned_directory "${APP_DIRECTORY}"
+require_root_owned_directory "${DATA_ROOT}"
+require_root_owned_directory "${DATA_DIRECTORY}"
+require_root_owned_directory "${RUNTIME_DIRECTORY}"
+load_non_secret_config "${CONFIG_FILE}"
+
+install -d -m 0750 "${DATA_DIRECTORY}/uploads"
+chown 1000:1000 "${DATA_DIRECTORY}/uploads"
+
+# postgres:18 と redis:7-alpine は、永続データの所有者としてUID 999を使用する。
+# root helperが移行済みデータの親ディレクトリをroot専用へ変更しないよう、
+# コンテナが書込み可能な所有者・modeを明示する。
+for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata"; do
+  install -d -m 0700 "${directory}"
+  chown 999:root "${directory}"
+done
+
+if [ ! -d "${APP_DIRECTORY}/.git" ]; then
+  git -C "${APP_DIRECTORY}" init
+  git -C "${APP_DIRECTORY}" remote add origin "${REPOSITORY_URL}"
+fi
+git -C "${APP_DIRECTORY}" remote set-url origin "${REPOSITORY_URL}"
+git -C "${APP_DIRECTORY}" fetch --depth 1 origin "${GIT_REF}"
+readonly CHECKED_OUT_SHA="$(git -C "${APP_DIRECTORY}" rev-parse --verify FETCH_HEAD^{commit})"
+if [ "${ENVIRONMENT}" = "stable" ] && [ "${CHECKED_OUT_SHA}" != "${GIT_REF}" ]; then
+  die "stable release commit does not match the approved commit"
+fi
+git -C "${APP_DIRECTORY}" checkout --detach --force "${CHECKED_OUT_SHA}"
+git -C "${APP_DIRECTORY}" clean -ffdqx
+if [ "${ENVIRONMENT}" = "stable" ]; then
+  echo "[receipt-deploy] stable release commit: ${CHECKED_OUT_SHA}"
+fi
+
+readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
+readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
+install -d -o root -g root -m 0700 "${SECRET_ROOT}"
+install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
+readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
+readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"
+chmod 0700 "${SECRET_DIRECTORY}"
+for credential in "${CREDENTIALS[@]}"; do
+  copy_credential "${credential}" "${SECRET_DIRECTORY}"
+done
+
+write_runtime_env "${RUNTIME_DIRECTORY}" "${ENVIRONMENT}" "${PROJECT_NAME}" "${NODE_ENV_VALUE}" "${BACKEND_COMMAND_VALUE}" "${DATA_DIRECTORY}"
+
+run_compose() {
+  env DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}" \
+    RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
+    docker compose --ansi never --project-directory "${APP_DIRECTORY}" \
+      --env-file "${RUNTIME_DIRECTORY}/compose.env" \
+      -f "${APP_DIRECTORY}/docker-compose.yml" \
+      -f "${APP_DIRECTORY}/docker-compose.secrets.yml" \
+      -f "${APP_DIRECTORY}/docker-compose.runtime.yml" \
+      "$@"
+}
+
+# Prisma CLIは *_FILE を解決しないため、コンテナ内だけでDATABASE_URLを設定して実行する。
+# 値をhostの引数・ログ・作業ディレクトリへ出さない。
+run_prisma_migration() {
+  if ! run_compose run --rm --no-deps backend node -e '
+    const { readFileSync } = require("node:fs");
+    const { statSync } = require("node:fs");
+    const { spawnSync } = require("node:child_process");
+    const databaseUrlFile = process.env.DATABASE_URL_FILE;
+    if (!databaseUrlFile) process.exit(20);
+    try {
+      if (!statSync(databaseUrlFile).isFile()) process.exit(21);
+    } catch {
+      process.exit(21);
+    }
+    const databaseUrl = readFileSync(databaseUrlFile, "utf8").replace(/\r?\n$/, "");
+    if (!databaseUrl) process.exit(22);
+    const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+    });
+    process.exit(result.status === null ? 1 : result.status);
+  '; then
+    die "database migration preflight or migration failed"
+  fi
+}
+
+verify_backend_health() {
+  local attempt
+  for attempt in $(seq 1 30); do
+    if run_compose exec -T backend node -e '
+      fetch("http://127.0.0.1:3000/health")
+        .then((response) => process.exit(response.ok ? 0 : 1))
+        .catch(() => process.exit(1));
+    ' >/dev/null 2>&1; then
+      return
+    fi
+    sleep 1
+  done
+  die "backend health check failed after deployment"
+}
+
+run_compose build backend frontend frontend-dev
+# DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
+# 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
+# 永続データはRECAIPT_PGDATA_DIRとRECAIPT_REDISDATA_DIRのbind mountに残るため削除しない。
+run_compose up -d --wait --force-recreate db redis
+run_prisma_migration
+# runtime設定・image更新を確実に反映する。DB／Redisは直前のhealthcheck済みのため再作成しない。
+run_compose up -d --no-deps --force-recreate --remove-orphans backend frontend frontend-dev
+verify_backend_health
+cleanup_retired_runtime_secrets

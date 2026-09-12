@@ -8,6 +8,8 @@ import { createApp } from '../../app';
 import { clearMockReceiptJobs, mockReceiptJobs, registerMockReceiptJob } from '../../test/mockJobStore';
 import { prisma } from '../../utils/prismaClient';
 import { getCleanText } from '../../utils/normalizer';
+import { recoverReceiptAnalysisJobs } from '../../services/receiptJobService';
+import { ReceiptAnalysisJobStatus } from '@prisma/client';
 import {
   ensureTestMemberPassword,
   getTenantBItemId,
@@ -309,6 +311,102 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     expect(res.body.data[0].id).toBe('member1-job');
   });
 
+  it('復旧台帳からキューにない未完了ジョブを復元し、本人だけに公開する', async () => {
+    clearMockReceiptJobs();
+    const imagePath = 'uploads/ledger-recovery-fixture.webp';
+    const fixturePath = path.join(process.cwd(), imagePath);
+    fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
+    fs.writeFileSync(fixturePath, Buffer.from('ledger-recovery-test'));
+    const ledger = await prisma.receiptAnalysisJob.create({
+      data: {
+        familyGroupId: 1,
+        memberId: 1,
+        imagePath,
+        status: ReceiptAnalysisJobStatus.QUEUED,
+      },
+    });
+
+    try {
+      await recoverReceiptAnalysisJobs(true);
+      expect(mockReceiptJobs.has(ledger.id)).toBe(true);
+
+      const token = await loginAsTestMember(app, 1);
+      const [status, jobs, image] = await Promise.all([
+        request(app).get(`/api/receipts/status/${ledger.id}`).set('Authorization', `Bearer ${token}`),
+        request(app).get('/api/receipts/jobs').set('Authorization', `Bearer ${token}`),
+        request(app).get(`/api/uploads/${path.basename(imagePath)}`).set('Authorization', `Bearer ${token}`),
+      ]);
+
+      expect(status.status).toBe(200);
+      expect(status.body.data.state).toBe('waiting');
+      expect(jobs.body.data.some((job: { id: string }) => job.id === ledger.id)).toBe(true);
+      expect(image.status).toBe(200);
+    } finally {
+      clearMockReceiptJobs();
+      fs.unlinkSync(fixturePath);
+      await prisma.receiptAnalysisJob.delete({ where: { id: ledger.id } });
+    }
+  });
+
+  it('キューを失った失敗台帳は再実行可能性を返し、同じ jobId で再投入する', async () => {
+    clearMockReceiptJobs();
+    const imagePath = 'uploads/ledger-retry-fixture.webp';
+    const fixturePath = path.join(process.cwd(), imagePath);
+    fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
+    fs.writeFileSync(fixturePath, Buffer.from('ledger-retry-test'));
+    const ledger = await prisma.receiptAnalysisJob.create({
+      data: {
+        familyGroupId: 1,
+        memberId: 1,
+        imagePath,
+        status: ReceiptAnalysisJobStatus.FAILED,
+        failureCode: 'gemini_daily_quota',
+        failureReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      },
+    });
+    await prisma.receiptAnalysisJob.update({
+      where: { id: ledger.id },
+      data: { updatedAt: new Date('2026-08-15T07:00:00.000Z') },
+    });
+
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const list = await request(app).get('/api/receipts/jobs').set('Authorization', `Bearer ${token}`);
+      const item = list.body.data.find((job: { id: string }) => job.id === ledger.id);
+      expect(item.retry).toMatchObject({ eligible: true, remainingCount: 1 });
+
+      const retry = await request(app)
+        .post(`/api/receipts/jobs/${ledger.id}/retry`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(retry.status).toBe(200);
+      expect(mockReceiptJobs.get(ledger.id)?.data.manualRetryCount).toBe(1);
+      await expect(prisma.receiptAnalysisJob.findUnique({ where: { id: ledger.id } }))
+        .resolves.toMatchObject({ status: ReceiptAnalysisJobStatus.QUEUED, manualRetryCount: 1 });
+    } finally {
+      clearMockReceiptJobs();
+      fs.unlinkSync(fixturePath);
+      await prisma.receiptAnalysisJob.delete({ where: { id: ledger.id } });
+    }
+  });
+
+  it('計画メンテナンス中はアップロードと再実行を 503 で止める', async () => {
+    const previous = process.env.RECEIPT_ANALYSIS_MAINTENANCE_MODE;
+    process.env.RECEIPT_ANALYSIS_MAINTENANCE_MODE = 'true';
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const [upload, retry] = await Promise.all([
+        request(app).post('/api/receipts/upload').set('Authorization', `Bearer ${token}`),
+        request(app).post('/api/receipts/jobs/any-job/retry').set('Authorization', `Bearer ${token}`),
+      ]);
+      expect(upload.status).toBe(503);
+      expect(retry.status).toBe(503);
+      expect(upload.body.message).toContain('解析基盤を更新中');
+    } finally {
+      if (previous === undefined) delete process.env.RECEIPT_ANALYSIS_MAINTENANCE_MODE;
+      else process.env.RECEIPT_ANALYSIS_MAINTENANCE_MODE = previous;
+    }
+  });
+
   it('GET /receipts/jobs flags duplicateSuspected on completed jobs', async () => {
     clearMockReceiptJobs();
     registerMockReceiptJob('dup-job', {
@@ -418,6 +516,7 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     }, {
       state: 'failed',
       failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.parse('2026-08-15T07:00:00.000Z'),
     });
 
     try {
@@ -427,10 +526,38 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toEqual({ jobId: 'retry-retry-source', status: 'queued' });
-      expect(mockReceiptJobs.has('retry-source')).toBe(false);
-      expect(mockReceiptJobs.get('retry-retry-source')?.data.imagePath).toBe(imagePath);
-      expect(mockReceiptJobs.get('retry-retry-source')?.data.manualRetryCount).toBe(1);
+      expect(res.body.data).toEqual({ jobId: 'retry-source', status: 'queued' });
+      expect(mockReceiptJobs.has('retry-source')).toBe(true);
+      expect(mockReceiptJobs.get('retry-source')?.data.imagePath).toBe(imagePath);
+      expect(mockReceiptJobs.get('retry-source')?.data.manualRetryCount).toBe(1);
+    } finally {
+      fs.unlinkSync(imagePath);
+    }
+  });
+
+  it('POST /receipts/jobs/:jobId/retry blocks a daily quota failure until the next RPD reset', async () => {
+    const imagePath = 'uploads/retry-quota-wait.webp';
+    fs.writeFileSync(imagePath, 'fixture');
+    registerMockReceiptJob('retry-quota-wait', {
+      memberId: 1,
+      familyGroupId: 1,
+      imagePath,
+      manualRetryCount: 0,
+    }, {
+      state: 'failed',
+      failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.now(),
+    });
+
+    try {
+      const token = await loginAsTestMember(app, 1);
+      const res = await request(app)
+        .post('/api/receipts/jobs/retry-quota-wait/retry')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toContain('日次無料枠が回復するまで');
+      expect(mockReceiptJobs.has('retry-quota-wait')).toBe(true);
     } finally {
       fs.unlinkSync(imagePath);
     }
@@ -477,6 +604,7 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     }, {
       state: 'failed',
       failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      finishedOn: Date.parse('2026-08-15T07:00:00.000Z'),
     });
 
     try {

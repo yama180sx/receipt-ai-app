@@ -9,12 +9,17 @@ import {
   createApiUsageLog,
   incrementApiUsageLogTokens,
 } from "../repositories/apiUsageLogRepository";
+import { findEffectiveAiPricingRevision } from '../repositories/aiPricingRevisionRepository';
+import { AiUsagePurpose, type AiPricingRevision } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { releaseAiBudgetReservation, reserveAiBudget } from './aiBudget/aiBudgetGuardService';
+import { getConfiguredReceiptModelId } from '../config/geminiModel';
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = getConfiguredReceiptModelId();
 const RETRY_COUNT = parseInt(process.env.GEMINI_RETRY_COUNT || "3", 10);
 const RETRY_DELAY = parseInt(process.env.GEMINI_RETRY_DELAY || "2000", 10);
 
@@ -92,6 +97,17 @@ export const analyzeReceiptImage = async (
   imagePath: string, 
   familyMemberId?: number
 ): Promise<ParsedReceipt> => {
+  // #124 がPaid Tier有効時の「単価未登録なら停止」を担当するまで、単価解決失敗は既存OCRを阻害しない。
+  // 有効な改定があれば開始時点のIDだけをログへ固定し、後からの単価変更で過去額を変えない。
+  let pricingRevision: AiPricingRevision | null | undefined;
+  try {
+    pricingRevision = await findEffectiveAiPricingRevision(
+      AiUsagePurpose.OCR,
+      GEMINI_MODEL
+    );
+  } catch (error) {
+    logger.error('❌ AI単価改定の取得に失敗しました:', error);
+  }
 
   const processAnalysis = async (
     retryWithCorrection: boolean = false, 
@@ -118,8 +134,10 @@ export const analyzeReceiptImage = async (
       },
     };
 
+    const startedAt = Date.now();
     const result = await model.generateContent([prompt, imageData]);
     const response = await result.response;
+    const durationMs = Date.now() - startedAt;
     
     // トークンログ記録
     let usageLogId: number | undefined = existingLogId;
@@ -131,6 +149,8 @@ export const analyzeReceiptImage = async (
             promptTokens: usage.promptTokenCount ?? 0,
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
+            selfRepairRetryCount: retryWithCorrection ? 1 : 0,
+            durationMs,
           });
           logger.info(`[Gemini_Log] 自己修復リトライ分のトークンを合算しました (LogID: ${existingLogId})`);
         } else {
@@ -140,6 +160,8 @@ export const analyzeReceiptImage = async (
             promptTokens: usage.promptTokenCount ?? 0,
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
+            durationMs,
+            pricingRevisionId: pricingRevision?.id,
           });
           usageLogId = log.id;
         }
@@ -163,13 +185,31 @@ export const analyzeReceiptImage = async (
 
     // 算術整合性チェック
     const { isValid, diff } = validateArithmetic(data);
-    if (!isValid && !retryWithCorrection) {
-      logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
-      return await processAnalysis(true, text, usageLogId);
+    if (!isValid) {
+      if (!retryWithCorrection) {
+        logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
+        return await processAnalysis(true, text, usageLogId);
+      }
+      throw new Error(`Gemini解析結果の算術整合性を確認できませんでした（差分:${diff}円）。`);
     }
 
     return data;
   };
 
-  return await withRetry(() => processAnalysis());
+  const jobKey = `ocr:${imagePath}:${Math.random()}`;
+  const maxCostJpy = pricingRevision
+    ? new Prisma.Decimal(pricingRevision.maxInputTokens)
+      .mul(pricingRevision.inputPriceJpyPerMillion)
+      .plus(new Prisma.Decimal(pricingRevision.maxOutputTokens).mul(pricingRevision.outputPriceJpyPerMillion))
+      .div(1_000_000)
+      // 通信リトライ3回と自己修復再解析を保守的に含める。
+      .mul(8)
+    : new Prisma.Decimal(0);
+  // 有効化時は単価取得失敗もガードへ渡し、設定不備としてフェイルクローズする。
+  await reserveAiBudget({ purpose: AiUsagePurpose.OCR, pricingRevisionId: pricingRevision?.id, maxCostJpy, jobKey });
+  try {
+    return await withRetry(() => processAnalysis());
+  } finally {
+    await releaseAiBudgetReservation(jobKey);
+  }
 };

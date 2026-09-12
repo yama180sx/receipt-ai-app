@@ -2,7 +2,8 @@ name: Test
 
 on:
   pull_request:
-    branches: [develop]
+    # 通常の変更は develop、承認済みリリース同期 PR は main を対象にする。
+    branches: [develop, main]
 
 jobs:
   backend-unit:
@@ -50,7 +51,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

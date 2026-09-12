@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { runWithTenant } from '../utils/context';
+import { AppError } from '../utils/appError';
 import { prisma } from '../utils/prismaClient';
 import logger from '../utils/logger';
 
@@ -50,11 +51,16 @@ export const tenantMiddleware = async (req: Request, res: Response, next: NextFu
       });
     }
 
+    const tenantContext = { familyGroupId: member.familyGroupId, memberId: member.id };
+    // Multer のように AsyncLocalStorage のスコープを引き継がないミドルウェアの後で
+    // 復元するため、認証・DB照合済みの値だけをリクエストに保持する。
+    req.tenantContext = tenantContext;
+
     // --- ここが ALC の生命線 ---
     // runWithTenant のコールバック内で next() を呼ぶことで、
     // この後に続く controller が requireTenantContext() で ctx を取得できる。
     runWithTenant(
-      { familyGroupId: member.familyGroupId, memberId: member.id },
+      tenantContext,
       () => {
         logger.info(`[TENANT] Context Set: Member ${memberId} (Group: ${member.familyGroupId})`);
         next();
@@ -66,4 +72,18 @@ export const tenantMiddleware = async (req: Request, res: Response, next: NextFu
     // next(error) を呼ぶことで errorHandler に処理を委譲
     next(error);
   }
+};
+
+/**
+ * ファイルアップロードなどで切断された AsyncLocalStorage のテナント文脈を復元する。
+ * tenantMiddleware による認証・所属照合後にだけ配置すること。
+ */
+export const restoreTenantContextMiddleware = (req: Request, _res: Response, next: NextFunction) => {
+  const tenantContext = req.tenantContext;
+  if (!tenantContext) {
+    next(new AppError('テナント情報の特定に失敗しました', 500));
+    return;
+  }
+
+  runWithTenant(tenantContext, next);
 };

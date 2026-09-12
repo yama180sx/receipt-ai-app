@@ -1,0 +1,31 @@
+[Unit]
+Description=RecAIpt stable root-managed deployment
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-stable
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+LoadCredentialEncrypted=backend_database_url:/etc/receipt-ai-app/credentials/stable/backend_database_url.cred
+LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/stable/backend_jwt_secret.cred
+LoadCredentialEncrypted=backend_gemini_api_key:/etc/receipt-ai-app/credentials/stable/backend_gemini_api_key.cred
+LoadCredentialEncrypted=backend_ai_budget_discord_webhook:/etc/receipt-ai-app/credentials/stable/backend_ai_budget_discord_webhook.cred
+LoadCredentialEncrypted=backend_smtp_user:/etc/receipt-ai-app/credentials/stable/backend_smtp_user.cred
+LoadCredentialEncrypted=backend_smtp_password:/etc/receipt-ai-app/credentials/stable/backend_smtp_password.cred
+LoadCredentialEncrypted=backend_smtp_from:/etc/receipt-ai-app/credentials/stable/backend_smtp_from.cred
+LoadCredentialEncrypted=postgres_password:/etc/receipt-ai-app/credentials/stable/postgres_password.cred
+ExecStart=/usr/local/libexec/receipt-deploy stable
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/receipt-ai-app/stable /var/lib/receipt-ai-app/stable /run/receipt-ai-app-stable
+
+[Install]
+WantedBy=multi-user.target

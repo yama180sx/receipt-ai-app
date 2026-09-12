@@ -1,0 +1,11 @@
+[Unit]
+Description=Run RecAIpt dev backup daily and after boot
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Tokyo
+OnBootSec=2min
+Persistent=true
+Unit=receipt-backup-dev.service
+
+[Install]
+WantedBy=timers.target

@@ -678,6 +678,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/UploadJobResponse'
+        '503':
+          description: キューストア移行中のため新規解析投入を停止中
 
   /receipts/jobs:
     get:
@@ -724,7 +726,7 @@ paths:
     post:
       tags: [receipt]
       summary: 失敗した解析ジョブを同じ画像で再実行
-      description: 本人の失敗ジョブだけを対象に、元画像が残っている場合に新しい解析ジョブを投入する。日次クォータ超過時の自動再試行は行わない。
+      description: 本人の失敗ジョブだけを対象に、元画像が残っている場合に同じjobIdで解析ジョブを再投入する。日次クォータ超過時の自動再試行は行わない。
       security:
         - bearerAuth: []
       parameters:
@@ -749,6 +751,8 @@ paths:
           description: Not Found
         '409':
           description: 再実行できないジョブ状態または元画像なし
+        '503':
+          description: キューストア移行中のため手動再実行を停止中
 
   /receipts/status/{jobId}:
     get:
@@ -1137,6 +1141,191 @@ paths:
                         items:
                           $ref: '#/components/schemas/AdminCostStatRow'
 
+  /admin/ai-budget:
+    get:
+      tags: [admin]
+      summary: 全体 AI 予算の設定・利用状況を取得
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GlobalAiBudgetOverview'
+        '403':
+          description: 全体AI予算管理者ではない
+    put:
+      tags: [admin]
+      summary: 全体 AI 予算を更新
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGlobalAiBudgetRequest'
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: 入力不正
+        '403':
+          description: 全体AI予算管理者ではない
+
+  /admin/ai-budget/resume:
+    post:
+      tags: [admin]
+      summary: 停止した全体 AI 予算を理由付きで再開
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+      responses:
+        '200': { description: OK }
+        '400': { description: 入力不正 }
+        '403': { description: 全体AI予算管理者ではない }
+
+  /admin/ai-budget/notifications/test:
+    post:
+      tags: [admin]
+      summary: 全体 AI 予算の通知を試験送信
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiBudgetTestNotificationRequest'
+      responses:
+        '200': { description: 受付済み }
+        '400': { description: 入力不正または通知先未設定 }
+        '403': { description: 全体AI予算管理者ではない }
+
+  /admin/ai-budget/notifications:
+    get:
+      tags: [admin]
+      summary: 全体 AI 予算の通知配送履歴を取得
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AiBudgetNotificationDelivery'
+        '403': { description: 全体AI予算管理者ではない }
+
+  /admin/ai-budget/managers:
+    get:
+      tags: [admin]
+      summary: 全体 AI 予算管理者一覧
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GlobalAiBudgetManager'
+        '403': { description: 全体AI予算管理者ではない }
+    post:
+      tags: [admin]
+      summary: 全体 AI 予算管理者を追加
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetManagerRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GlobalAiBudgetManager'
+        '400': { description: 入力不正 }
+        '409': { description: 重複 }
+
+  /admin/ai-budget/manager-candidates:
+    get:
+      tags: [admin]
+      summary: 全体 AI 予算管理者に追加可能な候補を取得
+      description: 既存の全体AI予算管理者だけが利用できる。全世帯からADMINかつTOTP有効な未登録者のみを返す。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GlobalAiBudgetManagerCandidate'
+        '403': { description: 全体AI予算管理者ではない }
+
+  /admin/ai-budget/managers/{memberId}:
+    delete:
+      tags: [admin]
+      summary: 全体 AI 予算管理者を削除
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+      responses:
+        '200': { description: OK }
+        '409': { description: 最後の管理者は削除不可 }
   /admin/prompts:
     get:
       tags: [admin]
@@ -1918,6 +2107,10 @@ components:
             remainingCount:
               type: integer
               minimum: 0
+            availableAt:
+              type: number
+              format: double
+              description: Gemini日次無料枠の失敗時に、再実行可能になる時刻（epoch milliseconds）。未待機時は省略。
         parsedData:
           type: object
           properties:
@@ -2288,6 +2481,117 @@ components:
           type: integer
         estimatedCostJpy:
           type: number
+
+    UpdateGlobalAiBudgetRequest:
+      type: object
+      required: [isEnabled, monthlyBudgetJpy, reason]
+      properties:
+        isEnabled:
+          type: boolean
+        monthlyBudgetJpy:
+          type: number
+          exclusiveMinimum: 0
+        warningPercent:
+          type: integer
+          default: 50
+        criticalPercent:
+          type: integer
+          default: 80
+        stopPercent:
+          type: integer
+          default: 100
+        notifyDiscord:
+          type: boolean
+          default: true
+        notificationEmails:
+          type: array
+          items: { type: string, format: email }
+        reason:
+          type: string
+
+    AiBudgetTestNotificationRequest:
+      type: object
+      required: [channels]
+      properties:
+        channels:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [DISCORD, EMAIL]
+
+    AiBudgetNotificationDelivery:
+      type: object
+      required: [id, kind, month, thresholdPercent, channel, recipient, status, attempts, createdAt]
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [THRESHOLD, TEST] }
+        month: { type: string, pattern: '^\\d{4}-\\d{2}$' }
+        thresholdPercent: { type: integer }
+        channel: { type: string, enum: [DISCORD, EMAIL] }
+        recipient: { type: string }
+        status: { type: string, enum: [PENDING, PROCESSING, SUCCEEDED, FAILED] }
+        attempts: { type: integer }
+        sentAt: { type: string, format: date-time, nullable: true }
+        lastError: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    GlobalAiBudgetReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    GlobalAiBudgetManagerRequest:
+      allOf:
+        - $ref: '#/components/schemas/GlobalAiBudgetReasonRequest'
+        - type: object
+          required: [memberId]
+          properties:
+            memberId: { type: integer, minimum: 1 }
+
+    GlobalAiBudgetManager:
+      type: object
+      required: [id, memberId, createdAt, member]
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        createdAt: { type: string, format: date-time }
+        member:
+          $ref: '#/components/schemas/GlobalAiBudgetManagerMember'
+
+    GlobalAiBudgetManagerCandidate:
+      allOf:
+        - $ref: '#/components/schemas/GlobalAiBudgetManagerMember'
+        - type: object
+          required: [familyGroup]
+          properties:
+            familyGroup:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+
+    GlobalAiBudgetManagerMember:
+      type: object
+      required: [id, name, familyGroupId, role, totpEnabled]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        familyGroupId: { type: integer }
+        role: { type: string, enum: [ADMIN, USER] }
+        totpEnabled: { type: boolean }
+
+    GlobalAiBudgetOverview:
+      type: object
+      properties:
+        setting:
+          type: object
+          nullable: true
+        usage:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCostStatRow'
 
     HealthResponse:
       type: object

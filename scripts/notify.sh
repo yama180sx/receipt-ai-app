@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# --- 設定項目 ---
-# Discord の Webhook URL (後ほど取得して貼り付けます)
-WEBHOOK_URL="https://discord.com/api/webhooks/1494659784304230442/Hh4scCNNv0hga2AtqMbUufCdaAaZUmmRrltAo4Ke5Pjq7QlS1iO1PIDIz5MAK399sY2Z"
+# 呼出元で BACKUP_DISCORD_WEBHOOK_URL を設定する。秘密値はGit管理しない。
+WEBHOOK_URL="${BACKUP_DISCORD_WEBHOOK_URL:-}"
 
 # 通知関数
 send_notification() {
@@ -14,6 +13,7 @@ send_notification() {
         color=16711680 # Red (Error)
     fi
 
+    [ -n "$WEBHOOK_URL" ] || return 0
     # Discord への送信 (JSON形式)
     curl -H "Content-Type: application/json" \
          -X POST \

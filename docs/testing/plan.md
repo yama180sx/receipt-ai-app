@@ -54,7 +54,7 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 | 対象 | 理由 |
 |------|------|
 | カメラ・画像クロップ | デバイス依存、自動化コスト高 |
-| Gemini 実 OCR | 外部 API・非決定論 |
+| Gemini 実 OCR | 外部 API・非決定論。実施・集計は [Gemini Free Tier実測手順](./gemini-free-tier-measurement.md) に従う |
 | 全画面フロー回帰 | #87-5 を拡張（#91-5） |
 
 ### Should / Later
@@ -102,13 +102,15 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 実Gemini OCR、実Redis Worker、実画像アップロードを通す確認は自動テストの対象外とし、
 `regression-checklist.md` に従う手動確認で扱う。
 
+Issue #119では`ReceiptAnalysisJob`台帳を正本とし、空のキューストアへ同一jobIdで再投入できることを結合テストと手動確認で検証する。
+
 ## 5. CI 方針
 
 | トリガー | 内容 | ランナー |
 |----------|------|----------|
-| PR → `develop` | `npm test`（backend + frontend unit） | `ubuntu-latest` — `.github/workflows/test.yml` |
-| PR → `develop` | API 結合（`npm run test:integration`） | 同上ジョブ `backend-integration`（Postgres service） |
-| push → `main` | 既存 deploy workflow（変更なし） | self-hosted (T320) |
+| PR → `develop` / リリース同期PR → `main` | `npm test`（backend + frontend unit）、OpenAPI生成整合 | `ubuntu-latest` — `.github/workflows/test.yml` |
+| PR → `develop` / リリース同期PR → `main` | API 結合（`npm run test:integration`） | 同上ジョブ `backend-integration`（Postgres service） |
+| GitHub `stable` Environment承認後の手動実行 | 固定SHAのstable root管理デプロイ（Issue #131-3-3受入を含む） | self-hosted (T320) |
 
 **スコープ外:** ESLint / Prettier（未導入のため別 Issue）
 

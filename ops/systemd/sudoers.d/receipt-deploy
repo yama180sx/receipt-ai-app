@@ -1,0 +1,5 @@
+# rootが /etc/sudoers.d/receipt-deploy として install -o root -g root -m 0440 する。
+# runner／開発ユーザーには、固定名unitの開始だけを許可する。
+Cmnd_Alias RECAIPT_DEPLOY_UNITS = /usr/bin/systemctl start receipt-deploy-dev.service, \
+  /usr/bin/systemctl start receipt-deploy-stable.service
+cntnt001 ALL=(root) NOPASSWD: RECAIPT_DEPLOY_UNITS
