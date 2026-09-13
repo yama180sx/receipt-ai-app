@@ -13,7 +13,9 @@ export function getStartupFailureCode(error: unknown): StartupFailureCode {
   const message = error instanceof Error ? error.message : '';
 
   if (message.includes('Secret file for ')) return 'SECRET_FILE_UNAVAILABLE';
-  if (message.includes('TOTP encryption')) return 'TOTP_SECRET_UNAVAILABLE';
+  if (message.includes('TOTP_ENCRYPTION_KEY') || message.includes('TOTP_LEGACY_ENCRYPTION_KEY')) {
+    return 'TOTP_SECRET_UNAVAILABLE';
+  }
   if (message.includes('JWT_SECRET')) return 'JWT_SECRET_UNAVAILABLE';
   if (message.includes('GEMINI_RECEIPT_MODEL') || message.includes('GEMINI_PRODUCT_CLASSIFICATION_MODEL')) {
     return 'GEMINI_MODEL_INVALID';
