@@ -10,6 +10,5 @@ useDefault = true
 description = "Issue #131-4 TOTP key-version labels (not secret values)"
 regexTarget = "match"
 regexes = [
-  '''legacy-jwt-v1''',
   '''totp-old-v1''',
 ]
