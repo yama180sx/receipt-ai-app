@@ -137,13 +137,16 @@ require_exact_line 'LoadCredentialEncrypted=backend_totp_encryption_key:/etc/rec
   ops/systemd/units/receipt-deploy-stable.service
 for expected_line in \
   'TOTP_ENCRYPTION_KEY_FILE: /run/secrets/backend_totp_encryption_key' \
-  'TOTP_LEGACY_ENCRYPTION_KEY_FILE: /run/secrets/backend_jwt_secret' \
   'backend_totp_encryption_key:'; do
   if ! grep -Fq "${expected_line}" docker-compose.secrets.yml; then
     echo "[ERROR] root deployment must deliver a dedicated TOTP credential." >&2
     exit 1
   fi
 done
+if grep -Fq 'TOTP_LEGACY_ENCRYPTION_KEY' docker-compose.secrets.yml; then
+  echo "[ERROR] root deployment must not retain the retired TOTP legacy-key path." >&2
+  exit 1
+fi
 for expected_line in \
   'readonly BASE_CREDENTIALS=(backend_database_url backend_jwt_secret' \
   'TOTP_ENCRYPTION_KEY_FILE: /run/secrets/backend_totp_encryption_key' \

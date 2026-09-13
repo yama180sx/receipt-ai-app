@@ -2,7 +2,6 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 export const CURRENT_TOTP_KEY_VERSION = 'totp-v1';
-export const LEGACY_TOTP_KEY_VERSION = 'totp-old-v1';
 
 function deriveEncryptionKey(source: string, keyVersion: string): Buffer {
   return crypto.createHash('sha256').update(`${source}:totp:${keyVersion}`).digest();
@@ -16,24 +15,11 @@ function getCurrentEncryptionKey(): Buffer {
   return deriveEncryptionKey(source, CURRENT_TOTP_KEY_VERSION);
 }
 
-function getLegacyEncryptionKey(): Buffer {
-  const source = process.env.TOTP_LEGACY_ENCRYPTION_KEY;
-  if (!source) {
-    throw new Error('TOTP_LEGACY_ENCRYPTION_KEY is not defined for legacy TOTP data');
-  }
-  // Issue #131-4以前の暗号文は、JWT_SECRETから `${source}:totp` を導出していた。
-  return crypto.createHash('sha256').update(`${source}:totp`).digest();
-}
-
 function getDecryptionKey(keyVersion: string): Buffer {
-  switch (keyVersion) {
-    case CURRENT_TOTP_KEY_VERSION:
-      return getCurrentEncryptionKey();
-    case LEGACY_TOTP_KEY_VERSION:
-      return getLegacyEncryptionKey();
-    default:
-      throw new Error('Unsupported TOTP key version');
+  if (keyVersion !== CURRENT_TOTP_KEY_VERSION) {
+    throw new Error('Unsupported TOTP key version');
   }
+  return getCurrentEncryptionKey();
 }
 
 export function encryptTotpSecret(secret: string): string {
