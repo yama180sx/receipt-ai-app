@@ -40,10 +40,12 @@ export async function ensureTestMemberTotp(memberId: number): Promise<void> {
   }
   if (member.totpEnabled) return;
 
+  const encrypted = encryptSecretForStorage(TEST_TOTP_SECRET);
   await prisma.familyMember.update({
     where: { id: memberId },
     data: {
-      totpSecret: encryptSecretForStorage(TEST_TOTP_SECRET),
+      totpSecret: encrypted.encryptedSecret,
+      totpKeyVersion: encrypted.keyVersion,
       totpEnabled: true,
       totpVerifiedAt: new Date(),
     },

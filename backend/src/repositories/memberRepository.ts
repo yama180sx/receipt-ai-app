@@ -33,11 +33,16 @@ export async function findMemberById(memberId: number) {
   return prisma.familyMember.findUnique({ where: { id: memberId } });
 }
 
-export async function saveMemberTotpSetup(memberId: number, encryptedSecret: string) {
+export async function saveMemberTotpSetup(
+  memberId: number,
+  encryptedSecret: string,
+  keyVersion: string
+) {
   return prisma.familyMember.update({
     where: { id: memberId },
     data: {
       totpSecret: encryptedSecret,
+      totpKeyVersion: keyVersion,
       totpEnabled: false,
       totpVerifiedAt: null,
     },
@@ -59,6 +64,7 @@ export async function disableMemberTotp(memberId: number) {
     where: { id: memberId },
     data: {
       totpSecret: null,
+      totpKeyVersion: null,
       totpEnabled: false,
       totpVerifiedAt: null,
     },

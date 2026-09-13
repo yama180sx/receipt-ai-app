@@ -14,7 +14,7 @@ describe('getStartupFailureCode', () => {
 
   it('classifies the known non-secret startup configuration categories', () => {
     expect(getStartupFailureCode(new Error('JWT_SECRET is not defined'))).toBe('JWT_SECRET_UNAVAILABLE');
-    expect(getStartupFailureCode(new Error('TOTP encryption requires JWT_SECRET or TOTP_ENCRYPTION_KEY'))).toBe('TOTP_SECRET_UNAVAILABLE');
+    expect(getStartupFailureCode(new Error('TOTP_ENCRYPTION_KEY is not defined'))).toBe('TOTP_SECRET_UNAVAILABLE');
     expect(getStartupFailureCode(new Error('GEMINI_RECEIPT_MODEL must use a fixed Gemini model ID'))).toBe('GEMINI_MODEL_INVALID');
     expect(getStartupFailureCode(new Error('Environment variable not found: DATABASE_URL'))).toBe('DATABASE_CONFIGURATION_INVALID');
   });

@@ -174,7 +174,7 @@ describe.skipIf(!shouldRunDbIntegration())('Auth API integration', () => {
     it('POST /api/auth/login returns requiresTotpSetup for USER without TOTP', async () => {
       await prisma.familyMember.update({
         where: { id: 2 },
-        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+        data: { totpSecret: null, totpKeyVersion: null, totpEnabled: false, totpVerifiedAt: null },
       });
 
       const res = await request(app)
@@ -199,7 +199,7 @@ describe.skipIf(!shouldRunDbIntegration())('Auth API integration', () => {
     it('admin without TOTP gets requiresTotpSetup on login', async () => {
       await prisma.familyMember.update({
         where: { id: 1 },
-        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+        data: { totpSecret: null, totpKeyVersion: null, totpEnabled: false, totpVerifiedAt: null },
       });
 
       const res = await request(app)
@@ -221,7 +221,7 @@ describe.skipIf(!shouldRunDbIntegration())('Auth API integration', () => {
     it('admin setup flow issues access token', async () => {
       await prisma.familyMember.update({
         where: { id: 1 },
-        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+        data: { totpSecret: null, totpKeyVersion: null, totpEnabled: false, totpVerifiedAt: null },
       });
 
       const loginRes = await request(app)
@@ -254,7 +254,7 @@ describe.skipIf(!shouldRunDbIntegration())('Auth API integration', () => {
     it('blocks admin API when TOTP not enabled', async () => {
       await prisma.familyMember.update({
         where: { id: 1 },
-        data: { totpSecret: null, totpEnabled: false, totpVerifiedAt: null },
+        data: { totpSecret: null, totpKeyVersion: null, totpEnabled: false, totpVerifiedAt: null },
       });
 
       const loginRes = await request(app)
