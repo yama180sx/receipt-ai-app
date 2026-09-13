@@ -144,8 +144,17 @@ for expected_line in \
     exit 1
   fi
 done
-if ! grep -Fq 'readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_totp_encryption_key' ops/systemd/libexec/receipt-deploy; then
-  echo "[ERROR] root deployment must stage a dedicated TOTP credential." >&2
+for expected_line in \
+  'readonly BASE_CREDENTIALS=(backend_database_url backend_jwt_secret' \
+  'TOTP_ENCRYPTION_KEY_FILE: /run/secrets/backend_totp_encryption_key' \
+  'CREDENTIALS+=(backend_totp_encryption_key)'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-deploy; then
+    echo "[ERROR] root deployment must stage the dedicated TOTP credential when Compose requires it." >&2
+    exit 1
+  fi
+done
+if ! grep -Fq 'docker-compose.secrets.yml"; then' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deployment must decide credential requirements from the checked-out Compose contract." >&2
   exit 1
 fi
 

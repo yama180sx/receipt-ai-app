@@ -204,7 +204,16 @@ readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
 readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
 install -d -o root -g root -m 0700 "${SECRET_ROOT}"
 install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
-readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_totp_encryption_key backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
+# root helperはdev/stable共通である。TOTP専用鍵が必要なのは、このcheckoutの
+# Compose契約が明示している場合だけにする。これによりIssue #131-4をdevへ先行
+# 適用しても、旧mainを固定SHAで動かすstableの再起動復旧を妨げない。
+readonly BASE_CREDENTIALS=(backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
+CREDENTIALS=("${BASE_CREDENTIALS[@]}")
+if grep -Fqx '      TOTP_ENCRYPTION_KEY_FILE: /run/secrets/backend_totp_encryption_key' "${APP_DIRECTORY}/docker-compose.secrets.yml" && \
+   grep -Fqx '  backend_totp_encryption_key:' "${APP_DIRECTORY}/docker-compose.secrets.yml"; then
+  CREDENTIALS+=(backend_totp_encryption_key)
+fi
+readonly CREDENTIALS
 readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"
 chmod 0700 "${SECRET_DIRECTORY}"
 for credential in "${CREDENTIALS[@]}"; do
