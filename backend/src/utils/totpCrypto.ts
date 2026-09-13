@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 export const CURRENT_TOTP_KEY_VERSION = 'totp-v1';
-export const LEGACY_TOTP_KEY_VERSION = 'legacy-jwt-v1';
+export const LEGACY_TOTP_KEY_VERSION = 'totp-old-v1';
 
 function deriveEncryptionKey(source: string, keyVersion: string): Buffer {
   return crypto.createHash('sha256').update(`${source}:totp:${keyVersion}`).digest();

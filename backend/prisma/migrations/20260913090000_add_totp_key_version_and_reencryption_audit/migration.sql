@@ -3,7 +3,7 @@ ALTER TABLE "FamilyMember" ADD COLUMN "totpKeyVersion" VARCHAR(32);
 
 -- 既存の暗号文は Issue #131-4 より前のJWT由来鍵で暗号化されている。
 UPDATE "FamilyMember"
-SET "totpKeyVersion" = 'legacy-jwt-v1'
+SET "totpKeyVersion" = 'totp-old-v1'
 WHERE "totpSecret" IS NOT NULL;
 
 ALTER TABLE "FamilyMember"

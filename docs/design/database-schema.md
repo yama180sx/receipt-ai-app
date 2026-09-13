@@ -78,7 +78,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 **FK:** `familyGroupId` → `FamilyGroup.id`  
 **Unique:** `(name, familyGroupId)`
 
-`totpSecret` と `totpKeyVersion` はともにnull、またはともに非nullである。鍵の実値は保存しない。既存のJWT由来暗号文は `legacy-jwt-v1`、専用TOTP鍵で暗号化した値は `totp-v1` として扱う。
+`totpSecret` と `totpKeyVersion` はともにnull、またはともに非nullである。鍵の実値は保存しない。既存のJWT由来暗号文は `totp-old-v1`、専用TOTP鍵で暗号化した値は `totp-v1` として扱う。
 
 ---
 

@@ -19,7 +19,7 @@ vi.mock('../utils/prismaClient', () => ({
 
 vi.mock('../utils/totpCrypto', () => ({
   CURRENT_TOTP_KEY_VERSION: 'totp-v1',
-  LEGACY_TOTP_KEY_VERSION: 'legacy-jwt-v1',
+  LEGACY_TOTP_KEY_VERSION: 'totp-old-v1',
   decryptTotpSecret: mocks.decrypt,
   encryptTotpSecret: mocks.encrypt,
 }));
@@ -50,15 +50,15 @@ describe('TOTP再暗号化サービス', () => {
     mocks.auditCreate.mockResolvedValue({ id: 1 });
 
     await expect(reencryptLegacyTotpSecrets(input)).resolves.toEqual({
-      sourceKeyVersion: 'legacy-jwt-v1',
+      sourceKeyVersion: 'totp-old-v1',
       targetKeyVersion: 'totp-v1',
       candidateCount: 1,
       reencryptedCount: 1,
       failedCount: 0,
     });
-    expect(mocks.decrypt).toHaveBeenCalledWith('encrypted-payload', 'legacy-jwt-v1');
+    expect(mocks.decrypt).toHaveBeenCalledWith('encrypted-payload', 'totp-old-v1');
     expect(mocks.updateMany).toHaveBeenCalledWith({
-      where: { id: 41, totpKeyVersion: 'legacy-jwt-v1' },
+      where: { id: 41, totpKeyVersion: 'totp-old-v1' },
       data: { totpSecret: 'new-encrypted-payload', totpKeyVersion: 'totp-v1' },
     });
     expect(mocks.auditCreate).toHaveBeenCalledWith({
