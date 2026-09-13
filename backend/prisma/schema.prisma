@@ -141,6 +141,7 @@ model FamilyMember {
   familyGroupId                             Int // ★ 所属世帯
   role                                      Role                                       @default(USER) // [Issue #73] デフォルトは一般ユーザー
   totpSecret                                String? // [Issue #93-5] TOTP シークレット（暗号化保存）
+  totpKeyVersion                            String?                                    @db.VarChar(32) // [Issue #131-4] 暗号化に使用したTOTP鍵の論理バージョン
   totpEnabled                               Boolean                                    @default(false)
   totpVerifiedAt                            DateTime?                                  @db.Timestamptz(3)
   familyGroup                               FamilyGroup                                @relation(fields: [familyGroupId], references: [id])
@@ -162,6 +163,22 @@ model FamilyMember {
   receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
+}
+
+// [Issue #131-4] root専用CLIによるTOTP再暗号化の値なし監査記録。
+// TOTPシークレット、鍵、認証コード、利用者名は保存しない。
+model TotpSecretReencryptionAudit {
+  id               Int      @id @default(autoincrement())
+  operatorName     String   @db.VarChar(128)
+  reason           String   @db.Text
+  sourceKeyVersion String   @db.VarChar(32)
+  targetKeyVersion String   @db.VarChar(32)
+  candidateCount   Int
+  reencryptedCount Int
+  failedCount      Int
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
 }
 
 // [Issue #124] FamilyGroupとは独立した、全体AI予算操作を許可する利用者。

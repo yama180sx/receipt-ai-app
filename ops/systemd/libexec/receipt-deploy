@@ -204,7 +204,7 @@ readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
 readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/docker-config"
 install -d -o root -g root -m 0700 "${SECRET_ROOT}"
 install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
-readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
+readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_totp_encryption_key backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user backend_smtp_password backend_smtp_from postgres_password)
 readonly SECRET_DIRECTORY="$(mktemp -d -p "${SECRET_ROOT}" generation.XXXXXX)"
 chmod 0700 "${SECRET_DIRECTORY}"
 for credential in "${CREDENTIALS[@]}"; do

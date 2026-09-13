@@ -131,6 +131,24 @@ for expected_line in \
   fi
 done
 
+require_exact_line 'LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/dev/backend_totp_encryption_key.cred' \
+  ops/systemd/units/receipt-deploy-dev.service
+require_exact_line 'LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/stable/backend_totp_encryption_key.cred' \
+  ops/systemd/units/receipt-deploy-stable.service
+for expected_line in \
+  'TOTP_ENCRYPTION_KEY_FILE: /run/secrets/backend_totp_encryption_key' \
+  'TOTP_LEGACY_ENCRYPTION_KEY_FILE: /run/secrets/backend_jwt_secret' \
+  'backend_totp_encryption_key:'; do
+  if ! grep -Fq "${expected_line}" docker-compose.secrets.yml; then
+    echo "[ERROR] root deployment must deliver a dedicated TOTP credential." >&2
+    exit 1
+  fi
+done
+if ! grep -Fq 'readonly CREDENTIALS=(backend_database_url backend_jwt_secret backend_totp_encryption_key' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deployment must stage a dedicated TOTP credential." >&2
+  exit 1
+fi
+
 if grep -Fq 'EXPO_PUBLIC_API_TOKEN' docker-compose.runtime.yml; then
   echo "[ERROR] runtime frontend must not receive an API token." >&2
   exit 1

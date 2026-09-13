@@ -37,7 +37,7 @@
 | `config/{dev,stable}.env.example` | `/etc/receipt-ai-app/{dev,stable}.env` | root:root / 0600 |
 | `sudoers.d/receipt-deploy` | `/etc/sudoers.d/receipt-deploy` | root:root / 0440 |
 
-credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_secret`、`backend_gemini_api_key`、`backend_ai_budget_discord_webhook`、`backend_smtp_user`、`backend_smtp_password`、`backend_smtp_from`、`postgres_password`、backupでは`db_password`、`backup_discord_webhook_url`に固定する。devとstableはcredentialを共有しない。
+credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_secret`、`backend_totp_encryption_key`、`backend_gemini_api_key`、`backend_ai_budget_discord_webhook`、`backend_smtp_user`、`backend_smtp_password`、`backend_smtp_from`、`postgres_password`、backupでは`db_password`、`backup_discord_webhook_url`に固定する。devとstableはcredentialを共有しない。TOTP移行中の旧JWT由来鍵は、既存の`backend_jwt_secret`を`TOTP_LEGACY_ENCRYPTION_KEY_FILE`へ明示的に割り当てる。再暗号化・認証確認後にこの割当を廃止するまで、JWT自体を更新してはならない。
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 

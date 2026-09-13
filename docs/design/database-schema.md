@@ -71,11 +71,32 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | familyGroupId | Int | No | — | — | FamilyGroup.id | 複合 | — |
 | role | Role | No | USER | — | — | — | — |
 | totpSecret | String | Yes | — | — | — | — | — |
+| totpKeyVersion | String | Yes | — | — | — | — | — |
 | totpEnabled | Boolean | No | false | — | — | — | — |
 | totpVerifiedAt | DateTime | Yes | — | — | — | — | — |
 
 **FK:** `familyGroupId` → `FamilyGroup.id`  
 **Unique:** `(name, familyGroupId)`
+
+`totpSecret` と `totpKeyVersion` はともにnull、またはともに非nullである。鍵の実値は保存しない。既存のJWT由来暗号文は `legacy-jwt-v1`、専用TOTP鍵で暗号化した値は `totp-v1` として扱う。
+
+---
+
+### TotpSecretReencryptionAudit
+
+root専用CLIによるTOTP再暗号化の追記型監査。利用者名、TOTPシークレット、鍵、認証コードは保存しない。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| operatorName | String | No | — | — | — | — | — |
+| reason | String | No | — | — | — | — | — |
+| sourceKeyVersion | String | No | — | — | — | — | — |
+| targetKeyVersion | String | No | — | — | — | — | — |
+| candidateCount | Int | No | — | — | — | — | — |
+| reencryptedCount | Int | No | — | — | — | — | — |
+| failedCount | Int | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | Yes |
 
 ---
 
