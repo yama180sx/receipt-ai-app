@@ -164,7 +164,7 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 |------|------|
 | スクリプト | `scripts/backup.sh {dev\|stable}` |
 | DB 形式 | `pg_dump` → gzip（`db_backup_YYYYMMDD_HHMMSS.sql.gz`） |
-| 画像形式 | `backend/uploads` を tar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
+| 画像形式 | root管理`/var/lib/receipt-ai-app/{env}/uploads`をtar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
 | 未完了解析 | PostgreSQL `ReceiptAnalysisJob` を正本として復元後に再投入 |
 | 保存先（stable） | `/mnt/raid_1t/backups/receipt-app/{db,uploads}/` |
 | 保存先（dev） | `/mnt/raid_1t/backups/receipt-app-dev/{db,uploads}/` |
@@ -191,12 +191,12 @@ sudo systemctl show receipt-backup-stable.service \
 | 実装 | `scripts/backup.sh` 内 `send_discord_alert` |
 | 通知先 | Discord Webhook（`#alerts` 相当 — README 記載） |
 | SUCCESS | DB・画像バックアップとも成功時（緑 embed） |
-| ERROR | `.env` 欠落、DB コンテナ停止、dump/tar 失敗、uploads ディレクトリ不在 |
+| ERROR | root管理credential・uploads領域の欠落、DB コンテナ停止、dump/tar 失敗 |
 
 `scripts/notify.sh` は汎用通知関数のみ定義されており、**現行の定期バックアップ通知は `backup.sh` が担う**。手動障害通知用のテンプレートとして利用可能。
 
 Discord Webhook、SMTP資格情報、送信元アドレスはGitへ保存しない。バックアップ通知は
-`BACKUP_DISCORD_WEBHOOK_URL`、AI予算通知は`AI_BUDGET_DISCORD_WEBHOOK_URL`を別々に設定する。
+encrypted credentialの`backup_discord_webhook_url`、AI予算通知のencrypted credentialを別々に設定する。
 SMTPは`SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`で設定する。
 Webhookを誤ってGitへ記録した場合は、履歴削除だけでなくDiscord側で旧Webhookを直ちに無効化・再発行する。
 

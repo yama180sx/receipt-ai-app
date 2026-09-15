@@ -51,6 +51,7 @@ for helper in \
 done
 
 "${project_root}/scripts/security/test-restore-helper-contract.sh"
+"${project_root}/scripts/security/test-root-only-backup-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"
