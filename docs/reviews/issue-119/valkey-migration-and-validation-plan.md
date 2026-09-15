@@ -2,11 +2,9 @@
 
 ## 目的とこのPRの範囲
 
-この資料は、Issue #119でValkeyへ切り替える前の設計・検証計画である。この段階ではCompose、T320のroot管理設定、永続データ、Redisコンテナを変更しない。
+この資料は、Issue #119の設計・検証計画と実施結果を記録する。実装PRで対象イメージ、切替手順、証跡を反映し、2026-09-15にdevおよびT320 stable（amd64）への切替を完了した。
 
-実装PRでは、ここで確定した対象イメージ、切替手順、証跡を反映する。
-
-dev検証候補は、`docker-compose.yml`へ固定した公式Valkey imageとする。このmanifestにはAMD64とARM64のイメージが含まれる。stableでの採用は、devとARM64実機での受入基準達成後に人間が承認する。
+`docker-compose.yml`にはAMD64とARM64を含む公式Valkey imageの完全なdigestを固定する。Oracle ARM64実機での受入は、公開環境を扱うIssue #118-1以降で実施する。
 
 ## 2026-09-15 現行棚卸し
 
@@ -39,7 +37,7 @@ PostgreSQL ReceiptAnalysisJob + uploads  ──正本──>  backend起動時�
 1. root管理devバックアップを成功させ、backend health・migration・BullMQ件数・台帳件数を値なしで記録する。
 2. devの解析メンテナンスモードを有効化し、画面で「解析基盤を更新中」と表示されることを確認する。
 3. 既存`redisdata`の所有者・mode・ファイル名だけを記録し、その内容を変更しない。
-4. Valkey用の新規`valkeydata`をroot所有で作成する。既存`redisdata`をコピー・削除・上書きしない。
+4. rootヘルパーがValkey用の新規`valkeydata`を作成し、Valkey公式imageの実行UID（`999:root`、mode `0700`）に書込権限を設定する。既存`redisdata`をコピー・削除・上書きしない。
 5. 固定タグ・digestの公式Valkeyイメージでdevを起動する。選んだmanifestにamd64とARM64の両方が含まれることを確認する。
 6. backend health、migration、Valkey health、BullMQ件数、台帳件数を確認する。
 7. devのテスト世帯で、通常レシートの投入、Worker完了、確認トレイ、結果登録を確認する。
@@ -87,3 +85,23 @@ stableへの適用は、devの全受入基準、実施SHA、採用タグ・diges
 - 環境変数の互換性と既存backend設定を維持し、利用者向けAPIは変更しない。
 - 本番用Composeのネットワーク・host port非公開方針はIssue #118-1へ引き継ぐ。
 - 採用した完全なimage reference、ARM64確認日、更新・ロールバック手順をADR-012と運用資料へ追記する。
+
+## 2026-09-15 実施結果
+
+| 確認項目 | dev | T320 stable |
+|---|---|---|
+| Valkey起動・backend health・migration | 成功 | 成功 |
+| メンテナンス表示 | 成功 | 成功 |
+| 通常レシートの解析・確認・登録 | 成功 | 成功 |
+| 台帳からの同一jobId復旧 | 成功 | 成功 |
+| テストジョブ破棄後の未完了キュー・台帳0件 | 成功 | 成功 |
+| root管理backup（DB・uploads） | 成功 | 成功 |
+| T320ホスト再起動後の自動復旧 | 成功 | 成功 |
+
+stable切替前の旧Compose再デプロイに必要な`RECAIPT_REDISDATA_DIR`は、Issue #119-1でrootヘルパーに移行期間中の互換変数として追加した。Valkey導入後のComposeは`RECAIPT_QUEUE_DATA_DIR`だけを参照するため、旧Redis RDBは読み込まない。
+
+### 後続条件
+
+- Oracle ARM64実機で、同一image digestによる主要フローを再実行する（Issue #118-1以降）。
+- 旧`redisdata`はstableで少なくとも14日間運用観察し、人間が明示承認するまで削除しない。
+- AI予算通知キューの切替後送達確認は、通常の通知試験と併せて別途記録する。

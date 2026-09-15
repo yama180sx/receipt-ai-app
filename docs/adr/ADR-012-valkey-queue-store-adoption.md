@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted（dev検証候補は`docker-compose.yml`に固定する。stable採用はdev・ARM64実機検証後に承認する）
+Accepted（devおよびT320 stableへの採用は完了。Oracle ARM64実機検証はIssue #118-1以降の公開環境受入条件とする）
 
 関連: [Issue #119](https://github.com/yama180sx/receipt-ai-app/issues/633)、[Issue #118-1](https://github.com/yama180sx/receipt-ai-app/issues/632)、[ADR-008](ADR-008-valkey-queue-recovery.md)
 
@@ -19,7 +19,7 @@ Redis CE 7.4以降が生成したRDB/AOFはValkeyと互換ではない。この�
 - Redis 7.4の既存RDBはValkeyへ移行しない。切替時は新しい空のValkey永続領域から開始し、未完了台帳を同じjobIdで再投入する。
 - 旧`redisdata`は、切替後のdev検証とstable適用が完了するまで削除・上書きしない。ロールバック時だけ旧Redis構成と組み合わせる。
 - 新しい永続領域は`valkeydata`とし、旧Redis領域と混在させない。
-- dev検証には、公式ValkeyのAMD64／ARM64 manifestを含む完全なdigestを`docker-compose.yml`へ固定して使用する。可変タグは使用しない。stable採用はdev・ARM64実機検証に成功した後に承認する。
+- dev／stableには、公式ValkeyのAMD64／ARM64 manifestを含む完全なdigestを`docker-compose.yml`へ固定して使用する。可変タグは使用しない。Oracle ARM64実機での同一digest検証は、公開環境を扱うIssue #118-1以降で完了させる。
 - 予定外のキューストア停止、接続断、空領域からの再起動に対し、起動時・接続復帰時・定期照合の台帳復旧が機能することを検証する。
 
 ## Consequences
@@ -35,6 +35,18 @@ Redis CE 7.4以降が生成したRDB/AOFはValkeyと互換ではない。この�
 - Redis 7.4のRDBをValkeyへ変換・復元しない。切替時にキュー内だけに存在したジョブは台帳から再投入する。
 - 切替中は`RECEIPT_ANALYSIS_MAINTENANCE_MODE=true`で新規投入と手動再実行を停止する。履歴閲覧・確認済み結果の登録は継続する。
 - イメージのタグ・digestは、検証前に推測で固定しない。ARM64を含む同一manifestで確認した値だけを採用する。
+
+## Verification record
+
+2026-09-15に、devおよびT320 stable（amd64）で以下を値・ジョブID・レシート内容を記録せずに確認した。
+
+- メンテナンスモード中は新規解析投入が503となること。
+- Valkeyへの切替後、通常レシートの解析、確認、登録ができること。
+- 制御した未完了ジョブをキューストアから削除後、PostgreSQLの`ReceiptAnalysisJob`台帳から同じjobIdで復元できること。
+- テストジョブを破棄後、未完了キューおよび台帳が0件となること。
+- root管理backup、root管理deploy再起動、T320ホスト再起動後の自動復旧、ログインが成功すること。
+
+Oracle ARM64実機での検証、および旧`redisdata`削除の可否は未完了である。後者はstableでの運用観察を少なくとも14日間行い、人間が明示承認した場合にだけ別レビューで判断する。
 
 ## Rollback
 
