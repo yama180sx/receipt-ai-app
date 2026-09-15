@@ -19,8 +19,8 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | やりたいこと | 最初に読む場所 | 詳細 |
 |--------------|----------------|------|
 | root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
-| 定期バックアップの確認・手動実行 | 本書 §3 | [restore-manual.md §0](../restore-manual.md) |
-| 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | dev / stable 別手順 |
+| 定期バックアップの確認・手動実行 | 本書 §3 | root管理`receipt-backup-{env}.service` |
+| 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | root管理restore helperを使う |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
@@ -164,7 +164,7 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 |------|------|
 | スクリプト | `scripts/backup.sh {dev\|stable}` |
 | DB 形式 | `pg_dump` → gzip（`db_backup_YYYYMMDD_HHMMSS.sql.gz`） |
-| 画像形式 | `backend/uploads` を tar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
+| 画像形式 | root管理`/var/lib/receipt-ai-app/{env}/uploads`をtar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
 | 未完了解析 | PostgreSQL `ReceiptAnalysisJob` を正本として復元後に再投入 |
 | 保存先（stable） | `/mnt/raid_1t/backups/receipt-app/{db,uploads}/` |
 | 保存先（dev） | `/mnt/raid_1t/backups/receipt-app-dev/{db,uploads}/` |
@@ -182,7 +182,7 @@ sudo systemctl show receipt-backup-stable.service \
 
 定期実行は`systemctl is-enabled receipt-backup-stable.timer`と`systemctl list-timers receipt-backup-stable.timer`で確認する。`systemctl status -l`やプロセス詳細は秘密値を含み得るため、通常の確認には使わない。
 
-バックアップ一覧の確認は [restore-manual.md §1](../restore-manual.md) を参照。
+バックアップ一覧の確認では、対象環境の保存先だけを参照し、秘密値を含む`.env`や旧ユーザー所有作業ディレクトリを使用しない。
 
 ### 3.3 Discord アラート
 
@@ -191,12 +191,12 @@ sudo systemctl show receipt-backup-stable.service \
 | 実装 | `scripts/backup.sh` 内 `send_discord_alert` |
 | 通知先 | Discord Webhook（`#alerts` 相当 — README 記載） |
 | SUCCESS | DB・画像バックアップとも成功時（緑 embed） |
-| ERROR | `.env` 欠落、DB コンテナ停止、dump/tar 失敗、uploads ディレクトリ不在 |
+| ERROR | root管理credential・uploads領域の欠落、DB コンテナ停止、dump/tar 失敗 |
 
 `scripts/notify.sh` は汎用通知関数のみ定義されており、**現行の定期バックアップ通知は `backup.sh` が担う**。手動障害通知用のテンプレートとして利用可能。
 
 Discord Webhook、SMTP資格情報、送信元アドレスはGitへ保存しない。バックアップ通知は
-`BACKUP_DISCORD_WEBHOOK_URL`、AI予算通知は`AI_BUDGET_DISCORD_WEBHOOK_URL`を別々に設定する。
+encrypted credentialの`backup_discord_webhook_url`、AI予算通知のencrypted credentialを別々に設定する。
 SMTPは`SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`で設定する。
 Webhookを誤ってGitへ記録した場合は、履歴削除だけでなくDiscord側で旧Webhookを直ちに無効化・再発行する。
 
@@ -208,7 +208,7 @@ root管理unitの結果とjournalを、秘密値を出さない範囲で確認�
 2. `journalctl -u receipt-backup-{env}.service`から成功・失敗分類だけを確認
 3. root管理uploads領域、DBコンテナ、encrypted credentialの論理名を確認する
 
-詳細: [restore-manual.md §0](../restore-manual.md)
+旧cron・平文`.env`を前提とする確認手順は使用しない。
 
 ### 3.5 PostgreSQL スロークエリログ
 
@@ -289,8 +289,9 @@ docker compose exec backend npm run prisma:sync-sequences
 
 ### 5.1 事前確認
 
-1. [restore-manual.md §1](../restore-manual.md) で対象環境のバックアップ一覧を表示
-2. 復元したい `TARGET_TS`（例: `20260519_061210`）を特定
+1. 対象環境のroot管理backupが成功していることを確認する
+2. 復元候補のバックアップ時刻を特定する
+3. 対象環境、停止時間、復旧担当者を人間が承認する
 
 ### 5.2 環境別作業ディレクトリ
 
@@ -299,7 +300,7 @@ docker compose exec backend npm run prisma:sync-sequences
 | dev | `/srv/receipt-ai-app/dev` | `receipt-dev-db` |
 | stable | `/srv/receipt-ai-app/stable` | `receipt-stable-db` |
 
-> root管理環境の復旧は、対象環境のdeploy unitを止めた上でroot管理作業ディレクトリと`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。旧手順書のユーザー所有パスはロールバック期限中の旧経路にだけ使用する。
+> root管理環境の復旧は、対象環境のroot管理backup、encrypted credential、`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。平文`.env`・旧ユーザー所有パス・直接Docker Composeを使わず、[復旧手順書](../restore-manual.md)のroot helperだけを使用する。
 
 ### 5.3 復旧後チェックリスト
 
@@ -308,7 +309,7 @@ docker compose exec backend npm run prisma:sync-sequences
 - [ ] レシート画像（WebP 等）が描画される
 - [ ] 統計・精算画面が正常
 
-全文: [restore-manual.md §4](../restore-manual.md)
+復旧手順の詳細は[restore-manual.md](../restore-manual.md)を参照する。
 
 ---
 
@@ -347,7 +348,7 @@ flowchart LR
   end
 
   subgraph recovery [障害時]
-    RAID --> Restore[restore-manual.md 手順]
+    RAID --> Restore[root restore helper]
     Restore --> App[アプリ動作確認]
   end
 ```
@@ -367,7 +368,8 @@ flowchart LR
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
-| `docs/restore-manual.md` | リストア詳細（移行期間維持） |
+| `ops/systemd/libexec/receipt-restore` | root管理DB・uploads復旧ヘルパー |
+| `docs/restore-manual.md` | root管理復旧の承認条件・実行・受入確認 |
 
 ---
 

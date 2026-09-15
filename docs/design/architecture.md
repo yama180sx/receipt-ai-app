@@ -62,7 +62,7 @@ flowchart TB
     BE --> FS
     BE --> Gemini
 
-    Cron[setup-env.sh cron] --> Backup[scripts/backup.sh]
+    Timer[systemd backup timer] --> Backup[root backup helper]
     Backup --> Discord
 ```
 
@@ -118,7 +118,7 @@ receipt-ai-app/
 ├── scripts/                 # backup.sh, notify.sh
 ├── docs/                    # 設計・運用ドキュメント
 ├── docker-compose.yml
-└── setup-env.sh             # dev / stable 環境生成
+└── setup-env.sh             # 廃止済み（root管理手順へ移行）
 ```
 
 ---

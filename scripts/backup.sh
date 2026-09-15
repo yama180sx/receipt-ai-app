@@ -1,8 +1,8 @@
 #!/bin/bash
-set -o pipefail
+set -euo pipefail
 
 # --- 環境判定ロジック ---
-ENV=$1
+ENV="${1:-}"
 
 if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
     echo "[ERROR] Usage: $0 {stable|dev}"
@@ -10,12 +10,11 @@ if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
 fi
 
 # --- 設定項目 ---
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
-# Discord Webhookは環境変数またはroot管理のSecretファイルで渡す。秘密値はGit管理しない。
-WEBHOOK_URL="${BACKUP_DISCORD_WEBHOOK_URL:-}"
+# DB passwordとDiscord Webhookはroot管理のcredentialだけから渡す。秘密値はGit管理しない。
+WEBHOOK_URL=""
 SECRET_DIR="${RECAIPT_BACKUP_SECRET_DIR:-}"
 RUNTIME_UPLOADS_DIR="${RECAIPT_BACKUP_UPLOADS_DIR:-}"
 
@@ -55,56 +54,42 @@ send_discord_alert() {
                     \"color\": $color,
                     \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
                 }]
-                }" > /dev/null 2>&1
+                }" > /dev/null 2>&1 || true
+    # 通知失敗はDB・uploadsのbackup結果を覆さない。backupの成否は各処理で判定する。
+    return 0
 }
 
-# 1. バックアップ先ディレクトリ作成
-mkdir -p "${BACKUP_DIR}/db"
-mkdir -p "${BACKUP_DIR}/uploads"
+# 1. root管理credentialと永続uploads領域がなければ、Docker・保存先へ触れずに失敗する。
+[ -n "${SECRET_DIR}" ] || {
+    echo "[$(date)] [ERROR] Root-managed backup secret directory is unavailable."
+    exit 1
+}
+[ -n "${RUNTIME_UPLOADS_DIR}" ] || {
+    echo "[$(date)] [ERROR] Root-managed uploads directory is not configured."
+    exit 1
+}
 
-# 2. root管理Secretファイル、または段階移行中の旧.envから認証情報を取得
-if [ -n "${SECRET_DIR}" ]; then
-    DB_SECRET_FILE="${SECRET_DIR}/db_password"
-    WEBHOOK_SECRET_FILE="${SECRET_DIR}/backup_discord_webhook_url"
-    if [ ! -r "${DB_SECRET_FILE}" ]; then
-        echo "[$(date)] [ERROR] Backup secret files are unavailable."
-        exit 1
-    fi
-    DB_PASS=$(<"${DB_SECRET_FILE}")
-    if [ -z "${DB_PASS}" ]; then
-        echo "[$(date)] [ERROR] Backup secret files are unavailable."
-        exit 1
-    fi
-    if [ -r "${WEBHOOK_SECRET_FILE}" ]; then
-        BACKUP_WEBHOOK=$(<"${WEBHOOK_SECRET_FILE}")
-        WEBHOOK_URL="${BACKUP_WEBHOOK}"
-    fi
-else
-    DOTENV_FILE="${PROJECT_ROOT}/.env"
-    if [ ! -f "${DOTENV_FILE}" ]; then
-        msg="[ERROR] .env file not found at ${DOTENV_FILE}"
-        echo "[$(date)] $msg"
-        send_discord_alert "ERROR" "$msg"
-        exit 1
-    fi
-    DB_PASS=$(grep '^DB_PASSWORD=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
-    BACKUP_WEBHOOK=$(grep '^BACKUP_DISCORD_WEBHOOK_URL=' "${DOTENV_FILE}" | cut -d '=' -f 2-)
-    WEBHOOK_URL="${BACKUP_WEBHOOK:-$WEBHOOK_URL}"
+DB_SECRET_FILE="${SECRET_DIR}/db_password"
+WEBHOOK_SECRET_FILE="${SECRET_DIR}/backup_discord_webhook_url"
+if [ ! -r "${DB_SECRET_FILE}" ] || [ ! -r "${WEBHOOK_SECRET_FILE}" ]; then
+    echo "[$(date)] [ERROR] Root-managed backup credential files are unavailable."
+    exit 1
+fi
+DB_PASS=$(<"${DB_SECRET_FILE}")
+WEBHOOK_URL=$(<"${WEBHOOK_SECRET_FILE}")
+if [ -z "${DB_PASS}" ] || [ -z "${WEBHOOK_URL}" ]; then
+    echo "[$(date)] [ERROR] Root-managed backup credential files are unavailable."
+    exit 1
 fi
 
-if [ -n "${SECRET_DIR}" ]; then
-    # root管理runtimeでは、uploadsはソースツリーではなくroot管理の永続領域にある。
-    SOURCE_UPLOADS_DIR="${RUNTIME_UPLOADS_DIR}"
-    if [ -z "${SOURCE_UPLOADS_DIR}" ]; then
-        echo "[$(date)] [ERROR] Root-managed uploads directory is not configured."
-        exit 1
-    fi
-else
-    # 段階移行中の旧Composeでは従来のソースツリーを使う。
-    SOURCE_UPLOADS_DIR="${PROJECT_ROOT}/backend/uploads"
-fi
+# 2. root管理runtimeでは、uploadsはソースツリーではなく永続領域にある。
+SOURCE_UPLOADS_DIR="${RUNTIME_UPLOADS_DIR}"
 UPLOADS_PARENT_DIR="$(dirname "${SOURCE_UPLOADS_DIR}")"
 UPLOADS_DIRECTORY_NAME="$(basename "${SOURCE_UPLOADS_DIR}")"
+
+# 3. credentialと入力領域の検査後にだけbackup保存先を作成する。
+mkdir -p "${BACKUP_DIR}/db"
+mkdir -p "${BACKUP_DIR}/uploads"
 
 echo "[$(date)] ($ENV_LABEL) Backup started."
 
@@ -112,7 +97,7 @@ echo "[$(date)] ($ENV_LABEL) Backup started."
 ERROR_COUNT=0
 DETAILS=""
 
-# 3. DBバックアップ
+# 4. DBバックアップ
 if [ ! "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
     msg="Container ${CONTAINER_NAME} is NOT running."
     echo "  -> [ERROR] $msg"
@@ -133,38 +118,36 @@ else
         msg="PostgreSQL Dump FAILED on ($ENV_LABEL)."
         echo "  -> [ERROR] $msg"
         DETAILS="${DETAILS}- DB Backup: FAILED (Dump error)\n"
-        ((ERROR_COUNT++))
+        ((ERROR_COUNT+=1))
     fi
 fi
 
-# 4. 画像バックアップ
+# 5. 画像バックアップ
 if [ -d "${SOURCE_UPLOADS_DIR}" ]; then
-    tar -czf "${BACKUP_DIR}/uploads/uploads_backup_${TIMESTAMP}.tar.gz" -C "${UPLOADS_PARENT_DIR}" "${UPLOADS_DIRECTORY_NAME}"
-    
-    if [ $? -eq 0 ]; then
+    if tar -czf "${BACKUP_DIR}/uploads/uploads_backup_${TIMESTAMP}.tar.gz" -C "${UPLOADS_PARENT_DIR}" "${UPLOADS_DIRECTORY_NAME}"; then
         echo "  -> ($ENV_LABEL) Uploads Backup SUCCESS."
         DETAILS="${DETAILS}- Image Backup: SUCCESS\n"
     else
         msg="Tar archive creation FAILED on ($ENV_LABEL)."
         echo "  -> [ERROR] $msg"
         DETAILS="${DETAILS}- Image Backup: FAILED (Tar error)\n"
-        ((ERROR_COUNT++))
+        ((ERROR_COUNT+=1))
     fi
 else
     msg="Uploads directory NOT found at ${SOURCE_UPLOADS_DIR}."
     echo "  -> [ERROR] $msg"
     DETAILS="${DETAILS}- Image Backup: FAILED (Dir not found)\n"
-    ((ERROR_COUNT++))
+    ((ERROR_COUNT+=1))
 fi
 
-# 5. 世代管理
+# 6. 世代管理
 find "${BACKUP_DIR}/db" -name "*.gz" -mtime +${RETENTION_DAYS} -delete
 find "${BACKUP_DIR}/uploads" -name "*.tar.gz" -mtime +${RETENTION_DAYS} -delete
 DETAILS="${DETAILS}- Retention Policy: Applied (Kept $RETENTION_DAYS days)"
 
 echo "[$(date)] ($ENV_LABEL) Backup completed."
 
-# 6. 最終結果通知
+# 7. 最終結果通知
 if [ $ERROR_COUNT -eq 0 ]; then
     send_discord_alert "SUCCESS" "Backup completed successfully.\n\n**Details:**\n$DETAILS"
 else
