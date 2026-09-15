@@ -33,6 +33,8 @@
 | --- | --- | --- |
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
+| `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
+| `libexec/receipt-rollback-invitation-codes` | `/usr/local/libexec/receipt-rollback-invitation-codes` | root:root / 0750 |
 | `units/*.service`, `units/*.timer` | `/etc/systemd/system/` | root:root / 0644 |
 | `config/{dev,stable}.env.example` | `/etc/receipt-ai-app/{dev,stable}.env` | root:root / 0600 |
 | `sudoers.d/receipt-deploy` | `/etc/sudoers.d/receipt-deploy` | root:root / 0440 |
