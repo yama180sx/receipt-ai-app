@@ -4,7 +4,7 @@ RecAIpt（読み：レシート、Receipt + AI）の **本番入口** と **開�
 
 ## URL 一覧（stable 環境の例）
 
-`HOST_IP` は T320 の LAN IP（例: `192.168.1.32`）。`grep '^HOST_IP=' ~/stable/receipt-ai-app/.env` で確認。
+`HOST_IP` はroot所有の`/etc/receipt-ai-app/stable.env`にある非機密設定である。確認が必要な場合だけ、管理担当者が`sudo grep '^HOST_IP=' /etc/receipt-ai-app/stable.env`を実行する。値をIssueやGitへ転記しない。
 
 | 用途 | URL | 対象 |
 |------|-----|------|
@@ -40,8 +40,8 @@ stable の backend は `:80` に加え `:8082` / `exp://` を CORS 許可して�
 | 症状 | 確認 |
 |------|------|
 | Expo Go / Web dev の URL | ログ冒頭の案内を参照。stable は `http://HOST_IP:8082`（dev は `:8081`）。Expo 標準ログの `localhost:8081` は無視 |
-| `:8082` の QR が `8081` になる / Expo Go が繋がらない | `docker compose up -d frontend-dev --force-recreate`（`DEV_PORT` と内部ポートを一致させる） |
-| `:8082` で招待コードが通らない | T320 上で `http://localhost:8082` を使う場合、backend の CORS に `localhost:8082` が必要。`./setup-env.sh stable` 後 `docker compose restart backend`。別 PC/スマホからは `http://HOST_IP:8082` を使う |
+| `:8082` の QR が `8081` になる / Expo Go が繋がらない | root管理設定の`DEV_PORT`を確認し、管理担当者が固定unitでstableを再デプロイする。`docker compose`を直接実行しない。 |
+| `:8082` で招待コードが通らない | root所有設定のCORS関連値と`HOST_IP`を確認し、管理担当者が固定unitでstableを再デプロイする。`setup-env.sh`やユーザー所有Composeは使わない。別PC／スマホからは`http://HOST_IP:8082`を使う。 |
 | 招待コード入力後に進まない（Android Web） | 旧ビルドは `:3000` 直叩きで CORS / ポート到達性の問題あり。**frontend を再ビルド**（`/api` 同一 Origin プロキシ）。それでも失敗する場合は Wi‑Fi 同一 LAN・`http://HOST_IP` でアクセスしているか確認 |
 | Expo Go が繋がらない | 同一 Wi-Fi、`HOST_IP` が QR の URL と一致するか |
 | iPhone でカメラが起動しない | HTTP 制限の可能性 — ギャラリーから選択、または Web 切り取り UI（#94-4）を利用 |
