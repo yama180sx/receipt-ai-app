@@ -43,5 +43,5 @@ services:
 
   redis:
     volumes: !override
-      - ${RECAIPT_REDISDATA_DIR}:/data
+      - ${RECAIPT_QUEUE_DATA_DIR}:/data
       - /etc/localtime:/etc/localtime:ro

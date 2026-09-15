@@ -6,6 +6,8 @@
 
 実装PRでは、ここで確定した対象イメージ、切替手順、証跡を反映する。
 
+dev検証候補は、`docker-compose.yml`へ固定した公式Valkey imageとする。このmanifestにはAMD64とARM64のイメージが含まれる。stableでの採用は、devとARM64実機での受入基準達成後に人間が承認する。
+
 ## 2026-09-15 現行棚卸し
 
 | 項目 | dev | stable |

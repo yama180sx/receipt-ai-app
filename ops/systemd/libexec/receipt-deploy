@@ -107,7 +107,8 @@ write_runtime_env() {
     printf 'DB_PASSWORD=__managed_by_file__\n'
     printf 'RECAIPT_UPLOADS_DIR=%s/uploads\n' "${data_directory}"
     printf 'RECAIPT_PGDATA_DIR=%s/pgdata\n' "${data_directory}"
-    printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
+    # Redis CE 7.4の旧RDBをValkeyへ読ませない。旧redisdataはrollback専用で保持する。
+    printf 'RECAIPT_QUEUE_DATA_DIR=%s/valkeydata\n' "${data_directory}"
     printf 'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env\n' "${APP_DIRECTORY}"
   } > "${destination}/compose.env"
 
@@ -176,10 +177,10 @@ esac
 install -d -m 0750 "${DATA_DIRECTORY}/uploads"
 chown 1000:1000 "${DATA_DIRECTORY}/uploads"
 
-# postgres:18 と redis:7-alpine は、永続データの所有者としてUID 999を使用する。
+# postgres:18 と Valkey公式image は、永続データの所有者としてUID 999を使用する。
 # root helperが移行済みデータの親ディレクトリをroot専用へ変更しないよう、
 # コンテナが書込み可能な所有者・modeを明示する。
-for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata"; do
+for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"; do
   install -d -m 0700 "${directory}"
   chown 999:root "${directory}"
 done
@@ -277,7 +278,7 @@ verify_backend_health() {
 run_compose build backend frontend frontend-dev
 # DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
 # 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
-# 永続データはRECAIPT_PGDATA_DIRとRECAIPT_REDISDATA_DIRのbind mountに残るため削除しない。
+# 永続データはRECAIPT_PGDATA_DIRとRECAIPT_QUEUE_DATA_DIRのbind mountに残るため削除しない。
 run_compose up -d --wait --force-recreate db redis
 run_prisma_migration
 # runtime設定・image更新を確実に反映する。DB／Redisは直前のhealthcheck済みのため再作成しない。
