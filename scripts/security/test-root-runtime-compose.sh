@@ -43,9 +43,18 @@ DB_NAME=contract
 DB_PASSWORD=managed-by-file
 RECAIPT_UPLOADS_DIR=${temporary_directory}/uploads
 RECAIPT_PGDATA_DIR=${temporary_directory}/pgdata
+RECAIPT_REDISDATA_DIR=${temporary_directory}/redisdata
 RECAIPT_QUEUE_DATA_DIR=${temporary_directory}/valkeydata
 RECAIPT_BACKEND_ENV_FILE=${temporary_directory}/backend.env
 EOF
+}
+
+verify_legacy_runtime_compatibility() {
+  local deploy_helper="${repo_root}/ops/systemd/libexec/receipt-deploy"
+
+  grep -Fq 'RECAIPT_REDISDATA_DIR=%s/redisdata' "${deploy_helper}"
+  grep -Fq 'RECAIPT_QUEUE_DATA_DIR=%s/valkeydata' "${deploy_helper}"
+  grep -Fq '"${DATA_DIRECTORY}/redisdata"' "${deploy_helper}"
 }
 
 verify_command() {
@@ -73,5 +82,6 @@ verify_command() {
 
 verify_command 'npm run dev' 'npm run dev'
 verify_command 'npm run start' 'npm run start'
+verify_legacy_runtime_compatibility
 
 echo '[OK] root runtime Compose contract is valid.'
