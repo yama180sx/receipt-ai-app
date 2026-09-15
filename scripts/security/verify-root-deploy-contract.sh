@@ -26,6 +26,7 @@ fi
 for file in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/units/receipt-deploy-dev.service \
@@ -43,10 +44,13 @@ done
 for helper in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes; do
   bash -n "${helper}"
 done
+
+"${project_root}/scripts/security/test-restore-helper-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"

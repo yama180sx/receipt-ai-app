@@ -33,6 +33,7 @@
 | --- | --- | --- |
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
+| `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
 | `libexec/receipt-rollback-invitation-codes` | `/usr/local/libexec/receipt-rollback-invitation-codes` | root:root / 0750 |
 | `units/*.service`, `units/*.timer` | `/etc/systemd/system/` | root:root / 0644 |
@@ -46,6 +47,14 @@ deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照
 deployはDBとRedisを現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
 
 root管理backupは`/var/lib/receipt-ai-app/{env}/uploads`をアーカイブする。DBまたはuploadsのどちらかが失敗した場合、通知後に非0で終了するためsystemdは成功扱いにしない。
+
+## 緊急復旧
+
+DB・uploadsの復旧は、通常運用の操作ではない。対象環境、対象バックアップ時刻、停止時間、作業担当者、復旧担当者を人間が承認したメンテナンス時間にだけ実施する。詳細な開始条件と受入確認は[docs/restore-manual.md](../../docs/restore-manual.md)を正とする。
+
+root管理restore helperは、固定した`dev`または`stable`、バックアップの時刻形式、明示確認語だけを受け取る。任意パス・任意コンテナ名・平文`.env`を受け取らない。実行前に新しいroot管理backupを作成し、DB dumpとuploads archiveを検査する。復元後はValkeyを空にし、PostgreSQLの`ReceiptAnalysisJob`台帳から未完了ジョブを復旧する。
+
+途中失敗時は自動ロールバックやコンテナ再開をしない。復旧担当者が停止状態、事前backup、退避済みuploadsを確認して次の判断を行う。helperが退避する`uploads`は明示承認なしに削除しない。
 
 ## ロールバックと停止条件
 
