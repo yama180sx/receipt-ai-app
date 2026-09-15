@@ -110,20 +110,22 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- Redis ---
+  # --- Queue store (Valkey) ---
+  # service名は既存BullMQ接続（REDIS_HOST=redis）との互換のため維持する。
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:8.1.10-alpine3.24@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1
     container_name: receipt-${ENV_NAME}-redis
     restart: unless-stopped
     environment:
       - TZ=Asia/Tokyo
     volumes:
-      - ./redisdata:/data
+      # Redis CE 7.4 の既存RDBはValkeyと互換ではないため、旧redisdataをmountしない。
+      - "${RECAIPT_QUEUE_DATA_DIR:-./valkeydata}:/data"
       - /etc/localtime:/etc/localtime:ro
     ports:
       - "${REDIS_PORT}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
