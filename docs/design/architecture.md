@@ -73,7 +73,7 @@ flowchart TB
 | Frontend | Expo ~57, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
 | Backend | Node.js 20, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
-| Queue | BullMQ 5 + Redis 7（Valkey移行は Issue #119 で検証中） |
+| Queue | BullMQ 5 + Valkey 8.1（Issue #119でdev検証中） |
 | AI | `@google/generative-ai`（Gemini） |
 | 画像 | sharp（WebP 変換）, multer（アップロード） |
 | 認証 | JWT, bcrypt, otplib（TOTP）, AES-256-GCM |
@@ -660,9 +660,11 @@ ER 詳細は [domain-model.md](./domain-model.md)（#90-2）。
 
 クラウドストレージは未使用。`backend/uploads/` に WebP 変換後の画像を保存し、認証付き `GET /api/uploads/:filename` で配信する（世帯スコープ検証あり）。
 
-### 7.3 Redis
+### 7.3 Valkey
 
-BullMQ のジョブキュー専用。`redisdata/` ボリュームで永続化。
+BullMQのジョブキュー専用。公式Valkeyイメージを完全なタグとdigestで固定し、`valkeydata/`ボリュームで永続化する。接続先サービス名と既存の`REDIS_*`設定名はBullMQ/ioredis互換のため維持する。
+
+PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkeyは実行キューである。キューストアを喪失した場合は、台帳とuploadsから同じjobIdで再投入する。Redis CE 7.4の旧`redisdata/`はValkeyへ移行せず、ロールバック専用に分離保持する。詳細は[ADR-012](../adr/ADR-012-valkey-queue-store-adoption.md)を参照する。
 
 ---
 
