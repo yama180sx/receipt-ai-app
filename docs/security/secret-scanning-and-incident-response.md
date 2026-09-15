@@ -13,6 +13,14 @@
 
 Gitleaksの除外は原則禁止とする。テスト固定値による誤検知を確認した場合だけ、完全一致の値または最小の条件を `.gitleaks.toml` へ追加する。ディレクトリ、ファイル全体、ルール全体を除外してはならない。
 
+履歴上の特定検出だけを値なしで除外する必要がある場合は、`.gitleaksignore` にGitleaks fingerprint（`commit:file:rule:line`）だけを追加する。fingerprintに秘密値を含めず、追加前に次を満たす。
+
+1. 値を表示しない診断で、rule・commit・file・lineを確定する。
+2. 対象がruntime credential、実データ、実在tokenではないことを確認する。
+3. 同じGitleaks versionで履歴全体を再検査し、新規検出を隠していないことを確認する。
+
+fingerprintは対象コミットと行に限定されるため、将来の同名ファイル・同名変数・新しいcommitを除外しない。Gitleaks versionを変更するPRでは、PR・push・履歴全体の再検査を必須とする。
+
 週次実行は毎週月曜04:17（`Asia/Tokyo`）に履歴全体を再検査する。GitHub Actionsの手動実行でも履歴全体を検査できる。検知した場合、値を表示しない失敗結果だけを確認し、本書 §4 の手順で対応する。
 
 ## 2. 開発者の初回設定
