@@ -26,17 +26,25 @@ fi
 for file in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-rotate-invitation-codes \
+  ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/units/receipt-deploy-dev.service \
   ops/systemd/units/receipt-deploy-stable.service \
   ops/systemd/units/receipt-backup-dev.service \
-  ops/systemd/units/receipt-backup-stable.service; do
+  ops/systemd/units/receipt-backup-stable.service \
+  ops/systemd/units/receipt-rotate-invitation-codes-dev.service \
+  ops/systemd/units/receipt-rotate-invitation-codes-stable.service; do
   test -f "${file}" || {
     echo "[ERROR] missing managed runtime artifact: ${file}" >&2
     exit 1
   }
 done
 
-for helper in ops/systemd/libexec/receipt-deploy ops/systemd/libexec/receipt-backup; do
+for helper in \
+  ops/systemd/libexec/receipt-deploy \
+  ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-rotate-invitation-codes \
+  ops/systemd/libexec/receipt-rollback-invitation-codes; do
   bash -n "${helper}"
 done
 
@@ -57,6 +65,10 @@ require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-dev' \
   ops/systemd/units/receipt-backup-dev.service
 require_exact_line 'RuntimeDirectory=receipt-ai-app-backup-stable' \
   ops/systemd/units/receipt-backup-stable.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-invitation-code-rotation-dev' \
+  ops/systemd/units/receipt-rotate-invitation-codes-dev.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-invitation-code-rotation-stable' \
+  ops/systemd/units/receipt-rotate-invitation-codes-stable.service
 
 for compose_file in docker-compose.yml docker-compose.secrets.yml docker-compose.runtime.yml; do
   if ! grep -Fq -- "-f \"\${APP_DIRECTORY}/${compose_file}\"" ops/systemd/libexec/receipt-deploy; then
@@ -208,5 +220,27 @@ if [ -z "${config_load_line}" ] || [ -z "${stable_sha_check_line}" ] || \
   echo "[ERROR] stable release SHA must be loaded from root config before validation." >&2
   exit 1
 fi
+
+for expected_line in \
+  'systemctl start "${BACKUP_UNIT}"' \
+  'npm run invitation-codes:rotate --' \
+  'systemd-creds encrypt --name=' \
+  'completed without exposing invitation-code values'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-rotate-invitation-codes; then
+    echo "[ERROR] invitation-code rotation helper is missing its safe-operation contract." >&2
+    exit 1
+  fi
+done
+
+for expected_line in \
+  'systemctl start "receipt-backup-${ENVIRONMENT}.service"' \
+  'systemd-creds decrypt "${ROLLBACK_CREDENTIAL}" "${PLAINTEXT_MANIFEST}"' \
+  'npm run invitation-codes:rollback --' \
+  'completed without exposing invitation-code values'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-rollback-invitation-codes; then
+    echo "[ERROR] invitation-code rollback helper is missing its safe-operation contract." >&2
+    exit 1
+  fi
+done
 
 echo "[OK] root deployment contract is structurally valid."

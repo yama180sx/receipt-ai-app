@@ -364,13 +364,13 @@ sequenceDiagram
 POST /api/auth/resolve-family
 Content-Type: application/json
 
-{ "inviteCode": "YAMAMOTO-2026" }
+{ "inviteCode": "EXAMPLE-INVITE-CODE" }
 ```
 
 ```json
 {
   "success": true,
-  "data": { "familyGroupId": 1, "name": "山本家" }
+  "data": { "familyGroupId": 123, "name": "サンプル世帯" }
 }
 ```
 

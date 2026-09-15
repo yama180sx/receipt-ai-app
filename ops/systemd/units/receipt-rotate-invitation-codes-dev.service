@@ -1,0 +1,19 @@
+[Unit]
+Description=RecAIpt dev invitation-code rotation
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-invitation-code-rotation-dev
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/libexec/receipt-rotate-invitation-codes dev
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/receipt-ai-app/dev /run/receipt-ai-app-invitation-code-rotation-dev
