@@ -8,6 +8,8 @@ GitHub Issue: [#667](https://github.com/yama180sx/receipt-ai-app/issues/667)
 
 根拠: [ADR-010](../../adr/ADR-010-secret-lifecycle-and-runtime-delivery.md)、[秘密情報ライフサイクル設計・台帳](../issue-131-2/secret-lifecycle-design.md)
 
+実施結果: [完了記録](completion-record.md)
+
 ## 1. 目的と前提
 
 JWT署名鍵とTOTP暗号鍵を分離し、既存のTOTP登録を失わずに再暗号化した後、JWTと外部credentialを用途ごとにローテーションする。値、接続先、利用者のメールアドレス、認証コードは本書・Issue・PR・端末出力へ記録しない。
