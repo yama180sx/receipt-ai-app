@@ -82,6 +82,25 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ---
 
+### InvitationCodeRotationAudit
+
+root専用CLIによる招待コードの一括再発行／対象限定ロールバックの値なし監査。招待コード、世帯名、利用者情報、配布先は保存しない。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| rotationId | String | No | — | — | — | `rotationId + action` | — |
+| action | Enum (`ROTATED` / `ROLLED_BACK`) | No | — | — | — | `rotationId + action` | — |
+| status | Enum (`SUCCEEDED` / `FAILED`) | No | — | — | — | — | — |
+| targetCount | Int | No | — | — | — | — | — |
+| rotatedCount | Int | No | — | — | — | — | — |
+| failedCount | Int | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | Yes |
+
+**Unique:** `rotationId, action`
+
+---
+
 ### TotpSecretReencryptionAudit
 
 root専用CLIによるTOTP再暗号化の追記型監査。利用者名、TOTPシークレット、鍵、認証コードは保存しない。
