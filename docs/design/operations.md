@@ -20,7 +20,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 |--------------|----------------|------|
 | root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
 | 定期バックアップの確認・手動実行 | 本書 §3 | root管理`receipt-backup-{env}.service` |
-| 障害時の DB / 画像リストア | 本書 §5 | root管理の安全な復旧手順はIssue #129-2で整備中 |
+| 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | root管理restore helperを使う |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
@@ -300,7 +300,7 @@ docker compose exec backend npm run prisma:sync-sequences
 | dev | `/srv/receipt-ai-app/dev` | `receipt-dev-db` |
 | stable | `/srv/receipt-ai-app/stable` | `receipt-stable-db` |
 
-> root管理環境の復旧は、対象環境のdeploy unitを止めた上でroot管理作業ディレクトリと`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。安全な実行手順はIssue #129-2で整備するまで、旧ユーザー所有パス・平文`.env`・直接Docker Composeを使って復旧しない。
+> root管理環境の復旧は、対象環境のroot管理backup、encrypted credential、`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。平文`.env`・旧ユーザー所有パス・直接Docker Composeを使わず、[復旧手順書](../restore-manual.md)のroot helperだけを使用する。
 
 ### 5.3 復旧後チェックリスト
 
@@ -309,7 +309,7 @@ docker compose exec backend npm run prisma:sync-sequences
 - [ ] レシート画像（WebP 等）が描画される
 - [ ] 統計・精算画面が正常
 
-安全な復旧手順の整備状況は[Issue #129-2](https://github.com/yama180sx/receipt-ai-app/issues/726)を参照する。
+復旧手順の詳細は[restore-manual.md](../restore-manual.md)を参照する。
 
 ---
 
@@ -348,7 +348,7 @@ flowchart LR
   end
 
   subgraph recovery [障害時]
-    RAID --> Restore[restore-manual.md 手順]
+    RAID --> Restore[root restore helper]
     Restore --> App[アプリ動作確認]
   end
 ```
@@ -368,7 +368,8 @@ flowchart LR
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
-| `docs/restore-manual.md` | 旧リストア手順の廃止通知。安全なroot管理リストアはIssue #129-2で整備中 |
+| `ops/systemd/libexec/receipt-restore` | root管理DB・uploads復旧ヘルパー |
+| `docs/restore-manual.md` | root管理復旧の承認条件・実行・受入確認 |
 
 ---
 

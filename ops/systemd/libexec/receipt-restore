@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# root所有で /usr/local/libexec/receipt-restore として設置する、root管理backup専用の復旧ヘルパー。
+# 任意パス、任意コンテナ名、平文.envは受け取らない。
+set -euo pipefail
+
+readonly CONFIG_ROOT="/etc/receipt-ai-app"
+readonly DATA_ROOT="/var/lib/receipt-ai-app"
+readonly BACKUP_ROOT="/mnt/raid_1t/backups"
+
+die() {
+  echo "[receipt-restore] $1" >&2
+  exit 1
+}
+
+[ "$(id -u)" -eq 0 ] || die "must run as root"
+[ "$#" -eq 4 ] || die "usage: receipt-restore {dev|stable} YYYYMMDD_HHMMSS --confirm restore-root-managed-backup"
+
+readonly ENVIRONMENT="$1"
+readonly TARGET_TIMESTAMP="$2"
+readonly CONFIRMATION="$3"
+readonly CONFIRMATION_PHRASE="$4"
+
+case "${ENVIRONMENT}" in
+  dev)
+    readonly BACKUP_DIRECTORY="${BACKUP_ROOT}/receipt-app-dev"
+    readonly DATABASE_CONTAINER="receipt-dev-db"
+    readonly QUEUE_CONTAINER="receipt-dev-redis"
+    readonly BACKUP_UNIT="receipt-backup-dev.service"
+    readonly DEPLOY_UNIT="receipt-deploy-dev.service"
+    ;;
+  stable)
+    readonly BACKUP_DIRECTORY="${BACKUP_ROOT}/receipt-app"
+    readonly DATABASE_CONTAINER="receipt-stable-db"
+    readonly QUEUE_CONTAINER="receipt-stable-redis"
+    readonly BACKUP_UNIT="receipt-backup-stable.service"
+    readonly DEPLOY_UNIT="receipt-deploy-stable.service"
+    ;;
+  *) die "unknown fixed environment" ;;
+esac
+
+[ "${CONFIRMATION}" = "--confirm" ] && \
+  [ "${CONFIRMATION_PHRASE}" = "restore-root-managed-backup" ] \
+  || die "explicit confirmation is required"
+[[ "${TARGET_TIMESTAMP}" =~ ^[0-9]{8}_[0-9]{6}$ ]] || die "backup timestamp has an invalid format"
+
+readonly DATA_DIRECTORY="${DATA_ROOT}/${ENVIRONMENT}"
+readonly CREDENTIAL_FILE="${CONFIG_ROOT}/credentials/${ENVIRONMENT}/db_password.cred"
+readonly DATABASE_BACKUP="${BACKUP_DIRECTORY}/db/db_backup_${TARGET_TIMESTAMP}.sql.gz"
+readonly UPLOADS_BACKUP="${BACKUP_DIRECTORY}/uploads/uploads_backup_${TARGET_TIMESTAMP}.tar.gz"
+
+require_root_owned_directory() {
+  local directory="$1"
+  [ -d "${directory}" ] || die "managed directory is unavailable"
+  [ "$(stat -c '%u:%g' "${directory}")" = "0:0" ] || die "managed directory ownership is invalid"
+  [ $((8#$(stat -c '%a' "${directory}") & 8#022)) -eq 0 ] || die "managed directory is writable by group or others"
+}
+
+require_root_owned_directory "${DATA_DIRECTORY}"
+[ -f "${CREDENTIAL_FILE}" ] || die "database credential is unavailable"
+[ -s "${DATABASE_BACKUP}" ] || die "database backup is unavailable"
+[ -s "${UPLOADS_BACKUP}" ] || die "uploads backup is unavailable"
+[ -d "${DATA_DIRECTORY}/uploads" ] || die "managed uploads directory is unavailable"
+
+# backupファイルは停止前に検査する。展開時にも同じ形式だけを許可する。
+gzip -t "${DATABASE_BACKUP}" || die "database backup integrity check failed"
+if ! tar -tzf "${UPLOADS_BACKUP}" | awk '
+  $0 ~ /(^|\/)\.\.($|\/)/ { exit 1 }
+  $0 == "uploads" || $0 ~ /^uploads\// { next }
+  { exit 1 }
+'; then
+  die "uploads backup has an unexpected archive layout"
+fi
+if ! tar -tvzf "${UPLOADS_BACKUP}" | awk '
+  substr($0, 1, 1) == "-" || substr($0, 1, 1) == "d" { next }
+  { exit 1 }
+'; then
+  die "uploads backup contains a non-regular entry"
+fi
+
+for container in "${DATABASE_CONTAINER}" "${QUEUE_CONTAINER}"; do
+  docker inspect --format '{{.State.Running}}' "${container}" 2>/dev/null | grep -Fxq true \
+    || die "required container is not running"
+done
+
+# 停止前に新しいroot管理backupを必ず取得する。失敗した場合は破壊的操作を始めない。
+echo "[receipt-restore] creating pre-restore backup"
+systemctl start "${BACKUP_UNIT}"
+systemctl show "${BACKUP_UNIT}" -p Result --value | grep -Fxq success \
+  || die "pre-restore backup did not succeed"
+
+readonly RESTORE_RUNTIME_DIRECTORY="/run/receipt-ai-app-restore-${ENVIRONMENT}"
+umask 077
+install -d -o root -g root -m 0700 "${RESTORE_RUNTIME_DIRECTORY}"
+readonly DATABASE_SECRET_FILE="${RESTORE_RUNTIME_DIRECTORY}/db_password"
+readonly UPLOADS_STAGING_DIRECTORY="$(mktemp -d "${DATA_DIRECTORY}/.uploads-restore.XXXXXX")"
+readonly UPLOADS_PRE_RESTORE_DIRECTORY="${DATA_DIRECTORY}/.uploads-pre-restore-${TARGET_TIMESTAMP}"
+
+cleanup() {
+  rm -f -- "${DATABASE_SECRET_FILE}"
+  rmdir -- "${RESTORE_RUNTIME_DIRECTORY}" 2>/dev/null || true
+  if [ -d "${UPLOADS_STAGING_DIRECTORY}" ]; then
+    rm -rf -- "${UPLOADS_STAGING_DIRECTORY}"
+  fi
+}
+trap cleanup EXIT
+
+# systemd credentialの平文はroot専用の/runに短時間だけ置き、引数・環境変数・ログへ出さない。
+systemd-creds decrypt --name=db_password "${CREDENTIAL_FILE}" "${DATABASE_SECRET_FILE}" >/dev/null
+[ -s "${DATABASE_SECRET_FILE}" ] || die "database credential is empty"
+
+echo "[receipt-restore] stopping application containers"
+docker stop "receipt-${ENVIRONMENT}-backend" "receipt-${ENVIRONMENT}-frontend" "receipt-${ENVIRONMENT}-frontend-dev" >/dev/null
+
+# uploadsを先にstagingへ展開する。既存uploadsは削除せず、同一filesystem内に退避する。
+tar -xzf "${UPLOADS_BACKUP}" --no-same-owner --no-same-permissions -C "${UPLOADS_STAGING_DIRECTORY}"
+[ -d "${UPLOADS_STAGING_DIRECTORY}/uploads" ] || die "uploads backup does not contain uploads directory"
+chown -R 1000:1000 "${UPLOADS_STAGING_DIRECTORY}/uploads"
+chmod 0750 "${UPLOADS_STAGING_DIRECTORY}/uploads"
+[ ! -e "${UPLOADS_PRE_RESTORE_DIRECTORY}" ] || die "pre-restore uploads directory already exists"
+
+# backendを停止している間にDBを置換する。途中失敗時は自動ロールバックせず、再deployも行わない。
+echo "[receipt-restore] restoring database"
+printf '%s\n' "$(<"${DATABASE_SECRET_FILE}")" \
+  | docker exec -i "${DATABASE_CONTAINER}" sh -c '
+      IFS= read -r PGPASSWORD || exit 1
+      export PGPASSWORD
+      psql -U "$1" -d postgres -v ON_ERROR_STOP=1 -c \
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''$2'\'' AND pid <> pg_backend_pid();"
+      dropdb -U "$1" --if-exists "$2"
+      createdb -U "$1" "$2"
+    ' sh cntadm receipt_db
+
+{
+  printf '%s\n' "$(<"${DATABASE_SECRET_FILE}")"
+  gzip -cd -- "${DATABASE_BACKUP}"
+} | docker exec -i "${DATABASE_CONTAINER}" sh -c '
+      IFS= read -r PGPASSWORD || exit 1
+      export PGPASSWORD
+      exec psql -U "$1" -d "$2" -v ON_ERROR_STOP=1
+    ' sh cntadm receipt_db
+
+mv "${DATA_DIRECTORY}/uploads" "${UPLOADS_PRE_RESTORE_DIRECTORY}"
+mv "${UPLOADS_STAGING_DIRECTORY}/uploads" "${DATA_DIRECTORY}/uploads"
+
+# キューストアは正本ではない。DBを過去時点へ戻した後は空にして、起動時に台帳から再構築する。
+docker exec "${QUEUE_CONTAINER}" valkey-cli FLUSHALL >/dev/null
+
+echo "[receipt-restore] starting root-managed deployment"
+systemctl start "${DEPLOY_UNIT}"
+systemctl show "${DEPLOY_UNIT}" -p Result --value | grep -Fxq success \
+  || die "post-restore deployment did not succeed"
+
+echo "[receipt-restore] completed; previous uploads are retained for explicit rollback"
