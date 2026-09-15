@@ -83,8 +83,8 @@ describe.skipIf(!shouldRunDbIntegration())('Global AI budget aggregate (Issue #1
       }));
 
     expect(rows).toEqual([
-      { month: '2026-09', purpose: AiUsagePurpose.OCR, estimatedCostJpy: '300' },
-      { month: '2026-09', purpose: AiUsagePurpose.PRODUCT_CLASSIFICATION, estimatedCostJpy: '700' },
+      { month: '2026-09', purpose: 'ocr', estimatedCostJpy: '300' },
+      { month: '2026-09', purpose: 'product_classification', estimatedCostJpy: '700' },
     ]);
   });
 });
