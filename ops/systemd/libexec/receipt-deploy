@@ -107,7 +107,9 @@ write_runtime_env() {
     printf 'DB_PASSWORD=__managed_by_file__\n'
     printf 'RECAIPT_UPLOADS_DIR=%s/uploads\n' "${data_directory}"
     printf 'RECAIPT_PGDATA_DIR=%s/pgdata\n' "${data_directory}"
-    # Redis CE 7.4の旧RDBをValkeyへ読ませない。旧redisdataはrollback専用で保持する。
+    # Valkey導入前の固定SHAでもComposeを再実行できるよう旧変数を残す。
+    # Valkey導入後のComposeはQUEUE_DATA_DIRだけを参照するため、旧RDBは読まない。
+    printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
     printf 'RECAIPT_QUEUE_DATA_DIR=%s/valkeydata\n' "${data_directory}"
     printf 'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env\n' "${APP_DIRECTORY}"
   } > "${destination}/compose.env"
@@ -180,7 +182,7 @@ chown 1000:1000 "${DATA_DIRECTORY}/uploads"
 # postgres:18 と Valkey公式image は、永続データの所有者としてUID 999を使用する。
 # root helperが移行済みデータの親ディレクトリをroot専用へ変更しないよう、
 # コンテナが書込み可能な所有者・modeを明示する。
-for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"; do
+for directory in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/redisdata" "${DATA_DIRECTORY}/valkeydata"; do
   install -d -m 0700 "${directory}"
   chown 999:root "${directory}"
 done
