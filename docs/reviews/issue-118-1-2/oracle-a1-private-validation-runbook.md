@@ -25,18 +25,101 @@ OCIではSecurity Listより個別VNICへ適用できるNSGが推奨される。
 
 人間がOCI Consoleから以下を作成する。ここではOCID、IPアドレス、鍵パス、秘密値を貼り付けない。
 
-1. home regionに検証専用compartmentを作成する。
-2. VCNとprivate subnetを作成し、A1 VMは可能ならPublic IPなしで配置する。
-3. OCI Bastionを作成し、作業PCのグローバルIP CIDRだけをallowlistへ登録する。
-4. Ubuntu ARM64またはOracle Linux ARM64のA1 VMを作成する。Always Freeの合計上限を超えないshapeを選ぶ。
-5. 対象VM用NSGを作成する。受信はBastionからのTCP 22だけとし、TCP 80、443、3000、5432、6379は追加しない。
-6. OS更新とDocker導入に必要な外向き通信を、NAT Gateway等で許可する。不要な受信ルールは追加しない。
+以下は初回検証のための**簡略・非公開方式**である。VMにはPublic IPを付けるが、受信を作業PCからのTCP 22だけに限定し、アプリportは公開しない。公開前の本番方式では、OCI Bastionとprivate subnetへ移行する。
+
+### 3.1 アカウントとCompartment
+
+1. OCI Free Tier登録時はhome regionを慎重に選ぶ。Always Free A1はhome regionでだけ作成する。
+2. OCI Consoleで**Identity & Security → Compartments → Create compartment**を開く。
+3. Nameは`recai-validation`、Descriptionは`RecAIpt Oracle A1 private validation`とする。
+4. Pay As You Goへのアップグレードは、この検証では選ばない。
+
+### 3.2 Windows作業PCの検証専用SSH鍵
+
+Windows PowerShellで以下を実行する。秘密鍵の内容は表示・共有しない。最後のコマンドは**公開鍵だけ**をクリップボードへコピーする。
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh" | Out-Null
+
+ssh-keygen -t ed25519 `
+  -f "$env:USERPROFILE\.ssh\receipt-oci-validation" `
+  -C "receipt-oci-validation"
+
+Get-Content "$env:USERPROFILE\.ssh\receipt-oci-validation.pub" | Set-Clipboard
+```
+
+パスフレーズは設定してよい。`receipt-oci-validation`（拡張子なし）の秘密鍵はPCだけに保管し、OCI Console、VM、Git、チャットへ置かない。
+
+### 3.3 VCN
+
+1. **Networking → Virtual cloud networks**を開き、Compartmentを`recai-validation`へ切り替える。
+2. **Start VCN Wizard → VCN with Internet Connectivity**を選ぶ。
+3. Nameを`recai-validation-vcn`とし、CIDRなどは既定値のまま作成する。
+4. ここではTCP 80、443、3000、5432、6379の受信ルールを追加しない。
+
+### 3.4 Network Security Group（NSG）
+
+1. 作成したVCNのSecurityタブから**Network Security Groups → Create Network Security Group**を開く。
+2. Nameを`recai-validation-admin`として作成する。
+3. 作成したNSGに受信ルールを1件だけ追加する。
+
+| 項目 | 設定 |
+| --- | --- |
+| Direction | Ingress |
+| Source type | CIDR |
+| Source CIDR | 作業PCの現在のグローバルIPに`/32`を付けた値 |
+| IP protocol | TCP |
+| Destination port range | `22` |
+| Description | `temporary validation SSH only` |
+
+作業PCのグローバルIPはブラウザで確認する。値はrunbook、Issue、チャットへ残さない。
+
+### 3.5 A1 VM
+
+1. **Compute → Instances → Create instance**を開き、Compartmentを`recai-validation`にする。
+2. Nameを`recai-a1-validation`とする。
+3. Imageは**Oracle Linux 9**で`Always Free Eligible`表示を確認する。
+4. **Change shape → Ampere → VM.Standard.A1.Flex**を選ぶ。
+5. OCPUを`2`、Memoryを`12 GB`以下に設定する。これはAlways FreeのA1合計上限内である。
+6. Networkingでは作成済みのVCNとPublic Subnetを選び、Public IPv4を割り当てる。
+7. Advanced optionsのNetwork Security Groupsで`recai-validation-admin`を選ぶ。
+8. SSH keysは**Paste public keys**を選び、3.2でクリップボードへコピーした公開鍵を貼り付ける。
+9. Boot Volumeは既定の50GBのままとし、追加Block Volumeを作成しない。
+10. ReviewでAlways Free対象のshape・image・容量であることを確認してからCreateする。
+
+`Out of host capacity`が表示された場合、課金shapeへ変更しない。Availability Domainを変えるか、時間を置いて再試行する。
+
+### 3.6 Security Listの全開SSHを除去
+
+NSGがVMのPrimary VNICへ適用されていることを確認してから、VM → Primary VNIC → Subnet → Security Listを開く。次のような既定ルールがあれば削除または無効化する。
+
+```text
+Source: 0.0.0.0/0
+Protocol: TCP
+Destination port: 22
+```
+
+Security ListとNSGの許可は合算される。NSGだけを作っても、Security Listの`0.0.0.0/0:22`が残ればSSHは全世界から到達できる。
+
+### 3.7 作成完了の確認
+
+- [ ] VMは`Running`
+- [ ] Oracle Linux 9 / ARM64、A1 Flex、2 OCPU・12GB以下
+- [ ] Public IPはあるが、受信許可は作業PCIPからのTCP 22だけ
+- [ ] TCP 80、443、3000、5432、6379の受信許可がない
+- [ ] Docker、Git clone、credential、実利用データはまだVMへ置いていない
 
 Public IPを使う暫定方式では、Bastionの代わりにTCP 22を作業PCの単一CIDRへ限定する。検証完了後はPublic IPまたはTCP 22受信ルールを削除する。
 
 ## 4. VMへの接続と事前確認
 
-OCI Consoleが表示するBastion用のSSHコマンドを使用する。Bastionの接続コマンドはConsoleからコピーし、鍵・OCID・IPをこの手順書やチャットへ転記しない。
+この初回検証では、作業PCのIPに限定したTCP 22で直接SSHする。鍵パスとVMのPublic IPは作業PCだけで扱い、Issue・チャット・Gitへ転記しない。
+
+```powershell
+ssh -i "$env:USERPROFILE\.ssh\receipt-oci-validation" opc@<oracle-validation-public-ip>
+```
+
+`<oracle-validation-public-ip>`はOCI ConsoleのVM詳細からローカルで確認する。公開前の方式へ移る時は、この直接SSHを廃止し、OCI Bastionのport-forwarding sessionまたはVPNへ移行する。
 
 VMに接続後、次だけを確認する。
 
