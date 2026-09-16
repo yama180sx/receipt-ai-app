@@ -64,10 +64,15 @@ export async function assertReceiptImageCanBeAnalyzed(buffer: Buffer): Promise<I
  * 空の確認画面を表示せず、再撮影を促す。AI応答の形式検証とは別の業務上の妥当性検査。
  */
 export function assertReceiptAnalysisContainsData(receipt: ParsedReceipt): void {
-  const hasStoreName = receipt.storeName.trim().length > 0;
-  const hasPurchaseDate = receipt.purchaseDate.trim().length > 0;
-  const hasLineItem = receipt.items.some((item) => item.name.trim().length > 0);
-  const hasPositiveTotal = Number.isFinite(receipt.totalAmount) && receipt.totalAmount > 0;
+  // Gemini の実行時出力は TypeScript の型どおりとは限らないため、null も空値として扱う。
+  const hasText = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+  const items = Array.isArray(receipt.items) ? receipt.items : [];
+  const hasStoreName = hasText(receipt.storeName);
+  const hasPurchaseDate = hasText(receipt.purchaseDate);
+  const hasLineItem = items.some((item) => hasText(item?.name));
+  const hasPositiveTotal = typeof receipt.totalAmount === 'number'
+    && Number.isFinite(receipt.totalAmount)
+    && receipt.totalAmount > 0;
 
   if (!hasStoreName && !hasPurchaseDate && !hasLineItem && !hasPositiveTotal) {
     throw new AppError(

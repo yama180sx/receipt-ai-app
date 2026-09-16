@@ -4,10 +4,23 @@ import { RECEIPT_QUEUE_NAME } from '../queues/receiptQueue';
 import { analyzeOnly } from '../services/receipt/receiptAnalysisService';
 import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
-import { getErrorMessage, isRetryableHttpError } from '../utils/httpError';
+import { getErrorMessage, isGeminiDailyQuotaError, isRetryableHttpError } from '../utils/httpError';
 import { getReceiptAnalysisFailureCode } from '../config/receiptRetryPolicy';
 import { ReceiptAnalysisJobStatus } from '@prisma/client';
 import { updateReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
+import { AppError } from '../utils/appError';
+
+/** 利用者に内部実装や英語のプロバイダーエラーを表示しない。 */
+export function getReceiptAnalysisFailureMessage(error: unknown): string {
+  if (error instanceof AppError) return error.message;
+  if (isGeminiDailyQuotaError(error)) {
+    return 'AI解析の1日の利用上限に達しました。時間をおいてから再実行してください。';
+  }
+  if (isRetryableHttpError(error)) {
+    return '解析サービスで一時的なエラーが発生しました。時間をおいてから再実行してください。';
+  }
+  return 'レシートを解析できませんでした。レシート全体が明るく写るように再撮影してください。';
+}
 
 /**
  * [Issue #49-8 / #71]
@@ -38,11 +51,12 @@ const receiptWorker = new Worker(
         return result;
 
       } catch (error: unknown) {
-        const message = getErrorMessage(error);
+        const technicalMessage = getErrorMessage(error);
+        const message = getReceiptAnalysisFailureMessage(error);
         const failureCode = getReceiptAnalysisFailureCode(error);
         await job.updateData({ ...job.data, failureCode: failureCode ?? null });
         await updateReceiptAnalysisJob(String(job.id), { status: ReceiptAnalysisJobStatus.FAILED, failureCode: failureCode ?? null, failureReason: message });
-        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${message}`);
+        logger.error(`[Worker] ジョブ失敗: ID ${job.id} - ${technicalMessage}`);
 
         // 日次枠切れなど、BullMQ 再試行しても回復しないエラーは即 failed にする
         if (!isRetryableHttpError(error)) {
