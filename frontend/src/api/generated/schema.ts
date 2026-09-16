@@ -454,6 +454,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -493,6 +500,13 @@ export interface paths {
                             data?: components["schemas"]["AuthFamilyMember"][];
                         };
                     };
+                };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -538,6 +552,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -575,6 +596,13 @@ export interface paths {
                             data?: components["schemas"]["TotpSetupInfo"];
                         };
                     };
+                };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -618,6 +646,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -660,6 +695,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -693,6 +735,13 @@ export interface paths {
             responses: {
                 /** @description OK */
                 200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1004,6 +1053,13 @@ export interface paths {
                 };
                 /** @description 画像が解析不能（白紙・小さすぎる画像・未対応形式） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 短時間の操作上限を超過（Retry-After秒後に再試行） */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };

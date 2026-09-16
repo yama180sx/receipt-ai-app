@@ -72,6 +72,8 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 `RECEIPT_ANALYSIS_MAINTENANCE_MODE=true` はキューストア移行時の一時停止用である。新規解析投入と手動再実行だけを停止し、履歴閲覧と確定保存は継続する。切替確認後は必ず `false` に戻す。
 `gemini_daily_quota` は、GoogleのRPDリセット（太平洋時間の次の午前0時）まで再実行ボタンを表示しない。自動で翌日に再投入することはない。
 
+`TRUST_PROXY_HOPS` はクライアントIPを用いるレート制限の信頼境界である。既定値`0`では`X-Forwarded-For`を信頼しない。既知のリバースプロキシを導入し、backendまでのhop数を確認した場合だけ`1`または`2`に設定する。転送ヘッダーが届いているという理由だけで値を変更してはならない。
+
 新しい設定項目を導入する際は、以下を同じ変更に含める。
 
 1. コードに安全な既定値を実装する
