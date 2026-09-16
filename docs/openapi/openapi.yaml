@@ -680,6 +680,8 @@ paths:
                         $ref: '#/components/schemas/UploadJobResponse'
         '503':
           description: キューストア移行中のため新規解析投入を停止中
+        '400':
+          description: 画像が解析不能（白紙・小さすぎる画像・未対応形式）
 
   /receipts/jobs:
     get:

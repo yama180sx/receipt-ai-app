@@ -254,7 +254,7 @@ sequenceDiagram
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| POST | `/receipts/upload` | JWT + tenant | 画像アップロード → WebP → 復旧台帳とBullMQジョブ（202、メンテナンス中は503） |
+| POST | `/receipts/upload` | JWT + tenant | 画像品質の事前検査 → WebP → 復旧台帳とBullMQジョブ（202、解析不能な画像は400、メンテナンス中は503） |
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の商品明細一覧（`not_applicable` は含めない） |
@@ -456,6 +456,8 @@ Authorization: Bearer <token>
 ### 5.3 画像アップロード & 確定
 
 **POST `/api/receipts/upload`**
+
+AI 利用前に、画像として復号できること、最低限の大きさ、文字・罫線などの濃淡が存在することを検査する。ほぼ単色の白紙・黒紙、極端に小さい画像、未対応形式は `400` とし、ファイル保存・ジョブ作成・AI 呼び出しを行わない。人物写真などがレシートかどうかの判定はこの段階では行わず、既存の確認画面で扱う。
 
 ```http
 POST /api/receipts/upload

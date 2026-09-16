@@ -51,6 +51,7 @@ import { SplitInput } from '../services/settlement/itemSplitAllocation';
 import { getCleanText } from '../utils/normalizer';
 import { decodeReceiptCursor, type ReceiptPaginationFilters } from '../utils/receiptPaginationCursor';
 import { normalizeYearMonth } from '../utils/yearMonth';
+import { assertReceiptImageCanBeAnalyzed } from '../services/receipt/receiptImagePreflightService';
 
 function invalidQueryParameter(message: string): never {
   throw new AppError(message, 400);
@@ -142,6 +143,9 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
 
   const ctx = requireTenantContext();
   const { familyGroupId, memberId } = ctx;
+
+  // Issue #136: 白紙など明らかに解析不能な画像は、保存・キュー投入・AI 呼び出しの前に止める。
+  await assertReceiptImageCanBeAnalyzed(file.buffer);
 
   const timestamp = Date.now();
   const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
