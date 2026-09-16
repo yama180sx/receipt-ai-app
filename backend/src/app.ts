@@ -14,6 +14,7 @@ import productTypeRoutes from './routes/productTypeRoutes';
 import { AppError } from './utils/appError';
 import { errorHandler } from './middleware/errorHandler';
 import logger from './utils/logger';
+import { getTrustedProxyHops } from './config/trustedProxy';
 
 /**
  * Express アプリ本体（Supertest / 本番起動で共有）。
@@ -22,6 +23,8 @@ import logger from './utils/logger';
 export function createApp() {
   const app = express();
   const nodeEnv = process.env.NODE_ENV || 'development';
+  // 既定値0ではX-Forwarded-Forを信頼しない。公開時だけ既知のプロキシ段数を設定する。
+  app.set('trust proxy', getTrustedProxyHops());
 
   const getAllowedOrigins = () => {
     const rawOrigins = process.env.CORS_ORIGIN || '';
