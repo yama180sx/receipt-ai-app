@@ -9,12 +9,15 @@ type RateLimitOptions = {
 
 type RateLimitEntry = { count: number; resetAt: number };
 
+const resetters = new Set<() => void>();
+
 /**
  * 単一プロセス用の固定ウィンドウ制限。
  * 公開初期の単一VMで認証・アップロード入口を保護する。複数process化時は共有ストアへ置換する。
  */
 export function createRateLimitMiddleware(options: RateLimitOptions) {
   const entries = new Map<string, RateLimitEntry>();
+  resetters.add(() => entries.clear());
 
   return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
@@ -50,6 +53,11 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
     }
     next();
   };
+}
+
+/** 結合テストの各ケースを独立した制限ウィンドウとして実行するためのリセット。 */
+export function resetRateLimiters(): void {
+  for (const reset of resetters) reset();
 }
 
 /** Expressのtrust proxy設定に従う。未設定時はsocketの接続元だけを使う。 */

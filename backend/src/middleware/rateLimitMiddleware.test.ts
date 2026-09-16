@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Request, Response } from 'express';
-import { createRateLimitMiddleware, getRateLimitClientIp } from './rateLimitMiddleware';
+import { createRateLimitMiddleware, getRateLimitClientIp, resetRateLimiters } from './rateLimitMiddleware';
 
 function invoke(middleware: ReturnType<typeof createRateLimitMiddleware>, ip = '198.51.100.10') {
   const headers = new Map<string, string>();
@@ -42,5 +42,12 @@ describe('createRateLimitMiddleware', () => {
     const limiter = createRateLimitMiddleware({ name: 'test', windowMs: 60_000, max: 1, key: getRateLimitClientIp });
     invoke(limiter, '198.51.100.1');
     expect(invoke(limiter, '198.51.100.2').next).toHaveBeenCalledOnce();
+  });
+
+  it('can reset state between isolated test cases', () => {
+    const limiter = createRateLimitMiddleware({ name: 'test', windowMs: 60_000, max: 1, key: getRateLimitClientIp });
+    invoke(limiter);
+    resetRateLimiters();
+    expect(invoke(limiter).next).toHaveBeenCalledOnce();
   });
 });
