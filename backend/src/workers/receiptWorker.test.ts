@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   analyzeOnly: vi.fn(),
   runWithTenant: vi.fn(),
   getErrorMessage: vi.fn(),
+  isGeminiDailyQuotaError: vi.fn(),
   isRetryableHttpError: vi.fn(),
   getReceiptAnalysisFailureCode: vi.fn(),
   loggerError: vi.fn(),
+  updateReceiptAnalysisJob: vi.fn(),
   UnrecoverableError: class TestUnrecoverableError extends Error {},
 }));
 
@@ -27,22 +29,25 @@ vi.mock('bullmq', () => ({
 }));
 vi.mock('../config/redis', () => ({ redisConnection: {} }));
 vi.mock('../queues/receiptQueue', () => ({ RECEIPT_QUEUE_NAME: 'receipt-analysis' }));
+vi.mock('../repositories/receiptAnalysisJobRepository', () => ({ updateReceiptAnalysisJob: mocks.updateReceiptAnalysisJob }));
 vi.mock('../services/receipt/receiptAnalysisService', () => ({ analyzeOnly: mocks.analyzeOnly }));
 vi.mock('../utils/context', () => ({ runWithTenant: mocks.runWithTenant }));
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), error: mocks.loggerError } }));
 vi.mock('../utils/httpError', () => ({
   getErrorMessage: mocks.getErrorMessage,
+  isGeminiDailyQuotaError: mocks.isGeminiDailyQuotaError,
   isRetryableHttpError: mocks.isRetryableHttpError,
 }));
 vi.mock('../config/receiptRetryPolicy', () => ({
   getReceiptAnalysisFailureCode: mocks.getReceiptAnalysisFailureCode,
 }));
 
-import './receiptWorker';
+import { getReceiptAnalysisFailureMessage } from './receiptWorker';
 
 describe('receiptWorker', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.isGeminiDailyQuotaError.mockReturnValue(false);
     mocks.runWithTenant.mockImplementation(
       (_context: unknown, fn: () => Promise<unknown>) => fn()
     );
@@ -85,5 +90,10 @@ describe('receiptWorker', () => {
       ...job.data,
       failureCode: 'INVALID_RESPONSE',
     });
+  });
+
+  it('returns a Japanese safe message instead of provider error details', () => {
+    expect(getReceiptAnalysisFailureMessage(new Error("Cannot read properties of null (reading 'trim')")))
+      .toBe('レシートを解析できませんでした。レシート全体が明るく写るように再撮影してください。');
   });
 });

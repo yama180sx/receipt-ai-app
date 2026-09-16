@@ -12,6 +12,8 @@ interface AdminMenuScreenProps {
   onGoToAdminStats: () => void;
   onGoToProductClassificationReclassification: () => void;
   onGoToStandardProductClassificationRules: () => void;
+  onGoToAiBudget: () => void;
+  onGoToManualReceipt: () => void;
 }
 
 const adm = colors.semantic.admin;
@@ -22,6 +24,8 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
   onGoToAdminStats,
   onGoToProductClassificationReclassification,
   onGoToStandardProductClassificationRules,
+  onGoToAiBudget,
+  onGoToManualReceipt,
 }) => {
   return (
     <View style={[screenLayout.container, styles.containerAdmin]}>
@@ -33,8 +37,22 @@ export const AdminMenuScreen: React.FC<AdminMenuScreenProps> = ({
 
       <ScrollView contentContainerStyle={screenLayout.scrollContent}>
         <View style={cardStyles.section}>
+          <Text style={styles.sectionTitle}>レシート管理</Text>
+          <AppListItem
+            variant="nav" onPress={onGoToManualReceipt} title="手動レシート登録"
+            subtitle="AI解析を使わず、世帯メンバーを選んで入力"
+            left={<View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.stats }]}><Text>✏️</Text></View>}
+          />
+        </View>
+
+        <View style={cardStyles.section}>
           <Text style={styles.sectionTitle}>システム・AI設定</Text>
 
+          <AppListItem
+            variant="nav" onPress={onGoToAiBudget} title="全体AI予算・通知管理"
+            subtitle="予算、通知先、試験通知、配送状況を管理"
+            left={<View style={[styles.iconWrapper, { backgroundColor: colors.semantic.icon.stats }]}><Text>🔔</Text></View>}
+          />
           <AppListItem
             variant="nav"
             onPress={onGoToStandardProductClassificationRules}

@@ -155,6 +155,7 @@ SafeAreaProvider
 | **CategoryManagement** | `screens/CategoryManagementScreen.tsx` | `useCategoryManagement` | `GET/POST/DELETE /categories` |
 | **PromptEditor** | `screens/PromptEditorScreen.tsx` | Gemini プロンプトテンプレート管理 | `GET/PATCH/POST/DELETE /admin/prompts` |
 | **AdminStats** | `screens/AdminStatsScreen.tsx` | AI トークン・コスト統計テーブル | `GET /admin/stats` |
+| **GlobalAiBudget** | `screens/GlobalAiBudgetScreen.tsx` | 全体AI予算・通知の設定、配送履歴、全体AI予算管理者の一覧・追加・削除 | `GET/PUT /admin/ai-budget`、`GET/POST/DELETE /admin/ai-budget/managers`、`GET /admin/ai-budget/manager-candidates` |
 | **ProductClassificationReclassification** | `screens/ProductClassificationReclassificationScreen.tsx` | 既存の未分類・要確認明細を安全に再評価し結果を表示 | `POST /admin/product-classification/reclassification-runs` |
 | **StandardProductClassificationRules** | `screens/StandardProductClassificationRulesScreen.tsx` | 全世帯共通キーワード分類ルールの管理 | `GET/POST/PATCH /admin/product-classification/standard-rules` |
 
@@ -188,6 +189,13 @@ SafeAreaProvider
 | **ロール保持** | `AppSessionProvider` / `authService` | ログイン時 `result.member.role` → Context、ストレージ `@role` |
 | **API 403** | `apiClient` レスポンス interceptor | `showAlert('アクセス権限エラー', ...)` |
 | **AdminStats** | `AdminStatsScreen` | 403 時 UI にエラー帯表示 |
+
+### 手動レシート登録（管理者）
+
+- 導線は管理者メニューのみに置き、通常のホーム画面・レシート撮影フローには表示しない。
+- 管理者は同一世帯の登録先メンバー、店舗名、購入日、明細、任意のカテゴリを入力できる。
+- 画面上のロール判定は誤操作防止であり、代理登録の認可と世帯境界は `POST /api/receipts` 側で強制する。
+- 保存後は選択したメンバーの履歴に通常のレシートと同じ形式で表示される。
 
 **重要:** 管理画面（`/admin/*`）へのルートは **UI で ADMIN のみリンク表示** する。URL を直接開けば USER も遷移可能だが、**実際の制限はバックエンドの `isAdmin` ミドルウェア（403）** に依存する。
 

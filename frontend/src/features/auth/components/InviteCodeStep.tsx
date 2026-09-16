@@ -23,7 +23,7 @@ export const InviteCodeStep: React.FC<Props> = ({
     <View style={[formStyles.field, authScreenStyles.inputWrapper]}>
       <TextInput
         style={authScreenStyles.input}
-        placeholder="例: YAMAMOTO-2026"
+        placeholder="管理者から受け取った招待コード"
         placeholderTextColor="rgba(255,255,255,0.6)"
         value={inviteCode}
         onChangeText={onInviteCodeChange}

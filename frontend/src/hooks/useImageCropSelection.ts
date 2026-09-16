@@ -65,9 +65,13 @@ export function useImageCropSelection({
   }, []);
 
   const handleImageLoad = useCallback(
-    (e: { nativeEvent: { source: { width: number; height: number } } }) => {
-      const { width, height } = e.nativeEvent.source;
-      setNaturalSize({ width, height });
+    (e: { nativeEvent?: { source?: { width?: number; height?: number } } }) => {
+      // Web の Image.onLoad は nativeEvent.source を含まない場合がある。
+      // その場合は getNaturalSize() が loadImageDimensions() で取得する。
+      const { width, height } = e.nativeEvent?.source ?? {};
+      if (typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0) {
+        setNaturalSize({ width, height });
+      }
     },
     []
   );

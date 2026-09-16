@@ -1,0 +1,2 @@
+ALTER TABLE "ApiUsageLog"
+  ADD COLUMN "selfRepairRetryCount" INTEGER NOT NULL DEFAULT 0;

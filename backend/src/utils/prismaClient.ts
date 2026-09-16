@@ -21,6 +21,12 @@ const basePrisma = new PrismaClient({
 });
 
 /**
+ * 全体権限を別途検証済みの、世帯横断運用処理専用クライアント。
+ * 通常の世帯データ処理では、下のテナント分離済み `prisma` を必ず使用する。
+ */
+export const globalPrisma = basePrisma;
+
+/**
  * [Issue #19 & #45] 
  * 物理ファイル削除 + マルチテナント自動フィルタリング統合クライアント
  */
@@ -37,6 +43,7 @@ export const prisma = basePrisma.$extends({
           'Store',
           'PromptTemplate',
           'SettlementTransfer',
+          'ReceiptAnalysisJob',
         ];
         
         if (!tenantModels.includes(model)) {

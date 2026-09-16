@@ -2,6 +2,9 @@ import path from 'path';
 import sharp from 'sharp';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
+import { createReceiptAnalysisJob, findReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
+import { enqueueReceiptAnalysisJob } from '../services/receiptJobService';
+import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
 import {
   enrichCompletedJobPayload,
   listReceiptJobsForMember,
@@ -26,7 +29,7 @@ import {
 } from '../mappers/receiptMapper';
 import { mapAdvancedStatsToApi, mapMonthlyStatsToApi } from '../mappers/statsMapper';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
-import { createManualReceipt } from '../services/receipt/receiptUpdateService';
+import { createManualReceiptForMember } from '../services/receipt/manualReceiptRegistrationService';
 import {
   listReceipts,
   getReceiptById,
@@ -48,6 +51,7 @@ import { SplitInput } from '../services/settlement/itemSplitAllocation';
 import { getCleanText } from '../utils/normalizer';
 import { decodeReceiptCursor, type ReceiptPaginationFilters } from '../utils/receiptPaginationCursor';
 import { normalizeYearMonth } from '../utils/yearMonth';
+import { assertReceiptImageCanBeAnalyzed } from '../services/receipt/receiptImagePreflightService';
 
 function invalidQueryParameter(message: string): never {
   throw new AppError(message, 400);
@@ -84,8 +88,15 @@ function parseLimit(value: string | undefined): number {
 
 export const getJobStatus = asyncHandler(async (req, res) => {
   const { familyGroupId } = requireTenantContext();
-  const job = await receiptQueue.getJob(getRouteParam(req, 'jobId'));
-  if (!job) throw new AppError('ジョブが見つかりません。', 404);
+  const jobId = getRouteParam(req, 'jobId');
+  const job = await receiptQueue.getJob(jobId);
+  if (!job) {
+    const ledger = await findReceiptAnalysisJob(jobId, familyGroupId);
+    if (!ledger) throw new AppError('ジョブが見つかりません。', 404);
+    const state = ledger.status === 'FAILED' ? 'failed' : 'waiting';
+    sendSuccess(res, { id: ledger.id, state, error: ledger.failureReason ?? undefined });
+    return;
+  }
 
   const jobFamilyGroupId = Number(job.data?.familyGroupId);
   if (!jobFamilyGroupId || jobFamilyGroupId !== familyGroupId) {
@@ -115,6 +126,7 @@ export const discardReceiptJob = asyncHandler(async (req, res) => {
 });
 
 export const retryReceiptJob = asyncHandler(async (req, res) => {
+  if (isReceiptAnalysisMaintenanceMode()) throw new AppError('解析基盤を更新中です。しばらくしてから再実行してください。', 503);
   const ctx = requireTenantContext();
   const job = await retryFailedReceiptJobForMember(
     getRouteParam(req, 'jobId'),
@@ -125,11 +137,15 @@ export const retryReceiptJob = asyncHandler(async (req, res) => {
 });
 
 export const uploadReceipt = asyncHandler(async (req, res) => {
+  if (isReceiptAnalysisMaintenanceMode()) throw new AppError('解析基盤を更新中です。しばらくしてから再試行してください。', 503);
   const file = req.file as Express.Multer.File | undefined;
   if (!file) throw new AppError('画像がアップロードされていません。', 400);
 
   const ctx = requireTenantContext();
   const { familyGroupId, memberId } = ctx;
+
+  // Issue #136: 白紙など明らかに解析不能な画像は、保存・キュー投入・AI 呼び出しの前に止める。
+  await assertReceiptImageCanBeAnalyzed(file.buffer);
 
   const timestamp = Date.now();
   const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
@@ -142,11 +158,8 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
     .webp({ quality: 75, effort: 6 })
     .toFile(imagePath);
 
-  const job = await receiptQueue.add('analyze-receipt', {
-    memberId,
-    familyGroupId,
-    imagePath,
-  });
+  const job = await createReceiptAnalysisJob({ memberId, familyGroupId, imagePath });
+  await enqueueReceiptAnalysisJob({ id: job.id, memberId, familyGroupId, imagePath });
 
   logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 
@@ -173,9 +186,18 @@ export const commitReceipt = asyncHandler(async (req, res) => {
 
 export const createReceipt = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
-  const { date, storeName, items, imagePath } = req.body;
+  const { date, storeName, items, imagePath, memberId: requestedMemberId } = req.body;
+  let targetMemberId: number | undefined;
 
-  const newReceipt = await createManualReceipt(ctx, {
+  if (requestedMemberId !== undefined) {
+    const parsedMemberId = Number(requestedMemberId);
+    if (!Number.isSafeInteger(parsedMemberId) || parsedMemberId <= 0) {
+      throw new AppError('登録先メンバーが不正です。', 400);
+    }
+    targetMemberId = parsedMemberId;
+  }
+
+  const newReceipt = await createManualReceiptForMember(ctx, targetMemberId, {
     date,
     storeName,
     items: items as ReceiptCreateItemInput[],

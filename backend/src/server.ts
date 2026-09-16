@@ -1,25 +1,23 @@
 import dotenv from 'dotenv';
+import { loadSecretFiles } from './config/secretFiles';
+import { getStartupFailureCode } from './config/startupDiagnostics';
 
-dotenv.config();
+function reportStartupFailure(error: unknown): void {
+  const code = getStartupFailureCode(error);
+  process.stderr.write(`Fatal startup configuration error [${code}]\n`);
+}
 
-// Worker は本番・開発サーバー起動時のみ（テストでは import しない）
-import './workers/receiptWorker';
+try {
+  dotenv.config();
+  loadSecretFiles();
 
-import { createApp } from './app';
-import logger from './utils/logger';
-
-const app = createApp();
-const port = process.env.PORT || 3000;
-const host = process.env.HOST || '0.0.0.0';
-const nodeEnv = process.env.NODE_ENV || 'development';
-
-const rawOrigins = process.env.CORS_ORIGIN || '';
-const allowedOrigins = rawOrigins.includes(',')
-  ? rawOrigins.split(',').map((o) => o.trim())
-  : rawOrigins || (nodeEnv === 'production' ? false : true);
-
-app.listen(Number(port), host, () => {
-  logger.info(`🚀 API Server running on [${nodeEnv}] mode`);
-  logger.info(`🔗 URL: http://${host}:${port}`);
-  logger.info(`🌐 CORS: ${JSON.stringify(allowedOrigins)}`);
-});
+  // Workerを含む実行時依存は、秘密ファイルを解決してから読み込む。
+  // テストはserver.tsをimportせず、vitest.setup.tsで明示的な合成設定を渡す。
+  void import('./serverRuntime.js').catch((error: unknown) => {
+    reportStartupFailure(error);
+    process.exitCode = 1;
+  });
+} catch (error: unknown) {
+  reportStartupFailure(error);
+  process.exitCode = 1;
+}

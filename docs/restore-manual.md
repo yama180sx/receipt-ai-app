@@ -1,155 +1,59 @@
-# 復旧手順書（リストアマニュアル）
+# 復旧手順書（root管理環境）
 
-> 設計資料からの索引: [design/operations.md](./design/operations.md)（Issue #90-6）。本ファイルはリストアのコマンド全文を維持する。
+> [!WARNING]
+> DB・uploadsの復旧は破壊的な緊急作業である。対象環境、バックアップ時刻、停止時間、作業担当者、復旧担当者を人間が明示承認したメンテナンス時間だけに実施する。旧Git履歴のユーザー所有作業ディレクトリ、平文`.env`、直接Docker Composeを使う手順は廃止済みであり、現在のdev／stableで実行してはならない。
 
-万が一の障害発生時に、データベースとアップロード画像を15分以内に復旧するためのコマンド手順書。
-作業対象の環境（開発環境 または 本番環境）のセクションを選択し、記載されているコマンドを上から順に実行すること。
+## 1. 対象と前提
 
----
+この手順はroot管理の`/var/lib/receipt-ai-app/{dev,stable}`、root管理backup、encrypted credentialだけを対象にする。helperはDBとuploadsを同じバックアップ時刻から戻す。片方だけを復元する用途には使わない。
 
-## 0. バックアップが増えないとき（cron）
+開始前に、次を人間が確認・記録する。秘密値、実環境値、レシート内容は記録しない。
 
-stable の定期バックアップは `crontab`（4:00 / `@reboot`）で `scripts/backup.sh` を実行する。ログは `{プロジェクト}/logs/backup_{env}.log` に追記される。
+- [ ] 対象は`dev`または`stable`の一方だけである
+- [ ] 復元候補のDB archiveとuploads archiveが同じ時刻で存在する
+- [ ] 利用者への停止連絡、停止時間、作業担当者、復旧担当者を承認した
+- [ ] 現在の障害状況と、復旧後に確認するログイン・画像表示・解析・通知の担当者を決めた
+- [ ] `/usr/local/libexec/receipt-restore`がroot:root・0750で設置済みである
 
-**`logs/` が無いと cron のリダイレクトが失敗し、バックアップ自体が走らない**（Issue #89）。`main` デプロイ後は次を確認する。
-
-```bash
-mkdir -p ~/stable/receipt-ai-app/logs
-cd ~/stable/receipt-ai-app && ./scripts/backup.sh stable
-tail ~/stable/receipt-ai-app/logs/backup_stable.log
-```
-
-cron 行を直す場合は `setup-env.sh stable` を再実行する（`mkdir -p logs` を含む行に更新される）。
-
----
-
-## 1. 事前準備：最新バックアップのタイムスタンプ確認
-
-リストアを実行する前に、まずは復元に使用するバックアップファイルの「タイムスタンプ（日時情報）」を確認する。
-
-### Step 1: 対象環境のバックアップ一覧を表示
+バックアップ一覧は対象環境の保存先で**ファイル名と時刻だけ**を確認する。DB password、Webhook、`.env`を読んだり表示したりしない。
 
 ```bash
-# 【開発環境 (dev)】のファイルを確認する場合
-ls -l /mnt/raid_1t/backups/receipt-app-dev/db/
+# dev
+sudo find /mnt/raid_1t/backups/receipt-app-dev/db -maxdepth 1 -type f -name 'db_backup_*.sql.gz' -printf '%f\n' | sort
+sudo find /mnt/raid_1t/backups/receipt-app-dev/uploads -maxdepth 1 -type f -name 'uploads_backup_*.tar.gz' -printf '%f\n' | sort
 
-# 【本番環境 (stable)】のファイルを確認する場合
-ls -l /mnt/raid_1t/backups/receipt-app/db/
+# stable
+sudo find /mnt/raid_1t/backups/receipt-app/db -maxdepth 1 -type f -name 'db_backup_*.sql.gz' -printf '%f\n' | sort
+sudo find /mnt/raid_1t/backups/receipt-app/uploads -maxdepth 1 -type f -name 'uploads_backup_*.tar.gz' -printf '%f\n' | sort
 ```
 
-### Step 2: タイムスタンプの特定
+`db_backup_YYYYMMDD_HHMMSS.sql.gz`と`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`の共通する`YYYYMMDD_HHMMSS`だけを対象にする。
 
-出力されたファイル名から、復元したい日時の文字列（例: `20260519_061210`）を確認し、以降の手順の `TARGET_TS=` の右側に差し替えて使用する。
+## 2. 実行
 
----
+helperは、まず新しいroot管理backupを実行して成功を確認する。次にapplication containersを停止し、DB・uploadsを復元する。Valkeyは意図的に空にし、再デプロイ時にPostgreSQLの台帳から未完了解析だけを復旧する。Valkeyの旧RDBを戻してはいけない。
 
-## 2. A. 【開発環境 (dev)】一撃リストア手順
-
-開発環境（dev）のデータを復旧する場合は、以下のコマンドブロックを順に実行する。
-
-### Step 1: 環境変数の定義
+次の`YYYYMMDD_HHMMSS`は承認済みの時刻へローカルで置き換える。値をIssueやGitへ転記しない。
 
 ```bash
-cd ~/dev/receipt-ai-app
-DB_PASS=$(grep '^DB_PASSWORD=' .env | cut -d '=' -f 2-)
-# ★確認したタイムスタンプ（例: 20260519_061210）を以下に設定
-TARGET_TS="【ここにタイムスタンプを入力】"
+# dev
+sudo /usr/local/libexec/receipt-restore dev YYYYMMDD_HHMMSS \
+  --confirm restore-root-managed-backup
+
+# stable
+sudo /usr/local/libexec/receipt-restore stable YYYYMMDD_HHMMSS \
+  --confirm restore-root-managed-backup
 ```
 
-### Step 2: データベースの物理削除と再作成（初期化）
+成功時はroot管理deployが再実行される。失敗時は**自動ロールバックも自動再開もしない**。追加コマンドを試さず、復旧担当者がjournal、直前backup、`/var/lib/receipt-ai-app/{env}/.uploads-pre-restore-*`を確認して判断する。
 
-```bash
-# 既存の接続を強制切断
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-dev-db psql -U cntadm -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'receipt_db' AND pid <> pg_backend_pid();"
+## 3. 復旧後の受入確認
 
-# データベースをクリーンに再作成
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-dev-db dropdb -U cntadm --if-exists receipt_db
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-dev-db createdb -U cntadm receipt_db
-```
+- [ ] `receipt-deploy-{env}.service`の結果が`success`
+- [ ] DB・Valkey・backend・frontendが起動し、backend healthが成功
+- [ ] 利用者がログインできる
+- [ ] 履歴・明細・レシート画像が復元時点として整合する
+- [ ] 未完了解析がある場合だけ、台帳から同じjobIdで再投入される
+- [ ] 通知とroot管理backupを確認する
 
-### Step 3: DBデータの流し込み
-
-```bash
-zcat /mnt/raid_1t/backups/receipt-app-dev/db/db_backup_${TARGET_TS}.sql.gz | \
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-dev-db psql -U cntadm -d receipt_db
-```
-
-### Step 4: アップロード画像の展開
-
-```bash
-# 既存の物理ディレクトリを退避
-if [ -d "backend/uploads" ]; then
-    mv backend/uploads backend/uploads_bak_$(date +%Y%m%d_%H%M%S)
-fi
-
-# アーカイブを展開
-tar -xzvf /mnt/raid_1t/backups/receipt-app-dev/uploads/uploads_backup_${TARGET_TS}.tar.gz -C backend/
-```
-
-### Step 5: 全コンテナの起動と確認
-
-```bash
-docker compose up -d
-docker compose ps
-```
-
----
-
-## 3. B. 【本番・安定環境 (stable)】一撃リストア手順
-
-本番環境（stable）のデータを復旧する場合は、以下のコマンドブロックを順に実行する。
-
-### Step 1: 環境変数の定義
-
-```bash
-cd ~/stable/receipt-ai-app
-DB_PASS=$(grep '^DB_PASSWORD=' .env | cut -d '=' -f 2-)
-# ★確認したタイムスタンプ（例: 20260519_061210）を以下に設定
-TARGET_TS="【ここにタイムスタンプを入力】"
-```
-
-### Step 2: データベースの物理削除と再作成（初期化）
-
-```bash
-# 既存の接続を強制切断
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-stable-db psql -U cntadm -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'receipt_db' AND pid <> pg_backend_pid();"
-
-# データベースをクリーンに再作成
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-stable-db dropdb -U cntadm --if-exists receipt_db
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-stable-db createdb -U cntadm receipt_db
-```
-
-### Step 3: DBデータの流し込み
-
-```bash
-zcat /mnt/raid_1t/backups/receipt-app/db/db_backup_${TARGET_TS}.sql.gz | \
-docker exec -i -e PGPASSWORD="${DB_PASS}" receipt-stable-db psql -U cntadm -d receipt_db
-```
-
-### Step 4: アップロード画像の展開
-
-```bash
-# 既存の物理ディレクトリを退避
-if [ -d "backend/uploads" ]; then
-    mv backend/uploads backend/uploads_bak_$(date +%Y%m%d_%H%M%S)
-fi
-
-# アーカイブを展開
-tar -xzvf /mnt/raid_1t/backups/receipt-app/uploads/uploads_backup_${TARGET_TS}.tar.gz -C backend/
-```
-
-### Step 5: 全コンテナの起動と確認
-
-```bash
-docker compose up -d
-docker compose ps
-```
-
----
-
-## 4. 復旧後の動作確認チェックリスト
-
-- [ ] アプリケーションへ正常にログインできるか。
-- [ ] レシート履歴画面を開き、明細データが欠損なく表示されているか。
-- [ ] 履歴に紐づくレシート画像（WebP等）が正しく描画されているか。
-- [ ] 統計画面等の集計ロジックが正常に動作しているか。
+`uploads`の復元前データは`.uploads-pre-restore-<時刻>`として残る。削除・上書き・再復元は、原因とロールバック可否を確認した上で人間が別途承認する。

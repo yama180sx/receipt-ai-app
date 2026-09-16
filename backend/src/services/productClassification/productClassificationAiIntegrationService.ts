@@ -1,13 +1,17 @@
 import {
+  AiUsagePurpose,
   ClassificationConfidence,
   ClassificationSource,
   ProductTypeStatus,
   ProductClassificationAiRunStatus,
 } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { classifyProductsWithAi } from '../../ai';
 import { getConfiguredProductClassificationModelId } from '../../ai/geminiProductClassificationProvider';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 import { createProductClassificationAiRun } from '../../repositories/productClassificationAiRunRepository';
+import { findEffectiveAiPricingRevision } from '../../repositories/aiPricingRevisionRepository';
+import { releaseAiBudgetReservation, reserveAiBudget } from '../aiBudget/aiBudgetGuardService';
 import logger from '../../utils/logger';
 import { getHttpStatusFromError, getNodeErrorCode } from '../../utils/httpError';
 import { runInTransaction } from '../../utils/prismaTransaction';
@@ -69,6 +73,30 @@ export async function applyProductClassificationAiToItems(
   }
   if (targets.length === 0) return;
 
+  let pricingRevision;
+  try {
+    pricingRevision = await findEffectiveAiPricingRevision(
+      AiUsagePurpose.PRODUCT_CLASSIFICATION,
+      getConfiguredProductClassificationModelId()
+    );
+  } catch (error) {
+    // #124 の有効化後はガードがフェイルクローズする。先行導入中は既存分類を止めない。
+    logger.error('[ProductClassificationAI] AI単価改定の取得に失敗しました。');
+  }
+
+  const jobKey = `product-classification:${targets[0].receipt.id}:${Math.random()}`;
+  const maxCostJpy = pricingRevision
+    ? new Prisma.Decimal(pricingRevision.maxInputTokens).mul(pricingRevision.inputPriceJpyPerMillion)
+      .plus(new Prisma.Decimal(pricingRevision.maxOutputTokens).mul(pricingRevision.outputPriceJpyPerMillion)).div(1_000_000)
+    : new Prisma.Decimal(0);
+  // OCRと同じく、予算有効時は単価未解決を安全側で拒否する。
+  try {
+    await reserveAiBudget({ purpose: AiUsagePurpose.PRODUCT_CLASSIFICATION, pricingRevisionId: pricingRevision?.id, maxCostJpy, jobKey });
+  } catch (error) {
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: getConfiguredProductClassificationModelId(), promptTokens: 0, candidatesTokens: 0, totalTokens: 0, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: targets.length, status: ProductClassificationAiRunStatus.PROVIDER_ERROR, failureCode: toSafeProviderFailureCode(error), durationMs: Date.now() - startedAt, pricingRevisionId: pricingRevision?.id }).catch(() => undefined);
+    logger.warn('[ProductClassificationAI] 全体AI予算により分類を見送りました。');
+    return;
+  }
   let aiResult;
   try {
     aiResult = await classifyProductsWithAi({
@@ -101,12 +129,14 @@ export async function applyProductClassificationAiToItems(
       status: isInvalidResponse ? ProductClassificationAiRunStatus.INVALID_RESPONSE : ProductClassificationAiRunStatus.PROVIDER_ERROR,
       failureCode: toSafeProviderFailureCode(error),
       durationMs: Date.now() - startedAt,
+      pricingRevisionId: pricingRevision?.id,
     }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] 分類AIを適用できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
       itemIds: targets.map((item) => item.id),
       error: error instanceof Error ? error.message : String(error),
     });
+    await releaseAiBudgetReservation(jobKey);
     return;
   }
 
@@ -162,15 +192,15 @@ export async function applyProductClassificationAiToItems(
     });
     const returnedIds = new Set(aiResult.response.items.map((item) => item.itemId));
     const classifiedCount = aiResult.response.items.filter((item) => item.productTypeId !== null && item.confidence === 'high').length;
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount, needsReviewCount: aiResult.response.items.length - classifiedCount, unreturnedCount: targets.length - returnedIds.size, status: ProductClassificationAiRunStatus.SUCCEEDED, durationMs: Date.now() - startedAt }).catch(() => undefined);
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount, needsReviewCount: aiResult.response.items.length - classifiedCount, unreturnedCount: targets.length - returnedIds.size, status: ProductClassificationAiRunStatus.SUCCEEDED, durationMs: Date.now() - startedAt, pricingRevisionId: pricingRevision?.id }).catch(() => undefined);
   } catch (error) {
-    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, failureCode: 'persistence_error', durationMs: Date.now() - startedAt }).catch(() => undefined);
+    await createProductClassificationAiRun({ familyGroupId, receiptId: targets[0].receipt.id, modelId: aiResult.modelId, ...aiResult.usage, targetItemCount: targets.length, classifiedCount: 0, needsReviewCount: 0, unreturnedCount: 0, status: ProductClassificationAiRunStatus.PERSISTENCE_ERROR, failureCode: 'persistence_error', durationMs: Date.now() - startedAt, pricingRevisionId: pricingRevision?.id }).catch(() => undefined);
     logger.warn('[ProductClassificationAI] AI分類結果を保存できませんでした。類似候補の要確認状態を維持します。', {
       familyGroupId,
       itemIds: targets.map((item) => item.id),
       error: error instanceof Error ? error.message : String(error),
     });
-  }
+  } finally { await releaseAiBudgetReservation(jobKey); }
 }
 
 /** 単一明細の更新後に、AI反映後の表示用データを取得する。 */

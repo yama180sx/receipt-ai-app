@@ -19,12 +19,14 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 | やりたいこと | 最初に読む場所 | 詳細 |
 |--------------|----------------|------|
-| 環境の初回構築・cron 登録 | 本書 §2 | [setup-env.sh](../../setup-env.sh) |
-| 定期バックアップの確認・手動実行 | 本書 §3 | [restore-manual.md §0](../restore-manual.md) |
-| 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | dev / stable 別手順 |
+| root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
+| 定期バックアップの確認・手動実行 | 本書 §3 | root管理`receipt-backup-{env}.service` |
+| 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | root管理restore helperを使う |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
+| 秘密情報の検知・安全診断・漏えい時の初動 | [secret-scanning-and-incident-response.md](../security/secret-scanning-and-incident-response.md) | GitHub Secret Scanning、Gitleaks、診断スクリプト |
+| 招待コードの安全な再発行・配布・対象限定ロールバック | [Issue #131-7 runbook](../reviews/issue-131-7/invitation-code-rotation-runbook.md) | root専用serviceと暗号化artifact |
 
 **重複削減方針:** 本書は設計資料から辿れる **索引 + 実装準拠の要点** とする。コマンド全文・チェックリストは `docs/db-operations.md` / `docs/restore-manual.md` に残し、内容が食い違う場合は **ソースコードとスクリプトを正** とする。
 
@@ -32,29 +34,21 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 
 ## 2. 環境構築（T320）
 
-同一ホスト（T320）上に **dev** と **stable** の 2 系統を独立した Compose プロジェクトとして運用する。
+同一ホスト（T320）上に **dev** と **stable** の 2 系統を独立したroot管理Composeプロジェクトとして運用する。runnerと通常利用者はDocker socket、秘密情報、任意のデプロイ操作を直接扱わない。
 
 | 項目 | dev | stable |
 |------|-----|--------|
 | プロジェクト名 | `receipt-dev` | `receipt-stable` |
-| 作業ディレクトリ例 | `~/dev/receipt-ai-app` | `~/stable/receipt-ai-app` |
+| root管理作業ディレクトリ | `/srv/receipt-ai-app/dev` | `/srv/receipt-ai-app/stable` |
+| 永続データ | `/var/lib/receipt-ai-app/dev` | `/var/lib/receipt-ai-app/stable` |
 | DB コンテナ | `receipt-dev-db` | `receipt-stable-db` |
-| バックアップ cron | 毎日 3:00 + `@reboot`（120s 後） | 毎日 4:00 + `@reboot`（120s 後） |
+| バックアップ | `receipt-backup-dev.timer` | `receipt-backup-stable.timer` |
 
 ### 2.1 初回セットアップ
 
-```bash
-# リポジトリルートで .env.secret を用意（git 管理外）
-./setup-env.sh dev    # または stable
-docker compose up -d --build
-```
+root管理unit、root所有の非機密設定、encrypted credentialを使用する。設置先・所有者・mode・credential論理名は[ops/systemd/README.md](../../ops/systemd/README.md)を正本とする。秘密値を`.env`、Git、shell履歴、Issue、PR、端末ログへ書かない。
 
-`setup-env.sh` が行うこと:
-
-1. `.env.secret` から秘密情報（`DB_PASS`, `JWT_SECRET`, `GEMINI_API_KEY` 等）を読み込み
-2. ルート / `frontend` / `backend` の `.env` を環境別に生成
-3. **cron 登録** — `scripts/backup.sh {dev|stable}` を定期実行および `@reboot` で登録（[Issue #41], [Issue #89]）
-4. `logs/` ディレクトリ作成（cron リダイレクト失敗防止）
+stableの初回切替は[Issue #131-3-3の段階移行手順](../reviews/issue-131-3-3/stable-staged-migration-runbook.md)に従い、承認済みの停止時間だけで行う。stableはroot所有`stable.env`の承認済み完全長SHAに固定し、`main`更新だけでは自動反映しない。
 
 ポート・CORS 等の一覧は [architecture.md §8.1](./architecture.md) を参照。
 
@@ -64,8 +58,8 @@ docker compose up -d --build
 
 | 環境 | 設定場所 | 反映方法 |
 |------|----------|----------|
-| dev | `backend/.env` | `docker compose up -d --force-recreate backend` |
-| stable | GitHub Actions Variables | `main` への次回デプロイ（または値を反映した手動デプロイ） |
+| dev | root所有`/etc/receipt-ai-app/dev.env` | root管理deploy unit |
+| stable | root所有`/etc/receipt-ai-app/stable.env` | 承認済みの手動stable deploy |
 
 例: 1レシートあたりの手動再実行を2回まで許可し、Gemini の日次クォータ超過だけを対象にする場合。
 
@@ -76,12 +70,90 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 
 `RECEIPT_MANUAL_RETRY_FAILURE_CODES` はカンマ区切りで指定する。現行で指定可能なコードは `gemini_daily_quota`、`http_429`、`http_5xx`。既定値は前者のみである。値を空にすると手動再実行は無効化される。
 
+`RECEIPT_ANALYSIS_MAINTENANCE_MODE=true` はキューストア移行時の一時停止用である。新規解析投入と手動再実行だけを停止し、履歴閲覧と確定保存は継続する。切替確認後は必ず `false` に戻す。
+`gemini_daily_quota` は、GoogleのRPDリセット（太平洋時間の次の午前0時）まで再実行ボタンを表示しない。自動で翌日に再投入することはない。
+
 新しい設定項目を導入する際は、以下を同じ変更に含める。
 
 1. コードに安全な既定値を実装する
-2. `backend/.env.example` と `setup-env.sh` の生成内容を更新する
-3. stable 用の値が必要なら GitHub Actions の `vars` から `backend/.env` へ渡す
+2. `backend/.env.example` とroot管理用設定例の許可キーを更新する
+3. root管理環境では、許可された非機密キーだけを`/etc/receipt-ai-app/{dev,stable}.env`へ追加する
 4. 本節と機能設計資料の環境変数表を更新する
+
+### 2.3 Gemini モデルの切替
+
+OCR と商品分類はそれぞれ `GEMINI_RECEIPT_MODEL` と
+`GEMINI_PRODUCT_CLASSIFICATION_MODEL` で固定モデルIDを指定する。既定値はどちらも
+`gemini-3.5-flash-lite` である。`gemini-flash-latest` のような別名は、提供側による
+参照先の自動変更を防ぐため使用できない。
+
+モデルを切り替えるときは、対象モデルの実レシート検証と商品分類の契約検証を完了してから、
+環境変数を変更して backend を再デプロイする。OCRだけ・商品分類だけの切替もでき、
+アプリケーションコードの変更は不要である。切替後に問題が起きた場合は、提供終了前の
+直前の固定モデルIDへ戻す。戻せない場合は自動フォールバックせず、手入力で登録する。
+
+### 2.4 Gemini の定期確認
+
+毎月、Google AI Studio と公式のモデル・料金・廃止予定情報を確認する。確認対象は、
+設定済みモデルの利用可否、Free Tier のクォータ、料金表、廃止日である。廃止予定が確認された
+場合は、少なくとも30日前までに代替候補を実レシートと商品分類契約で検証し、環境変数の変更と
+再デプロイを別途承認して行う。個人情報を含むレシート画像・プロンプト・応答本文は、調査記録へ
+転記しない。
+
+### 2.5 Free Tier の実測
+
+モデルの切替判断や無料枠運用に使う実測は、
+[Gemini Free Tier実測手順](../testing/gemini-free-tier-measurement.md)に従う。固定のRPDを
+アプリケーション設定へ持ち込まず、実施時点のGoogle AI Studio表示と`ApiUsageLog`の集計値を
+記録する。Paid Tierの料金試算・予算管理は Issue #120-1 のスコープである。単価の初回登録・改定は通常UIではなく、
+デプロイ担当者が公式料金URL、確認日時・確認者、用途別の最大トークンを確認してから、次の追記専用CLIで行う。
+
+```bash
+cd backend
+npm run ai-pricing:add -- \
+  --purpose ocr --model-id gemini-3.5-flash-lite \
+  --input-price-jpy-per-million <JPY_PER_MILLION> \
+  --output-price-jpy-per-million <JPY_PER_MILLION> \
+  --max-input-tokens <MAX_INPUT_TOKENS> --max-output-tokens <MAX_OUTPUT_TOKENS> \
+  --effective-from <ISO_TIMESTAMP> --source-url <OFFICIAL_HTTPS_URL> \
+  --verified-at <ISO_TIMESTAMP> --verified-by <OPERATOR>
+```
+
+OCRと商品分類AIを別々に登録する。登録済み改定の更新・削除は行わず、新しい適用開始日時で追加する。
+
+### 2.6 全体AI予算管理者の初期・復旧登録
+
+初回登録、または事故対応で全体AI予算管理者が0名になった場合だけ、デプロイ担当者がT320で次のCLIを実行する。通常の追加・削除はアプリの「全体AI予算・通知管理」画面から行う。対象利用者は事前にADMIN権限とTOTP有効化を完了していなければならない。root管理環境では稼働中backendコンテナ内から実行し、`*_FILE`の秘密値をCLI自身が解決する。
+
+```bash
+sudo docker exec receipt-stable-backend \
+  npm run ai-budget:bootstrap-manager -- \
+  --member-id <MEMBER_ID> \
+  --operator <DEPLOYMENT_OPERATOR> \
+  --reason <REASON> \
+  --confirm bootstrap-global-ai-budget-manager
+```
+
+このCLIは有効な管理者が既に存在する場合に失敗する。出力や操作記録に秘密情報を含めず、監査記録へ対象者、実行者、理由、実行経路を追記する。実行前にDB migrationが適用済みであることを確認する。
+
+### 2.7 Expo SDK と Expo Go の運用
+
+Expo Go は開発・検証用であり、家族の日常利用の正規入口はモバイルWebとする。Expo Go はプロジェクトのExpo SDKと一致しない場合に起動できないため、端末でSDK不一致を確認した場合、またはExpo Goの新SDK公開を確認した場合は、**翌営業日までに**対応Issueを起票してdev環境で更新を開始する。
+
+更新は1メジャーずつ行い、各段階で次を確認する。
+
+```bash
+cd frontend
+npx expo-doctor@latest
+npx tsc --noEmit
+npm test
+npm run check:api
+npx expo export --platform web
+```
+
+Expo SDK 57はTypeScript 6を要求する一方、OpenAPI生成に使用する`openapi-typescript`の現行版はTypeScript 5系だけをpeer dependencyとして宣言している。`frontend/.npmrc` の `legacy-peer-deps=true` はこの上流制約に限る一時対応である。`npm run check:api`、型チェック、Expo Doctor、Web書き出しが通ることを更新ごとに確認し、上流がTypeScript 6対応を公開した時点で設定を削除する。
+
+iPhoneではExpo Goの旧版を個別に固定・再導入できないため、SDK不一致中はモバイルWebを利用する。Androidで対応SDK版のExpo Goを一時利用する場合も、恒久的な固定運用にはせず、対応Issueの更新完了までに限定する。
 
 ---
 
@@ -93,22 +165,25 @@ RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota
 |------|------|
 | スクリプト | `scripts/backup.sh {dev\|stable}` |
 | DB 形式 | `pg_dump` → gzip（`db_backup_YYYYMMDD_HHMMSS.sql.gz`） |
-| 画像形式 | `backend/uploads` を tar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
+| 画像形式 | root管理`/var/lib/receipt-ai-app/{env}/uploads`をtar.gz（`uploads_backup_YYYYMMDD_HHMMSS.tar.gz`） |
+| 未完了解析 | PostgreSQL `ReceiptAnalysisJob` を正本として復元後に再投入 |
 | 保存先（stable） | `/mnt/raid_1t/backups/receipt-app/{db,uploads}/` |
 | 保存先（dev） | `/mnt/raid_1t/backups/receipt-app-dev/{db,uploads}/` |
 | 世代管理 | **7 日**超のファイルを自動削除（`RETENTION_DAYS=7`） |
-| ログ | `{プロジェクト}/logs/backup_{env}.log` |
+| 実行経路 | root管理`receipt-backup-{dev,stable}.service` |
+| 定期実行 | `receipt-backup-{dev,stable}.timer`（起動後と毎日） |
 
 ### 3.2 手動実行・確認
 
 ```bash
-cd ~/stable/receipt-ai-app   # または ~/dev/receipt-ai-app
-mkdir -p logs
-./scripts/backup.sh stable   # dev の場合は dev
-tail logs/backup_stable.log
+sudo systemctl start receipt-backup-stable.service
+sudo systemctl show receipt-backup-stable.service \
+  -p Result -p ExecMainStatus -p ActiveState -p SubState
 ```
 
-バックアップ一覧の確認は [restore-manual.md §1](../restore-manual.md) を参照。
+定期実行は`systemctl is-enabled receipt-backup-stable.timer`と`systemctl list-timers receipt-backup-stable.timer`で確認する。`systemctl status -l`やプロセス詳細は秘密値を含み得るため、通常の確認には使わない。
+
+バックアップ一覧の確認では、対象環境の保存先だけを参照し、秘密値を含む`.env`や旧ユーザー所有作業ディレクトリを使用しない。
 
 ### 3.3 Discord アラート
 
@@ -117,19 +192,24 @@ tail logs/backup_stable.log
 | 実装 | `scripts/backup.sh` 内 `send_discord_alert` |
 | 通知先 | Discord Webhook（`#alerts` 相当 — README 記載） |
 | SUCCESS | DB・画像バックアップとも成功時（緑 embed） |
-| ERROR | `.env` 欠落、DB コンテナ停止、dump/tar 失敗、uploads ディレクトリ不在 |
+| ERROR | root管理credential・uploads領域の欠落、DB コンテナ停止、dump/tar 失敗 |
 
 `scripts/notify.sh` は汎用通知関数のみ定義されており、**現行の定期バックアップ通知は `backup.sh` が担う**。手動障害通知用のテンプレートとして利用可能。
 
+Discord Webhook、SMTP資格情報、送信元アドレスはGitへ保存しない。バックアップ通知は
+encrypted credentialの`backup_discord_webhook_url`、AI予算通知のencrypted credentialを別々に設定する。
+SMTPは`SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`で設定する。
+Webhookを誤ってGitへ記録した場合は、履歴削除だけでなくDiscord側で旧Webhookを直ちに無効化・再発行する。
+
 ### 3.4 バックアップが増えないとき
 
-cron のリダイレクト先 `logs/` が無いとジョブ全体が失敗する（[Issue #89]）。対処:
+root管理unitの結果とjournalを、秘密値を出さない範囲で確認する。対処:
 
-1. `mkdir -p logs` を確認
-2. `./scripts/backup.sh {env}` を手動実行してログ確認
-3. 必要なら `./setup-env.sh {env}` を再実行して cron 行を更新
+1. `systemctl show receipt-backup-{env}.service -p Result -p ExecMainStatus`を確認
+2. `journalctl -u receipt-backup-{env}.service`から成功・失敗分類だけを確認
+3. root管理uploads領域、DBコンテナ、encrypted credentialの論理名を確認する
 
-詳細: [restore-manual.md §0](../restore-manual.md)
+旧cron・平文`.env`を前提とする確認手順は使用しない。
 
 ### 3.5 PostgreSQL スロークエリログ
 
@@ -210,17 +290,18 @@ docker compose exec backend npm run prisma:sync-sequences
 
 ### 5.1 事前確認
 
-1. [restore-manual.md §1](../restore-manual.md) で対象環境のバックアップ一覧を表示
-2. 復元したい `TARGET_TS`（例: `20260519_061210`）を特定
+1. 対象環境のroot管理backupが成功していることを確認する
+2. 復元候補のバックアップ時刻を特定する
+3. 対象環境、停止時間、復旧担当者を人間が承認する
 
 ### 5.2 環境別作業ディレクトリ
 
 | 環境 | `cd` 先 | DB コンテナ |
 |------|---------|-------------|
-| dev | `~/dev/receipt-ai-app` | `receipt-dev-db` |
-| stable | `~/stable/receipt-ai-app` | `receipt-stable-db` |
+| dev | `/srv/receipt-ai-app/dev` | `receipt-dev-db` |
+| stable | `/srv/receipt-ai-app/stable` | `receipt-stable-db` |
 
-> [restore-manual.md §3](../restore-manual.md) のstable手順は **`~/stable/receipt-ai-app`** を使用する。devとstableの作業ディレクトリ・Composeプロジェクトを混在させない。
+> root管理環境の復旧は、対象環境のroot管理backup、encrypted credential、`/var/lib/receipt-ai-app/{env}`だけを対象にする。devとstableのデータ・Composeプロジェクトを混在させない。平文`.env`・旧ユーザー所有パス・直接Docker Composeを使わず、[復旧手順書](../restore-manual.md)のroot helperだけを使用する。
 
 ### 5.3 復旧後チェックリスト
 
@@ -229,20 +310,20 @@ docker compose exec backend npm run prisma:sync-sequences
 - [ ] レシート画像（WebP 等）が描画される
 - [ ] 統計・精算画面が正常
 
-全文: [restore-manual.md §4](../restore-manual.md)
+復旧手順の詳細は[restore-manual.md](../restore-manual.md)を参照する。
 
 ---
 
 ## 6. デプロイ（stable）
 
-`main` ブランチ push で self-hosted runner（T320）が `.github/workflows/deploy.yml` を実行する。
+`main`へのpushはstableをデプロイしない。stableはGitHub `stable` Environmentのrequired reviewer承認後、self-hosted runner（T320）から手動実行する`.github/workflows/deploy.yml`でのみ反映する。runnerは固定名のroot管理unit開始だけを要求し、Docker、credential、任意refを直接操作しない。
 
-1. `rsync` で `~/stable/receipt-ai-app/` に同期（`pgdata`, `uploads`, `logs` 等は除外）
-2. GitHub Secrets / Vars から `.env` 生成
-3. `prisma migrate deploy`
-4. `docker compose up -d --build`
+1. リリース担当者が、dev受入済みでmainに含まれる対象コミットSHAをroot所有`/etc/receipt-ai-app/stable.env`の`STABLE_RELEASE_SHA`へ設定する。
+2. required reviewerの承認後、workflowが`receipt-deploy-stable.service`を開始する。
+3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Redis healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
+4. backend health、ログイン、TOTP、既存データ・uploads、新規解析、通知、backupを確認する。
 
-コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計。マイグレーションのみ自動適用。
+stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時間、復旧担当者を満たした人間承認済みの作業に限定する。コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計であり、migration失敗時は追加変更を停止してロールバック判断へ進む。
 
 詳細: [architecture.md §8.3](./architecture.md)
 
@@ -253,20 +334,22 @@ docker compose exec backend npm run prisma:sync-sequences
 ```mermaid
 flowchart LR
   subgraph daily [定期運用]
-    Cron[cron / @reboot] --> Backup[scripts/backup.sh]
+    Timer[systemd timer] --> Backup[root backup service]
     Backup --> RAID["/mnt/raid_1t/backups/"]
     Backup --> Discord[Discord Webhook]
   end
 
   subgraph deploy [デプロイ]
-    MainPush[push to main] --> GHA[deploy.yml]
-    GHA --> Rsync[rsync to ~/stable/]
-    GHA --> Migrate[prisma migrate deploy]
-    GHA --> Compose[docker compose up]
+    Main[承認済み main commit SHA] --> RootConfig[root所有 stable.env]
+    Approval[stable Environment 承認] --> GHA[手動 deploy.yml]
+    GHA --> Unit[receipt-deploy-stable.service]
+    RootConfig --> Unit
+    Unit --> Migrate[container内 prisma migrate deploy]
+    Unit --> Compose[root管理 docker compose up]
   end
 
   subgraph recovery [障害時]
-    RAID --> Restore[restore-manual.md 手順]
+    RAID --> Restore[root restore helper]
     Restore --> App[アプリ動作確認]
   end
 ```
@@ -277,7 +360,7 @@ flowchart LR
 
 | パス | 内容 |
 |------|------|
-| `setup-env.sh` | 環境別 `.env` 生成・cron 登録 |
+| `ops/systemd/` | root管理deploy／backup unit、timer、設定例、設置契約 |
 | `scripts/backup.sh` | DB / 画像バックアップ・世代管理・Discord 通知 |
 | `scripts/notify.sh` | 汎用 Discord 通知関数 |
 | `backend/prisma/seed.ts` | 全削除 + 初期データ投入 |
@@ -286,7 +369,8 @@ flowchart LR
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
-| `docs/restore-manual.md` | リストア詳細（移行期間維持） |
+| `ops/systemd/libexec/receipt-restore` | root管理DB・uploads復旧ヘルパー |
+| `docs/restore-manual.md` | root管理復旧の承認条件・実行・受入確認 |
 
 ---
 

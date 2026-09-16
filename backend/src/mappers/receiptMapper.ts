@@ -267,6 +267,7 @@ export async function mapReceiptJobToListItem(
           failureCode: typeof job.data?.failureCode === 'string' ? job.data.failureCode : null,
           failedReason: job.failedReason,
           manualRetryCount: job.data?.manualRetryCount,
+          failedAt: job.finishedOn ?? job.timestamp,
         })
       : undefined,
   };

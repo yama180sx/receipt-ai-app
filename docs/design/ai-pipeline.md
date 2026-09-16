@@ -142,7 +142,7 @@ Issue #49-8 / #71 により、**AI 解析（読み取り）** と **DB 保存（
 - Gemini API 呼び出し（`analyzeReceiptImage`）
 - 明細への初期`categoryId`付与（世帯内`Category.keywords`による推定）と、商品種別分類の表示用評価
 - 閾値ベースの警告生成（`validationService.validateReceiptItems`）
-- OCRの`ApiUsageLog`はGemini解析内で作成（`receiptId` はcommitまで未設定）
+- OCRの`ApiUsageLog`はGemini解析内で作成（`receiptId` はcommitまで未設定）。有効な`AiPricingRevision`が登録済みなら、呼出し開始時点のIDも保存する
 
 **commit で初めて行うこと**（`saveConfirmedReceipt`）:
 
@@ -206,10 +206,12 @@ sequenceDiagram
 
 | 項目 | 内容 |
 |------|------|
-| 画像処理 | multer 受信 → sharp で回転・リサイズ（最大 1000px）→ WebP（quality 75） |
+| 画像処理 | multer 受信 → 事前検査（復号可否・最小寸法・ほぼ単色の白紙/黒紙）→ sharp で回転・リサイズ（最大 1000px）→ WebP（quality 75） |
 | 保存先 | `backend/uploads/receipt-{timestamp}-{random}.webp` |
 | レスポンス | `202 Accepted` + `{ jobId, status: "queued" }` |
 | 実装 | `receiptRoutes.ts`（ルート定義）/ `receiptController.uploadReceipt` |
+
+事前検査を通過しても、紙のしわ・影だけが写った画像のように局所的な濃淡を持つ非レシート画像は残り得る。この場合はGemini応答後に、店舗名・購入日時・明細・正の合計がすべて欠ける空結果を失敗として扱い、空の確認画面を表示しない。確認トレイにはNode.jsやGeminiの内部エラーではなく、日本語の利用者向け失敗理由だけを表示する。画像内容をAIで事前分類する処理は費用削減にならないため行わない。
 
 #### ジョブ監視（フロント）
 
@@ -296,7 +298,7 @@ flowchart TB
 | 404 秘匿 | 他世帯・他メンバーのジョブ ID は 404（存在を漏らさない） |
 | commit 後 | `removeReceiptJobAfterCommit` — キューから除去（画像は Receipt に紐づくため残す） |
 | 破棄 | `discardReceiptJobForMember` — キュー除去 + 未保存画像ファイル削除 |
-| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。既定は Gemini 日次クォータ超過のみ・手動再実行1回まで |
+| 再実行 | `retryFailedReceiptJobForMember` — `failed` 状態・元画像・再実行ポリシーを検証後、新規ジョブを投入して元の失敗ジョブを除去。Gemini 日次クォータ超過時は次の太平洋時間午前0時以後だけ手動再実行できる。自動再投入はしない |
 
 ---
 
@@ -307,10 +309,11 @@ flowchart TB
 | 環境変数 | デフォルト | 用途 |
 |----------|------------|------|
 | `GEMINI_API_KEY` | — | API キー（必須） |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | 使用モデル |
+| `GEMINI_RECEIPT_MODEL` | `gemini-3.5-flash-lite` | レシート画像OCR・構造化に使う固定モデルID。`*-latest` の別名は禁止 |
+| `GEMINI_PRODUCT_CLASSIFICATION_MODEL` | `gemini-3.5-flash-lite` | 商品分類に使う固定モデルID。OCRとは独立に切替可能 |
 | `GEMINI_RETRY_COUNT` | `3` | 429 / 5xx リトライ回数 |
 | `GEMINI_RETRY_DELAY` | `2000` | 初回リトライ待機 ms（指数バックオフ） |
-| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要 |
+| `RECEIPT_MANUAL_RETRY_LIMIT` | `1` | 1レシートあたりの手動再実行上限。変更時は worker / API の再起動が必要。Gemini 日次クォータ超過は次の太平洋時間午前0時以後に限る |
 | `RECEIPT_MANUAL_RETRY_FAILURE_CODES` | `gemini_daily_quota` | 手動再実行を許可する失敗コード（カンマ区切り）。現行の候補は `gemini_daily_quota`、`http_429`、`http_5xx` |
 
 ### 6.2 解析処理（`analyzeReceiptImage`）
@@ -346,8 +349,8 @@ flowchart TB
 
 | タイミング | 操作 |
 |------------|------|
-| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`） |
-| 自己修復リトライ | 同一レコードへ `increment` で累積 |
+| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`, 有効なら`pricingRevisionId`） |
+| 自己修復リトライ | 同一レコードへtokenと`durationMs`を`increment`で累積し、`selfRepairRetryCount`を加算 |
 | commit 成功 | `ApiUsageLog.receiptId` を更新（1 対 1 紐付け） |
 | 手動登録 | `usageLogId` なし（AI コスト対象外） |
 

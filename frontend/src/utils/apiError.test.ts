@@ -69,6 +69,27 @@ describe('apiError', () => {
     expect(getApiErrorMessage('unknown')).toBe('通信エラーが発生しました。');
   });
 
+  it('appends API validation details to the generic validation message', () => {
+    const axiosError = new axios.AxiosError(
+      'Request failed',
+      'ERR_BAD_REQUEST',
+      undefined,
+      undefined,
+      {
+        status: 400,
+        data: {
+          message: '入力内容に不備があります',
+          details: [{ field: 'priority', message: '優先度は整数で入力してください' }],
+        },
+        statusText: 'Bad Request',
+        headers: {},
+        config: {} as never,
+      }
+    );
+
+    expect(getApiErrorMessage(axiosError)).toBe('入力内容に不備があります\n優先度は整数で入力してください');
+  });
+
   it('showApiErrorAlert notifies user with extracted message', () => {
     const error = new axios.AxiosError(
       'Request failed',
@@ -90,9 +111,54 @@ describe('apiError', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it('logs an expected 4xx response as a warning instead of an error', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = new axios.AxiosError(
+      'Request failed',
+      'ERR_BAD_REQUEST',
+      undefined,
+      undefined,
+      {
+        status: 400,
+        data: { message: '入力内容に不備があります' },
+        statusText: 'Bad Request',
+        headers: {},
+        config: {} as never,
+      }
+    );
+
+    showApiErrorAlert('エラー', error);
+
+    expect(console.error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+  });
+
   it('showApiErrorAlert uses fallback when message is unavailable', () => {
     showApiErrorAlert('エラー', 'unknown', '一覧の取得に失敗しました。');
 
     expect(showAlert).toHaveBeenCalledWith('エラー', '一覧の取得に失敗しました。');
+  });
+
+  it('can notify an expected maintenance error without a console error', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = new axios.AxiosError(
+      'Request failed',
+      'ERR_BAD_RESPONSE',
+      undefined,
+      undefined,
+      {
+        status: 503,
+        data: { message: '解析基盤を更新中です。しばらくしてから再試行してください。' },
+        statusText: 'Service Unavailable',
+        headers: {},
+        config: {} as never,
+      }
+    );
+
+    showApiErrorAlert('解析基盤を更新中', error, undefined, { log: false });
+
+    expect(showAlert).toHaveBeenCalledWith('解析基盤を更新中', '解析基盤を更新中です。しばらくしてから再試行してください。');
+    expect(console.error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

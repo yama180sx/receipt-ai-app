@@ -8,6 +8,7 @@ import {
   type ReceiptTrayItem,
 } from '../types/receiptJob';
 import { showAlert } from '../utils/alertMessage';
+import { getApiErrorMessage, getApiErrorStatus } from '../utils/apiError';
 import { showConfirmDialog } from '../utils/confirmDialog';
 import { discardReceiptJob, fetchReceiptScanInitialData, retryReceiptJob } from '../utils/receiptJobActions';
 import {
@@ -165,8 +166,12 @@ export function useReceiptTrayController({
       await retryReceiptJob(item.id);
       showAlert('再実行を開始しました', '同じレシート画像を解析キューへ再投入しました。');
       await refresh();
-    } catch {
-      showAlert('再実行できません', '元画像が見つからないか、再実行できない状態です。再撮影してください。');
+    } catch (error) {
+      const maintenance = getApiErrorStatus(error) === 503;
+      showAlert(
+        maintenance ? '解析基盤を更新中' : '再実行できません',
+        getApiErrorMessage(error, '元画像が見つからないか、再実行できない状態です。再撮影してください。')
+      );
       await refresh();
     } finally {
       setRetryingJobId(null);

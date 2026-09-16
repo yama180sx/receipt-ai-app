@@ -162,7 +162,8 @@ export async function startTotpSetupForMember(memberId: number) {
   }
 
   const secret = generateTotpSecret();
-  await saveMemberTotpSetup(member.id, encryptSecretForStorage(secret));
+  const encrypted = encryptSecretForStorage(secret);
+  await saveMemberTotpSetup(member.id, encrypted.encryptedSecret, encrypted.keyVersion);
 
   return {
     secret,
@@ -187,7 +188,7 @@ export async function confirmTotpSetupForMember(
     throw new AppError('二要素認証は既に有効です。', 400);
   }
 
-  const secret = decryptSecretFromStorage(member.totpSecret);
+  const secret = decryptSecretFromStorage(member.totpSecret, member.totpKeyVersion);
   if (!verifyTotpCode(secret, code.trim())) {
     throw new AppError('認証コードが正しくありません。', 401);
   }
@@ -217,7 +218,7 @@ export async function verifyTotpForMember(
     throw new AppError('二要素認証が有効ではありません。', 400);
   }
 
-  const secret = decryptSecretFromStorage(member.totpSecret);
+  const secret = decryptSecretFromStorage(member.totpSecret, member.totpKeyVersion);
   if (!verifyTotpCode(secret, code.trim())) {
     throw new AppError('認証コードが正しくありません。', 401);
   }
@@ -243,7 +244,7 @@ export async function disableTotpForMember(memberId: number, password: string, c
     throw new AppError('パスワードが正しくありません。', 401);
   }
 
-  const secret = decryptSecretFromStorage(member.totpSecret);
+  const secret = decryptSecretFromStorage(member.totpSecret, member.totpKeyVersion);
   if (!verifyTotpCode(secret, String(code).trim())) {
     throw new AppError('認証コードが正しくありません。', 401);
   }

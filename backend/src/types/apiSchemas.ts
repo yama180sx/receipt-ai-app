@@ -214,6 +214,7 @@ export type ReceiptJobListItem = {
   retry?: {
     eligible: boolean;
     remainingCount: number;
+    availableAt?: number;
   };
   parsedData?: {
     storeName: string;

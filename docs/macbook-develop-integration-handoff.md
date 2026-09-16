@@ -24,6 +24,17 @@ git status --short
 git log --oneline HEAD..origin/develop
 ```
 
+## 2026-09-16 の統合判断
+
+このWIPブランチでは、`develop`のroot管理運用を採用する。MacBook固有のIPアドレス、バックアップ保存先、WebhookをGit管理ファイルへ固定する旧方式は引き継がない。
+
+- `setup-env.sh` は廃止済みであり、MacBookでも実行しない。
+- 旧ユーザーcronとユーザー所有の`.env`に依存するバックアップ方式は、root管理のsystemd timerとencrypted credentialへ移行する。
+- MacBookのLAN IP、バックアップ先、秘密情報は、Git管理外の`/etc/receipt-ai-app/stable.env`とroot管理credentialで設定する。
+- SharpのWebAssemblyフォールバックはこのブランチに残す。`npm ci`で依存関係を作り直した後は、MacBookで`npm run install:sharp-wasm`と`npx prisma generate`を再実行する。
+
+このマージはリポジトリ上の統合だけであり、MacBookのroot管理runtimeへの切替、データ移行、旧Redisデータの扱い、systemd unitの有効化はまだ実行していない。
+
 ## このブランチが必要な理由
 
 このブランチには、通常のT320向け`develop`にそのまま適用できないMacBook固有の対応がある。

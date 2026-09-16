@@ -62,7 +62,7 @@ flowchart TB
     BE --> FS
     BE --> Gemini
 
-    Cron[setup-env.sh cron] --> Backup[scripts/backup.sh]
+    Timer[systemd backup timer] --> Backup[root backup helper]
     Backup --> Discord
 ```
 
@@ -70,10 +70,10 @@ flowchart TB
 
 | レイヤー | 技術 |
 |----------|------|
-| Frontend | Expo ~54, React 19, React Native 0.81, TypeScript, Axios |
+| Frontend | Expo ~57, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
 | Backend | Node.js 20, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
-| Queue | BullMQ 5 + Redis 7 |
+| Queue | BullMQ 5 + Valkey 8.1（Issue #119でdev検証中） |
 | AI | `@google/generative-ai`（Gemini） |
 | 画像 | sharp（WebP 変換）, multer（アップロード） |
 | 認証 | JWT, bcrypt, otplib（TOTP）, AES-256-GCM |
@@ -118,7 +118,7 @@ receipt-ai-app/
 ├── scripts/                 # backup.sh, notify.sh
 ├── docs/                    # 設計・運用ドキュメント
 ├── docker-compose.yml
-└── setup-env.sh             # dev / stable 環境生成
+└── setup-env.sh             # 廃止済み（root管理手順へ移行）
 ```
 
 ---
@@ -267,6 +267,7 @@ Prisma への直接アクセスは **Repository に集約** する。Service は
 | `repositories/productClassificationRepository.ts` | 商品分類・世帯辞書・確定履歴・類似検索 |
 | `repositories/promptRepository.ts` | プロンプトテンプレート |
 | `repositories/apiUsageLogRepository.ts` | AI 利用ログ |
+| `repositories/aiPricingRevisionRepository.ts` | 用途・モデル別単価改定の解決 |
 
 テナントスコープは Prisma Client Extension（`$extends`）で Repository 内部から適用する。UseCase 物理層（`usecases/` フォルダ）は設けず、**Service メソッド = Application 操作** とする（[plan.md](../refactor/plan.md) §7）。
 
@@ -426,6 +427,7 @@ sequenceDiagram
 | concurrency | 5 |
 | 完了ジョブ保持 | 30 分（ポーリング用） |
 | リトライ | attempts: 3, exponential backoff 5s |
+| 復旧台帳 | `ReceiptAnalysisJob`（PostgreSQL）。キュー喪失時は未完了ジョブを同じjobIdで再投入する。 |
 
 Worker の実装: `backend/src/workers/receiptWorker.ts`  
 キュー定義: `backend/src/queues/receiptQueue.ts`
@@ -658,9 +660,11 @@ ER 詳細は [domain-model.md](./domain-model.md)（#90-2）。
 
 クラウドストレージは未使用。`backend/uploads/` に WebP 変換後の画像を保存し、認証付き `GET /api/uploads/:filename` で配信する（世帯スコープ検証あり）。
 
-### 7.3 Redis
+### 7.3 Valkey
 
-BullMQ のジョブキュー専用。`redisdata/` ボリュームで永続化。
+BullMQのジョブキュー専用。公式Valkeyイメージを完全なタグとdigestで固定し、`valkeydata/`ボリュームで永続化する。接続先サービス名と既存の`REDIS_*`設定名はBullMQ/ioredis互換のため維持する。
+
+PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkeyは実行キューである。キューストアを喪失した場合は、台帳とuploadsから同じjobIdで再投入する。Redis CE 7.4の旧`redisdata/`はValkeyへ移行せず、ロールバック専用に分離保持する。詳細は[ADR-012](../adr/ADR-012-valkey-queue-store-adoption.md)を参照する。
 
 ---
 
@@ -704,13 +708,26 @@ BullMQ のジョブキュー専用。`redisdata/` ボリュームで永続化。
 
 `createApp()` 分離により、結合テストは Worker なしで Supertest 実行可能。
 
-**デプロイ（`deploy.yml`）** — push to `main`:
+**stableデプロイ（`deploy.yml`）** — GitHub `stable` Environmentのrequired reviewer承認後の手動実行:
 
-1. self-hosted runner（`t320`）で checkout
-2. `rsync` → `~/stable/receipt-ai-app/`（`pgdata`, `uploads` 等は除外）
-3. GitHub Secrets / Vars から `.env` 生成
-4. `prisma migrate deploy`
-5. `docker compose up -d --build`
+1. self-hosted runner（`t320`）は固定名の`receipt-deploy-stable.service`だけを要求する。
+2. root管理helperが`/srv/receipt-ai-app/stable`で、root所有設定の`STABLE_RELEASE_SHA`に固定された承認済みmainコミットを検証・取得する。
+3. encrypted credentialを実行時だけサービス別に配布し、DB／Redis healthcheck後にコンテナ内でPrisma migrationを実行する。
+4. root管理runtime Composeを起動し、backend healthを確認する。
+
+`main`へのpushはstableデプロイを開始しない。stableの対象SHA、dev受入結果、承認者、実施時刻、結果をリリース記録に残す。秘密値、Webhook URL、認証情報は記録しない。
+
+### 8.4 将来のARM64限定公開用Compose
+
+`docker-compose.production.yml`は、Oracle A1等のARM64 Linuxで限定公開可否を検証するための最小構成である。既存T320のdev/stable root管理runtimeには重ねず、`backend`、`frontend`、PostgreSQL、Valkeyだけを起動する。
+
+- `frontend-dev`、TTY、ソースbind mountを含めない。
+- backend、PostgreSQL、Valkeyはhost portを公開しない。
+- frontendは`127.0.0.1:${WEB_PORT}:80`だけにbindする。TLS未導入の検証段階ではSSH port forwardで確認し、インターネット公開しない。
+- ARM64 host内でbackendの`npm ci`とPrisma Client生成、frontend Web buildを行う。別アーキテクチャで作った`node_modules`を持ち込まない。
+- 実credentialはCompose Secret論理名で渡す。T320のencrypted credentialはOCIへコピーせず、OCI側で新規発行・一時配布する。
+
+Compose境界は`bash scripts/security/test-production-compose-contract.sh`で継続検証する。OCI実機の非公開検証手順は[Issue #118-1-2 runbook](../reviews/issue-118-1-2/oracle-a1-private-validation-runbook.md)を参照する。
 
 運用詳細（バックアップ・Discord 通知・リストア・DB マスタ運用）は [operations.md](./operations.md)（#90-6）を参照。コマンド全文は [db-operations.md](../db-operations.md), [restore-manual.md](../restore-manual.md) にも維持。
 

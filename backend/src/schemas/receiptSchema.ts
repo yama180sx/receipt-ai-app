@@ -67,15 +67,27 @@ export const productClassificationReclassificationSchema = z
   }));
 
 export const standardProductClassificationRuleSchema = z.object({
-  keyword: z.string().trim().min(1).max(100),
-  productTypeId: z.coerce.number().int().positive(),
-  priority: z.coerce.number().int().min(0).max(100000),
+  keyword: z.string().trim().min(1, 'キーワードを入力してください').max(100, 'キーワードは100文字以内で入力してください'),
+  productTypeId: z.coerce.number().int('商品種別を選択してください').positive('商品種別を選択してください'),
+  priority: z.coerce.number().int('優先度は整数で入力してください').min(0, '優先度は0以上で入力してください').max(100000, '優先度は100000以下で入力してください'),
   reason: z.string().trim().min(1, '変更理由は必須です').max(500),
 });
 
 export const standardProductClassificationRulePreviewSchema = z.object({
   keyword: z.string().trim().min(1).max(100),
 });
+
+export const globalAiBudgetReasonSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+export const globalAiBudgetManagerSchema = globalAiBudgetReasonSchema.extend({ memberId: z.coerce.number().int().positive() });
+export const updateGlobalAiBudgetSchema = globalAiBudgetReasonSchema.extend({
+  isEnabled: z.boolean(), monthlyBudgetJpy: z.coerce.number().positive(),
+  warningPercent: z.coerce.number().int().min(1).max(99).optional(),
+  criticalPercent: z.coerce.number().int().min(1).max(99).optional(),
+  stopPercent: z.coerce.number().int().min(1).max(100).optional(),
+  notifyDiscord: z.boolean().default(true),
+  notificationEmails: z.array(z.string().trim().email().max(320)).max(20).default([]),
+});
+export const aiBudgetTestNotificationSchema = z.object({ channels: z.array(z.enum(['DISCORD', 'EMAIL'])).min(1) });
 
 /**
  * 3. 最終的な保存・更新用のバリデーション
@@ -89,6 +101,14 @@ export const createReceiptSchema = z.object({
   imagePath: z.string().optional(),
   rawText: z.string().optional(),
   items: z.array(receiptItemSchema).min(1, "明細が必要です")
+});
+
+/** 手動登録。memberId を指定した代理登録は controller で管理者・同一世帯を検証する。 */
+export const manualReceiptSchema = z.object({
+  memberId: z.coerce.number().int().positive().optional(),
+  storeName: z.string().trim().min(1, '店舗名は必須です'),
+  date: z.string().trim().min(1, '購入日は必須です'),
+  items: z.array(receiptItemSchema).min(1, '明細が必要です'),
 });
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;

@@ -57,6 +57,7 @@ export function ReceiptJobTrayRow({
   const display = resolveReceiptTrayItemDisplay(item);
   const isDuplicate = display.kind === 'duplicate_suspected';
   const imagePath = 'imagePath' in item ? item.imagePath : null;
+  const retryAvailableAt = 'retry' in item ? item.retry?.availableAt : undefined;
 
   const content = (
     <>
@@ -74,6 +75,11 @@ export function ReceiptJobTrayRow({
           </Text>
         ) : null}
         {canOpen ? <Text style={styles.openHint}>タップして内容を確認</Text> : null}
+        {retryAvailableAt ? (
+          <Text style={styles.retryHint}>
+            Geminiの無料枠が回復後に再実行できます（{new Date(retryAvailableAt).toLocaleString('ja-JP')}）
+          </Text>
+        ) : null}
       </View>
       <View style={[styles.badge, badgeStyle(display.kind)]}>
         {display.isActive ? (
@@ -139,6 +145,7 @@ const styles = StyleSheet.create({
   },
   rowPressed: { opacity: 0.85 },
   main: { flex: 1, minWidth: 0 },
+  retryHint: { ...theme.typography.caption, color: theme.colors.text.muted, marginTop: theme.spacing.xs },
   title: {
     ...theme.typography.body,
     color: theme.colors.text.main,

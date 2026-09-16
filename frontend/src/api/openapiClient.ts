@@ -13,10 +13,11 @@ if (!API_BASE) {
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
     const headers = await buildAuthHeaders();
+    const nextHeaders = new Headers(request.headers);
     for (const [key, value] of Object.entries(headers)) {
-      request.headers.set(key, value);
+      nextHeaders.set(key, value);
     }
-    return request;
+    return new Request(request, { headers: nextHeaders });
   },
   async onResponse({ response }) {
     if (response.status === 401) {
@@ -26,7 +27,6 @@ const authMiddleware: Middleware = {
       console.warn('[OpenAPI] Forbidden');
       showAlert('アクセス権限エラー', 'この操作を行う権限がありません。');
     }
-    return response;
   },
 };
 

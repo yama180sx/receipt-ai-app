@@ -11,11 +11,24 @@ afterEach(() => {
 });
 
 describe('receipt manual retry policy', () => {
-  it('allows one retry for a Gemini daily quota failure by default', () => {
+  it('allows one retry for a Gemini daily quota failure after the next Pacific midnight', () => {
+    const failedAt = Date.parse('2026-08-16T08:00:00.000Z'); // 8/16 01:00 PDT
+    const nextResetAt = Date.parse('2026-08-17T07:00:00.000Z');
     expect(getReceiptManualRetryInfo({
       state: 'failed', imagePath: 'uploads/receipt.webp',
-      failureCode: GEMINI_DAILY_QUOTA_FAILURE_CODE, manualRetryCount: 0,
-    })).toEqual({ eligible: true, remainingCount: 1 });
+      failureCode: GEMINI_DAILY_QUOTA_FAILURE_CODE, manualRetryCount: 0, failedAt,
+      now: nextResetAt,
+    })).toEqual({ eligible: true, remainingCount: 1, availableAt: undefined });
+  });
+
+  it('blocks a Gemini daily quota retry until the next Pacific midnight', () => {
+    const failedAt = Date.parse('2026-08-16T08:00:00.000Z'); // 8/16 01:00 PDT
+    const nextResetAt = Date.parse('2026-08-17T07:00:00.000Z');
+    expect(getReceiptManualRetryInfo({
+      state: 'failed', imagePath: 'uploads/receipt.webp',
+      failureCode: GEMINI_DAILY_QUOTA_FAILURE_CODE, manualRetryCount: 0, failedAt,
+      now: failedAt + 1,
+    })).toEqual({ eligible: false, remainingCount: 1, availableAt: nextResetAt });
   });
 
   it('does not allow a second manual retry with the default limit', () => {
@@ -38,6 +51,8 @@ describe('receipt manual retry policy', () => {
     expect(getReceiptManualRetryInfo({
       state: 'failed', imagePath: 'uploads/receipt.webp',
       failureCode: GEMINI_DAILY_QUOTA_FAILURE_CODE, manualRetryCount: 1,
+      failedAt: Date.parse('2026-08-16T08:00:00.000Z'),
+      now: Date.parse('2026-08-17T07:00:00.000Z'),
     })).toEqual({ eligible: true, remainingCount: 1 });
     expect(getReceiptManualRetryInfo({
       state: 'failed', imagePath: 'uploads/receipt.webp',
@@ -51,6 +66,8 @@ describe('receipt manual retry policy', () => {
     expect(getReceiptManualRetryInfo({
       state: 'failed', imagePath: 'uploads/receipt.webp',
       failedReason: 'Quota: GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+      failedAt: Date.parse('2026-08-16T08:00:00.000Z'),
+      now: Date.parse('2026-08-17T07:00:00.000Z'),
     }).eligible).toBe(true);
   });
 

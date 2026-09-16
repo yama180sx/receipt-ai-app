@@ -9,7 +9,7 @@ import {
   registerWebImageFile,
   clearPendingCropUri,
 } from '../../../utils/webImageFileRegistry';
-import { showApiErrorAlert } from '../../../utils/apiError';
+import { getApiErrorStatus, showApiErrorAlert } from '../../../utils/apiError';
 import { showAlert } from '../../../utils/alertMessage';
 
 const ACCEPTANCE_MESSAGE_MS = 3000;
@@ -64,8 +64,17 @@ export function useReceiptUpload({
         registerLocalUploadFailure('サーバーが受付を拒否しました。');
         showAlert('エラー', 'レシートの受付に失敗しました。');
       } catch (err) {
-        registerLocalUploadFailure('画像のアップロードに失敗しました。');
-        showApiErrorAlert('エラー', err, '画像のアップロードに失敗しました。');
+        const maintenance = getApiErrorStatus(err) === 503;
+        if (!maintenance) {
+          registerLocalUploadFailure('画像のアップロードに失敗しました。');
+        }
+        showApiErrorAlert(
+          maintenance ? '解析基盤を更新中' : 'エラー',
+          err,
+          '画像のアップロードに失敗しました。',
+          // 計画メンテナンスの503は利用者向け案内であり、DEVの赤いconsole errorにしない。
+          maintenance ? { log: false } : undefined
+        );
       } finally {
         setUploadingCount((count) => Math.max(0, count - 1));
       }

@@ -13,6 +13,8 @@ export default function AdminMenuRoute() {
         onBack={goHome}
         onGoToPromptEditor={() => router.push('/admin/prompts')}
         onGoToAdminStats={() => router.push('/admin/stats')}
+        onGoToAiBudget={() => router.push('/admin/ai-budget')}
+        onGoToManualReceipt={() => router.push('/admin/manual-receipt')}
         onGoToStandardProductClassificationRules={() => router.push('/admin/product-classification-rules')}
         onGoToProductClassificationReclassification={() => router.push('/admin/product-classification-reclassification')}
       />

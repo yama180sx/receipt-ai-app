@@ -1,6 +1,10 @@
 import { authenticator } from 'otplib';
 import { Role } from '@prisma/client';
-import { encryptTotpSecret, decryptTotpSecret } from '../utils/totpCrypto';
+import {
+  CURRENT_TOTP_KEY_VERSION,
+  encryptTotpSecret,
+  decryptTotpSecret,
+} from '../utils/totpCrypto';
 
 const APP_NAME = 'ReceiptAI';
 
@@ -18,12 +22,21 @@ export function verifyTotpCode(secret: string, code: string): boolean {
   return authenticator.verify({ token: code, secret });
 }
 
-export function encryptSecretForStorage(secret: string): string {
-  return encryptTotpSecret(secret);
+export function encryptSecretForStorage(secret: string): {
+  encryptedSecret: string;
+  keyVersion: string;
+} {
+  return {
+    encryptedSecret: encryptTotpSecret(secret),
+    keyVersion: CURRENT_TOTP_KEY_VERSION,
+  };
 }
 
-export function decryptSecretFromStorage(encrypted: string): string {
-  return decryptTotpSecret(encrypted);
+export function decryptSecretFromStorage(encrypted: string, keyVersion: string | null): string {
+  if (!keyVersion) {
+    throw new Error('TOTP key version is unavailable');
+  }
+  return decryptTotpSecret(encrypted, keyVersion);
 }
 
 /** 全メンバーで初回ログイン時に 2FA セットアップ必須 */

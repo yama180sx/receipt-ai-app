@@ -1,6 +1,7 @@
 import path from 'path';
 import { receiptQueue } from '../queues/receiptQueue';
 import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
+import { findReceiptAnalysisJobByImagePath } from '../repositories/receiptAnalysisJobRepository';
 
 function normalizeImagePath(imagePath: string): string {
   return imagePath.replace(/\\/g, '/');
@@ -37,6 +38,9 @@ export async function canAccessReceiptImage(
 
   const receipt = await findReceiptIdByImagePath(familyGroupId, normalized);
   if (receipt) return true;
+
+  const ledger = await findReceiptAnalysisJobByImagePath(familyGroupId, normalized);
+  if (ledger) return true;
 
   return hasQueueJobForImage(familyGroupId, normalized);
 }

@@ -10,9 +10,9 @@ alwaysApply: true
 | ブランチ | 用途 |
 |----------|------|
 | `develop` | **日常開発の積み上げ先**。feature ブランチのベース・PR のマージ先 |
-| `main` | **リリース / デプロイ先**（`deploy.yml`）。通常の Issue 作業では PR を作らない |
+| `main` | **承認済みリリースコードの昇格先**。stableデプロイは`deploy.yml`の手動承認フローで別途実施し、通常の Issue 作業では PR を作らない |
 
-CI（`test.yml`）は **`develop` 向け PR** で実行される。
+CI（`test.yml`）は **`develop`向けPRと、例外的なリリース同期PRの`main`向けPR** で実行される。
 
 ## 作業開始時（必須）
 

@@ -2,9 +2,19 @@ name: Test
 
 on:
   pull_request:
-    branches: [develop]
+    # 通常の変更は develop、承認済みリリース同期 PR は main を対象にする。
+    branches: [develop, main]
 
 jobs:
+  production-compose-contract:
+    name: Production Compose contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify production Compose boundary
+        run: bash scripts/security/test-production-compose-contract.sh
+
   backend-unit:
     name: Backend unit tests
     runs-on: ubuntu-latest
@@ -50,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

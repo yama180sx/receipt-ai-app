@@ -4,6 +4,7 @@ export type MockReceiptJob = {
   returnvalue: unknown;
   failedReason: string | null;
   timestamp: number;
+  finishedOn?: number;
   getState: () => Promise<string>;
   remove: () => Promise<void>;
 };
@@ -18,6 +19,7 @@ export function registerMockReceiptJob(
     returnvalue?: unknown;
     failedReason?: string | null;
     timestamp?: number;
+    finishedOn?: number;
   }
 ): void {
   const state = options?.state ?? 'completed';
@@ -27,6 +29,7 @@ export function registerMockReceiptJob(
     returnvalue: options?.returnvalue ?? null,
     failedReason: options?.failedReason ?? null,
     timestamp: options?.timestamp ?? Date.now(),
+    finishedOn: options?.finishedOn,
     getState: async () => state,
     remove: async () => {
       mockReceiptJobs.delete(id);

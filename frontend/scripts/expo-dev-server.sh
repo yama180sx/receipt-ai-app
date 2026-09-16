@@ -24,4 +24,4 @@ if [ ! -f node_modules/expo-router/build/global-state/storeContext.js ]; then
   echo ""
 fi
 
-exec npx expo start --web --port "${PORT}" --host lan
+exec npx expo start --port "${PORT}" --host lan
