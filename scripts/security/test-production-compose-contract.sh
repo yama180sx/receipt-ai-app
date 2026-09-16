@@ -73,6 +73,7 @@ for service in backend db redis; do
   fi
 done
 
+service_block frontend | grep -Fq 'host_ip: 127.0.0.1'
 service_block frontend | grep -Fq 'published: "18080"'
 service_block backend | grep -Fq 'target: /app/uploads'
 service_block db | grep -Fq 'target: /var/lib/postgresql'
