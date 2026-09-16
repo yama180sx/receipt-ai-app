@@ -717,6 +717,18 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 
 `main`へのpushはstableデプロイを開始しない。stableの対象SHA、dev受入結果、承認者、実施時刻、結果をリリース記録に残す。秘密値、Webhook URL、認証情報は記録しない。
 
+### 8.4 将来のARM64限定公開用Compose
+
+`docker-compose.production.yml`は、Oracle A1等のARM64 Linuxで限定公開可否を検証するための最小構成である。既存T320のdev/stable root管理runtimeには重ねず、`backend`、`frontend`、PostgreSQL、Valkeyだけを起動する。
+
+- `frontend-dev`、TTY、ソースbind mountを含めない。
+- backend、PostgreSQL、Valkeyはhost portを公開しない。
+- frontendは`127.0.0.1:${WEB_PORT}:80`だけにbindする。TLS未導入の検証段階ではSSH port forwardで確認し、インターネット公開しない。
+- ARM64 host内でbackendの`npm ci`とPrisma Client生成、frontend Web buildを行う。別アーキテクチャで作った`node_modules`を持ち込まない。
+- 実credentialはCompose Secret論理名で渡す。T320のencrypted credentialはOCIへコピーせず、OCI側で新規発行・一時配布する。
+
+Compose境界は`bash scripts/security/test-production-compose-contract.sh`で継続検証する。OCI実機の非公開検証手順は[Issue #118-1-2 runbook](../reviews/issue-118-1-2/oracle-a1-private-validation-runbook.md)を参照する。
+
 運用詳細（バックアップ・Discord 通知・リストア・DB マスタ運用）は [operations.md](./operations.md)（#90-6）を参照。コマンド全文は [db-operations.md](../db-operations.md), [restore-manual.md](../restore-manual.md) にも維持。
 
 ---
