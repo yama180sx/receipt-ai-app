@@ -3,7 +3,7 @@ import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { restoreTenantContextMiddleware, tenantMiddleware } from '../middleware/tenantMiddleware';
 import { validate } from '../middleware/validate';
-import { deactivateProductClassificationLearningDataSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
+import { deactivateProductClassificationLearningDataSchema, manualReceiptSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
 import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
 import { AppError } from '../utils/appError';
 
@@ -82,7 +82,7 @@ router.get('/receipts/latest', getLatestReceipt);
 router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
 router.get('/stats/advanced', getAdvancedStats);
-router.post('/receipts', createReceipt);
+router.post('/receipts', validate(manualReceiptSchema), createReceipt);
 router.get('/receipts/:id', getReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 router.patch('/receipts/:id', updateReceipt);

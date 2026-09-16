@@ -161,7 +161,7 @@ export async function listFamilyMembers(familyGroupId: number) {
 export async function findMemberById(memberId: number) {
   return prisma.familyMember.findUnique({
     where: { id: memberId },
-    select: { familyGroupId: true },
+    select: { id: true, familyGroupId: true, role: true, totpEnabled: true },
   });
 }
 

@@ -280,7 +280,7 @@ sequenceDiagram
 | GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート）。調整Categoryの負額は同一レシートの通常Categoryへ統計時だけ比例配賦する |
 | GET | `/stats/advanced` | JWT + tenant | トレンド・パレート分析 |
 | GET | `/stats/product-classification` | JWT + tenant | 標準Category階層・確定ProductType・未確定状態別の月次集計 |
-| POST | `/receipts` | JWT + tenant | 手動レシート登録 |
+| POST | `/receipts` | JWT + tenant | 手動レシート登録。`memberId`省略時は本人、別メンバー指定は同一世帯のTOTP済み管理者だけ許可 |
 | DELETE | `/receipts/:id` | JWT + tenant | レシート削除 |
 | PATCH | `/receipts/:id` | JWT + tenant | レシート全体編集 |
 | PATCH | `/receipts/items/:id` | JWT + tenant | 明細カテゴリ更新 + 学習マスタ反映 |

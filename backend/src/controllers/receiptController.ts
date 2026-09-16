@@ -29,7 +29,7 @@ import {
 } from '../mappers/receiptMapper';
 import { mapAdvancedStatsToApi, mapMonthlyStatsToApi } from '../mappers/statsMapper';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
-import { createManualReceipt } from '../services/receipt/receiptUpdateService';
+import { createManualReceiptForMember } from '../services/receipt/manualReceiptRegistrationService';
 import {
   listReceipts,
   getReceiptById,
@@ -186,9 +186,18 @@ export const commitReceipt = asyncHandler(async (req, res) => {
 
 export const createReceipt = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
-  const { date, storeName, items, imagePath } = req.body;
+  const { date, storeName, items, imagePath, memberId: requestedMemberId } = req.body;
+  let targetMemberId: number | undefined;
 
-  const newReceipt = await createManualReceipt(ctx, {
+  if (requestedMemberId !== undefined) {
+    const parsedMemberId = Number(requestedMemberId);
+    if (!Number.isSafeInteger(parsedMemberId) || parsedMemberId <= 0) {
+      throw new AppError('登録先メンバーが不正です。', 400);
+    }
+    targetMemberId = parsedMemberId;
+  }
+
+  const newReceipt = await createManualReceiptForMember(ctx, targetMemberId, {
     date,
     storeName,
     items: items as ReceiptCreateItemInput[],
