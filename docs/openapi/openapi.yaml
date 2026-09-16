@@ -496,6 +496,9 @@ paths:
     post:
       tags: [receipt]
       summary: 手動レシート登録
+      description: |
+        手入力したレシートを保存する。`memberId` を省略した場合はログイン本人へ登録する。
+        別メンバーを指定できるのは、同一世帯に所属する二要素認証済み管理者だけである。
       security:
         - bearerAuth: []
       requestBody:
@@ -505,8 +508,8 @@ paths:
             schema:
               $ref: '#/components/schemas/ManualReceiptRequest'
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
           content:
             application/json:
               schema:
@@ -1966,6 +1969,10 @@ components:
       properties:
         date:
           type: string
+        memberId:
+          type: integer
+          minimum: 1
+          description: 登録先メンバーID。ログイン本人以外を指定できるのは二要素認証済み管理者のみ。
         storeName:
           type: string
         imagePath:

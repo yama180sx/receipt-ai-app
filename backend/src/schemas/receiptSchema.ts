@@ -103,5 +103,13 @@ export const createReceiptSchema = z.object({
   items: z.array(receiptItemSchema).min(1, "明細が必要です")
 });
 
+/** 手動登録。memberId を指定した代理登録は controller で管理者・同一世帯を検証する。 */
+export const manualReceiptSchema = z.object({
+  memberId: z.coerce.number().int().positive().optional(),
+  storeName: z.string().trim().min(1, '店舗名は必須です'),
+  date: z.string().trim().min(1, '購入日は必須です'),
+  items: z.array(receiptItemSchema).min(1, '明細が必要です'),
+});
+
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>;
 export type UploadReceiptInput = z.infer<typeof uploadReceiptSchema>;

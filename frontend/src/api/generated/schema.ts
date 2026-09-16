@@ -746,7 +746,11 @@ export interface paths {
             };
         };
         put?: never;
-        /** 手動レシート登録 */
+        /**
+         * 手動レシート登録
+         * @description 手入力したレシートを保存する。`memberId` を省略した場合はログイン本人へ登録する。
+         *     別メンバーを指定できるのは、同一世帯に所属する二要素認証済み管理者だけである。
+         */
         post: {
             parameters: {
                 query?: never;
@@ -760,8 +764,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Created */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2633,6 +2637,8 @@ export interface components {
         };
         ManualReceiptRequest: {
             date: string;
+            /** @description 登録先メンバーID。ログイン本人以外を指定できるのは二要素認証済み管理者のみ。 */
+            memberId?: number;
             storeName: string;
             imagePath?: string;
             items: components["schemas"]["ReceiptItemInput"][];
