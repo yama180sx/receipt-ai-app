@@ -1,0 +1,92 @@
+# Issue #118-1-1: Oracle A1 等の限定公開用。本番用の最小 Compose 構成。
+#
+# 開発用 docker-compose.yml / docker-compose.runtime.yml とは重ねないこと。
+# HTTPS 終端・Firewall・DNS・実際のOCI配備は Issue #118-1 の別フェーズで扱う。
+# backend / db / redis にホスト公開ポートを持たせず、公開面は frontend だけに限定する。
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.runtime
+    restart: unless-stopped
+    env_file:
+      - ${RECAIPT_BACKEND_ENV_FILE:?RECAIPT_BACKEND_ENV_FILE is required}
+    environment:
+      TZ: Asia/Tokyo
+      NODE_ENV: production
+    volumes:
+      - ${RECAIPT_UPLOADS_DIR:?RECAIPT_UPLOADS_DIR is required}:/app/uploads
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - private
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.web
+      args:
+        EXPO_PUBLIC_API_URL: /api
+        EXPO_PUBLIC_APP_ENV: ${ENV_NAME:?ENV_NAME is required}
+    restart: unless-stopped
+    ports:
+      - ${WEB_PORT:?WEB_PORT is required}:80
+    environment:
+      TZ: Asia/Tokyo
+    depends_on:
+      - backend
+    networks:
+      - edge
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - log_min_duration_statement=500ms
+      - -c
+      - log_statement=none
+      - -c
+      - log_duration=off
+    environment:
+      TZ: Asia/Tokyo
+      POSTGRES_USER: ${DB_USER:?DB_USER is required}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+    volumes:
+      - ${RECAIPT_PGDATA_DIR:?RECAIPT_PGDATA_DIR is required}:/var/lib/postgresql
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:?DB_USER is required} -d ${DB_NAME:?DB_NAME is required}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - private
+
+  # サービス名は既存BullMQ接続（REDIS_HOST=redis）との互換のため維持する。
+  redis:
+    image: valkey/valkey:8.1.10-alpine3.24@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Tokyo
+    volumes:
+      - ${RECAIPT_QUEUE_DATA_DIR:?RECAIPT_QUEUE_DATA_DIR is required}:/data
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - private
+
+networks:
+  edge:
+  private:
+    internal: true

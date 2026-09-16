@@ -93,3 +93,10 @@
 - OCI Network Security: https://docs.oracle.com/en/solutions/oci-security-checklist/network-security1.html
 - OWASP REST Security Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html
 - OWASP File Upload Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+
+## 7. 後続実装との対応
+
+Issue #118-1-1では、この調査結果を基に`docker-compose.production.yml`を追加する。これはARM64で対象ホスト自身がimageをbuildする最小Compose契約であり、既存T320 runtimeを変更しない。
+
+- 契約と実機合格条件: [Issue #118-1-1 Oracle ARM64限定公開用Compose契約](./issue-118-1-1/oracle-production-compose-contract.md)
+- OCIの実機作成、DNS、TLS、Firewall、利用者データの移送は後続の人間承認済みフェーズで扱う。
