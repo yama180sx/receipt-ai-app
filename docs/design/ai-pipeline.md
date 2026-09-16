@@ -206,10 +206,12 @@ sequenceDiagram
 
 | 項目 | 内容 |
 |------|------|
-| 画像処理 | multer 受信 → sharp で回転・リサイズ（最大 1000px）→ WebP（quality 75） |
+| 画像処理 | multer 受信 → 事前検査（復号可否・最小寸法・ほぼ単色の白紙/黒紙）→ sharp で回転・リサイズ（最大 1000px）→ WebP（quality 75） |
 | 保存先 | `backend/uploads/receipt-{timestamp}-{random}.webp` |
 | レスポンス | `202 Accepted` + `{ jobId, status: "queued" }` |
 | 実装 | `receiptRoutes.ts`（ルート定義）/ `receiptController.uploadReceipt` |
+
+事前検査を通過しても、紙のしわ・影だけが写った画像のように局所的な濃淡を持つ非レシート画像は残り得る。この場合はGemini応答後に、店舗名・購入日時・明細・正の合計がすべて欠ける空結果を失敗として扱い、空の確認画面を表示しない。画像内容をAIで事前分類する処理は費用削減にならないため行わない。
 
 #### ジョブ監視（フロント）
 

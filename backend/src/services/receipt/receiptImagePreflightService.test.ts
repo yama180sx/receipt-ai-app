@@ -1,6 +1,9 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { assertReceiptImageCanBeAnalyzed } from './receiptImagePreflightService';
+import {
+  assertReceiptAnalysisContainsData,
+  assertReceiptImageCanBeAnalyzed,
+} from './receiptImagePreflightService';
 
 describe('assertReceiptImageCanBeAnalyzed', () => {
   it('rejects a nearly uniform blank image before AI analysis', async () => {
@@ -34,5 +37,23 @@ describe('assertReceiptImageCanBeAnalyzed', () => {
       statusCode: 400,
       code: 'RECEIPT_IMAGE_INVALID',
     });
+  });
+
+  it('rejects an empty AI result instead of showing an empty confirmation screen', () => {
+    expect(() => assertReceiptAnalysisContainsData({
+      storeName: '',
+      purchaseDate: '',
+      totalAmount: 0,
+      items: [],
+    })).toThrow('レシートとして必要な情報を読み取れませんでした');
+  });
+
+  it('accepts an AI result that contains receipt data', () => {
+    expect(() => assertReceiptAnalysisContainsData({
+      storeName: 'テスト店舗',
+      purchaseDate: '2026-09-16 12:00',
+      totalAmount: 100,
+      items: [{ name: '商品', price: 100, quantity: 1 }],
+    })).not.toThrow();
   });
 });

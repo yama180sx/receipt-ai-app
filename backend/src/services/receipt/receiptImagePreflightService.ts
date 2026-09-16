@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import type { ParsedReceipt } from '../../types/receipt';
 import { AppError } from '../../utils/appError';
 
 const MIN_RECEIPT_IMAGE_DIMENSION = 120;
@@ -54,6 +55,26 @@ export async function assertReceiptImageCanBeAnalyzed(buffer: Buffer): Promise<I
       400,
       undefined,
       'RECEIPT_IMAGE_INVALID'
+    );
+  }
+}
+
+/**
+ * 画像の影・しわだけでは事前検査を通過する場合があるため、AI出力も最低限検査する。
+ * 空の確認画面を表示せず、再撮影を促す。AI応答の形式検証とは別の業務上の妥当性検査。
+ */
+export function assertReceiptAnalysisContainsData(receipt: ParsedReceipt): void {
+  const hasStoreName = receipt.storeName.trim().length > 0;
+  const hasPurchaseDate = receipt.purchaseDate.trim().length > 0;
+  const hasLineItem = receipt.items.some((item) => item.name.trim().length > 0);
+  const hasPositiveTotal = Number.isFinite(receipt.totalAmount) && receipt.totalAmount > 0;
+
+  if (!hasStoreName && !hasPurchaseDate && !hasLineItem && !hasPositiveTotal) {
+    throw new AppError(
+      'レシートとして必要な情報を読み取れませんでした。レシート全体が明るく写るように再撮影してください。',
+      422,
+      undefined,
+      'RECEIPT_ANALYSIS_EMPTY'
     );
   }
 }
