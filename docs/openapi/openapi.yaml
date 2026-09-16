@@ -308,6 +308,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/ResolvedFamily'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/families/{familyGroupId}/members:
     get:
@@ -338,6 +340,8 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/AuthFamilyMember'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/login:
     post:
@@ -361,6 +365,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/LoginResponse'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/totp/setup:
     post:
@@ -380,6 +386,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/TotpSetupInfo'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/totp/confirm:
     post:
@@ -405,6 +413,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/LoginResponse'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/verify-totp:
     post:
@@ -430,6 +440,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/LoginResponse'
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /auth/totp/disable:
     post:
@@ -446,6 +458,8 @@ paths:
       responses:
         '200':
           description: OK
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /receipts:
     get:
@@ -685,6 +699,8 @@ paths:
           description: キューストア移行中のため新規解析投入を停止中
         '400':
           description: 画像が解析不能（白紙・小さすぎる画像・未対応形式）
+        '429':
+          description: 短時間の操作上限を超過（Retry-After秒後に再試行）
 
   /receipts/jobs:
     get:

@@ -63,6 +63,10 @@ flowchart LR
 
 CORS 許可ヘッダ: `Content-Type`, `Authorization`, `x-member-id`（`app.ts`）
 
+### 2.1.1 公開入口のレート制限
+
+認証前の招待コード確認・ログインはIP単位、認証後のTOTP操作・画像アップロードはメンバーID+IP単位で固定ウィンドウ制限する。超過時は`429`、`code: RATE_LIMITED`、`Retry-After`を返し、招待コード・パスワード・画像・アカウント有無を返さない。値とプロキシ信頼境界は[ADR-013](../adr/ADR-013-public-entry-rate-limiting.md)を正とする。
+
 ### 2.2 成功レスポンス（envelope）
 
 コントローラ経由の標準形式:
@@ -242,9 +246,9 @@ sequenceDiagram
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| POST | `/resolve-family` | なし | 招待コード → 世帯 ID・名称 |
-| GET | `/families/:familyGroupId/members` | なし（`inviteCode` クエリ必須） | ログイン前メンバー一覧 |
-| POST | `/login` | なし | パスワード認証 |
+| POST | `/resolve-family` | なし | 招待コード → 世帯 ID・名称。15分30回/IPで制限 |
+| GET | `/families/:familyGroupId/members` | なし（`inviteCode` クエリ必須） | ログイン前メンバー一覧。15分20回/IPで制限 |
+| POST | `/login` | なし | パスワード認証。15分10回/IPで制限 |
 | POST | `/totp/setup` | pending JWT（`totp_setup` / `access`） | TOTP シークレット発行 |
 | POST | `/totp/confirm` | pending JWT（`totp_setup` / `access`） | TOTP 有効化 + access token（setup フロー時） |
 | POST | `/verify-totp` | pending JWT（`totp_pending`） | ログイン時 TOTP 検証 |
@@ -254,7 +258,7 @@ sequenceDiagram
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| POST | `/receipts/upload` | JWT + tenant | 画像品質の事前検査 → WebP → 復旧台帳とBullMQジョブ（202、解析不能な画像は400、メンテナンス中は503） |
+| POST | `/receipts/upload` | JWT + tenant | 画像品質の事前検査 → WebP → 復旧台帳とBullMQジョブ（202、解析不能な画像は400、メンテナンス中は503）。multipart受信前に15分20回/メンバー+IPで制限 |
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の商品明細一覧（`not_applicable` は含めない） |

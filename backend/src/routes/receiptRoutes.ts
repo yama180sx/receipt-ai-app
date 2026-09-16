@@ -6,6 +6,7 @@ import { validate } from '../middleware/validate';
 import { deactivateProductClassificationLearningDataSchema, manualReceiptSchema, productClassificationCorrectionSchema, uploadReceiptSchema } from '../schemas/receiptSchema';
 import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
 import { AppError } from '../utils/appError';
+import { receiptUploadRateLimit } from '../middleware/rateLimitMiddleware';
 
 import {
   getReceipts,
@@ -59,6 +60,7 @@ router.post(
   authMiddleware,
   tenantMiddleware,
   rejectReceiptAnalysisDuringMaintenance,
+  receiptUploadRateLimit,
   upload.single('image'),
   restoreTenantContextMiddleware,
   validate(uploadReceiptSchema),
