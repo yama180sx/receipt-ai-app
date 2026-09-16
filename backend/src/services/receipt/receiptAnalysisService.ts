@@ -6,6 +6,7 @@ import type { TenantContext } from '../../utils/context';
 import { runInTransaction } from '../../utils/prismaTransaction';
 import { classifyItemWithSimilarityCandidates } from '../productClassification/productClassificationService';
 import { resolveAdjustmentCategoryIdInTx } from './adjustmentCategoryService';
+import { assertReceiptAnalysisContainsData } from './receiptImagePreflightService';
 
 /**
  * [Issue #49-8 / #72 / #63] 解析のみを実行し、推論カテゴリを付与して返す
@@ -16,6 +17,7 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId}, 世帯: ${familyGroupId})`);
 
   const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(imagePath, memberId);
+  assertReceiptAnalysisContainsData(parsedData);
   const itemsWithCategories = await Promise.all(
     parsedData.items.map(async (item) => {
       let initialCategoryId = null;
