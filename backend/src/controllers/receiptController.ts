@@ -29,7 +29,7 @@ import {
 } from '../mappers/receiptMapper';
 import { mapAdvancedStatsToApi, mapMonthlyStatsToApi } from '../mappers/statsMapper';
 import { commitReceipt as commitReceiptService } from '../services/receipt/receiptCommitService';
-import { createManualReceipt } from '../services/receipt/receiptUpdateService';
+import { createManualReceiptForMember } from '../services/receipt/manualReceiptRegistrationService';
 import {
   listReceipts,
   getReceiptById,
@@ -51,6 +51,7 @@ import { SplitInput } from '../services/settlement/itemSplitAllocation';
 import { getCleanText } from '../utils/normalizer';
 import { decodeReceiptCursor, type ReceiptPaginationFilters } from '../utils/receiptPaginationCursor';
 import { normalizeYearMonth } from '../utils/yearMonth';
+import { assertReceiptImageCanBeAnalyzed } from '../services/receipt/receiptImagePreflightService';
 
 function invalidQueryParameter(message: string): never {
   throw new AppError(message, 400);
@@ -143,6 +144,9 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
   const { familyGroupId, memberId } = ctx;
 
+  // Issue #136: 白紙など明らかに解析不能な画像は、保存・キュー投入・AI 呼び出しの前に止める。
+  await assertReceiptImageCanBeAnalyzed(file.buffer);
+
   const timestamp = Date.now();
   const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
   const uploadDir = 'uploads';
@@ -182,9 +186,18 @@ export const commitReceipt = asyncHandler(async (req, res) => {
 
 export const createReceipt = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
-  const { date, storeName, items, imagePath } = req.body;
+  const { date, storeName, items, imagePath, memberId: requestedMemberId } = req.body;
+  let targetMemberId: number | undefined;
 
-  const newReceipt = await createManualReceipt(ctx, {
+  if (requestedMemberId !== undefined) {
+    const parsedMemberId = Number(requestedMemberId);
+    if (!Number.isSafeInteger(parsedMemberId) || parsedMemberId <= 0) {
+      throw new AppError('登録先メンバーが不正です。', 400);
+    }
+    targetMemberId = parsedMemberId;
+  }
+
+  const newReceipt = await createManualReceiptForMember(ctx, targetMemberId, {
     date,
     storeName,
     items: items as ReceiptCreateItemInput[],

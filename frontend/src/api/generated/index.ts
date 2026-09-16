@@ -42,6 +42,7 @@ export type ReceiptJobListItem = Schemas['ReceiptJobListItem'];
 export type ReceiptJobStatus = Schemas['ReceiptJobStatus'];
 export type UploadJobResponse = Schemas['UploadJobResponse'];
 export type CommitReceiptRequest = Schemas['CommitReceiptRequest'];
+export type ManualReceiptRequest = Schemas['ManualReceiptRequest'];
 export type ItemSplitInput = Schemas['ItemSplitInput'];
 
 // --- stats ---

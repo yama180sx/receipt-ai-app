@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ClassificationCorrectionScope, ProductTypeStatus } from '@prisma/client';
 import {
   deactivateProductClassificationLearningDataSchema,
+  manualReceiptSchema,
   productClassificationCorrectionSchema,
   productClassificationReclassificationSchema,
 } from './receiptSchema';
@@ -46,5 +47,19 @@ describe('productClassificationReclassificationSchema', () => {
       ProductTypeStatus.UNCLASSIFIED,
       ProductTypeStatus.NEEDS_REVIEW,
     ]);
+  });
+});
+
+describe('manualReceiptSchema', () => {
+  it('accepts an optional positive target member ID', () => {
+    const result = manualReceiptSchema.parse({
+      memberId: '2', date: '2026-09-16', storeName: '店舗',
+      items: [{ name: '商品', price: '100', quantity: '1' }],
+    });
+    expect(result.memberId).toBe(2);
+  });
+
+  it('rejects invalid target member IDs and an empty item list', () => {
+    expect(() => manualReceiptSchema.parse({ memberId: 0, date: '2026-09-16', storeName: '店舗', items: [] })).toThrow();
   });
 });

@@ -11,6 +11,7 @@ import type {
   ReceiptItemDetail,
   ReceiptJobListItem,
   ReceiptJobStatus,
+  ManualReceiptRequest,
   UploadJobResponse,
   ProductTypeSummary,
   ProductClassificationCandidateSummary,
@@ -129,6 +130,13 @@ export const receiptApi = {
 
   async commitReceipt(payload: CommitReceiptPayload): Promise<ApiSuccessResponse<ReceiptDetail>> {
     const res = await apiClient.post('/receipts/commit', payload);
+    return res.data;
+  },
+
+  async createManualReceipt(
+    payload: ManualReceiptRequest
+  ): Promise<ApiSuccessResponse<ReceiptDetail>> {
+    const res = await apiClient.post('/receipts', payload);
     return res.data;
   },
 

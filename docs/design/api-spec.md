@@ -254,7 +254,7 @@ sequenceDiagram
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| POST | `/receipts/upload` | JWT + tenant | 画像アップロード → WebP → 復旧台帳とBullMQジョブ（202、メンテナンス中は503） |
+| POST | `/receipts/upload` | JWT + tenant | 画像品質の事前検査 → WebP → 復旧台帳とBullMQジョブ（202、解析不能な画像は400、メンテナンス中は503） |
 | GET | `/family-groups/members` | JWT + tenant | 認証済み世帯のメンバー一覧 |
 | GET | `/uploads/:filename` | JWT + tenant | レシート画像配信（JSON なし） |
 | GET | `/product-classification/review-items` | JWT + tenant | 要確認・未分類・初期分類範囲外の商品明細一覧（`not_applicable` は含めない） |
@@ -280,7 +280,7 @@ sequenceDiagram
 | GET | `/stats/monthly` | JWT + tenant | 月別家計統計（カテゴリ別・最新レシート）。調整Categoryの負額は同一レシートの通常Categoryへ統計時だけ比例配賦する |
 | GET | `/stats/advanced` | JWT + tenant | トレンド・パレート分析 |
 | GET | `/stats/product-classification` | JWT + tenant | 標準Category階層・確定ProductType・未確定状態別の月次集計 |
-| POST | `/receipts` | JWT + tenant | 手動レシート登録 |
+| POST | `/receipts` | JWT + tenant | 手動レシート登録。`memberId`省略時は本人、別メンバー指定は同一世帯のTOTP済み管理者だけ許可 |
 | DELETE | `/receipts/:id` | JWT + tenant | レシート削除 |
 | PATCH | `/receipts/:id` | JWT + tenant | レシート全体編集 |
 | PATCH | `/receipts/items/:id` | JWT + tenant | 明細カテゴリ更新 + 学習マスタ反映 |
@@ -456,6 +456,8 @@ Authorization: Bearer <token>
 ### 5.3 画像アップロード & 確定
 
 **POST `/api/receipts/upload`**
+
+AI 利用前に、画像として復号できること、最低限の大きさ、文字・罫線などの濃淡が存在することを検査する。ほぼ単色の白紙・黒紙、極端に小さい画像、未対応形式は `400` とし、ファイル保存・ジョブ作成・AI 呼び出しを行わない。人物写真などがレシートかどうかの判定はこの段階では行わず、既存の確認画面で扱う。
 
 ```http
 POST /api/receipts/upload
