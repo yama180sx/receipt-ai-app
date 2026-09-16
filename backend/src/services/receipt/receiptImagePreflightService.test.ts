@@ -48,6 +48,17 @@ describe('assertReceiptImageCanBeAnalyzed', () => {
     })).toThrow('レシートとして必要な情報を読み取れませんでした');
   });
 
+  it('treats null fields from an AI response as an empty result', () => {
+    expect(() => assertReceiptAnalysisContainsData({
+      storeName: null,
+      purchaseDate: null,
+      totalAmount: 0,
+      items: [],
+    } as unknown as import('../../types/receipt').ParsedReceipt)).toThrow(
+      'レシートとして必要な情報を読み取れませんでした'
+    );
+  });
+
   it('accepts an AI result that contains receipt data', () => {
     expect(() => assertReceiptAnalysisContainsData({
       storeName: 'テスト店舗',
