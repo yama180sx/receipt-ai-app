@@ -998,6 +998,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description 画像が解析不能（白紙・小さすぎる画像・未対応形式） */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
                 /** @description キューストア移行中のため新規解析投入を停止中 */
                 503: {
                     headers: {
