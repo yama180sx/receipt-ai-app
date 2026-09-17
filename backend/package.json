@@ -13,6 +13,7 @@
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
     "ai-pricing:add": "npx tsx prisma/add-ai-pricing-revision.ts",
     "ai-budget:bootstrap-manager": "npx tsx prisma/bootstrap-global-ai-budget-manager.ts",
+    "totp:reencrypt": "npx tsx prisma/reencrypt-totp-secrets.ts",
     "invitation-codes:rotate": "npx tsx prisma/rotate-invitation-codes.ts",
     "invitation-codes:rollback": "npx tsx prisma/rollback-invitation-codes.ts",
     "prisma:reset-receipt-data": "npx tsx prisma/reset-receipt-data-preserve-auth.ts",
