@@ -18,6 +18,7 @@ web-build/
 # DB、Redisの物理データおよびアップロードディレクトリ
 pgdata/
 redisdata/
+valkeydata/
 uploads/
 backend/uploads/*
 !backend/uploads/.gitkeep
