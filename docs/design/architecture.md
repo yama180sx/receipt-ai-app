@@ -155,13 +155,15 @@ flowchart TB
     JSON --> ROUTE{パス判定}
 
     ROUTE -->|/health| HEALTH[公開]
-    ROUTE -->|/api/auth/*| AUTH[authRoutes]
+    ROUTE -->|/api/auth/*| AUTH[IP rate limit → authRoutes]
     ROUTE -->|/api/admin/*| ADM[auth → tenant → isAdmin → adminRoutes]
     ROUTE -->|/api/*| PROT[protectedApi]
 
     PROT --> A1[authMiddleware]
     A1 --> T1[tenantMiddleware]
     T1 --> CTRL[Controller<br/>asyncHandler]
+    T1 -->|POST /receipts| UPLOAD_LIMIT[upload rate limit<br/>before Multer]
+    UPLOAD_LIMIT --> CTRL[Controller<br/>asyncHandler]
 
     CTRL -->|成功| OK[sendSuccess / sendMessage]
     CTRL -->|throw / reject| NEXT[next error]
@@ -175,6 +177,7 @@ flowchart TB
 | `authMiddleware` | Bearer JWT 検証（`purpose: access`）、`req.user` 設定。認証失敗は **ミドルウェア直返し**（[api-spec.md](./api-spec.md) §2.3） |
 | `tenantMiddleware` | `memberId` → DB で `familyGroupId` 取得、`AsyncLocalStorage` にテナントコンテキスト設定 |
 | `pendingAuthMiddleware` | TOTP セットアップ・検証用短期トークン（10 分） |
+| `rateLimitMiddleware` | 認証前はIP、認証後のTOTP・画像アップロードはメンバーID+IPで固定ウィンドウ制限。超過時は429と`Retry-After`を直返しする。`TRUST_PROXY_HOPS=0`では転送ヘッダーを信頼しない。 |
 | `validate` | Zod 検証。失敗時は `zodErrorToAppError` → `next(error)` |
 | `isAdmin` | `role=ADMIN` かつ `totpEnabled=true`（管理者 API） |
 | `asyncHandler` | Controller の未捕捉例外を `next(error)` に委譲（#103-4） |
