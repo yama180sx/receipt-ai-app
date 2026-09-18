@@ -73,3 +73,13 @@ sudo ./scripts/macbook/register-root-credentials.sh
 ```
 
 このスクリプトは、既存MacBookのDB接続・JWT・DB passwordを値を表示せず取り込み、MacBook専用のTOTP暗号鍵を生成する。T320のcredentialや設定ファイルは読まない。
+
+## root管理runtimeへの切替
+
+credential登録後、MacBook上で以下を実行する。この操作中はWeb版が停止する。旧Composeを停止してDB・uploads・Valkeyをroot管理領域へコピーし、`receipt-deploy-mb-stable.service`を起動する。
+
+```bash
+sudo ./scripts/macbook/migrate-to-root-runtime.sh
+```
+
+途中でroot deployが失敗した場合、スクリプトは従来のComposeを再起動する。root管理領域にコピー済みのデータは調査用に保持し、スクリプトをそのまま再実行して上書きしない。
