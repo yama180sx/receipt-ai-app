@@ -83,3 +83,9 @@ sudo ./scripts/macbook/migrate-to-root-runtime.sh
 ```
 
 途中でroot deployが失敗した場合、スクリプトは従来のComposeを再起動する。root管理領域にコピー済みのデータは調査用に保持し、スクリプトをそのまま再実行して上書きしない。
+
+credential修正後など、コピー完了後の切替を再試行する場合だけは、上書きせず次を使う。
+
+```bash
+sudo ./scripts/macbook/migrate-to-root-runtime.sh --resume
+```

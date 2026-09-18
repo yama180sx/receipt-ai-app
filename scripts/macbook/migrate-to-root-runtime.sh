@@ -13,6 +13,7 @@ readonly DATA_DIRECTORY="/var/lib/receipt-ai-app/${INSTANCE_NAME}"
 readonly BACKUP_DIRECTORY='/mnt/receipt-backups/receipt-app'
 readonly SOURCE_ENV_FILE="${REPOSITORY_ROOT}/.env"
 readonly SOURCE_BACKEND_ENV_FILE="${REPOSITORY_ROOT}/backend/.env"
+readonly RESUME_MODE="${1:-}"
 
 die() { echo "[macbook-root-migration] $1" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die 'run with sudo; do not share the password'
@@ -24,6 +25,7 @@ command -v systemctl >/dev/null 2>&1 || die 'systemctl is required'
 [ -d "${REPOSITORY_ROOT}/backend/uploads" ] || die 'source uploads are unavailable'
 [ -d "${REPOSITORY_ROOT}/valkeydata" ] || die 'source Valkey data is unavailable'
 [ -d "${BACKUP_DIRECTORY}" ] || die 'MacBook backup directory is unavailable'
+[ "${RESUME_MODE}" = '' ] || [ "${RESUME_MODE}" = '--resume' ] || die 'only --resume is supported'
 
 for credential in backend_database_url backend_jwt_secret backend_totp_encryption_key \
   backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user \
@@ -76,9 +78,15 @@ restore_source_on_failure() {
 trap restore_source_on_failure EXIT
 
 # root管理領域に既存データがある場合は、意図しない上書きを避けて停止する。
-for path in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/uploads" "${DATA_DIRECTORY}/valkeydata"; do
-  [ ! -e "${path}" ] || die "root target already exists: ${path}"
-done
+if [ "${RESUME_MODE}" = '--resume' ]; then
+  for path in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/uploads" "${DATA_DIRECTORY}/valkeydata"; do
+    [ -d "${path}" ] || die "copied root target is unavailable: ${path}"
+  done
+else
+  for path in "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/uploads" "${DATA_DIRECTORY}/valkeydata"; do
+    [ ! -e "${path}" ] || die "root target already exists; use --resume after a failed cutover"
+  done
+fi
 
 install -d -o root -g root -m 0750 "${CONFIG_ROOT}" "${APP_DIRECTORY}" "${DATA_DIRECTORY}"
 install -d -o root -g root -m 0700 "${CONFIG_ROOT}/credentials/${INSTANCE_NAME}"
@@ -99,17 +107,20 @@ install -D -o root -g root -m 0750 "${REPOSITORY_ROOT}/ops/systemd/libexec/recei
 install -D -o root -g root -m 0644 "${REPOSITORY_ROOT}/ops/systemd/units/receipt-deploy-mb-stable.service" /etc/systemd/system/receipt-deploy-mb-stable.service
 systemctl daemon-reload
 
-echo '[macbook-root-migration] stopping prior mb-stable Compose and copying persistent data.' >&2
+echo '[macbook-root-migration] stopping prior mb-stable Compose.' >&2
 (cd "${REPOSITORY_ROOT}" && docker compose down)
 source_stopped=1
-install -d -m 0700 "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
-install -d -m 0750 "${DATA_DIRECTORY}/uploads"
-rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/pgdata/" "${DATA_DIRECTORY}/pgdata/"
-rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/valkeydata/" "${DATA_DIRECTORY}/valkeydata/"
-rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/backend/uploads/" "${DATA_DIRECTORY}/uploads/"
-chown -R 999:root "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
-chmod 0700 "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
-chown -R 1000:1000 "${DATA_DIRECTORY}/uploads"
+if [ "${RESUME_MODE}" != '--resume' ]; then
+  echo '[macbook-root-migration] copying persistent data.' >&2
+  install -d -m 0700 "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
+  install -d -m 0750 "${DATA_DIRECTORY}/uploads"
+  rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/pgdata/" "${DATA_DIRECTORY}/pgdata/"
+  rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/valkeydata/" "${DATA_DIRECTORY}/valkeydata/"
+  rsync -aHAX --numeric-ids "${REPOSITORY_ROOT}/backend/uploads/" "${DATA_DIRECTORY}/uploads/"
+  chown -R 999:root "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
+  chmod 0700 "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
+  chown -R 1000:1000 "${DATA_DIRECTORY}/uploads"
+fi
 
 systemctl start receipt-deploy-mb-stable.service
 # backendの通常起動には旧JWT由来のTOTP鍵を渡さない。一回限りのCLIだけへ、

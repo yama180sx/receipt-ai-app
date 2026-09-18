@@ -26,6 +26,11 @@ read_env_value() {
   local name="$2"
   local value
   value="$(sed -n "s/^${name}=//p" "${file}" | tail -n 1)"
+  # dotenvで許容される全体引用符はruntime credentialへ含めない。
+  case "${value}" in
+    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+  esac
   [ -n "${value}" ] || die "required existing setting is unavailable: ${name}"
   printf '%s' "${value}"
 }
@@ -45,7 +50,14 @@ write_credential() {
   local value="$2"
   [ -n "${value}" ] || die "credential input is empty: ${name}"
   # stdinで渡すため、値はargv・journal・shell履歴へ出ない。
-  printf '%s' "${value}" | systemd-creds encrypt --name="${name}" - "${CREDENTIAL_DIRECTORY}/${name}.cred"
+  local temporary
+  temporary="$(mktemp "${CREDENTIAL_DIRECTORY}/.${name}.XXXXXX")"
+  if ! printf '%s' "${value}" | systemd-creds encrypt --name="${name}" - "${temporary}"; then
+    rm -f -- "${temporary}"
+    die "credential encryption failed: ${name}"
+  fi
+  install -m 0600 -o root -g root "${temporary}" "${CREDENTIAL_DIRECTORY}/${name}.cred"
+  rm -f -- "${temporary}"
 }
 
 umask 077
