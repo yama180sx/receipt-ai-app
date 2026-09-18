@@ -31,6 +31,8 @@ run_compose() {
   env INSTANCE_NAME="${PREFLIGHT_INSTANCE_NAME}" COMPOSE_PROJECT_NAME="${PREFLIGHT_INSTANCE_NAME}" \
     DOCKER_CONFIG="${RUNTIME_DIRECTORY}/docker-config" \
     RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
+    GEMINI_RECEIPT_MODEL='gemini-3.5-flash-lite' \
+    GEMINI_PRODUCT_CLASSIFICATION_MODEL='gemini-3.5-flash-lite' \
     docker compose --project-directory "${APP_DIRECTORY}" --env-file "${COMPOSE_ENV_FILE}" \
       -f "${APP_DIRECTORY}/docker-compose.yml" \
       -f "${APP_DIRECTORY}/docker-compose.secrets.yml" \

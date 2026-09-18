@@ -50,7 +50,9 @@ readonly REDIS_PORT="$(read_env_value "${SOURCE_ENV_FILE}" REDIS_PORT)"
 readonly EXPO_PORT_1="$(read_env_value "${SOURCE_ENV_FILE}" EXPO_PORT_1)"
 readonly EXPO_PORT_2="$(read_env_value "${SOURCE_ENV_FILE}" EXPO_PORT_2)"
 readonly RELEASE_SHA="$(git -C "${REPOSITORY_ROOT}" rev-parse --verify HEAD^{commit})"
-readonly GEMINI_MODEL="$(read_env_value "${SOURCE_BACKEND_ENV_FILE}" GEMINI_MODEL)"
+# 旧環境のGEMINI_MODELは *-latest aliasを許容していた。root runtimeは再現性のため固定IDだけを許可する。
+readonly GEMINI_RECEIPT_MODEL='gemini-3.5-flash-lite'
+readonly GEMINI_PRODUCT_CLASSIFICATION_MODEL='gemini-3.5-flash-lite'
 
 # 途中失敗時に、元のComposeを再起動する。コピー済みroot dataは残して調査対象とする。
 source_stopped=0
@@ -101,7 +103,7 @@ printf '%s\n' \
   "DEV_PORT=${DEV_PORT}" "DB_PORT=${DB_PORT}" "REDIS_PORT=${REDIS_PORT}" \
   "EXPO_PORT_1=${EXPO_PORT_1}" "EXPO_PORT_2=${EXPO_PORT_2}" \
   'REDIS_PORT_INTERNAL=6379' 'SMTP_HOST=smtp.gmail.com' 'SMTP_PORT=587' 'SMTP_SECURE=false' \
-  "GEMINI_RECEIPT_MODEL=${GEMINI_MODEL}" "GEMINI_PRODUCT_CLASSIFICATION_MODEL=${GEMINI_MODEL}" \
+  "GEMINI_RECEIPT_MODEL=${GEMINI_RECEIPT_MODEL}" "GEMINI_PRODUCT_CLASSIFICATION_MODEL=${GEMINI_PRODUCT_CLASSIFICATION_MODEL}" \
   'RECEIPT_MANUAL_RETRY_LIMIT=1' 'RECEIPT_MANUAL_RETRY_FAILURE_CODES=gemini_daily_quota' \
   'RECEIPT_ANALYSIS_MAINTENANCE_MODE=false' 'LOG_LEVEL=info' 'TRUST_PROXY_HOPS=0' > "${CONFIG_FILE}"
 chmod 0600 "${CONFIG_FILE}"
