@@ -109,7 +109,13 @@ printf '%s\n' \
 chmod 0600 "${CONFIG_FILE}"
 
 install -D -o root -g root -m 0750 "${REPOSITORY_ROOT}/ops/systemd/libexec/receipt-deploy" /usr/local/libexec/receipt-deploy
+install -D -o root -g root -m 0750 "${REPOSITORY_ROOT}/ops/systemd/libexec/receipt-backup" /usr/local/libexec/receipt-backup
+install -D -o root -g root -m 0750 "${REPOSITORY_ROOT}/ops/systemd/libexec/receipt-rotate-invitation-codes" /usr/local/libexec/receipt-rotate-invitation-codes
+install -D -o root -g root -m 0750 "${REPOSITORY_ROOT}/ops/systemd/libexec/receipt-reset-all-totp" /usr/local/libexec/receipt-reset-all-totp
 install -D -o root -g root -m 0644 "${REPOSITORY_ROOT}/ops/systemd/units/receipt-deploy-mb-stable.service" /etc/systemd/system/receipt-deploy-mb-stable.service
+install -D -o root -g root -m 0644 "${REPOSITORY_ROOT}/ops/systemd/units/receipt-backup-mb-stable.service" /etc/systemd/system/receipt-backup-mb-stable.service
+install -D -o root -g root -m 0644 "${REPOSITORY_ROOT}/ops/systemd/units/receipt-rotate-invitation-codes-mb-stable.service" /etc/systemd/system/receipt-rotate-invitation-codes-mb-stable.service
+install -D -o root -g root -m 0644 "${REPOSITORY_ROOT}/ops/systemd/units/receipt-reset-all-totp-mb-stable.service" /etc/systemd/system/receipt-reset-all-totp-mb-stable.service
 systemctl daemon-reload
 
 echo '[macbook-root-migration] stopping prior mb-stable Compose.' >&2

@@ -12,7 +12,7 @@ MacBook上の`stable`を、T320のroot管理runtimeと同じ安全境界で実�
 ## 現在の確認済み状態
 
 - 作業ブランチ: `wip/issue-128-macbook-server-setup`
-- MacBookのサービスは通常のDocker Composeで稼働中であり、root管理runtimeには未移行。
+- MacBookのサービスは`receipt-deploy-mb-stable.service`でroot管理runtimeへ移行済み。
 - バックアップ先はMacBook専用の`/mnt/receipt-backups/receipt-app`。T320の`/mnt/raid_1t`は使用しない。
 - Postgres、uploads、Valkey dataは既存のまま保持する。移行の確認が終わるまで削除・上書きしない。
 - 旧鍵バージョン`totp-old-v1`のTOTP登録が1件ある。現行の専用TOTP鍵だけでは復号できないため、データ移行前に専用の一回限りの再暗号化手順が必要である。
@@ -108,3 +108,9 @@ sudo ./scripts/macbook/preflight-root-compose.sh
 ```
 
 この検証が成功してからだけ、`--resume`によるroot runtime切替を行う。
+
+## MacBookの招待コード・二段階認証の一括更新
+
+MacBookだけで全招待コードを再発行する場合は、先に同じMacBook専用バックアップを成功させる。再発行serviceは新コードを端末出力に出さず、配布用とrollback用の暗号化artifactだけを`/var/lib/receipt-ai-app/mb-stable/invitation-code-rotations/`へ保存する。
+
+二段階認証の全解除は、招待コード再発行とは別のroot専用serviceで行う。解除後は各ユーザーが次回ログイン時に二段階認証を再登録する。

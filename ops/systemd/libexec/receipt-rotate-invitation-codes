@@ -13,7 +13,7 @@ die() {
 [ "$#" -eq 1 ] || die "environment is fixed by the systemd unit"
 
 case "$1" in
-  dev|stable) readonly ENVIRONMENT="$1" ;;
+  dev|stable|mb-stable) readonly ENVIRONMENT="$1" ;;
   *) die "unknown fixed environment" ;;
 esac
 

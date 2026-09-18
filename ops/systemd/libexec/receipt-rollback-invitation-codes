@@ -10,10 +10,10 @@ die() {
 }
 
 [ "$(id -u)" -eq 0 ] || die "must run as root"
-[ "$#" -eq 2 ] || die "usage: receipt-rollback-invitation-codes {dev|stable} ROTATION_ID"
+[ "$#" -eq 2 ] || die "usage: receipt-rollback-invitation-codes {dev|stable|mb-stable} ROTATION_ID"
 
 case "$1" in
-  dev|stable) readonly ENVIRONMENT="$1" ;;
+  dev|stable|mb-stable) readonly ENVIRONMENT="$1" ;;
   *) die "unknown fixed environment" ;;
 esac
 readonly ROTATION_ID="$2"

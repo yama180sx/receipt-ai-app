@@ -4,8 +4,8 @@ set -euo pipefail
 # --- 環境判定ロジック ---
 ENV="${1:-}"
 
-if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
-    echo "[ERROR] Usage: $0 {stable|dev}"
+if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ] && [ "$ENV" != "mb-stable" ]; then
+    echo "[ERROR] Usage: $0 {stable|dev|mb-stable}"
     exit 1
 fi
 
@@ -31,10 +31,14 @@ if [ "$ENV" = "stable" ]; then
     BACKUP_DIR="/mnt/raid_1t/backups/receipt-app"
     CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
     ENV_LABEL="PROD"
-else
+elif [ "$ENV" = "dev" ]; then
     BACKUP_DIR="/mnt/raid_1t/backups/receipt-app-dev"
     CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
     ENV_LABEL="DEV"
+else
+    BACKUP_DIR="/mnt/receipt-backups/receipt-app"
+    CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
+    ENV_LABEL="MACBOOK"
 fi
 
 # --- 通知関数 ---
