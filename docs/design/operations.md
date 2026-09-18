@@ -22,6 +22,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
 | 定期バックアップの確認・手動実行 | 本書 §3 | root管理`receipt-backup-{env}.service` |
 | 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | root管理restore helperを使う |
+| オフサイトバックアップ／DR設計・導入 | [Issue #57 R2設計](../reviews/issue-57/r2-offsite-backup-design.md) | 実装前。現時点のバックアップはローカルRAIDのみ |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
@@ -160,6 +161,9 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 ---
 
 ## 3. バックアップ
+
+> [!NOTE]
+> Cloudflare R2への暗号化オフサイトコピーはIssue #57で設計済みだが、まだ実装されていない。以下は現行as-builtのローカルbackup仕様である。R2運用を開始するまで、オフサイト保管済みとは扱わない。
 
 ### 3.1 概要
 
