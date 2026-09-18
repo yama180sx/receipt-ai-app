@@ -3,6 +3,30 @@
 set -euo pipefail
 
 die() { echo "[receipt-offsite-backup] $1" >&2; exit 1; }
+
+# restore helperと同じ制約で、R2へ送る前にuploads archiveの構造を検証する。
+# backupはアプリが作成したuploadsディレクトリだけを含み、通常ファイルと
+# ディレクトリ以外（symlink、hard link、device、FIFOなど）は許可しない。
+validate_uploads_archive() {
+  local archive="$1"
+
+  if ! tar -tzf "${archive}" | awk '
+    $0 ~ /(^|\/)\.\.($|\/)/ { exit 1 }
+    $0 ~ /(^|\/)\.($|\/)/ { exit 1 }
+    $0 == "uploads" || $0 == "uploads/" || $0 ~ /^uploads\// { next }
+    { exit 1 }
+  '; then
+    die 'uploads backup has an unexpected archive layout'
+  fi
+
+  if ! tar -tvzf "${archive}" | awk '
+    substr($0, 1, 1) == "-" || substr($0, 1, 1) == "d" { next }
+    { exit 1 }
+  '; then
+    die 'uploads backup contains a non-regular entry'
+  fi
+}
+
 [ "$(id -u)" -eq 0 ] || die 'must run as root'
 [ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
 
@@ -45,7 +69,7 @@ done | sort | tail -n 1)"
 database_archive="${backup_dir}/db/db_backup_${latest_timestamp}.sql.gz"
 uploads_archive="${backup_dir}/uploads/uploads_backup_${latest_timestamp}.tar.gz"
 gzip -t -- "${database_archive}"
-tar -tzf "${uploads_archive}" >/dev/null
+validate_uploads_archive "${uploads_archive}"
 
 install -m 0600 -o root -g root "${database_archive}" "${staging_directory}/database.sql.gz"
 install -m 0600 -o root -g root "${uploads_archive}" "${staging_directory}/uploads.tar.gz"
