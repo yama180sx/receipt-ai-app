@@ -89,3 +89,14 @@ credential修正後など、コピー完了後の切替を再試行する場合�
 ```bash
 sudo ./scripts/macbook/migrate-to-root-runtime.sh --resume
 ```
+
+## 切替前backend事前検証
+
+既存の`mb-stable`を停止せず、root credentialとroot runtime imageで一時backendを起動してhealthを確認する。
+host portは公開せず、一時secretは終了時に削除される。
+
+```bash
+sudo ./scripts/macbook/preflight-root-backend.sh
+```
+
+この検証が成功するまで、root runtimeへの再切替を実施しない。
