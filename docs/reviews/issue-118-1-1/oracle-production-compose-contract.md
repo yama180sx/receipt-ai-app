@@ -24,10 +24,10 @@ Internet
       -> frontend:80
           -> backend:3000 (/api)
               -> db:5432       [private network]
-              -> redis:6379    [private network]
+              -> redis:6379    [Valkey、private network]
 ```
 
-Composeは`frontend`だけに`127.0.0.1:${WEB_PORT}:80`をbindする。backend、db、redisにはhost portを定義しない。限定公開前はSSH port forwardでだけ確認し、TLS終端前に、このportをインターネットへ直接公開してはならない。
+Composeは`frontend`だけに`127.0.0.1:${WEB_PORT}:80`をbindする。backend、db、Valkey（サービス名`redis`）にはhost portを定義しない。限定公開前はSSH port forwardでだけ確認し、TLS終端前に、このportをインターネットへ直接公開してはならない。
 
 `private` networkはinternal networkであり、dbとValkeyはbackendだけが利用する。backendはGemini、SMTP、Discordへ外向き通信を行うため、frontendと共有する`edge` networkにも接続する。
 

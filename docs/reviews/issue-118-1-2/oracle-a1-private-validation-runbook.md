@@ -213,7 +213,7 @@ sudo docker compose --env-file <root-only-compose-env> \
 sudo ss -ltnp | grep -E ':(80|443|3000|5432|6379)\\b' || true
 ```
 
-期待値は、backend health成功、db/redis healthy、かつhost listenは`127.0.0.1:<WEB_PORT>`だけである。3000、5432、6379、全IP向け80/443のlistenがあれば停止して設定を見直す。
+期待値は、backend health成功、db/Valkey（サービス名`redis`） healthy、かつhost listenは`127.0.0.1:<WEB_PORT>`だけである。3000、5432、6379、全IP向け80/443のlistenがあれば停止して設定を見直す。
 
 画面は作業PCからSSH local forward経由でだけ開く。
 

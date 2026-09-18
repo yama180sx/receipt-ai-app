@@ -322,7 +322,7 @@ docker compose exec backend npm run prisma:sync-sequences
 
 1. リリース担当者が、dev受入済みでmainに含まれる対象コミットSHAをroot所有`/etc/receipt-ai-app/stable.env`の`STABLE_RELEASE_SHA`へ設定する。
 2. required reviewerの承認後、workflowが`receipt-deploy-stable.service`を開始する。
-3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Redis healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
+3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Valkey healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
 4. backend health、ログイン、TOTP、既存データ・uploads、新規解析、通知、backupを確認する。
 
 stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時間、復旧担当者を満たした人間承認済みの作業に限定する。コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計であり、migration失敗時は追加変更を停止してロールバック判断へ進む。
