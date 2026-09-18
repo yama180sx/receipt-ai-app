@@ -62,3 +62,14 @@ git status --short
 ```
 
 `sudo -v`はMacBook上の端末でパスワードを入力して実行する。パスワードを共有しない。
+
+## MacBook用credentialの登録
+
+MacBook専用のGemini API key、SMTP、AI予算通知用Discord Webhook、backup通知用Discord Webhookを用意した後、MacBook上で次を実行する。
+値はプロンプトへ直接入力し、チャットやGitへ貼り付けない。
+
+```bash
+sudo ./scripts/macbook/register-root-credentials.sh
+```
+
+このスクリプトは、既存MacBookのDB接続・JWT・DB passwordを値を表示せず取り込み、MacBook専用のTOTP暗号鍵を生成する。T320のcredentialや設定ファイルは読まない。
