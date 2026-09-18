@@ -287,7 +287,7 @@ run_prisma_migration() {
 }
 
 verify_backend_health() {
-  local attempt
+  local attempt health_status
   for attempt in $(seq 1 30); do
     if run_compose exec -T backend node -e '
       fetch("http://127.0.0.1:3000/health")
@@ -298,6 +298,13 @@ verify_backend_health() {
     fi
     sleep 1
   done
+  # body・例外本文は秘密値を含み得るため出さず、HTTP statusだけを値なし診断として残す。
+  health_status="$(run_compose exec -T backend node -e '
+    fetch("http://127.0.0.1:3000/health")
+      .then((response) => process.stdout.write(String(response.status)))
+      .catch(() => process.stdout.write("unreachable"));
+  ' 2>/dev/null || true)"
+  [ -n "${health_status}" ] && echo "[receipt-deploy] backend health status: ${health_status}" >&2
   die "backend health check failed after deployment"
 }
 
