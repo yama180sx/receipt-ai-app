@@ -31,7 +31,7 @@ for credential in backend_database_url backend_jwt_secret backend_totp_encryptio
 done
 
 # root runtimeと同じimage・user・secret file契約で起動する。host portは公開しない。
-docker run -d --rm --name "${CONTAINER_NAME}" --network "${INSTANCE_NAME}_default" \
+docker run -d --name "${CONTAINER_NAME}" --network "${INSTANCE_NAME}_default" \
   --user 1000:1000 --env-file "${APP_DIRECTORY}/backend/.env" \
   -e DATABASE_URL_FILE=/run/secrets/backend_database_url \
   -e JWT_SECRET_FILE=/run/secrets/backend_jwt_secret \
