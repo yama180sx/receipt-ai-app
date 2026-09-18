@@ -63,6 +63,9 @@ restore_source_on_failure() {
       local secret_directory
       secret_directory="$(find "/run/receipt-ai-app-${INSTANCE_NAME}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit 2>/dev/null || true)"
       if [ -n "${secret_directory}" ]; then
+        # backendの生ログは秘密値を含み得るため出さず、設計済みの値なし分類だけを採取する。
+        docker logs "receipt-${INSTANCE_NAME}-backend" 2>&1 \
+          | grep -F 'Fatal startup configuration error [' || true
         DOCKER_CONFIG="/run/receipt-ai-app-${INSTANCE_NAME}/docker-config" \
           RECAIPT_SECRETS_DIR="${secret_directory}" \
           docker compose --project-directory "${APP_DIRECTORY}" \
