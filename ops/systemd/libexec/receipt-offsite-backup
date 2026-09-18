@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Cloudflare R2へ、完了したroot管理backupだけを暗号化して送信する。
+set -euo pipefail
+
+die() { echo "[receipt-offsite-backup] $1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+
+case "$1" in
+  dev) backup_dir='/mnt/raid_1t/backups/receipt-app-dev'; backup_unit='receipt-backup-dev.service' ;;
+  stable) backup_dir='/mnt/raid_1t/backups/receipt-app'; backup_unit='receipt-backup-stable.service' ;;
+  *) die 'unknown fixed environment' ;;
+esac
+readonly environment="$1"
+readonly runtime_directory="/run/receipt-ai-app-offsite-backup-${environment}"
+readonly credential_directory="${CREDENTIALS_DIRECTORY:-}"
+
+[ -n "${R2_S3_ENDPOINT:-}" ] && [ -n "${R2_BUCKET:-}" ] || die 'non-secret R2 configuration is unavailable'
+command -v rclone >/dev/null 2>&1 || die 'rclone is unavailable'
+[ -d "${credential_directory}" ] || die 'credential directory is unavailable'
+
+# R2障害をローカルbackup失敗と混同しない一方、送信対象は必ず直前に成功した世代に限定する。
+systemctl start "${backup_unit}"
+[ "$(systemctl show "${backup_unit}" -p Result --value)" = 'success' ] \
+  || die 'pre-offsite local backup did not succeed'
+
+for credential in r2_access_key_id r2_secret_access_key rclone_crypt_password rclone_crypt_salt; do
+  [ -r "${credential_directory}/${credential}" ] || die "required credential is unavailable: ${credential}"
+done
+
+install -d -o root -g root -m 0700 "${runtime_directory}"
+staging_directory="$(mktemp -d "${runtime_directory}/generation.XXXXXX")"
+config_file="${runtime_directory}/rclone.conf"
+cleanup() { rm -f -- "${config_file}"; rm -rf -- "${staging_directory}"; }
+trap cleanup EXIT
+
+latest_timestamp="$({
+  find "${backup_dir}/db" -maxdepth 1 -type f -name 'db_backup_*.sql.gz' -printf '%f\n' \
+    | sed -n 's/^db_backup_\([0-9]\{8\}_[0-9]\{6\}\)\.sql\.gz$/\1/p'
+} | while read -r timestamp; do
+  [ -f "${backup_dir}/uploads/uploads_backup_${timestamp}.tar.gz" ] && printf '%s\n' "${timestamp}"
+done | sort | tail -n 1)"
+[ -n "${latest_timestamp}" ] || die 'no complete local backup generation is available'
+
+database_archive="${backup_dir}/db/db_backup_${latest_timestamp}.sql.gz"
+uploads_archive="${backup_dir}/uploads/uploads_backup_${latest_timestamp}.tar.gz"
+gzip -t -- "${database_archive}"
+tar -tzf "${uploads_archive}" >/dev/null
+
+install -m 0600 -o root -g root "${database_archive}" "${staging_directory}/database.sql.gz"
+install -m 0600 -o root -g root "${uploads_archive}" "${staging_directory}/uploads.tar.gz"
+database_hash="$(sha256sum "${staging_directory}/database.sql.gz" | awk '{print $1}')"
+uploads_hash="$(sha256sum "${staging_directory}/uploads.tar.gz" | awk '{print $1}')"
+database_size="$(stat -c '%s' "${staging_directory}/database.sql.gz")"
+uploads_size="$(stat -c '%s' "${staging_directory}/uploads.tar.gz")"
+printf '{"schemaVersion":1,"environment":"%s","timestamp":"%s","artifacts":[{"name":"database.sql.gz","bytes":%s,"sha256":"%s"},{"name":"uploads.tar.gz","bytes":%s,"sha256":"%s"}]}' \
+  "${environment}" "${latest_timestamp}" "${database_size}" "${database_hash}" "${uploads_size}" "${uploads_hash}" \
+  >"${staging_directory}/manifest.json"
+chmod 0600 "${staging_directory}/manifest.json"
+
+# crypt password/saltはrclone obscure済みの値をcredentialとして受け取る。
+umask 077
+cat >"${config_file}" <<EOF
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = $(<"${credential_directory}/r2_access_key_id")
+secret_access_key = $(<"${credential_directory}/r2_secret_access_key")
+endpoint = ${R2_S3_ENDPOINT}
+acl = private
+
+[crypt]
+type = crypt
+remote = r2:${R2_BUCKET}
+filename_encryption = standard
+directory_name_encryption = true
+password = $(<"${credential_directory}/rclone_crypt_password")
+password2 = $(<"${credential_directory}/rclone_crypt_salt")
+EOF
+chmod 0600 "${config_file}"
+
+# manifestは最後に送信する完了印。syncは使用せず既存世代を削除しない。
+rclone --config "${config_file}" copy "${staging_directory}/database.sql.gz" "crypt:${latest_timestamp}" --log-level NOTICE
+rclone --config "${config_file}" copy "${staging_directory}/uploads.tar.gz" "crypt:${latest_timestamp}" --log-level NOTICE
+rclone --config "${config_file}" check "${staging_directory}" "crypt:${latest_timestamp}" --exclude manifest.json --one-way --log-level NOTICE
+rclone --config "${config_file}" copy "${staging_directory}/manifest.json" "crypt:${latest_timestamp}" --log-level NOTICE
+echo "[receipt-offsite-backup] ${environment} generation uploaded successfully"

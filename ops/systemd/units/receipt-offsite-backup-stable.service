@@ -1,0 +1,24 @@
+[Unit]
+Description=RecAIpt stable encrypted R2 offsite backup
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/etc/receipt-ai-app/offsite-stable.env
+RuntimeDirectory=receipt-ai-app-offsite-backup-stable
+RuntimeDirectoryMode=0700
+LoadCredentialEncrypted=r2_access_key_id:/etc/receipt-ai-app/credentials/stable/r2_access_key_id.cred
+LoadCredentialEncrypted=r2_secret_access_key:/etc/receipt-ai-app/credentials/stable/r2_secret_access_key.cred
+LoadCredentialEncrypted=rclone_crypt_password:/etc/receipt-ai-app/credentials/stable/rclone_crypt_password.cred
+LoadCredentialEncrypted=rclone_crypt_salt:/etc/receipt-ai-app/credentials/stable/rclone_crypt_salt.cred
+ExecStart=/usr/local/libexec/receipt-offsite-backup stable
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-offsite-backup-stable /mnt/raid_1t/backups/receipt-app
