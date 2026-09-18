@@ -305,6 +305,9 @@ verify_backend_health() {
       .catch(() => process.stdout.write("unreachable"));
   ' 2>/dev/null || true)"
   [ -n "${health_status}" ] && echo "[receipt-deploy] backend health status: ${health_status}" >&2
+  # Dockerのstateだけを出す。inspect全体やcontainer logは秘密値を含み得るため出さない。
+  docker inspect --format '[receipt-deploy] backend container state: {{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' \
+    "receipt-${INSTANCE_NAME}-backend" 2>/dev/null >&2 || true
   die "backend health check failed after deployment"
 }
 
