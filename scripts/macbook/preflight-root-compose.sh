@@ -27,7 +27,8 @@ for credential in backend_database_url backend_jwt_secret backend_totp_encryptio
 done
 
 run_compose() {
-  INSTANCE_NAME="${PREFLIGHT_INSTANCE_NAME}" COMPOSE_PROJECT_NAME="${PREFLIGHT_INSTANCE_NAME}" \
+  # readonlyのshell変数を上書きせず、子プロセスだけにpreflight名を渡す。
+  env INSTANCE_NAME="${PREFLIGHT_INSTANCE_NAME}" COMPOSE_PROJECT_NAME="${PREFLIGHT_INSTANCE_NAME}" \
     DOCKER_CONFIG="${RUNTIME_DIRECTORY}/docker-config" \
     RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
     docker compose --project-directory "${APP_DIRECTORY}" --env-file "${COMPOSE_ENV_FILE}" \
