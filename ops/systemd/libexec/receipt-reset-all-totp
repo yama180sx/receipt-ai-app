@@ -1,0 +1,13 @@
+#!/bin/bash
+# root専用。全メンバーのTOTP登録を解除し、次回ログイン時に再登録を要求する。
+set -euo pipefail
+
+die() { echo "[receipt-totp-reset] $1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+case "$1" in mb-stable) readonly ENVIRONMENT="$1" ;; *) die 'unknown fixed environment' ;; esac
+
+readonly CONTAINER_NAME="receipt-${ENVIRONMENT}-backend"
+[ "$(docker inspect --format '{{.State.Running}}' "${CONTAINER_NAME}" 2>/dev/null || true)" = 'true' ] || die 'backend container is not running'
+docker exec "${CONTAINER_NAME}" npm run totp:reset-all -- --confirm reset-all-totp
+echo '[receipt-totp-reset] completed without exposing member or secret values'

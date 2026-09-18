@@ -13,10 +13,13 @@
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
     "ai-pricing:add": "npx tsx prisma/add-ai-pricing-revision.ts",
     "ai-budget:bootstrap-manager": "npx tsx prisma/bootstrap-global-ai-budget-manager.ts",
+    "totp:reencrypt": "npx tsx prisma/reencrypt-totp-secrets.ts",
+    "totp:reset-all": "npx tsx prisma/reset-all-totp.ts",
     "invitation-codes:rotate": "npx tsx prisma/rotate-invitation-codes.ts",
     "invitation-codes:rollback": "npx tsx prisma/rollback-invitation-codes.ts",
     "prisma:reset-receipt-data": "npx tsx prisma/reset-receipt-data-preserve-auth.ts",
     "prisma:reset-test-data": "npx tsx prisma/reset-test-data-preserve-auth.ts",
+    "install:sharp-wasm": "sh scripts/install-sharp-wasm.sh",
     "test": "vitest run",
     "test:integration": "RUN_API_INTEGRATION=1 vitest run --config vitest.integration.config.ts",
     "check:openapi": "vitest run src/openapiDrift.test.ts src/utils/openapiRouteCollector.test.ts src/utils/apiRouteEndpoint.test.ts src/types/apiSchemas.test.ts"

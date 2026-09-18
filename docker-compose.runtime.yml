@@ -3,7 +3,9 @@
 services:
   backend:
     build:
-      dockerfile: Dockerfile.runtime
+      # MacBookの旧CPUではSharp native binaryを使えないため、root helperが専用Dockerfileを選択する。
+      # 未指定時はT320互換の通常runtime imageを維持する。
+      dockerfile: ${RECAIPT_BACKEND_RUNTIME_DOCKERFILE:-Dockerfile.runtime}
     user: "1000:1000"
     # dev はtsx watch、stable はtsx の通常起動をroot helperが明示する。
     # ここで固定すると、devでもts-node経由となり .js 拡張子のTS読込に失敗する。

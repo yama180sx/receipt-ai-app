@@ -19,6 +19,11 @@
 
 - [商品単位AI自動分類](./features/product-classification/README.md)
 
+## 運用手順
+
+- [MacBook（Linux Mint 22.3）へのDocker導入手順](./macbook-linux-server-setup.md) — Issue #128 のサーバー環境構築の初期手順
+- [運用・障害対応](./design/operations.md) — RecAIptの環境構築、バックアップ、復旧、デプロイ
+
 ## 既存資料の棚卸し
 
 | 資料群 | 状態 | 方針 |

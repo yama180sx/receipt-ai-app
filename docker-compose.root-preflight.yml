@@ -1,0 +1,15 @@
+# root Composeのbackendだけを、既存mb-stable networkへ一時接続する検証用override。
+# host portを公開せず、db／redis／frontendは作成しない。
+services:
+  backend:
+    # env_fileより優先させ、root deploy時に生成される固定Gemini model設定を再現する。
+    environment:
+      GEMINI_RECEIPT_MODEL: ${GEMINI_RECEIPT_MODEL}
+      GEMINI_PRODUCT_CLASSIFICATION_MODEL: ${GEMINI_PRODUCT_CLASSIFICATION_MODEL}
+    networks:
+      default: {}
+
+networks:
+  default:
+    name: mb-stable_default
+    external: true

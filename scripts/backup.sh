@@ -4,10 +4,14 @@ set -euo pipefail
 # --- 環境判定ロジック ---
 ENV="${1:-}"
 
-if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ]; then
-    echo "[ERROR] Usage: $0 {stable|dev}"
+if [ "$ENV" != "stable" ] && [ "$ENV" != "dev" ] && [ "$ENV" != "mb-stable" ]; then
+    echo "[ERROR] Usage: $0 {stable|dev|mb-stable}"
     exit 1
 fi
+
+# ENV_NAME はアプリの機能モード、INSTANCE_NAME は同一LAN内のDocker実体名を分離する。
+# 未指定時は既存のdev/stableコンテナ名との互換性を維持する。
+INSTANCE_NAME="${RECAIPT_INSTANCE_NAME:-${INSTANCE_NAME:-${ENV}}}"
 
 # --- 設定項目 ---
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -25,12 +29,16 @@ DB_NAME="receipt_db"
 # --- 環境別の動的分岐設定 ---
 if [ "$ENV" = "stable" ]; then
     BACKUP_DIR="/mnt/raid_1t/backups/receipt-app"
-    CONTAINER_NAME="receipt-stable-db"
+    CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
     ENV_LABEL="PROD"
-else
+elif [ "$ENV" = "dev" ]; then
     BACKUP_DIR="/mnt/raid_1t/backups/receipt-app-dev"
-    CONTAINER_NAME="receipt-dev-db" # ★修正: 実際のコンテナ名に一致
+    CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
     ENV_LABEL="DEV"
+else
+    BACKUP_DIR="/mnt/receipt-backups/receipt-app"
+    CONTAINER_NAME="receipt-${INSTANCE_NAME}-db"
+    ENV_LABEL="MACBOOK"
 fi
 
 # --- 通知関数 ---
