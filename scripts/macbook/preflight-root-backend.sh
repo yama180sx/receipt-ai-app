@@ -22,12 +22,15 @@ cleanup() {
 trap cleanup EXIT
 
 install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+secret_mounts=()
 for credential in backend_database_url backend_jwt_secret backend_totp_encryption_key \
   backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user \
   backend_smtp_password backend_smtp_from; do
   systemd-creds decrypt --name="${credential}" "${CONFIG_ROOT}/credentials/${INSTANCE_NAME}/${credential}.cred" \
     "${SECRET_DIRECTORY}/${credential}"
   chmod 0444 "${SECRET_DIRECTORY}/${credential}"
+  # Compose secretと同様に個別ファイルだけをcontainerへmountする。
+  secret_mounts+=(--mount "type=bind,src=${SECRET_DIRECTORY}/${credential},dst=/run/secrets/${credential},readonly")
 done
 
 # root runtimeと同じimage・user・secret file契約で起動する。host portは公開しない。
@@ -41,7 +44,7 @@ docker run -d --name "${CONTAINER_NAME}" --network "${INSTANCE_NAME}_default" \
   -e SMTP_USER_FILE=/run/secrets/backend_smtp_user \
   -e SMTP_PASSWORD_FILE=/run/secrets/backend_smtp_password \
   -e SMTP_FROM_FILE=/run/secrets/backend_smtp_from \
-  -v "${SECRET_DIRECTORY}:/run/secrets:ro" \
+  "${secret_mounts[@]}" \
   "${INSTANCE_NAME}-backend" npm run start >/dev/null
 
 for attempt in $(seq 1 20); do
