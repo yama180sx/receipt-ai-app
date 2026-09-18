@@ -63,7 +63,7 @@ restore_source_on_failure() {
     # root deploy後のTOTP移行で失敗した場合も、先に候補runtimeを停止してport競合を避ける。
     if [ -r "/run/receipt-ai-app-${INSTANCE_NAME}/compose.env" ]; then
       local secret_directory
-      secret_directory="$(find "/run/receipt-ai-app-${INSTANCE_NAME}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit 2>/dev/null || true)"
+      secret_directory="$(find "/run/receipt-ai-app-${INSTANCE_NAME}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation.*' -print -quit 2>/dev/null || true)"
       if [ -n "${secret_directory}" ]; then
         # backendの生ログは秘密値を含み得るため出さず、設計済みの値なし分類だけを採取する。
         docker logs "receipt-${INSTANCE_NAME}-backend" 2>&1 \
@@ -131,7 +131,7 @@ systemctl start receipt-deploy-mb-stable.service
 # backendの通常起動には旧JWT由来のTOTP鍵を渡さない。一回限りのCLIだけへ、
 # 既にDocker Secretとしてmount済みのJWT鍵を明示的に渡して再暗号化する。
 readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${INSTANCE_NAME}"
-readonly SECRET_DIRECTORY="$(find "${RUNTIME_DIRECTORY}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit)"
+readonly SECRET_DIRECTORY="$(find "${RUNTIME_DIRECTORY}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation.*' -print -quit)"
 [ -n "${SECRET_DIRECTORY}" ] || die 'deployed secret generation is unavailable'
 DOCKER_CONFIG="${RUNTIME_DIRECTORY}/docker-config" \
   RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
@@ -144,5 +144,6 @@ DOCKER_CONFIG="${RUNTIME_DIRECTORY}/docker-config" \
     backend npm run totp:reencrypt -- --operator root-managed-macbook \
     --reason 'Issue #128 root-managed migration' --confirm reencrypt-totp-secrets
 root_deployed=1
+systemctl enable receipt-deploy-mb-stable.service
 trap - EXIT
 echo '[macbook-root-migration] root-managed mb-stable deployment completed.' >&2

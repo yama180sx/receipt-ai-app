@@ -76,7 +76,7 @@ sudo ./scripts/macbook/register-root-credentials.sh
 
 ## root管理runtimeへの切替
 
-credential登録後、MacBook上で以下を実行する。この操作中はWeb版が停止する。旧Composeを停止してDB・uploads・Valkeyをroot管理領域へコピーし、`receipt-deploy-mb-stable.service`を起動する。
+credential登録後、MacBook上で以下を実行する。この操作中はWeb版が停止する。旧Composeを停止してDB・uploads・Valkeyをroot管理領域へコピーし、`receipt-deploy-mb-stable.service`を起動する。TOTP再暗号化まで成功した場合だけ、このserviceを次回起動時にも有効化する。
 
 ```bash
 sudo ./scripts/macbook/migrate-to-root-runtime.sh
