@@ -43,6 +43,8 @@ T320向けテンプレートをそのまま書き換えない。MacBookではroo
 | 項目 | MacBook |
 | --- | --- |
 | release | `wip/issue-128-macbook-server-setup` の承認済み完全SHA |
+| アプリ機能モード | `stable` |
+| Docker実体名 | `mb-stable`（`receipt-mb-stable-*`） |
 | LAN IP | `192.168.1.30` |
 | backup先 | `/mnt/receipt-backups/receipt-app` |
 | CPU | Sharp WebAssembly fallbackを維持 |
