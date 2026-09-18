@@ -1,0 +1,18 @@
+[Unit]
+Description=RecAIpt MacBook invitation-code rotation
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-invitation-code-rotation-mb-stable
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/libexec/receipt-rotate-invitation-codes mb-stable
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/receipt-ai-app/mb-stable /run/receipt-ai-app-invitation-code-rotation-mb-stable

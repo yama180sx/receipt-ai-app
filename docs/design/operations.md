@@ -9,6 +9,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | 資料 | 内容 |
 |------|------|
 | [architecture.md](./architecture.md) §8 | 環境構成・CI/CD（#90-1） |
+| [macbook-linux-server-setup.md](../macbook-linux-server-setup.md) | MacBook（Linux Mint 22.3）へのDocker導入（Issue #128） |
 | [db-operations.md](../db-operations.md) | DB マスタ投入・更新の詳細手順 |
 | [restore-manual.md](../restore-manual.md) | バックアップ確認・リストアのコマンド手順 |
 
