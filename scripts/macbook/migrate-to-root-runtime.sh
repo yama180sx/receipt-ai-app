@@ -56,6 +56,20 @@ root_deployed=0
 restore_source_on_failure() {
   if [ "${source_stopped}" = 1 ] && [ "${root_deployed}" = 0 ]; then
     echo '[macbook-root-migration] root deployment failed; restarting prior Compose.' >&2
+    # root deploy後のTOTP移行で失敗した場合も、先に候補runtimeを停止してport競合を避ける。
+    if [ -r "/run/receipt-ai-app-${INSTANCE_NAME}/compose.env" ]; then
+      local secret_directory
+      secret_directory="$(find "/run/receipt-ai-app-${INSTANCE_NAME}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit 2>/dev/null || true)"
+      if [ -n "${secret_directory}" ]; then
+        DOCKER_CONFIG="/run/receipt-ai-app-${INSTANCE_NAME}/docker-config" \
+          RECAIPT_SECRETS_DIR="${secret_directory}" \
+          docker compose --project-directory "${APP_DIRECTORY}" \
+            --env-file "/run/receipt-ai-app-${INSTANCE_NAME}/compose.env" \
+            -f "${APP_DIRECTORY}/docker-compose.yml" \
+            -f "${APP_DIRECTORY}/docker-compose.secrets.yml" \
+            -f "${APP_DIRECTORY}/docker-compose.runtime.yml" down || true
+      fi
+    fi
     (cd "${REPOSITORY_ROOT}" && docker compose up -d --no-build) || true
   fi
 }
@@ -98,6 +112,21 @@ chmod 0700 "${DATA_DIRECTORY}/pgdata" "${DATA_DIRECTORY}/valkeydata"
 chown -R 1000:1000 "${DATA_DIRECTORY}/uploads"
 
 systemctl start receipt-deploy-mb-stable.service
+# backendの通常起動には旧JWT由来のTOTP鍵を渡さない。一回限りのCLIだけへ、
+# 既にDocker Secretとしてmount済みのJWT鍵を明示的に渡して再暗号化する。
+readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${INSTANCE_NAME}"
+readonly SECRET_DIRECTORY="$(find "${RUNTIME_DIRECTORY}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit)"
+[ -n "${SECRET_DIRECTORY}" ] || die 'deployed secret generation is unavailable'
+DOCKER_CONFIG="${RUNTIME_DIRECTORY}/docker-config" \
+  RECAIPT_SECRETS_DIR="${SECRET_DIRECTORY}" \
+  docker compose --project-directory "${APP_DIRECTORY}" \
+    --env-file "${RUNTIME_DIRECTORY}/compose.env" \
+    -f "${APP_DIRECTORY}/docker-compose.yml" \
+    -f "${APP_DIRECTORY}/docker-compose.secrets.yml" \
+    -f "${APP_DIRECTORY}/docker-compose.runtime.yml" \
+    run --rm --no-deps -e TOTP_LEGACY_ENCRYPTION_KEY_FILE=/run/secrets/backend_jwt_secret \
+    backend npm run totp:reencrypt -- --operator root-managed-macbook \
+    --reason 'Issue #128 root-managed migration' --confirm reencrypt-totp-secrets
 root_deployed=1
 trap - EXIT
 echo '[macbook-root-migration] root-managed mb-stable deployment completed.' >&2
