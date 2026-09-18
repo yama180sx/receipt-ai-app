@@ -1,0 +1,11 @@
+# root Composeのbackendだけを、既存mb-stable networkへ一時接続する検証用override。
+# host portを公開せず、db／redis／frontendは作成しない。
+services:
+  backend:
+    networks:
+      default: {}
+
+networks:
+  default:
+    name: mb-stable_default
+    external: true

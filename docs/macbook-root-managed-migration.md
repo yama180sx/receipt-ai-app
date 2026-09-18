@@ -100,3 +100,11 @@ sudo ./scripts/macbook/preflight-root-backend.sh
 ```
 
 この検証が成功するまで、root runtimeへの再切替を実施しない。
+
+`docker compose`のsecret mountまで同一に確認するには、さらに次を実行する。既存の`mb-stable`は停止せず、公開portを持たない一時backendだけを同じDB／Valkey networkへ接続する。
+
+```bash
+sudo ./scripts/macbook/preflight-root-compose.sh
+```
+
+この検証が成功してからだけ、`--resume`によるroot runtime切替を行う。
