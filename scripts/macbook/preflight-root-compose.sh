@@ -7,6 +7,7 @@ readonly PREFLIGHT_INSTANCE_NAME='mb-stable-preflight'
 readonly APP_DIRECTORY="/srv/receipt-ai-app/${INSTANCE_NAME}"
 readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${INSTANCE_NAME}"
 readonly COMPOSE_ENV_FILE="${RUNTIME_DIRECTORY}/compose.env"
+readonly PREFLIGHT_RUNTIME_DIRECTORY="/run/receipt-ai-app-${INSTANCE_NAME}-compose-preflight"
 readonly REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 die() { echo "[macbook-root-compose-preflight] $1" >&2; exit 1; }
@@ -14,8 +15,16 @@ die() { echo "[macbook-root-compose-preflight] $1" >&2; exit 1; }
 [ -r "${COMPOSE_ENV_FILE}" ] || die 'root runtime compose configuration is unavailable'
 docker network inspect "${INSTANCE_NAME}_default" >/dev/null 2>&1 || die 'current mb-stable network is unavailable'
 
-readonly SECRET_DIRECTORY="$(find "${RUNTIME_DIRECTORY}/secrets" -mindepth 1 -maxdepth 1 -type d -name 'generation-*' -print -quit)"
-[ -n "${SECRET_DIRECTORY}" ] || die 'root secret generation is unavailable'
+readonly SECRET_DIRECTORY="${PREFLIGHT_RUNTIME_DIRECTORY}/secrets"
+install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
+for credential in backend_database_url backend_jwt_secret backend_totp_encryption_key \
+  backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user \
+  backend_smtp_password backend_smtp_from postgres_password; do
+  systemd-creds decrypt --name="${credential}" \
+    "/etc/receipt-ai-app/credentials/${INSTANCE_NAME}/${credential}.cred" \
+    "${SECRET_DIRECTORY}/${credential}"
+  chmod 0444 "${SECRET_DIRECTORY}/${credential}"
+done
 
 run_compose() {
   INSTANCE_NAME="${PREFLIGHT_INSTANCE_NAME}" COMPOSE_PROJECT_NAME="${PREFLIGHT_INSTANCE_NAME}" \
@@ -28,7 +37,10 @@ run_compose() {
       -f "${REPOSITORY_ROOT}/docker-compose.root-preflight.yml" "$@"
 }
 
-cleanup() { run_compose down --remove-orphans >/dev/null 2>&1 || true; }
+cleanup() {
+  run_compose down --remove-orphans >/dev/null 2>&1 || true
+  rm -rf -- "${PREFLIGHT_RUNTIME_DIRECTORY}"
+}
 trap cleanup EXIT
 
 run_compose up -d --no-deps backend
