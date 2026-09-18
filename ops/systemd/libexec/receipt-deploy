@@ -45,7 +45,7 @@ load_non_secret_config() {
       *) die "non-secret config has an invalid line" ;;
     esac
     case "${key}" in
-      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA)
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA|INSTANCE_NAME)
         printf -v "${key}" '%s' "${value}"
         export "${key}"
         ;;
@@ -88,15 +88,16 @@ cleanup_retired_runtime_secrets() {
 
 write_runtime_env() {
   local destination="$1"
-  local environment="$2"
-  local project_name="$3"
-  local node_env="$4"
-  local command="$5"
-  local data_directory="$6"
+  local app_environment="$2"
+  local instance_name="$3"
+  local project_name="$4"
+  local node_env="$5"
+  local command="$6"
+  local data_directory="$7"
 
   umask 077
   {
-    printf 'ENV_NAME=%s\n' "${environment}"
+    printf 'ENV_NAME=%s\nINSTANCE_NAME=%s\n' "${app_environment}" "${instance_name}"
     printf 'COMPOSE_PROJECT_NAME=%s\n' "${project_name}"
     printf 'UID=1000\nGID=1000\n'
     printf 'BACKEND_COMMAND=%s\nNODE_ENV=%s\n' "${command}" "${node_env}"
@@ -112,6 +113,7 @@ write_runtime_env() {
     printf 'RECAIPT_REDISDATA_DIR=%s/redisdata\n' "${data_directory}"
     printf 'RECAIPT_QUEUE_DATA_DIR=%s/valkeydata\n' "${data_directory}"
     printf 'RECAIPT_BACKEND_ENV_FILE=%s/backend/.env\n' "${APP_DIRECTORY}"
+    printf 'RECAIPT_BACKEND_RUNTIME_DOCKERFILE=%s\n' "${BACKEND_RUNTIME_DOCKERFILE}"
   } > "${destination}/compose.env"
 
   {
@@ -123,7 +125,7 @@ write_runtime_env() {
   } > "${APP_DIRECTORY}/backend/.env"
 
   {
-    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${environment}" "${HOST_IP}" "${BACKEND_PORT}"
+    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${app_environment}" "${HOST_IP}" "${BACKEND_PORT}"
   } > "${APP_DIRECTORY}/frontend/.env"
 
   chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
@@ -135,13 +137,21 @@ require_root
 case "$1" in
   dev)
     readonly ENVIRONMENT="dev"
-    readonly PROJECT_NAME="receipt-dev"
+    readonly APP_ENVIRONMENT="dev"
     readonly NODE_ENV_VALUE="development"
     readonly BACKEND_COMMAND_VALUE="npm run dev"
     ;;
   stable)
     readonly ENVIRONMENT="stable"
-    readonly PROJECT_NAME="receipt-stable"
+    readonly APP_ENVIRONMENT="stable"
+    readonly NODE_ENV_VALUE="production"
+    readonly BACKEND_COMMAND_VALUE="npm run start"
+    ;;
+  mb-stable)
+    # MacBookはT320 stableと別のroot所有runtime・Docker名前空間を使う。
+    # アプリの機能モードはstableのままにしてdev扱いにしない。
+    readonly ENVIRONMENT="mb-stable"
+    readonly APP_ENVIRONMENT="stable"
     readonly NODE_ENV_VALUE="production"
     readonly BACKEND_COMMAND_VALUE="npm run start"
     ;;
@@ -159,6 +169,15 @@ require_root_owned_directory "${DATA_ROOT}"
 require_root_owned_directory "${DATA_DIRECTORY}"
 require_root_owned_directory "${RUNTIME_DIRECTORY}"
 load_non_secret_config "${CONFIG_FILE}"
+INSTANCE_NAME="${INSTANCE_NAME:-${ENVIRONMENT}}"
+[[ "${INSTANCE_NAME}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "instance name is invalid"
+readonly INSTANCE_NAME
+readonly PROJECT_NAME="${INSTANCE_NAME}"
+if [ "${ENVIRONMENT}" = "mb-stable" ]; then
+  readonly BACKEND_RUNTIME_DOCKERFILE="Dockerfile.runtime-macbook"
+else
+  readonly BACKEND_RUNTIME_DOCKERFILE="Dockerfile.runtime"
+fi
 
 case "${ENVIRONMENT}" in
   dev)
@@ -167,7 +186,7 @@ case "${ENVIRONMENT}" in
     fi
     readonly GIT_REF="refs/heads/develop"
     ;;
-  stable)
+  stable|mb-stable)
     # stable の対象は移動する main ref ではなく、root 所有設定に登録した
     # 承認済みの完全長コミット SHA に固定する。runner はこの値を与えられない。
     [ -n "${STABLE_RELEASE_SHA:-}" ] || die "stable release commit is unavailable"
@@ -197,10 +216,15 @@ readonly CHECKED_OUT_SHA="$(git -C "${APP_DIRECTORY}" rev-parse --verify FETCH_H
 if [ "${ENVIRONMENT}" = "stable" ] && [ "${CHECKED_OUT_SHA}" != "${GIT_REF}" ]; then
   die "stable release commit does not match the approved commit"
 fi
+if [ "${ENVIRONMENT}" = "mb-stable" ] && [ "${CHECKED_OUT_SHA}" != "${GIT_REF}" ]; then
+  die "MacBook release commit does not match the approved commit"
+fi
 git -C "${APP_DIRECTORY}" checkout --detach --force "${CHECKED_OUT_SHA}"
 git -C "${APP_DIRECTORY}" clean -ffdqx
 if [ "${ENVIRONMENT}" = "stable" ]; then
   echo "[receipt-deploy] stable release commit: ${CHECKED_OUT_SHA}"
+elif [ "${ENVIRONMENT}" = "mb-stable" ]; then
+  echo "[receipt-deploy] mb-stable release commit: ${CHECKED_OUT_SHA}"
 fi
 
 readonly SECRET_ROOT="${RUNTIME_DIRECTORY}/secrets"
@@ -223,7 +247,7 @@ for credential in "${CREDENTIALS[@]}"; do
   copy_credential "${credential}" "${SECRET_DIRECTORY}"
 done
 
-write_runtime_env "${RUNTIME_DIRECTORY}" "${ENVIRONMENT}" "${PROJECT_NAME}" "${NODE_ENV_VALUE}" "${BACKEND_COMMAND_VALUE}" "${DATA_DIRECTORY}"
+write_runtime_env "${RUNTIME_DIRECTORY}" "${APP_ENVIRONMENT}" "${INSTANCE_NAME}" "${PROJECT_NAME}" "${NODE_ENV_VALUE}" "${BACKEND_COMMAND_VALUE}" "${DATA_DIRECTORY}"
 
 run_compose() {
   env DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}" \
