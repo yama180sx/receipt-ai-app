@@ -34,6 +34,7 @@
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
+| `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
 | `libexec/receipt-rollback-invitation-codes` | `/usr/local/libexec/receipt-rollback-invitation-codes` | root:root / 0750 |
@@ -45,6 +46,8 @@
 credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_secret`、`backend_totp_encryption_key`、`backend_gemini_api_key`、`backend_ai_budget_discord_webhook`、`backend_smtp_user`、`backend_smtp_password`、`backend_smtp_from`、`postgres_password`、backupでは`db_password`、`backup_discord_webhook_url`に固定する。devとstableはcredentialを共有しない。TOTPの暗号化・復号は`backend_totp_encryption_key`だけを使用し、JWT鍵をTOTP用途へ渡さない。
 
 Cloudflare R2オフサイトbackupは`r2_access_key_id`、`r2_secret_access_key`、`rclone_crypt_password`、`rclone_crypt_salt`を環境別encrypted credentialとして使用する。後者2つはrcloneの`obscure`形式で登録し、平文のcrypt鍵・rclone設定ファイルを永続化しない。R2 endpointとbucket名は秘密値ではないが、root所有`offsite-{env}.env`だけへ置き、Git・Issue・通知へ実値を記録しない。
+
+R2 credentialの初回登録は、root所有で設置した`receipt-register-offsite-credentials {dev|stable}`だけを使う。このhelperは4値を非表示入力で受け取り、`rclone obscure -`の標準入力と`systemd-creds encrypt`の標準入力だけを経由してencrypted credentialにする。既存credentialは上書きしない。入力前にcrypt passwordとcrypt saltを異なる値として暗号化された復旧キットへ保管し、値自体を端末表示・Git・Issue・shell履歴へ残さない。
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 

@@ -27,6 +27,7 @@ for file in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
   ops/systemd/libexec/receipt-offsite-backup \
+  ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
@@ -48,6 +49,7 @@ for helper in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
   ops/systemd/libexec/receipt-offsite-backup \
+  ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes; do
@@ -57,6 +59,7 @@ done
 "${project_root}/scripts/security/test-restore-helper-contract.sh"
 "${project_root}/scripts/security/test-root-only-backup-contract.sh"
 "${project_root}/scripts/security/test-offsite-backup-contract.sh"
+"${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"
