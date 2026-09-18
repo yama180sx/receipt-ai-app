@@ -25,7 +25,7 @@ install -d -o root -g root -m 0700 "${SECRET_DIRECTORY}"
 for credential in backend_database_url backend_jwt_secret backend_totp_encryption_key \
   backend_gemini_api_key backend_ai_budget_discord_webhook backend_smtp_user \
   backend_smtp_password backend_smtp_from; do
-  systemd-creds decrypt "${CONFIG_ROOT}/credentials/${INSTANCE_NAME}/${credential}.cred" \
+  systemd-creds decrypt --name="${credential}" "${CONFIG_ROOT}/credentials/${INSTANCE_NAME}/${credential}.cred" \
     "${SECRET_DIRECTORY}/${credential}"
   chmod 0444 "${SECRET_DIRECTORY}/${credential}"
 done
