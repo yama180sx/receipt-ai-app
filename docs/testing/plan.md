@@ -71,7 +71,7 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
 
 現状の `server.ts` は以下の理由で Supertest 非対応:
 
-1. import 時に `./workers/receiptWorker` が Redis 接続を試行
+1. import 時に `./workers/receiptWorker` が Valkey 接続を試行
 2. `app.listen()` がモジュール読み込み時に実行
 3. supertest 用の `app` エクスポートがない
 
@@ -94,12 +94,12 @@ Epic: [#277 Issue #91](https://github.com/yama180sx/receipt-ai-app/issues/277)
   モジュールのテストでは `vi.mock()` を使い、実APIを呼ばない。
 - **BullMQ Worker**: `createApp()` を使うテストでは `server.ts` を import しないため、
   Worker は起動しない。Queueを利用するSupertest結合テストは、ファイル先頭で
-  `test/mockReceiptQueue` を import してRedis接続を置き換える。
+  `test/mockReceiptQueue` を import してValkey接続を置き換える。
 - **normalizer**: `getCleanText` はDBなしの単体テストで検証する。
   `normalizeStoreName` はPrismaで世帯内の店舗を検索するため、Prismaを模倣した単体テストは
   行わず、テナント分離を含むDB結合テストで検証する。
 
-実Gemini OCR、実Redis Worker、実画像アップロードを通す確認は自動テストの対象外とし、
+実Gemini OCR、実Valkey Worker、実画像アップロードを通す確認は自動テストの対象外とし、
 `regression-checklist.md` に従う手動確認で扱う。
 
 Issue #119では`ReceiptAnalysisJob`台帳を正本とし、空のキューストアへ同一jobIdで再投入できることを結合テストと手動確認で検証する。
@@ -155,7 +155,7 @@ Issue #119では`ReceiptAnalysisJob`台帳を正本とし、空のキュース�
 | Backend Vitest | ✅ `itemSplitAllocation.test.ts` 2 passed（ローカル + Docker） |
 | Frontend Vitest | ✅ `splitEditorSplits.test.ts` 2 passed |
 | Supertest | ⚠️ `server.ts` 分離が必要 |
-| server.ts import | ⚠️ Redis Worker が起動、Redis 未接続でエラー |
+| server.ts import | ⚠️ Valkey Worker が起動、Valkey 未接続でエラー |
 
 POC ファイル（未マージ）:
 

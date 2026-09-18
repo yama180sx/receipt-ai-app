@@ -23,7 +23,7 @@
 5. helper、unit、sudoersをroot所有の所定位置へinstallし、`systemctl daemon-reload`する。
 6. 合成credentialでunitの読取り・失敗時の値なしエラーを確認する。
 7. `scripts/security/test-runtime-secret-staging.sh` を成功させ、同名ディレクトリへcredentialを誤配置しないことを確認する。
-8. 現行devのDB・Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
+8. 現行devのDB・旧Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
 9. dev確認後にだけDocker groupから開発ユーザー／runnerを外し、新しいログインセッションでDocker socketが直接読めないことを確認する。
 10. stableは、GitHub `stable` Environmentのrequired reviewer承認と別途承認されたメンテナンス時間が揃った時だけ移行する。`main`へのpushはstableを自動デプロイしない。
 
@@ -44,7 +44,7 @@ credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_se
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
-deployはDBとRedisを現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
+deployはDBとValkey（サービス名`redis`）を現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
 
 root管理backupは`/var/lib/receipt-ai-app/{env}/uploads`をアーカイブする。DBまたはuploadsのどちらかが失敗した場合、通知後に非0で終了するためsystemdは成功扱いにしない。
 

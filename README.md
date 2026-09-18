@@ -94,7 +94,7 @@ Google Gemini APIを利用し、レシート画像から以下を自動抽出し
 | Backend          | Node.js, Express, TypeScript          |
 | Database         | PostgreSQL                            |
 | ORM              | Prisma                                |
-| Queue            | BullMQ, Redis                         |
+| Queue            | BullMQ, Valkey（Redis互換）            |
 | AI               | Google Gemini API                     |
 | Authentication   | JWT, bcrypt, TOTP                     |
 | Image Processing | sharp, multer                         |

@@ -27,7 +27,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276) /
 - **テナント**: `FamilyGroup`（世帯）。招待コードで参加し、データは世帯 ID で分離する。
 - **ホスティング**: 自宅サーバー（Dell PowerEdge T320 / Ubuntu）上の Docker Compose。
 - **AI**: Google Gemini API によるレシート OCR・構造化。
-- **非同期処理**: BullMQ + Redis でレシート画像解析をキューイングする。
+- **非同期処理**: BullMQ + Valkey（Redis互換）でレシート画像解析をキューイングする。
 
 ---
 
@@ -44,7 +44,7 @@ flowchart TB
     subgraph docker [Docker Compose on T320]
         BE[Backend<br/>Express + Worker]
         PG[(PostgreSQL 18)]
-        RD[(Redis 7)]
+        RD[(Valkey 8.1<br/>Redis互換)]
         FS[uploads/<br/>ローカル FS]
     end
 
@@ -73,7 +73,7 @@ flowchart TB
 | Frontend | Expo ~57, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
 | Backend | Node.js 20, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
-| Queue | BullMQ 5 + Valkey 8.1（Issue #119でdev検証中） |
+| Queue | BullMQ 5 + Valkey 8.1.10（Redis互換、Issue #119で移行完了） |
 | AI | `@google/generative-ai`（Gemini） |
 | 画像 | sharp（WebP 変換）, multer（アップロード） |
 | 認証 | JWT, bcrypt, otplib（TOTP）, AES-256-GCM |
@@ -134,7 +134,7 @@ receipt-ai-app/
 | `app.ts` | `createApp()` — Express ミドルウェア・ルート定義のみ。Supertest 結合テストから import 可能 |
 | `server.ts` | `dotenv` 読込 → `receiptWorker` import → `createApp()` → `listen()` |
 
-**分離の理由**: 旧来の単一 `server.ts` では Worker 起動が import 時に走り、Redis 未接続環境（Vitest / Supertest）でエラーになる。テスト時は `createApp()` のみを import し、Worker は起動しない。
+**分離の理由**: 旧来の単一 `server.ts` では Worker 起動が import 時に走り、Valkey 未接続環境（Vitest / Supertest）でエラーになる。テスト時は `createApp()` のみを import し、Worker は起動しない。
 
 ```typescript
 // app.ts — Worker は起動しない
@@ -685,7 +685,7 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 | Web ポート | 8080 | 80 |
 | Expo Dev ポート | 8081 | 8082 |
 | DB ポート | 5433 | 5432 |
-| Redis ポート | 6380 | 6379 |
+| Valkey ポート（Redis互換） | 6380 | 6379 |
 | Backend コマンド | `npm run dev` | `npm run start` |
 | バックアップ cron | 毎日 3:00 | 毎日 4:00 |
 
@@ -699,7 +699,7 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 | `frontend` | Nginx + Expo Web 静的ビルド |
 | `frontend-dev` | Expo 開発サーバー |
 | `db` | PostgreSQL 18 |
-| `redis` | Redis 7 |
+| `redis` | Valkey 8.1.10（BullMQ互換のサービス名を維持） |
 
 ### 8.3 CI/CD
 
@@ -715,7 +715,7 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 
 1. self-hosted runner（`t320`）は固定名の`receipt-deploy-stable.service`だけを要求する。
 2. root管理helperが`/srv/receipt-ai-app/stable`で、root所有設定の`STABLE_RELEASE_SHA`に固定された承認済みmainコミットを検証・取得する。
-3. encrypted credentialを実行時だけサービス別に配布し、DB／Redis healthcheck後にコンテナ内でPrisma migrationを実行する。
+3. encrypted credentialを実行時だけサービス別に配布し、DB／Valkey healthcheck後にコンテナ内でPrisma migrationを実行する。
 4. root管理runtime Composeを起動し、backend healthを確認する。
 
 `main`へのpushはstableデプロイを開始しない。stableの対象SHA、dev受入結果、承認者、実施時刻、結果をリリース記録に残す。秘密値、Webhook URL、認証情報は記録しない。

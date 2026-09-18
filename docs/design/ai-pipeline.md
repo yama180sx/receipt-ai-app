@@ -238,7 +238,7 @@ sequenceDiagram
 
 ## 5. BullMQ Queue / Worker
 
-Redis 上の BullMQ が **API プロセスと Gemini 呼び出しを非同期化** する。Queue（投入側）と Worker（実行側）の役割分担は以下のとおり。
+Valkey（Redis互換）上の BullMQ が **API プロセスと Gemini 呼び出しを非同期化** する。Queue（投入側）と Worker（実行側）の役割分担は以下のとおり。接続先サービス名と`REDIS_*`設定名はBullMQ/ioredis互換のため維持する。
 
 ```mermaid
 flowchart TB
@@ -248,7 +248,7 @@ flowchart TB
         StatusAPI["GET /jobs, /status"]
     end
 
-    subgraph redis [Redis]
+    subgraph redis [Valkey（Redis互換）]
         Jobs[("receipt-analysis<br/>ジョブストア")]
     end
 
@@ -286,7 +286,7 @@ flowchart TB
 | concurrency | 5 |
 | テナント | `runWithTenant({ familyGroupId, memberId })` で AsyncLocalStorage 設定 |
 | 処理 | `analyzeOnly({ familyGroupId, memberId }, imagePath)` → 戻り値を `job.returnvalue` に格納 |
-| テスト | `createApp()` 経路では **import しない**（Redis 未接続回避 — #91-3） |
+| テスト | `createApp()` 経路では **import しない**（Valkey 未接続回避 — #91-3） |
 
 **責務**: Gemini 解析とカテゴリ推定。**Receipt テーブルへの書き込みは行わない**。
 
@@ -431,10 +431,10 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 |------|------|------|
 | Gemini | レシート解析フローは `ReceiptAnalysisProvider` を差し替え、直接依存のテストだけ `vi.mock()` を使う | [testing/plan.md §4](../testing/plan.md) |
 | BullMQ Worker | テスト時は `server.ts` / `receiptWorker` を import しない | `app.ts` / `server.ts` 分離（#91-3） |
-| Redis / Queue | Supertest結合テストはファイル先頭で `test/mockReceiptQueue` を import し、Redis接続なしで API のみ検証する | `mockReceiptQueue.ts` |
+| Valkey / Queue | Supertest結合テストはファイル先頭で `test/mockReceiptQueue` を import し、Valkey接続なしで API のみ検証する | `mockReceiptQueue.ts` |
 | normalizer | `getCleanText` は単体テスト、Prisma依存の `normalizeStoreName` はDB結合テスト | [testing/plan.md §4](../testing/plan.md) |
 
-実Gemini OCR・実Redis Workerを通すE2Eは [testing/plan.md §3](../testing/plan.md) のスコープ外とし、手動回帰で確認する。
+実Gemini OCR・実Valkey Workerを通すE2Eは [testing/plan.md §3](../testing/plan.md) のスコープ外とし、手動回帰で確認する。
 
 ---
 
@@ -459,7 +459,7 @@ Gemini API と BullMQ Worker は **非決定論・外部依存** のため、自
 
 ## 11. 関連資料
 
-- [architecture.md](./architecture.md) — Docker / Redis / Worker 起動
+- [architecture.md](./architecture.md) — Docker / Valkey / Worker 起動
 - [api-spec.md](./api-spec.md) — upload / commit / jobs API
 - [domain-model.md](./domain-model.md) — Store / 商品分類 / ApiUsageLog
 - [MILESTONE_PHASE1.md](../MILESTONE_PHASE1.md) — 3層正規化の起源
