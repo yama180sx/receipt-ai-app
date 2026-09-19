@@ -23,7 +23,7 @@
 5. helper、unit、sudoersをroot所有の所定位置へinstallし、`systemctl daemon-reload`する。
 6. 合成credentialでunitの読取り・失敗時の値なしエラーを確認する。
 7. `scripts/security/test-runtime-secret-staging.sh` を成功させ、同名ディレクトリへcredentialを誤配置しないことを確認する。
-8. 現行devのDB・Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
+8. 現行devのDB・旧Redis・uploadsを停止時間内にroot管理の永続領域へ移し、dev unitで回帰確認する。成功条件にはbackendコンテナ内部の`/health`応答を含める。
 9. dev確認後にだけDocker groupから開発ユーザー／runnerを外し、新しいログインセッションでDocker socketが直接読めないことを確認する。
 10. stableは、GitHub `stable` Environmentのrequired reviewer承認と別途承認されたメンテナンス時間が揃った時だけ移行する。`main`へのpushはstableを自動デプロイしない。
 
@@ -33,18 +33,28 @@
 | --- | --- | --- |
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
+| `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
+| `libexec/receipt-offsite-verify` | `/usr/local/libexec/receipt-offsite-verify` | root:root / 0750 |
+| `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
 | `libexec/receipt-rollback-invitation-codes` | `/usr/local/libexec/receipt-rollback-invitation-codes` | root:root / 0750 |
 | `units/*.service`, `units/*.timer` | `/etc/systemd/system/` | root:root / 0644 |
 | `config/{dev,stable}.env.example` | `/etc/receipt-ai-app/{dev,stable}.env` | root:root / 0600 |
+| `config/offsite-{dev,stable}.env.example` | `/etc/receipt-ai-app/offsite-{dev,stable}.env` | root:root / 0600 |
 | `sudoers.d/receipt-deploy` | `/etc/sudoers.d/receipt-deploy` | root:root / 0440 |
 
 credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_secret`、`backend_totp_encryption_key`、`backend_gemini_api_key`、`backend_ai_budget_discord_webhook`、`backend_smtp_user`、`backend_smtp_password`、`backend_smtp_from`、`postgres_password`、backupでは`db_password`、`backup_discord_webhook_url`に固定する。devとstableはcredentialを共有しない。TOTPの暗号化・復号は`backend_totp_encryption_key`だけを使用し、JWT鍵をTOTP用途へ渡さない。
 
+Cloudflare R2オフサイトbackupは`r2_access_key_id`、`r2_secret_access_key`、`rclone_crypt_password`、`rclone_crypt_salt`を環境別encrypted credentialとして使用する。後者2つはrcloneの`obscure`形式で登録し、平文のcrypt鍵・rclone設定ファイルを永続化しない。R2 endpointとbucket名は秘密値ではないが、root所有`offsite-{env}.env`だけへ置き、Git・Issue・通知へ実値を記録しない。
+
+R2 credentialの初回登録は、root所有で設置した`receipt-register-offsite-credentials {dev|stable}`だけを使う。このhelperは4値を非表示入力で受け取り、`rclone obscure -`の標準入力と`systemd-creds encrypt`の標準入力だけを経由してencrypted credentialにする。既存credentialは上書きしない。入力前にcrypt passwordとcrypt saltを異なる値として暗号化された復旧キットへ保管し、値自体を端末表示・Git・Issue・shell履歴へ残さない。
+
+R2読み戻し検証は`receipt-offsite-verify-{dev,stable}.service`を手動起動する。helperはcrypt remote上の最新の**完了世代**（`database.sql.gz`、`uploads.tar.gz`、`manifest.json`が厳密にそろう世代）だけを`/run`配下のroot専用一時領域へ読み戻す。manifestの環境・時刻・サイズ・SHA-256、gzip、uploads archive構造を検査し、終了時に一時ファイルとrclone設定を削除する。DB、uploads、Valkey、コンテナ、R2上のobjectは変更しない。復元操作ではなく、オフサイトバックアップが復号・検証できることを確かめるための手動検査である。
+
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
-deployはDBとRedisを現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
+deployはDBとValkey（サービス名`redis`）を現在の秘密ファイル世代で強制再作成してからhealthcheckを待つ。これは失効した`/run`上のbind mountを持つ旧DBコンテナを起動しないためであり、`/var/lib/receipt-ai-app/{env}`の永続データは削除しない。
 
 root管理backupは`/var/lib/receipt-ai-app/{env}/uploads`をアーカイブする。DBまたはuploadsのどちらかが失敗した場合、通知後に非0で終了するためsystemdは成功扱いにしない。
 

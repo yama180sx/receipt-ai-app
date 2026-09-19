@@ -26,6 +26,9 @@ fi
 for file in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-offsite-backup \
+  ops/systemd/libexec/receipt-offsite-verify \
+  ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
@@ -33,6 +36,10 @@ for file in \
   ops/systemd/units/receipt-deploy-stable.service \
   ops/systemd/units/receipt-backup-dev.service \
   ops/systemd/units/receipt-backup-stable.service \
+  ops/systemd/units/receipt-offsite-backup-dev.service \
+  ops/systemd/units/receipt-offsite-backup-stable.service \
+  ops/systemd/units/receipt-offsite-verify-dev.service \
+  ops/systemd/units/receipt-offsite-verify-stable.service \
   ops/systemd/units/receipt-rotate-invitation-codes-dev.service \
   ops/systemd/units/receipt-rotate-invitation-codes-stable.service; do
   test -f "${file}" || {
@@ -44,6 +51,9 @@ done
 for helper in \
   ops/systemd/libexec/receipt-deploy \
   ops/systemd/libexec/receipt-backup \
+  ops/systemd/libexec/receipt-offsite-backup \
+  ops/systemd/libexec/receipt-offsite-verify \
+  ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes; do
@@ -52,6 +62,9 @@ done
 
 "${project_root}/scripts/security/test-restore-helper-contract.sh"
 "${project_root}/scripts/security/test-root-only-backup-contract.sh"
+"${project_root}/scripts/security/test-offsite-backup-contract.sh"
+"${project_root}/scripts/security/test-offsite-readback-contract.sh"
+"${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"

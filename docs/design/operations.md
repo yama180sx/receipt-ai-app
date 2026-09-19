@@ -22,6 +22,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | root管理環境の構築・設定 | 本書 §2 | [ops/systemd/README.md](../../ops/systemd/README.md) |
 | 定期バックアップの確認・手動実行 | 本書 §3 | root管理`receipt-backup-{env}.service` |
 | 障害時の DB / 画像リストア | 本書 §5 → [restore-manual.md](../restore-manual.md) | root管理restore helperを使う |
+| オフサイトバックアップ／DR設計・導入 | [Issue #57 R2設計](../reviews/issue-57/r2-offsite-backup-design.md)、[root運用手順](../../ops/systemd/README.md) | devの暗号化送信を導入済み。stable適用、定期化、オフサイト復元演習は未完了 |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
@@ -160,6 +161,9 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 ---
 
 ## 3. バックアップ
+
+> [!NOTE]
+> Cloudflare R2への暗号化オフサイトコピーはIssue #57で段階導入中である。devは手動送信まで導入済みだが、stable適用、定期実行、オフサイト復元演習は未完了である。以下は通常運用のローカルbackup仕様であり、R2への送信成功だけで復旧可能とみなさない。
 
 ### 3.1 概要
 
@@ -322,7 +326,7 @@ docker compose exec backend npm run prisma:sync-sequences
 
 1. リリース担当者が、dev受入済みでmainに含まれる対象コミットSHAをroot所有`/etc/receipt-ai-app/stable.env`の`STABLE_RELEASE_SHA`へ設定する。
 2. required reviewerの承認後、workflowが`receipt-deploy-stable.service`を開始する。
-3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Redis healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
+3. root helperは承認済みSHAと取得commitの一致を検証し、runtime image build、DB／Valkey healthcheck、コンテナ内Prisma migration、root管理Compose起動を実行する。
 4. backend health、ログイン、TOTP、既存データ・uploads、新規解析、通知、backupを確認する。
 
 stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時間、復旧担当者を満たした人間承認済みの作業に限定する。コード更新は **バックアップ・リストア対象の永続データ（DB ボリューム・アップロード）を上書きしない** 設計であり、migration失敗時は追加変更を停止してロールバック判断へ進む。

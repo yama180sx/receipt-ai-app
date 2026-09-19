@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Cloudflare R2上の最新完了世代を、一時領域へ読み戻して整合性だけを検証する。
+set -euo pipefail
+
+die() { echo "[receipt-offsite-verify] $1" >&2; exit 1; }
+
+# restore helperと同じ制約で、読み戻したuploads archiveの構造を検証する。
+# 通常ファイルとディレクトリ以外（symlink、hard link、device、FIFOなど）は許可しない。
+validate_uploads_archive() {
+  local archive="$1"
+
+  if ! tar -tzf "${archive}" | awk '
+    $0 ~ /(^|\/)\.\.($|\/)/ { exit 1 }
+    $0 ~ /(^|\/)\.($|\/)/ { exit 1 }
+    $0 == "uploads" || $0 == "uploads/" || $0 ~ /^uploads\// { next }
+    { exit 1 }
+  '; then
+    die 'uploads backup has an unexpected archive layout'
+  fi
+
+  if ! tar -tvzf "${archive}" | awk '
+    substr($0, 1, 1) == "-" || substr($0, 1, 1) == "d" { next }
+    { exit 1 }
+  '; then
+    die 'uploads backup contains a non-regular entry'
+  fi
+}
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+
+case "$1" in
+  dev|stable) ;;
+  *) die 'unknown fixed environment' ;;
+esac
+readonly environment="$1"
+readonly runtime_directory="/run/receipt-ai-app-offsite-verify-${environment}"
+readonly credential_directory="${CREDENTIALS_DIRECTORY:-}"
+readonly expected_remote_files=$'database.sql.gz\nmanifest.json\nuploads.tar.gz'
+
+[ -n "${R2_S3_ENDPOINT:-}" ] && [ -n "${R2_BUCKET:-}" ] || die 'non-secret R2 configuration is unavailable'
+command -v rclone >/dev/null 2>&1 || die 'rclone is unavailable'
+command -v jq >/dev/null 2>&1 || die 'jq is unavailable'
+[ -d "${credential_directory}" ] || die 'credential directory is unavailable'
+
+for credential in r2_access_key_id r2_secret_access_key rclone_crypt_password rclone_crypt_salt; do
+  [ -r "${credential_directory}/${credential}" ] || die "required credential is unavailable: ${credential}"
+done
+
+install -d -o root -g root -m 0700 "${runtime_directory}"
+staging_directory="$(mktemp -d "${runtime_directory}/generation.XXXXXX")"
+config_file="${runtime_directory}/rclone.conf"
+cleanup() { rm -f -- "${config_file}"; rm -rf -- "${staging_directory}"; }
+trap cleanup EXIT
+
+# crypt password/saltはrclone obscure済みの値をcredentialとして受け取る。
+umask 077
+cat >"${config_file}" <<EOF
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = $(<"${credential_directory}/r2_access_key_id")
+secret_access_key = $(<"${credential_directory}/r2_secret_access_key")
+endpoint = ${R2_S3_ENDPOINT}
+acl = private
+# bucket限定Object Read/Write tokenはListBuckets権限を持たないため、
+# rcloneの不要なbucket確認を抑止する。読み戻しに必要なobject操作は維持する。
+no_check_bucket = true
+
+[crypt]
+type = crypt
+remote = r2:${R2_BUCKET}
+filename_encryption = standard
+directory_name_encryption = true
+password = $(<"${credential_directory}/rclone_crypt_password")
+password2 = $(<"${credential_directory}/rclone_crypt_salt")
+EOF
+chmod 0600 "${config_file}"
+
+# crypt remoteは復号後の論理名を返す。manifestがある厳密な3ファイルだけを
+# 完了世代とみなし、途中世代や予期しない内容は読み戻し対象にしない。
+selected_timestamp=''
+while IFS= read -r timestamp; do
+  [[ "${timestamp}" =~ ^[0-9]{8}_[0-9]{6}$ ]] || continue
+  remote_files="$(rclone --config "${config_file}" lsf "crypt:${timestamp}" --files-only --format p | sort)"
+  if [ "${remote_files}" = "${expected_remote_files}" ]; then
+    selected_timestamp="${timestamp}"
+    break
+  fi
+done < <(rclone --config "${config_file}" lsf 'crypt:' --dirs-only --format p | sed 's:/$::' | sort -r)
+
+[ -n "${selected_timestamp}" ] || die 'no complete remote backup generation is available'
+
+# copyはremoteから一時領域への読み取りだけである。R2上の世代は作成・更新・削除しない。
+rclone --config "${config_file}" copy "crypt:${selected_timestamp}" "${staging_directory}" --log-level NOTICE
+local_files="$(find "${staging_directory}" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort)"
+[ "${local_files}" = "${expected_remote_files}" ] || die 'downloaded backup has an unexpected artifact set'
+
+manifest="${staging_directory}/manifest.json"
+jq -e \
+  --arg environment "${environment}" \
+  --arg timestamp "${selected_timestamp}" '
+    .schemaVersion == 1 and
+    .environment == $environment and
+    .timestamp == $timestamp and
+    (.artifacts | type == "array" and length == 2) and
+    ([.artifacts[].name] | sort == ["database.sql.gz", "uploads.tar.gz"]) and
+    all(.artifacts[]; (.bytes | type == "number" and . >= 0 and floor == .) and
+                      (.sha256 | type == "string" and test("^[0-9a-f]{64}$")))
+  ' "${manifest}" >/dev/null || die 'backup manifest is invalid'
+
+for artifact in database.sql.gz uploads.tar.gz; do
+  read -r expected_size expected_hash < <(jq -er --arg name "${artifact}" \
+    '.artifacts[] | select(.name == $name) | "\(.bytes) \(.sha256)"' "${manifest}") \
+    || die 'backup manifest artifact is invalid'
+  actual_size="$(stat -c '%s' "${staging_directory}/${artifact}")"
+  actual_hash="$(sha256sum "${staging_directory}/${artifact}" | awk '{print $1}')"
+  [ "${actual_size}" = "${expected_size}" ] && [ "${actual_hash}" = "${expected_hash}" ] \
+    || die 'downloaded backup artifact does not match its manifest'
+done
+
+gzip -t -- "${staging_directory}/database.sql.gz"
+validate_uploads_archive "${staging_directory}/uploads.tar.gz"
+echo "[receipt-offsite-verify] ${environment} generation verified successfully"
