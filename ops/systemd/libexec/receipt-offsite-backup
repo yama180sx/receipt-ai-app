@@ -92,6 +92,9 @@ access_key_id = $(<"${credential_directory}/r2_access_key_id")
 secret_access_key = $(<"${credential_directory}/r2_secret_access_key")
 endpoint = ${R2_S3_ENDPOINT}
 acl = private
+# bucket限定Object Read/Write tokenはListBuckets権限を持たないため、
+# rcloneの不要なbucket確認を抑止する。転送・照合に必要なobject操作は維持する。
+no_check_bucket = true
 
 [crypt]
 type = crypt
