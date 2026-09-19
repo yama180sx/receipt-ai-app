@@ -42,6 +42,7 @@ for expected in \
   'uploads backup has an unexpected archive layout' \
   'uploads backup contains a non-regular entry' \
   'validate_uploads_archive "${uploads_archive}"' \
+  'no_check_bucket = true' \
   'manifestは最後に送信する完了印' \
   'rclone --config "${config_file}" check' \
   'rclone --config "${config_file}" copy "${staging_directory}/manifest.json"'; do
