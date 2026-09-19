@@ -34,6 +34,7 @@
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
+| `libexec/receipt-offsite-verify` | `/usr/local/libexec/receipt-offsite-verify` | root:root / 0750 |
 | `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
@@ -48,6 +49,8 @@ credentialの論理名は、deployでは`backend_database_url`、`backend_jwt_se
 Cloudflare R2オフサイトbackupは`r2_access_key_id`、`r2_secret_access_key`、`rclone_crypt_password`、`rclone_crypt_salt`を環境別encrypted credentialとして使用する。後者2つはrcloneの`obscure`形式で登録し、平文のcrypt鍵・rclone設定ファイルを永続化しない。R2 endpointとbucket名は秘密値ではないが、root所有`offsite-{env}.env`だけへ置き、Git・Issue・通知へ実値を記録しない。
 
 R2 credentialの初回登録は、root所有で設置した`receipt-register-offsite-credentials {dev|stable}`だけを使う。このhelperは4値を非表示入力で受け取り、`rclone obscure -`の標準入力と`systemd-creds encrypt`の標準入力だけを経由してencrypted credentialにする。既存credentialは上書きしない。入力前にcrypt passwordとcrypt saltを異なる値として暗号化された復旧キットへ保管し、値自体を端末表示・Git・Issue・shell履歴へ残さない。
+
+R2読み戻し検証は`receipt-offsite-verify-{dev,stable}.service`を手動起動する。helperはcrypt remote上の最新の**完了世代**（`database.sql.gz`、`uploads.tar.gz`、`manifest.json`が厳密にそろう世代）だけを`/run`配下のroot専用一時領域へ読み戻す。manifestの環境・時刻・サイズ・SHA-256、gzip、uploads archive構造を検査し、終了時に一時ファイルとrclone設定を削除する。DB、uploads、Valkey、コンテナ、R2上のobjectは変更しない。復元操作ではなく、オフサイトバックアップが復号・検証できることを確かめるための手動検査である。
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
