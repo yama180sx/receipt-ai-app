@@ -95,6 +95,10 @@ acl = private
 # bucket限定Object Read/Write tokenはListBuckets権限を持たないため、
 # rcloneの不要なbucket確認を抑止する。転送・照合に必要なobject操作は維持する。
 no_check_bucket = true
+# Cloudflare R2は新規objectへのupload直後のHEADで501を返すことがあるため、
+# rcloneのpost-upload HEADを抑止する。後続のrclone check、manifest、
+# 読み戻し時のSHA-256検証で、転送の整合性を別途確認する。
+no_head = true
 
 [crypt]
 type = crypt
