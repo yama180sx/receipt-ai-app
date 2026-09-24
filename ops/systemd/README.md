@@ -36,6 +36,7 @@
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup-failure` | `/usr/local/libexec/receipt-offsite-backup-failure` | root:root / 0750 |
 | `libexec/receipt-offsite-verify` | `/usr/local/libexec/receipt-offsite-verify` | root:root / 0750 |
+| `libexec/receipt-offsite-restore-isolated` | `/usr/local/libexec/receipt-offsite-restore-isolated` | root:root / 0750 |
 | `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
@@ -56,6 +57,8 @@ R2 credentialの初回登録は、root所有で設置した`receipt-register-off
 R2 offsite timerは`receipt-offsite-backup-{dev,stable}.timer`で、起動10分後に1回だけ送信する。既存の`receipt-backup-{env}.timer`（起動後・毎日）は維持する。offsite helperは送信直前に新しいlocal backupを作るため、host起動後にはlocal backupが追加で1回作成されるが、既存local世代やR2世代を削除しない。offsite serviceが失敗した場合だけ`OnFailure`で環境別のbackup Discord credentialを読み込むroot管理通知unitを起動する。通知本文にはendpoint、bucket名、credential、artifact名を含めない。timerはテンプレートを設置しただけでは有効化されず、人間がdevで確認してからenableする。
 
 R2読み戻し検証は`receipt-offsite-verify-{dev,stable}.service`を手動起動する。helperはcrypt remote上の最新の**完了世代**（`database.sql.gz`、`uploads.tar.gz`、`manifest.json`が厳密にそろう世代）だけを`/run`配下のroot専用一時領域へ読み戻す。manifestの環境・時刻・サイズ・SHA-256、gzip、uploads archive構造を検査し、終了時に一時ファイルとrclone設定を削除する。DB、uploads、Valkey、コンテナ、R2上のobjectは変更しない。復元操作ではなく、オフサイトバックアップが復号・検証できることを確かめるための手動検査である。
+
+隔離復旧演習の第1段階は`receipt-offsite-restore-isolated-{dev,stable}.service`である。最新の完了R2世代を検証してから、`/var/lib/receipt-ai-app-isolated-restore/{env}/generation-{timestamp}`配下の新規PostgreSQLとuploadsだけへ復元する。liveのdev/stable、local backup、R2 objectには書き込まず、専用internal Docker networkを作成し、host portは公開しない。既存のDB/JWT/TOTP/Gemini/SMTP/Discord credentialは読み込まない。成功後の隔離generationは意図的に残るため、削除はrootが対象日時と`destroy-isolated-r2-restore`確認語を指定してhelperを直接実行する。backend起動・TOTPログインを含む受入は、第2段階の明示承認作業として扱う。
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 

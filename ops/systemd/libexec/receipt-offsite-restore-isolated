@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# R2の完了backup世代を、稼働dev/stableから完全に分離したPostgreSQL/uploadsへだけ復元する。
+# 任意のpath、container名、R2世代、ref、平文.envは受け取らない。
+set -euo pipefail
+
+readonly ISOLATED_DATA_ROOT='/var/lib/receipt-ai-app-isolated-restore'
+readonly ISOLATED_NETWORK_PREFIX='receipt-isolated-restore'
+readonly ISOLATED_CONTAINER_PREFIX='receipt-isolated-restore'
+readonly POSTGRES_IMAGE='postgres:18'
+
+die() { echo "[receipt-offsite-restore-isolated] $1" >&2; exit 1; }
+
+validate_uploads_archive() {
+  local archive="$1"
+  if ! tar -tzf "${archive}" | awk '
+    $0 ~ /(^|\/)\.\.($|\/)/ { exit 1 }
+    $0 ~ /(^|\/)\.($|\/)/ { exit 1 }
+    $0 == "uploads" || $0 == "uploads/" || $0 ~ /^uploads\// { next }
+    { exit 1 }
+  '; then die 'uploads backup has an unexpected archive layout'; fi
+  if ! tar -tvzf "${archive}" | awk '
+    substr($0, 1, 1) == "-" || substr($0, 1, 1) == "d" { next }
+    { exit 1 }
+  '; then die 'uploads backup contains a non-regular entry'; fi
+}
+
+require_root_owned_directory() {
+  local directory="$1"
+  if [ -e "${directory}" ]; then
+    [ -d "${directory}" ] || die 'managed isolated path is not a directory'
+    [ "$(stat -c '%u:%g' "${directory}")" = '0:0' ] || die 'managed isolated directory ownership is invalid'
+    [ $((8#$(stat -c '%a' "${directory}") & 8#022)) -eq 0 ] || die 'managed isolated directory is writable by group or others'
+  else
+    install -d -o root -g root -m 0700 "${directory}"
+  fi
+}
+
+write_rclone_config() {
+  umask 077
+  cat >"${config_file}" <<EOF_CONFIG
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = $(<"${credential_directory}/r2_access_key_id")
+secret_access_key = $(<"${credential_directory}/r2_secret_access_key")
+endpoint = ${R2_S3_ENDPOINT}
+acl = private
+no_check_bucket = true
+
+[crypt]
+type = crypt
+remote = r2:${R2_BUCKET}
+filename_encryption = standard
+directory_name_encryption = true
+password = $(<"${credential_directory}/rclone_crypt_password")
+password2 = $(<"${credential_directory}/rclone_crypt_salt")
+EOF_CONFIG
+  chmod 0600 "${config_file}"
+}
+
+select_and_download_generation() {
+  local expected_remote_files=$'database.sql.gz\nmanifest.json\nuploads.tar.gz'
+  selected_timestamp=''
+  while IFS= read -r timestamp; do
+    [[ "${timestamp}" =~ ^[0-9]{8}_[0-9]{6}$ ]] || continue
+    remote_files="$(rclone --config "${config_file}" lsf "crypt:${timestamp}" --files-only --format p | sort)"
+    if [ "${remote_files}" = "${expected_remote_files}" ]; then selected_timestamp="${timestamp}"; break; fi
+  done < <(rclone --config "${config_file}" lsf 'crypt:' --dirs-only --format p | sed 's:/$::' | sort -r)
+  [ -n "${selected_timestamp}" ] || die 'no complete remote backup generation is available'
+  rclone --config "${config_file}" copy "crypt:${selected_timestamp}" "${staging_directory}" --log-level NOTICE
+  local_files="$(find "${staging_directory}" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort)"
+  [ "${local_files}" = "${expected_remote_files}" ] || die 'downloaded backup has an unexpected artifact set'
+  manifest="${staging_directory}/manifest.json"
+  jq -e --arg environment "${environment}" --arg timestamp "${selected_timestamp}" '
+    .schemaVersion == 1 and .environment == $environment and .timestamp == $timestamp and
+    (.artifacts | type == "array" and length == 2) and
+    ([.artifacts[].name] | sort == ["database.sql.gz", "uploads.tar.gz"]) and
+    all(.artifacts[]; (.bytes | type == "number" and . >= 0 and floor == .) and
+                      (.sha256 | type == "string" and test("^[0-9a-f]{64}$")))
+  ' "${manifest}" >/dev/null || die 'backup manifest is invalid'
+  for artifact in database.sql.gz uploads.tar.gz; do
+    read -r expected_size expected_hash < <(jq -er --arg name "${artifact}" \
+      '.artifacts[] | select(.name == $name) | "\(.bytes) \(.sha256)"' "${manifest}") || die 'backup manifest artifact is invalid'
+    actual_size="$(stat -c '%s' "${staging_directory}/${artifact}")"
+    actual_hash="$(sha256sum "${staging_directory}/${artifact}" | awk '{print $1}')"
+    [ "${actual_size}" = "${expected_size}" ] && [ "${actual_hash}" = "${expected_hash}" ] || die 'downloaded backup artifact does not match its manifest'
+  done
+  gzip -t -- "${staging_directory}/database.sql.gz"
+  validate_uploads_archive "${staging_directory}/uploads.tar.gz"
+}
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -ge 2 ] || die 'usage: receipt-offsite-restore-isolated {dev|stable} restore --confirm isolate-r2-backup'
+environment="$1"
+case "${environment}" in dev|stable) ;; *) die 'unknown fixed environment' ;; esac
+
+if [ "$2" = 'cleanup' ]; then
+  [ "$#" -eq 5 ] && [[ "$3" =~ ^[0-9]{8}_[0-9]{6}$ ]] && [ "$4" = '--confirm' ] && [ "$5" = 'destroy-isolated-r2-restore' ] || die 'usage: receipt-offsite-restore-isolated {dev|stable} cleanup YYYYMMDD_HHMMSS --confirm destroy-isolated-r2-restore'
+  target_directory="${ISOLATED_DATA_ROOT}/${environment}/generation-${3}"
+  [ -d "${target_directory}" ] || die 'isolated generation is unavailable'
+  [ "$(stat -c '%u:%g' "${target_directory}")" = '0:0' ] || die 'isolated generation ownership is invalid'
+  docker rm -f "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-db" >/dev/null 2>&1 || true
+  docker network rm "${ISOLATED_NETWORK_PREFIX}-${environment}-${3}" >/dev/null 2>&1 || true
+  rm -rf -- "${target_directory}"
+  echo "[receipt-offsite-restore-isolated] ${environment} generation ${3} removed"
+  exit 0
+fi
+
+[ "$#" -eq 4 ] && [ "$2" = 'restore' ] && [ "$3" = '--confirm' ] && [ "$4" = 'isolate-r2-backup' ] || die 'explicit restore confirmation is required'
+readonly credential_directory="${CREDENTIALS_DIRECTORY:-}"
+readonly runtime_directory="/run/receipt-ai-app-offsite-restore-isolated-${environment}"
+[ -n "${R2_S3_ENDPOINT:-}" ] && [ -n "${R2_BUCKET:-}" ] || die 'non-secret R2 configuration is unavailable'
+command -v rclone >/dev/null 2>&1 || die 'rclone is unavailable'
+command -v jq >/dev/null 2>&1 || die 'jq is unavailable'
+command -v docker >/dev/null 2>&1 || die 'docker is unavailable'
+[ -d "${credential_directory}" ] || die 'credential directory is unavailable'
+for credential in r2_access_key_id r2_secret_access_key rclone_crypt_password rclone_crypt_salt; do [ -r "${credential_directory}/${credential}" ] || die "required credential is unavailable: ${credential}"; done
+
+require_root_owned_directory "${ISOLATED_DATA_ROOT}"
+require_root_owned_directory "${ISOLATED_DATA_ROOT}/${environment}"
+install -d -o root -g root -m 0700 "${runtime_directory}"
+staging_directory="$(mktemp -d "${runtime_directory}/generation.XXXXXX")"
+config_file="${runtime_directory}/rclone.conf"
+database_password_file="${runtime_directory}/postgres_password"
+cleanup_runtime() { rm -f -- "${config_file}" "${database_password_file}"; rm -rf -- "${staging_directory}"; }
+trap cleanup_runtime EXIT
+write_rclone_config
+select_and_download_generation
+
+readonly isolated_directory="${ISOLATED_DATA_ROOT}/${environment}/generation-${selected_timestamp}"
+readonly isolated_network="${ISOLATED_NETWORK_PREFIX}-${environment}-${selected_timestamp}"
+readonly database_container="${ISOLATED_CONTAINER_PREFIX}-${environment}-${selected_timestamp}-db"
+[ ! -e "${isolated_directory}" ] || die 'isolated generation already exists; use its explicit cleanup command before retrying'
+docker inspect "${database_container}" >/dev/null 2>&1 && die 'isolated database container already exists'
+docker network inspect "${isolated_network}" >/dev/null 2>&1 && die 'isolated network already exists'
+
+# データは隔離root領域にしか書かない。liveのdata/backup/R2はこのhelperの書込み対象外。
+install -d -o root -g root -m 0700 "${isolated_directory}/pgdata" "${isolated_directory}/uploads"
+chown 999:root "${isolated_directory}/pgdata"
+chmod 0700 "${isolated_directory}/pgdata"
+tar -xzf "${staging_directory}/uploads.tar.gz" --no-same-owner --no-same-permissions -C "${isolated_directory}"
+[ -d "${isolated_directory}/uploads" ] || die 'uploads backup does not contain uploads directory'
+chown -R 1000:1000 "${isolated_directory}/uploads"
+chmod 0750 "${isolated_directory}/uploads"
+
+# 隔離DBだけの一時認証値。既存dev/stableのDB/JWT/TOTP credentialは読まない。
+umask 077
+head -c 48 /dev/urandom | base64 >"${database_password_file}"
+chmod 0400 "${database_password_file}"
+docker network create --internal "${isolated_network}" >/dev/null
+docker run -d --name "${database_container}" --network "${isolated_network}" \
+  --mount "type=bind,src=${isolated_directory}/pgdata,dst=/var/lib/postgresql" \
+  --mount "type=bind,src=${database_password_file},dst=/run/secrets/postgres_password,readonly" \
+  -e POSTGRES_USER=cntadm -e POSTGRES_DB=receipt_db -e POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
+  "${POSTGRES_IMAGE}" >/dev/null
+for _ in $(seq 1 30); do docker exec "${database_container}" pg_isready -U cntadm -d receipt_db >/dev/null 2>&1 && break; sleep 1; done
+docker exec "${database_container}" pg_isready -U cntadm -d receipt_db >/dev/null 2>&1 || die 'isolated PostgreSQL did not become ready'
+gzip -cd -- "${staging_directory}/database.sql.gz" | docker exec -i "${database_container}" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
+
+# PIIを含む復号artifactは永続化せず、復元済みのroot専用DB/uploadsだけを保持する。
+printf '{"schemaVersion":1,"environment":"%s","timestamp":"%s","state":"database-and-uploads-restored"}\n' "${environment}" "${selected_timestamp}" >"${isolated_directory}/restore-record.json"
+chmod 0600 "${isolated_directory}/restore-record.json"
+echo "[receipt-offsite-restore-isolated] ${environment} generation ${selected_timestamp} restored into isolated database and uploads"
+echo '[receipt-offsite-restore-isolated] no host port is published; backend/TOTP acceptance is a later explicit step'
