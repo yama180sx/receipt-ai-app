@@ -76,6 +76,7 @@ done
 "${project_root}/scripts/security/test-offsite-schedule-contract.sh"
 "${project_root}/scripts/security/test-offsite-readback-contract.sh"
 "${project_root}/scripts/security/test-offsite-isolated-restore-contract.sh"
+"${project_root}/scripts/security/test-isolated-backend-entrypoint-contract.sh"
 "${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 
 require_exact_line() {
