@@ -12,6 +12,7 @@ db="${PREFIX}-${env}-${ts}-db"; valkey="${PREFIX}-${env}-${ts}-valkey"; backend=
 runtime="/run/receipt-ai-app-isolated-login-acceptance-${env}/${ts}"; creds="${CREDENTIALS_DIRECTORY:-}"; app="${APP_ROOT}/${env}"
 [ -d "$gen" ] && [ "$(stat -c '%u:%g' "$gen")" = 0:0 ] && [ -f "$gen/restore-record.json" ] || die 'isolated generation is unavailable'
 [ -d "$app" ] && [ -f "$app/backend/Dockerfile.runtime" ] && [ -f "$app/backend/src/isolatedRestoreServer.ts" ] || die 'fixed root-managed application source is unavailable'
+[ -x "$app/scripts/security/test-isolated-backend-entrypoint-contract.sh" ] || die 'root-managed isolated backend contract test is unavailable'
 [ -d "$creds" ] || die 'credential directory is unavailable'
 for n in backend_jwt_secret backend_totp_encryption_key; do [ -r "$creds/$n" ] || die "required credential is unavailable: $n"; done
 command -v docker >/dev/null && command -v jq >/dev/null || die 'required command is unavailable'
@@ -24,6 +25,7 @@ docker inspect "$backend" >/dev/null 2>&1 && die 'isolated backend container alr
 install -d -o root -g root -m 0700 "$runtime" "$runtime/docker-config"
 export DOCKER_CONFIG="$runtime/docker-config"
 trap 'rm -rf -- "$runtime"' EXIT
+"$app/scripts/security/test-isolated-backend-entrypoint-contract.sh" >/dev/null
 # 復元時のDBパスワードは使わず、受入専用の短時間値へcontainer内local接続で更新する。
 pw="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 printf "ALTER ROLE cntadm PASSWORD '%s';\n" "$pw" | docker exec -i "$db" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
@@ -41,7 +43,10 @@ docker run -d --name "$backend" --network "$net" --user 1000:1000 --cap-drop ALL
  -e DATABASE_URL_FILE=/run/secrets/backend_database_url -e JWT_SECRET_FILE=/run/secrets/backend_jwt_secret -e TOTP_ENCRYPTION_KEY_FILE=/run/secrets/backend_totp_encryption_key \
  "$image" npm exec tsx src/isolatedRestoreServer.ts >/dev/null
 for attempt in $(seq 1 30); do docker exec "$backend" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1 && break; [ "$attempt" -lt 30 ] || die 'isolated backend health check failed'; sleep 1; done
-for c in "$db" "$valkey" "$backend"; do [ "$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$c")" = '{}' ] || die 'isolated container unexpectedly publishes a host port'; done
+# Image EXPOSE entries appear as null bindings. Reject only a real host-side HostPort binding.
+for c in "$db" "$valkey" "$backend"; do
+  [ -z "$(docker inspect --format '{{range $containerPort, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{if .HostPort}}{{.HostPort}}{{end}}{{end}}{{end}}' "$c")" ] || die 'isolated container unexpectedly publishes a host port'
+done
 read -r -p '隔離受入用の世帯ID: ' family; read -r -p '隔離受入用のメンバーID: ' member
 [[ "$family" =~ ^[0-9]+$ && "$member" =~ ^[0-9]+$ ]] || die 'family and member IDs must be numeric'
 read -r -s -p 'アプリパスワード: ' password; printf '\n' >&2; read -r -s -p 'TOTPコード: ' code; printf '\n' >&2

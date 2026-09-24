@@ -9,6 +9,7 @@ die() { echo "[receipt-offsite-restore-isolated-login-acceptance] $1" >&2; exit 
 [ "$#" -eq 5 ] && [ "$2" = accept ] && [[ "$3" =~ ^[0-9]{8}_[0-9]{6}$ ]] && [ "$4" = --confirm ] && [ "$5" = isolated-login-acceptance ] || die 'usage: receipt-offsite-restore-isolated-login-acceptance {dev|stable} accept YYYYMMDD_HHMMSS --confirm isolated-login-acceptance'
 environment="$1"; timestamp="$3"
 case "$environment" in dev|stable) ;; *) die 'unknown fixed environment' ;; esac
+[ -t 0 ] && [ -t 1 ] || die 'must run from an interactive terminal'
 [ -x "$RUNTIME_HELPER" ] || die 'runtime helper is unavailable'
 
 # --pty is required: it makes only the invoking administrator's terminal available to
