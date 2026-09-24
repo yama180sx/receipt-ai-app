@@ -1,0 +1,9 @@
+[Unit]
+Description=Run RecAIpt stable encrypted R2 offsite backup after boot
+
+[Timer]
+OnBootSec=10min
+Unit=receipt-offsite-backup-stable.service
+
+[Install]
+WantedBy=timers.target

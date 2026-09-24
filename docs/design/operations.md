@@ -163,7 +163,7 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 ## 3. バックアップ
 
 > [!NOTE]
-> Cloudflare R2への暗号化オフサイトコピーはIssue #57で段階導入中である。dev/stableは手動送信と読み戻し検証まで導入済みだが、定期実行、保持世代管理、オフサイト復元演習は未完了である。以下は通常運用のローカルbackup仕様であり、R2への送信成功だけで復旧可能とみなさない。
+> Cloudflare R2への暗号化オフサイトコピーはIssue #57で段階導入中である。dev/stableは送信直後の実データ照合と読み戻し検証まで導入済みで、起動後1回のtimerテンプレートと失敗通知を追加する。timerはdev受入後にだけenableする。保持世代管理とオフサイト復元演習は未完了である。以下は通常運用のローカルbackup仕様であり、R2への送信成功だけで復旧可能とみなさない。
 
 ### 3.1 概要
 
@@ -178,6 +178,7 @@ iPhoneではExpo Goの旧版を個別に固定・再導入できないため、S
 | 世代管理 | **7 日**超のファイルを自動削除（`RETENTION_DAYS=7`） |
 | 実行経路 | root管理`receipt-backup-{dev,stable}.service` |
 | 定期実行 | `receipt-backup-{dev,stable}.timer`（起動後と毎日） |
+| R2オフサイト送信 | `receipt-offsite-backup-{dev,stable}.timer`（起動10分後に1回、明示enable後） |
 
 ### 3.2 手動実行・確認
 

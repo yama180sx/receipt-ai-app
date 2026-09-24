@@ -34,6 +34,7 @@
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
+| `libexec/receipt-offsite-backup-failure` | `/usr/local/libexec/receipt-offsite-backup-failure` | root:root / 0750 |
 | `libexec/receipt-offsite-verify` | `/usr/local/libexec/receipt-offsite-verify` | root:root / 0750 |
 | `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
@@ -51,6 +52,8 @@ Cloudflare R2オフサイトbackupは`r2_access_key_id`、`r2_secret_access_key`
 R2のS3互換APIは、新規objectへのupload直後にrcloneの追加`HEAD`へ501を返すことがある。そのためoffsite backup helperは`no_head = true`でpost-upload HEADだけを抑止する。crypt remoteではlocalと共通hashを比較できないため、送信直後は`rclone check --download`でremoteを復号しながらlocal artifactと実データを照合する。これは送信成功だけを復旧可能性と扱うものではない。manifestは最後に送信し、別の`receipt-offsite-verify-{env}.service`が復号後のmanifest SHA-256、gzip、uploads archive構造を検証する。
 
 R2 credentialの初回登録は、root所有で設置した`receipt-register-offsite-credentials {dev|stable}`だけを使う。このhelperは4値を非表示入力で受け取り、`rclone obscure -`の標準入力と`systemd-creds encrypt`の標準入力だけを経由してencrypted credentialにする。既存credentialは上書きしない。入力前にcrypt passwordとcrypt saltを異なる値として暗号化された復旧キットへ保管し、値自体を端末表示・Git・Issue・shell履歴へ残さない。
+
+R2 offsite timerは`receipt-offsite-backup-{dev,stable}.timer`で、起動10分後に1回だけ送信する。既存の`receipt-backup-{env}.timer`（起動後・毎日）は維持する。offsite helperは送信直前に新しいlocal backupを作るため、host起動後にはlocal backupが追加で1回作成されるが、既存local世代やR2世代を削除しない。offsite serviceが失敗した場合だけ`OnFailure`で環境別のbackup Discord credentialを読み込むroot管理通知unitを起動する。通知本文にはendpoint、bucket名、credential、artifact名を含めない。timerはテンプレートを設置しただけでは有効化されず、人間がdevで確認してからenableする。
 
 R2読み戻し検証は`receipt-offsite-verify-{dev,stable}.service`を手動起動する。helperはcrypt remote上の最新の**完了世代**（`database.sql.gz`、`uploads.tar.gz`、`manifest.json`が厳密にそろう世代）だけを`/run`配下のroot専用一時領域へ読み戻す。manifestの環境・時刻・サイズ・SHA-256、gzip、uploads archive構造を検査し、終了時に一時ファイルとrclone設定を削除する。DB、uploads、Valkey、コンテナ、R2上のobjectは変更しない。復元操作ではなく、オフサイトバックアップが復号・検証できることを確かめるための手動検査である。
 
