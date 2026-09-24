@@ -33,7 +33,9 @@ R2への送信成功だけでは、復旧可能性を証明できない。復旧
 
 現在の`receipt-offsite-verify-{dev,stable}.service`は、R2上の**最新完了世代**を`/run`のroot専用一時領域へ読み戻し、復号後のmanifest SHA-256、gzip、uploads archive構造を検証して一時ファイルを削除する。DB、uploads、Valkey、container、R2 objectを変更しない。
 
-これは送信・復号・artifact整合性の検証として完了している。一方で、隔離DBへ投入するartifactを保持し、隔離Composeを起動し、復元後の画面まで確認するroot helperは未実装である。本runbookを実行可能にする次の実装では、既存の`receipt-restore`を流用して稼働環境を停止してはならない。
+第1段階として`receipt-offsite-restore-isolated-{dev,stable}.service`は、同じ検証を通過した世代だけを隔離root領域の新規PostgreSQLとuploadsへ復元する。専用internal Docker networkを作成しhost portを公開せず、liveのdev/stable data、local backup、R2 object、既存のDB/JWT/TOTP/Gemini/SMTP/Discord credentialを変更・利用しない。復元済み隔離generationは、後続の受入確認または明示cleanupまで保持する。
+
+ただし隔離backend、Valkey、短時間のJWT/TOTP credential配備、ログインを含む画面受入は第2段階である。既存の`receipt-restore`を流用して稼働環境を停止してはならない。
 
 ## 4. 実装する隔離復旧helperの契約
 
