@@ -31,6 +31,8 @@ for file in \
   ops/systemd/libexec/receipt-offsite-verify \
   ops/systemd/libexec/receipt-offsite-restore-isolated \
   ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
   ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
@@ -49,8 +51,6 @@ for file in \
   ops/systemd/units/receipt-offsite-verify-stable.service \
   ops/systemd/units/receipt-offsite-restore-isolated-dev.service \
   ops/systemd/units/receipt-offsite-restore-isolated-stable.service \
-  ops/systemd/units/receipt-offsite-restore-isolated-login-acceptance-dev@.service \
-  ops/systemd/units/receipt-offsite-restore-isolated-login-acceptance-stable@.service \
   ops/systemd/units/receipt-rotate-invitation-codes-dev.service \
   ops/systemd/units/receipt-rotate-invitation-codes-stable.service; do
   test -f "${file}" || {
@@ -67,6 +67,7 @@ for helper in \
   ops/systemd/libexec/receipt-offsite-verify \
   ops/systemd/libexec/receipt-offsite-restore-isolated \
   ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
   ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \

@@ -38,6 +38,8 @@
 | `libexec/receipt-offsite-verify` | `/usr/local/libexec/receipt-offsite-verify` | root:root / 0750 |
 | `libexec/receipt-offsite-restore-isolated` | `/usr/local/libexec/receipt-offsite-restore-isolated` | root:root / 0750 |
 | `libexec/receipt-offsite-restore-isolated-login-acceptance` | `/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance` | root:root / 0750 |
+| `libexec/receipt-offsite-restore-isolated-login-acceptance-runtime` | `/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime` | root:root / 0750 |
+| `libexec/receipt-offsite-restore-isolated-login-acceptance-runtime` | `/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime` | root:root / 0750 |
 | `libexec/receipt-register-offsite-credentials` | `/usr/local/libexec/receipt-register-offsite-credentials` | root:root / 0750 |
 | `libexec/receipt-restore` | `/usr/local/libexec/receipt-restore` | root:root / 0750 |
 | `libexec/receipt-rotate-invitation-codes` | `/usr/local/libexec/receipt-rotate-invitation-codes` | root:root / 0750 |
@@ -61,7 +63,7 @@ R2読み戻し検証は`receipt-offsite-verify-{dev,stable}.service`を手動起
 
 隔離復旧演習の第1段階は`receipt-offsite-restore-isolated-{dev,stable}.service`である。最新の完了R2世代を検証してから、`/var/lib/receipt-ai-app-isolated-restore/{env}/generation-{timestamp}`配下の新規PostgreSQLとuploadsだけへ復元する。liveのdev/stable、local backup、R2 objectには書き込まず、専用internal Docker networkを作成し、host portは公開しない。既存のDB/JWT/TOTP/Gemini/SMTP/Discord credentialは読み込まない。成功後の隔離generationは意図的に残るため、削除はrootが対象日時と`destroy-isolated-r2-restore`確認語を指定してhelperを直接実行する。backend起動・TOTPログインを含む受入は、第2段階の明示承認作業として扱う。
 
-第2段階はinstance unit `receipt-offsite-restore-isolated-login-acceptance-{dev,stable}@{timestamp}.service`である。復元済み世代だけに空のValkeyとworkerなしbackendをinternal network内で起動する。host portは公開せず、受入専用DBパスワードとJWT/TOTP鍵だけをroot専用`/run`へ短時間配置する。Gemini、SMTP、Discord、AI Budget credentialは配備しない。パスワードとTOTPコードは対話入力で、argv・shell history・journalへ出力しない。削除は既存の明示cleanupを使い、backend、Valkey、DB、network、uploads、一時secretを回収する。
+第2段階はroot helper `receipt-offsite-restore-isolated-login-acceptance`をTTYから直接起動する。helperは`systemd-run --pty --wait`で一時serviceを作り、JWT/TOTP鍵だけをroot専用`/run`へ短時間配置するため、パスワードとTOTPコードは呼出元端末だけで対話入力され、`systemctl start`やargv・shell history・journalへ渡らない。復元済み世代だけに空のValkeyとworkerなしbackendをinternal network内で起動する。host portは公開せず、受入専用DBパスワードとJWT/TOTP鍵だけをroot専用`/run`へ短時間配置する。Gemini、SMTP、Discord、AI Budget credentialは配備しない。パスワードとTOTPコードは対話入力で、argv・shell history・journalへ出力しない。削除は既存の明示cleanupを使い、backend、Valkey、DB、network、uploads、一時secretを回収する。
 
 deploy unitは`RuntimeDirectoryPreserve=yes`で、稼働中コンテナが参照する最新世代を同一boot中は保持する。host再起動後にもroot管理コンテナを復旧する運用にする場合は、devでの回帰確認後に人間が`receipt-deploy-*.service`をenableし、Docker起動後に固定refから再デプロイされることを確認する。enableはテンプレートの変更だけでは有効化されない。
 
