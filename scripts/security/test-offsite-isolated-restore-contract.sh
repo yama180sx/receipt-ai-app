@@ -45,6 +45,7 @@ for environment in dev stable; do
   for expected in \
     "EnvironmentFile=/etc/receipt-ai-app/offsite-${environment}.env" \
     "RuntimeDirectory=receipt-ai-app-offsite-restore-isolated-${environment}" \
+    "StateDirectory=receipt-ai-app-isolated-restore" \
     "ExecStart=/usr/local/libexec/receipt-offsite-restore-isolated ${environment} restore --confirm isolate-r2-backup" \
     'ProtectSystem=strict' \
     'ProtectHome=yes'; do
