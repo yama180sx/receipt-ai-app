@@ -1,0 +1,19 @@
+[Unit]
+Description=Notify RecAIpt dev R2 offsite backup failure
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-offsite-backup-failure-dev
+RuntimeDirectoryMode=0700
+LoadCredentialEncrypted=backup_discord_webhook_url:/etc/receipt-ai-app/credentials/dev/backup_discord_webhook_url.cred
+ExecStart=/usr/local/libexec/receipt-offsite-backup-failure dev
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-offsite-backup-failure-dev

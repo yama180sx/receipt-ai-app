@@ -3,6 +3,7 @@ Description=RecAIpt dev encrypted R2 offsite backup
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
+OnFailure=receipt-offsite-backup-failure-dev.service
 
 [Service]
 Type=oneshot
