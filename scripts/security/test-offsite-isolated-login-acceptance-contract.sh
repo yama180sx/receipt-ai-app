@@ -13,4 +13,5 @@ grep -Fq 'systemd-run --quiet --wait --pty --collect' "$helper"
 grep -Fq 'LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/${environment}/backend_jwt_secret.cred' "$helper"
 grep -Fq 'LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/${environment}/backend_totp_encryption_key.cred' "$helper"
 grep -Fq 'read -r -s -p' "$runtime"
+grep -Fq 'export DOCKER_CONFIG="$runtime/docker-config"' "$runtime"
 echo '[OK] isolated login acceptance contract is structurally valid.'
