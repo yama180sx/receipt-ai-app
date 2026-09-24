@@ -41,7 +41,10 @@ docker run -d --name "$backend" --network "$net" --user 1000:1000 --cap-drop ALL
  -e DATABASE_URL_FILE=/run/secrets/backend_database_url -e JWT_SECRET_FILE=/run/secrets/backend_jwt_secret -e TOTP_ENCRYPTION_KEY_FILE=/run/secrets/backend_totp_encryption_key \
  "$image" npm exec tsx src/isolatedRestoreServer.ts >/dev/null
 for attempt in $(seq 1 30); do docker exec "$backend" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1 && break; [ "$attempt" -lt 30 ] || die 'isolated backend health check failed'; sleep 1; done
-for c in "$db" "$valkey" "$backend"; do [ "$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$c")" = '{}' ] || die 'isolated container unexpectedly publishes a host port'; done
+# Image EXPOSE entries appear as null bindings. Reject only a real host-side HostPort binding.
+for c in "$db" "$valkey" "$backend"; do
+  [ -z "$(docker inspect --format '{{range $containerPort, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{if .HostPort}}{{.HostPort}}{{end}}{{end}}{{end}}' "$c")" ] || die 'isolated container unexpectedly publishes a host port'
+done
 read -r -p '隔離受入用の世帯ID: ' family; read -r -p '隔離受入用のメンバーID: ' member
 [[ "$family" =~ ^[0-9]+$ && "$member" =~ ^[0-9]+$ ]] || die 'family and member IDs must be numeric'
 read -r -s -p 'アプリパスワード: ' password; printf '\n' >&2; read -r -s -p 'TOTPコード: ' code; printf '\n' >&2
