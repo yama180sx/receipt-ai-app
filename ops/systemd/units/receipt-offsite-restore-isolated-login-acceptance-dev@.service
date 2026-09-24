@@ -1,0 +1,20 @@
+[Unit]
+Description=RecAIpt dev isolated restore login and TOTP acceptance (%i)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-isolated-login-acceptance-dev
+RuntimeDirectoryMode=0700
+LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/dev/backend_jwt_secret.cred
+LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/dev/backend_totp_encryption_key.cred
+ExecStart=/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance dev accept %i --confirm isolated-login-acceptance
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-isolated-login-acceptance-dev /var/lib/receipt-ai-app-isolated-restore

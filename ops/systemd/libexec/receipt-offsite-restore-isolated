@@ -99,8 +99,13 @@ if [ "$2" = 'cleanup' ]; then
   target_directory="${ISOLATED_DATA_ROOT}/${environment}/generation-${3}"
   [ -d "${target_directory}" ] || die 'isolated generation is unavailable'
   [ "$(stat -c '%u:%g' "${target_directory}")" = '0:0' ] || die 'isolated generation ownership is invalid'
-  docker rm -f "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-db" >/dev/null 2>&1 || true
+  docker rm -f \
+    "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-backend" \
+    "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-valkey" \
+    "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-db" >/dev/null 2>&1 || true
   docker network rm "${ISOLATED_NETWORK_PREFIX}-${environment}-${3}" >/dev/null 2>&1 || true
+  docker image rm "${ISOLATED_CONTAINER_PREFIX}-${environment}-${3}-backend:local" >/dev/null 2>&1 || true
+  rm -rf -- "/run/receipt-ai-app-isolated-login-acceptance-${environment}/${3}"
   rm -rf -- "${target_directory}"
   echo "[receipt-offsite-restore-isolated] ${environment} generation ${3} removed"
   exit 0
@@ -148,7 +153,7 @@ umask 077
 head -c 48 /dev/urandom | base64 >"${database_password_file}"
 chmod 0400 "${database_password_file}"
 docker network create --internal "${isolated_network}" >/dev/null
-docker run -d --name "${database_container}" --network "${isolated_network}" \
+docker run -d --name "${database_container}" --network "${isolated_network}" --network-alias db \
   --mount "type=bind,src=${isolated_directory}/pgdata,dst=/var/lib/postgresql" \
   --mount "type=bind,src=${database_password_file},dst=/run/secrets/postgres_password,readonly" \
   -e POSTGRES_USER=cntadm -e POSTGRES_DB=receipt_db -e POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
