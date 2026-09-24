@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# R2 offsite backup失敗を、秘密値を表示せず既存のbackup通知先へ伝える。
+set -euo pipefail
+
+die() { echo "[receipt-offsite-backup-failure] $1" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+
+case "$1" in
+  dev|stable) ;;
+  *) die 'unknown fixed environment' ;;
+esac
+readonly environment="$1"
+readonly credential_directory="${CREDENTIALS_DIRECTORY:-}"
+readonly webhook_file="${credential_directory}/backup_discord_webhook_url"
+
+[ -r "${webhook_file}" ] || die 'notification credential is unavailable'
+webhook_url="$(<"${webhook_file}")"
+[ -n "${webhook_url}" ] || die 'notification credential is unavailable'
+
+# URLはcurlの引数・journalに渡さず、標準入力のcurl設定として渡す。
+payload='{"embeds":[{"title":"[ERROR] T320 R2 Offsite Backup Alert","description":"R2オフサイトバックアップが失敗しました。秘密値を表示せず、T320のroot管理journalを確認してください。","color":16711680}]}'
+printf 'url = "%s"\n' "${webhook_url}" | curl --config - --fail --silent --show-error \
+  -H 'Content-Type: application/json' -X POST --data "${payload}"
+unset payload webhook_url
+echo "[receipt-offsite-backup-failure] ${environment} notification sent"
