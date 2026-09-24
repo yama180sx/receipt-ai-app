@@ -43,8 +43,9 @@ for expected in \
   'uploads backup contains a non-regular entry' \
   'validate_uploads_archive "${uploads_archive}"' \
   'no_check_bucket = true' \
+  'no_head = true' \
   'manifestは最後に送信する完了印' \
-  'rclone --config "${config_file}" check' \
+  'rclone --config "${config_file}" check "${staging_directory}" "crypt:${latest_timestamp}" --exclude manifest.json --one-way --download --log-level NOTICE' \
   'rclone --config "${config_file}" copy "${staging_directory}/manifest.json"'; do
   require_text "${expected}"
 done

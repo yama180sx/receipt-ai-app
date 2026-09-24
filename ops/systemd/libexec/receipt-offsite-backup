@@ -95,6 +95,10 @@ acl = private
 # bucket限定Object Read/Write tokenはListBuckets権限を持たないため、
 # rcloneの不要なbucket確認を抑止する。転送・照合に必要なobject操作は維持する。
 no_check_bucket = true
+# Cloudflare R2は新規objectへのupload直後のHEADで501を返すことがあるため、
+# rcloneのpost-upload HEADを抑止する。後続のrclone check、manifest、
+# 読み戻し時のSHA-256検証で、転送の整合性を別途確認する。
+no_head = true
 
 [crypt]
 type = crypt
@@ -109,6 +113,8 @@ chmod 0600 "${config_file}"
 # manifestは最後に送信する完了印。syncは使用せず既存世代を削除しない。
 rclone --config "${config_file}" copy "${staging_directory}/database.sql.gz" "crypt:${latest_timestamp}" --log-level NOTICE
 rclone --config "${config_file}" copy "${staging_directory}/uploads.tar.gz" "crypt:${latest_timestamp}" --log-level NOTICE
-rclone --config "${config_file}" check "${staging_directory}" "crypt:${latest_timestamp}" --exclude manifest.json --one-way --log-level NOTICE
+# crypt remoteではlocalと共通のhashを比較できないため、remoteを復号しながら
+# local artifactと実データで照合する。復号後のmanifest SHA-256検証はreadback helperが担当する。
+rclone --config "${config_file}" check "${staging_directory}" "crypt:${latest_timestamp}" --exclude manifest.json --one-way --download --log-level NOTICE
 rclone --config "${config_file}" copy "${staging_directory}/manifest.json" "crypt:${latest_timestamp}" --log-level NOTICE
 echo "[receipt-offsite-backup] ${environment} generation uploaded successfully"
