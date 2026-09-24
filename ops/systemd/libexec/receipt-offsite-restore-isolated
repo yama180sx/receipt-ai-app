@@ -153,8 +153,20 @@ docker run -d --name "${database_container}" --network "${isolated_network}" \
   --mount "type=bind,src=${database_password_file},dst=/run/secrets/postgres_password,readonly" \
   -e POSTGRES_USER=cntadm -e POSTGRES_DB=receipt_db -e POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
   "${POSTGRES_IMAGE}" >/dev/null
-for _ in $(seq 1 30); do docker exec "${database_container}" pg_isready -U cntadm -d receipt_db >/dev/null 2>&1 && break; sleep 1; done
-docker exec "${database_container}" pg_isready -U cntadm -d receipt_db >/dev/null 2>&1 || die 'isolated PostgreSQL did not become ready'
+wait_for_final_postgres() {
+  local attempt
+  # postgres official imageは初回init時に一時serverを起動・停止する。pg_isreadyは
+  # database未作成でも成功し得るため、PID 1が最終postgresへexec済みで、かつ
+  # 対象databaseへの実queryが通ることを復元開始条件にする。
+  for attempt in $(seq 1 60); do
+    if docker exec "${database_container}" sh -c '[ "$(cat /proc/1/comm)" = postgres ] && psql -U cntadm -d receipt_db -Atqc "SELECT 1" >/dev/null' >/dev/null 2>&1; then
+      return
+    fi
+    sleep 1
+  done
+  die 'isolated PostgreSQL did not reach its final ready state'
+}
+wait_for_final_postgres
 gzip -cd -- "${staging_directory}/database.sql.gz" | docker exec -i "${database_container}" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
 
 # PIIを含む復号artifactは永続化せず、復元済みのroot専用DB/uploadsだけを保持する。

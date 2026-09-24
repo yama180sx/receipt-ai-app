@@ -20,6 +20,8 @@ for expected in \
   'validate_uploads_archive "${staging_directory}/uploads.tar.gz"' \
   'docker network create --internal "${isolated_network}"' \
   'POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password' \
+  'cat /proc/1/comm' \
+  'SELECT 1' \
   'docker run -d --name "${database_container}" --network "${isolated_network}"' \
   'no host port is published' \
   'rm -rf -- "${target_directory}"'; do
