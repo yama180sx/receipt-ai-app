@@ -20,7 +20,10 @@ docker inspect "$db" >/dev/null 2>&1 || die 'isolated database container is unav
 docker inspect "$valkey" >/dev/null 2>&1 && die 'isolated Valkey container already exists'
 docker inspect "$backend" >/dev/null 2>&1 && die 'isolated backend container already exists'
 [ ! -e "$runtime" ] || die 'isolated acceptance runtime already exists'
-install -d -o root -g root -m 0700 "$runtime"; trap 'rm -rf -- "$runtime"' EXIT
+# ProtectHome=yes makes /root read-only. Keep Docker CLI state in this short-lived root-only runtime.
+install -d -o root -g root -m 0700 "$runtime" "$runtime/docker-config"
+export DOCKER_CONFIG="$runtime/docker-config"
+trap 'rm -rf -- "$runtime"' EXIT
 # 復元時のDBパスワードは使わず、受入専用の短時間値へcontainer内local接続で更新する。
 pw="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 printf "ALTER ROLE cntadm PASSWORD '%s';\n" "$pw" | docker exec -i "$db" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
