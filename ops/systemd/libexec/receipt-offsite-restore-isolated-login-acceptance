@@ -1,51 +1,26 @@
 #!/usr/bin/env bash
-# 隔離世代だけでbackend/Valkeyを起動し、対話入力のログイン/TOTPを受入確認する。
+# rootから直接起動し、TTYをsystemd transient serviceへ安全に引き継ぐ入口。
 set -euo pipefail
-readonly DATA_ROOT='/var/lib/receipt-ai-app-isolated-restore' PREFIX='receipt-isolated-restore' APP_ROOT='/srv/receipt-ai-app'
-readonly VALKEY_IMAGE='valkey/valkey:8.1.10-alpine3.24@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1'
+
+readonly RUNTIME_HELPER='/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime'
 die() { echo "[receipt-offsite-restore-isolated-login-acceptance] $1" >&2; exit 1; }
+
 [ "$(id -u)" -eq 0 ] || die 'must run as root'
 [ "$#" -eq 5 ] && [ "$2" = accept ] && [[ "$3" =~ ^[0-9]{8}_[0-9]{6}$ ]] && [ "$4" = --confirm ] && [ "$5" = isolated-login-acceptance ] || die 'usage: receipt-offsite-restore-isolated-login-acceptance {dev|stable} accept YYYYMMDD_HHMMSS --confirm isolated-login-acceptance'
-env="$1"; case "$env" in dev|stable) ;; *) die 'unknown fixed environment' ;; esac
-ts="$3"; gen="${DATA_ROOT}/${env}/generation-${ts}"; net="${PREFIX}-${env}-${ts}"
-db="${PREFIX}-${env}-${ts}-db"; valkey="${PREFIX}-${env}-${ts}-valkey"; backend="${PREFIX}-${env}-${ts}-backend"; image="${backend}:local"
-runtime="/run/receipt-ai-app-isolated-login-acceptance-${env}/${ts}"; creds="${CREDENTIALS_DIRECTORY:-}"; app="${APP_ROOT}/${env}"
-[ -d "$gen" ] && [ "$(stat -c '%u:%g' "$gen")" = 0:0 ] && [ -f "$gen/restore-record.json" ] || die 'isolated generation is unavailable'
-[ -d "$app" ] && [ -f "$app/backend/Dockerfile.runtime" ] && [ -f "$app/backend/src/isolatedRestoreServer.ts" ] || die 'fixed root-managed application source is unavailable'
-[ -d "$creds" ] || die 'credential directory is unavailable'
-for n in backend_jwt_secret backend_totp_encryption_key; do [ -r "$creds/$n" ] || die "required credential is unavailable: $n"; done
-command -v docker >/dev/null && command -v jq >/dev/null || die 'required command is unavailable'
-docker network inspect --format '{{.Internal}}' "$net" 2>/dev/null | grep -Fxq true || die 'isolated network is unavailable or not internal'
-docker inspect "$db" >/dev/null 2>&1 || die 'isolated database container is unavailable'
-docker inspect "$valkey" >/dev/null 2>&1 && die 'isolated Valkey container already exists'
-docker inspect "$backend" >/dev/null 2>&1 && die 'isolated backend container already exists'
-[ ! -e "$runtime" ] || die 'isolated acceptance runtime already exists'
-install -d -o root -g root -m 0700 "$runtime"; trap 'rm -rf -- "$runtime"' EXIT
-# 復元時のDBパスワードは使わず、受入専用の短時間値へcontainer内local接続で更新する。
-pw="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-printf "ALTER ROLE cntadm PASSWORD '%s';\n" "$pw" | docker exec -i "$db" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
-umask 077; printf 'postgresql://cntadm:%s@%s:5432/receipt_db?schema=public\n' "$pw" "$db" >"$runtime/backend_database_url"; unset pw
-install -T -m 0444 -o root -g root "$creds/backend_jwt_secret" "$runtime/backend_jwt_secret"
-install -T -m 0444 -o root -g root "$creds/backend_totp_encryption_key" "$runtime/backend_totp_encryption_key"; chmod 0444 "$runtime/backend_database_url"
-docker run -d --name "$valkey" --network "$net" --network-alias redis --cap-drop ALL --security-opt no-new-privileges "$VALKEY_IMAGE" >/dev/null
-docker build --tag "$image" --file "$app/backend/Dockerfile.runtime" "$app/backend" >/dev/null
-docker run -d --name "$backend" --network "$net" --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
- --mount "type=bind,src=$gen/uploads,dst=/app/uploads" \
- --mount "type=bind,src=$runtime/backend_database_url,dst=/run/secrets/backend_database_url,readonly" \
- --mount "type=bind,src=$runtime/backend_jwt_secret,dst=/run/secrets/backend_jwt_secret,readonly" \
- --mount "type=bind,src=$runtime/backend_totp_encryption_key,dst=/run/secrets/backend_totp_encryption_key,readonly" \
- -e NODE_ENV=production -e PORT=3000 -e REDIS_HOST=redis -e REDIS_PORT_INTERNAL=6379 \
- -e DATABASE_URL_FILE=/run/secrets/backend_database_url -e JWT_SECRET_FILE=/run/secrets/backend_jwt_secret -e TOTP_ENCRYPTION_KEY_FILE=/run/secrets/backend_totp_encryption_key \
- "$image" npm exec tsx src/isolatedRestoreServer.ts >/dev/null
-for attempt in $(seq 1 30); do docker exec "$backend" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1 && break; [ "$attempt" -lt 30 ] || die 'isolated backend health check failed'; sleep 1; done
-for c in "$db" "$valkey" "$backend"; do [ "$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$c")" = '{}' ] || die 'isolated container unexpectedly publishes a host port'; done
-read -r -p '隔離受入用の世帯ID: ' family; read -r -p '隔離受入用のメンバーID: ' member
-[[ "$family" =~ ^[0-9]+$ && "$member" =~ ^[0-9]+$ ]] || die 'family and member IDs must be numeric'
-read -r -s -p 'アプリパスワード: ' password; printf '\n' >&2; read -r -s -p 'TOTPコード: ' code; printf '\n' >&2
-input="$(jq -cn --arg f "$family" --arg m "$member" --arg p "$password" --arg c "$code" '{familyGroupId:$f,memberId:$m,password:$p,code:$c}')"; unset password code
-printf %s "$input" | docker exec -i "$backend" node -e '
-const x=JSON.parse(require("node:fs").readFileSync(0,"utf8")); const post=async(p,b,t)=>{const r=await fetch("http://127.0.0.1:3000"+p,{method:"POST",headers:{"content-type":"application/json",...(t?{authorization:"Bearer "+t}:{})},body:JSON.stringify(b)});if(!r.ok)process.exit(20);return r.json()};(async()=>{const l=await post("/api/auth/login",x);if(!l?.data?.requiresTotpVerification||typeof l.data.pendingToken!=="string")process.exit(21);const v=await post("/api/auth/verify-totp",{code:x.code},l.data.pendingToken);if(typeof v?.data?.token!=="string")process.exit(22)})().then(()=>process.exit(0)).catch(()=>process.exit(23))
-' >/dev/null || die 'isolated login or TOTP verification failed'; unset input
-printf '{"schemaVersion":1,"environment":"%s","timestamp":"%s","state":"isolated-login-totp-accepted"}\n' "$env" "$ts" >"$gen/restore-record.json"; chmod 0600 "$gen/restore-record.json"
-echo "[receipt-offsite-restore-isolated-login-acceptance] $env generation $ts health and login/TOTP accepted"
-echo '[receipt-offsite-restore-isolated-login-acceptance] no host port is published; use explicit cleanup when complete'
+environment="$1"; timestamp="$3"
+case "$environment" in dev|stable) ;; *) die 'unknown fixed environment' ;; esac
+[ -x "$RUNTIME_HELPER" ] || die 'runtime helper is unavailable'
+
+# --pty is required: it makes only the invoking administrator's terminal available to
+# read -s in the runtime helper. systemctl start cannot safely provide this interaction.
+exec systemd-run --quiet --wait --pty --collect --service-type=exec \
+  --unit="receipt-isolated-login-acceptance-${environment}-${timestamp}" \
+  --property=User=root --property=Group=root --property=UMask=0077 \
+  --property="RuntimeDirectory=receipt-ai-app-isolated-login-acceptance-${environment}" \
+  --property=RuntimeDirectoryMode=0700 \
+  --property="LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/${environment}/backend_jwt_secret.cred" \
+  --property="LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/${environment}/backend_totp_encryption_key.cred" \
+  --property=NoNewPrivileges=yes --property=PrivateTmp=yes --property=ProtectHome=yes \
+  --property=ProtectSystem=strict \
+  --property="ReadWritePaths=/run/receipt-ai-app-isolated-login-acceptance-${environment} /var/lib/receipt-ai-app-isolated-restore" \
+  "$RUNTIME_HELPER" "$environment" accept "$timestamp" --confirm isolated-login-acceptance
