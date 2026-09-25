@@ -62,6 +62,18 @@ R2への送信成功だけでは、復旧可能性を証明できない。復旧
 - [ ] host portを公開しない確認方法を決めた
 - [ ] 演習で作る隔離データの保持期間と明示cleanup担当者を決めた
 
+### 5.1 stable第2段階のrelease前提
+
+stableの第2段階は、隔離backend用の`isolatedRestoreServer.ts`と`isolatedRestoreServerRuntime.ts`を含む**承認済みstable release**だけで実施する。`develop`へPRをマージしただけではstableは更新されない。stable root管理ソースのcommitを確認し、承認済み`STABLE_RELEASE_SHA`による通常deployと通常health確認を済ませてから開始する。演習のためだけにlive stableを更新してはならない。
+
+### 5.2 認証受入と一時パスワード
+
+通常は、対象世代に存在するTOTP有効メンバーの既存RecAIptアプリパスワードと認証アプリの現在コードを対話入力する。アプリパスワードが不明な場合、推測・反復試行はしない。人間の明示承認のもと、隔離backendでbcrypt hashを生成し、隔離DBの対象TOTP有効ADMINの`password_hash`だけを一時値へ変更して受入する。TOTP secret、TOTP暗号鍵、live DBは変更しない。隔離generation cleanupで一時値を含むDB全体を削除する。
+
+### 5.3 中断時の扱い
+
+受入helperがbackendまたはValkeyを作成した後に失敗・中断した場合、自動cleanupはしない。対象generation、固定container名、live環境と異なるprefixを人間が確認したうえで、隔離backendと隔離Valkeyだけを削除してから再試行する。DB、uploads、networkは次の受入試行まで保持する。
+
 ## 6. 受入手順
 
 ### 6.1 R2世代の取得・検証
@@ -92,7 +104,16 @@ R2への送信成功だけでは、復旧可能性を証明できない。復旧
 
 ## 7. RPO・RTOの記録
 
-演習終了時に、次だけをIssueまたは運用記録へ残す。秘密値・レシート内容・endpoint・bucket名は残さない。
+演習開始前に、承認開始時刻を`TZ=Asia/Tokyo date -Is`で記録する。受入成功時に同じ形式で受入完了時刻を記録する。対象generationの日時もJSTとして扱い、差分を計算する。秘密値・レシート内容・endpoint・bucket名は残さない。
+
+| 時刻 | 記録する時点 |
+| --- | --- |
+| 承認開始時刻 | restore serviceを開始する直前 |
+| 対象generation時刻 | helperが選択したgeneration名から取得 |
+| 受入完了時刻 | health、login、TOTP、host port非公開を確認した直後 |
+| cleanup完了時刻 | container、network、generation、一時secretの不在を確認した直後 |
+
+計算式は`RPO = 承認開始時刻 - 対象generation時刻`、`RTO = 受入完了時刻 - 承認開始時刻`とする。時刻を記録できなかった演習では推測せず`未計測`と記録する。
 
 | 項目 | 記録内容 |
 | --- | --- |
@@ -107,8 +128,5 @@ crypt復旧キットのpasswordまたはsaltを失うと、R2の暗号化backup�
 
 ## 8. 次の作業
 
-- 専用root helper・systemd unit・Compose隔離namespaceを実装する
-- helperの静的契約テストを追加する
-- devを対象に実演習を行い、RTO/RPOを記録する
-- stableはdev結果をレビューし、別途明示承認した時間に実施する
+- dev/stableの隔離復旧・login/TOTP受入・明示cleanupは完了。次回は§7の時刻記録を必須にする
 - 保持期間は[Issue #57-3](https://github.com/yama180sx/receipt-ai-app/issues/763)で決定する
