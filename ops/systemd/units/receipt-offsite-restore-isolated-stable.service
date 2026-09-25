@@ -1,0 +1,26 @@
+[Unit]
+Description=RecAIpt stable isolated encrypted R2 restore exercise
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/etc/receipt-ai-app/offsite-stable.env
+RuntimeDirectory=receipt-ai-app-offsite-restore-isolated-stable
+RuntimeDirectoryMode=0700
+StateDirectory=receipt-ai-app-isolated-restore
+StateDirectoryMode=0700
+LoadCredentialEncrypted=r2_access_key_id:/etc/receipt-ai-app/credentials/stable/r2_access_key_id.cred
+LoadCredentialEncrypted=r2_secret_access_key:/etc/receipt-ai-app/credentials/stable/r2_secret_access_key.cred
+LoadCredentialEncrypted=rclone_crypt_password:/etc/receipt-ai-app/credentials/stable/rclone_crypt_password.cred
+LoadCredentialEncrypted=rclone_crypt_salt:/etc/receipt-ai-app/credentials/stable/rclone_crypt_salt.cred
+ExecStart=/usr/local/libexec/receipt-offsite-restore-isolated stable restore --confirm isolate-r2-backup
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-offsite-restore-isolated-stable /var/lib/receipt-ai-app-isolated-restore

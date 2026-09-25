@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# rootから直接起動し、TTYをsystemd transient serviceへ安全に引き継ぐ入口。
+set -euo pipefail
+
+readonly RUNTIME_HELPER='/usr/local/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime'
+die() { echo "[receipt-offsite-restore-isolated-login-acceptance] $1" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 5 ] && [ "$2" = accept ] && [[ "$3" =~ ^[0-9]{8}_[0-9]{6}$ ]] && [ "$4" = --confirm ] && [ "$5" = isolated-login-acceptance ] || die 'usage: receipt-offsite-restore-isolated-login-acceptance {dev|stable} accept YYYYMMDD_HHMMSS --confirm isolated-login-acceptance'
+environment="$1"; timestamp="$3"
+case "$environment" in dev|stable) ;; *) die 'unknown fixed environment' ;; esac
+[ -t 0 ] && [ -t 1 ] || die 'must run from an interactive terminal'
+[ -x "$RUNTIME_HELPER" ] || die 'runtime helper is unavailable'
+
+# --pty is required: it makes only the invoking administrator's terminal available to
+# read -s in the runtime helper. systemctl start cannot safely provide this interaction.
+exec systemd-run --quiet --wait --pty --collect --service-type=exec \
+  --unit="receipt-isolated-login-acceptance-${environment}-${timestamp}" \
+  --property=User=root --property=Group=root --property=UMask=0077 \
+  --property="RuntimeDirectory=receipt-ai-app-isolated-login-acceptance-${environment}" \
+  --property=RuntimeDirectoryMode=0700 \
+  --property="LoadCredentialEncrypted=backend_jwt_secret:/etc/receipt-ai-app/credentials/${environment}/backend_jwt_secret.cred" \
+  --property="LoadCredentialEncrypted=backend_totp_encryption_key:/etc/receipt-ai-app/credentials/${environment}/backend_totp_encryption_key.cred" \
+  --property=NoNewPrivileges=yes --property=PrivateTmp=yes --property=ProtectHome=yes \
+  --property=ProtectSystem=strict \
+  --property="ReadWritePaths=/run/receipt-ai-app-isolated-login-acceptance-${environment} /var/lib/receipt-ai-app-isolated-restore" \
+  "$RUNTIME_HELPER" "$environment" accept "$timestamp" --confirm isolated-login-acceptance

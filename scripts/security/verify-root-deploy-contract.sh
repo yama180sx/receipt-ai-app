@@ -29,6 +29,10 @@ for file in \
   ops/systemd/libexec/receipt-offsite-backup \
   ops/systemd/libexec/receipt-offsite-backup-failure \
   ops/systemd/libexec/receipt-offsite-verify \
+  ops/systemd/libexec/receipt-offsite-restore-isolated \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
   ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
@@ -45,6 +49,8 @@ for file in \
   ops/systemd/units/receipt-offsite-backup-failure-stable.service \
   ops/systemd/units/receipt-offsite-verify-dev.service \
   ops/systemd/units/receipt-offsite-verify-stable.service \
+  ops/systemd/units/receipt-offsite-restore-isolated-dev.service \
+  ops/systemd/units/receipt-offsite-restore-isolated-stable.service \
   ops/systemd/units/receipt-rotate-invitation-codes-dev.service \
   ops/systemd/units/receipt-rotate-invitation-codes-stable.service; do
   test -f "${file}" || {
@@ -59,6 +65,9 @@ for helper in \
   ops/systemd/libexec/receipt-offsite-backup \
   ops/systemd/libexec/receipt-offsite-backup-failure \
   ops/systemd/libexec/receipt-offsite-verify \
+  ops/systemd/libexec/receipt-offsite-restore-isolated \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance \
+  ops/systemd/libexec/receipt-offsite-restore-isolated-login-acceptance-runtime \
   ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
@@ -71,6 +80,9 @@ done
 "${project_root}/scripts/security/test-offsite-backup-contract.sh"
 "${project_root}/scripts/security/test-offsite-schedule-contract.sh"
 "${project_root}/scripts/security/test-offsite-readback-contract.sh"
+"${project_root}/scripts/security/test-offsite-isolated-restore-contract.sh"
+"${project_root}/scripts/security/test-isolated-backend-entrypoint-contract.sh"
+"${project_root}/scripts/security/test-offsite-isolated-login-acceptance-contract.sh"
 "${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 
 require_exact_line() {
