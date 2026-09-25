@@ -11,8 +11,12 @@ ts="$3"; gen="${DATA_ROOT}/${env}/generation-${ts}"; net="${PREFIX}-${env}-${ts}
 db="${PREFIX}-${env}-${ts}-db"; valkey="${PREFIX}-${env}-${ts}-valkey"; backend="${PREFIX}-${env}-${ts}-backend"; image="${backend}:local"
 runtime="/run/receipt-ai-app-isolated-login-acceptance-${env}/${ts}"; creds="${CREDENTIALS_DIRECTORY:-}"; app="${APP_ROOT}/${env}"
 [ -d "$gen" ] && [ "$(stat -c '%u:%g' "$gen")" = 0:0 ] && [ -f "$gen/restore-record.json" ] || die 'isolated generation is unavailable'
-[ -d "$app" ] && [ -f "$app/backend/Dockerfile.runtime" ] && [ -f "$app/backend/src/isolatedRestoreServer.ts" ] || die 'fixed root-managed application source is unavailable'
-[ -x "$app/scripts/security/test-isolated-backend-entrypoint-contract.sh" ] || die 'root-managed isolated backend contract test is unavailable'
+[ -d "$app" ] && [ -f "$app/backend/Dockerfile.runtime" ] && [ -f "$app/backend/src/isolatedRestoreServer.ts" ] && [ -f "$app/backend/src/isolatedRestoreServerRuntime.ts" ] || die 'fixed root-managed application source is unavailable'
+grep -Fq 'workerを一切importしない' "$app/backend/src/isolatedRestoreServer.ts" || die 'root-managed isolated backend entrypoint is invalid'
+if grep -Eq 'workers/|recoverReceiptAnalysisJobs|enqueuePendingAiBudgetNotifications' \
+  "$app/backend/src/isolatedRestoreServer.ts" "$app/backend/src/isolatedRestoreServerRuntime.ts"; then
+  die 'root-managed isolated backend entrypoint imports a worker or recovery job'
+fi
 [ -d "$creds" ] || die 'credential directory is unavailable'
 for n in backend_jwt_secret backend_totp_encryption_key; do [ -r "$creds/$n" ] || die "required credential is unavailable: $n"; done
 command -v docker >/dev/null && command -v jq >/dev/null || die 'required command is unavailable'
@@ -25,7 +29,6 @@ docker inspect "$backend" >/dev/null 2>&1 && die 'isolated backend container alr
 install -d -o root -g root -m 0700 "$runtime" "$runtime/docker-config"
 export DOCKER_CONFIG="$runtime/docker-config"
 trap 'rm -rf -- "$runtime"' EXIT
-"$app/scripts/security/test-isolated-backend-entrypoint-contract.sh" >/dev/null
 # 復元時のDBパスワードは使わず、受入専用の短時間値へcontainer内local接続で更新する。
 pw="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 printf "ALTER ROLE cntadm PASSWORD '%s';\n" "$pw" | docker exec -i "$db" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
