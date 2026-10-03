@@ -34,7 +34,8 @@ services:
       REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_IP}
       EXPO_PACKAGER_PROXY_URL: http://${HOST_IP}:${DEV_PORT}
       EXPO_PUBLIC_APP_ENV: ${ENV_NAME}
-      EXPO_PUBLIC_API_URL: http://${HOST_IP}:${BACKEND_PORT}/api
+      # Expo Go / 開発Webとも、LAN公開しないbackendではなく環境ごとのWeb Nginxプロキシを通す。
+      EXPO_PUBLIC_API_URL: http://${HOST_IP}:${WEB_PORT}/api
     volumes: !override
       - /etc/localtime:/etc/localtime:ro
 
