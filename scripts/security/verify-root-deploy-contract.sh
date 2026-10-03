@@ -173,7 +173,7 @@ done
 
 for expected_line in \
   'EXPO_PUBLIC_APP_ENV: ${ENV_NAME}' \
-  'EXPO_PUBLIC_API_URL: http://${HOST_IP}:${BACKEND_PORT}/api'; do
+  'EXPO_PUBLIC_API_URL: http://${HOST_IP}:${WEB_PORT}/api'; do
   if ! grep -Fq "${expected_line}" docker-compose.runtime.yml; then
     echo "[ERROR] runtime frontend must receive its required public configuration." >&2
     exit 1

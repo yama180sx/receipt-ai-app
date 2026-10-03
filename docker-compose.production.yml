@@ -1,7 +1,8 @@
-# Issue #118-1-1: Oracle A1 等の限定公開用。本番用の最小 Compose 構成。
+# Issue #118-1-1 の最小本番Composeを、Issue #118-2 のCloud VPS検証でも使用する。
+# 特定の事業者・CPUアーキテクチャへは依存しない。
 #
 # 開発用 docker-compose.yml / docker-compose.runtime.yml とは重ねないこと。
-# HTTPS 終端・Firewall・DNS・実際のOCI配備は Issue #118-1 の別フェーズで扱う。
+# HTTPS 終端・Firewall・DNS・実際のVPS配備は Issue #118-1 の別フェーズで扱う。
 # backend / db / redis にホスト公開ポートを持たせず、公開面は frontend だけに限定する。
 services:
   backend:

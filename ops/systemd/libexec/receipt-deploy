@@ -125,7 +125,8 @@ write_runtime_env() {
   } > "${APP_DIRECTORY}/backend/.env"
 
   {
-    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${app_environment}" "${HOST_IP}" "${BACKEND_PORT}"
+    # backendはLANへ公開しない。Expo Go / 開発Webとも環境ごとのfrontend Nginx /apiプロキシを使う。
+    printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${app_environment}" "${HOST_IP}" "${WEB_PORT}"
   } > "${APP_DIRECTORY}/frontend/.env"
 
   chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
