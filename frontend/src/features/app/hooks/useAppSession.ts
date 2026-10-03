@@ -40,6 +40,21 @@ export function useAppSession() {
     }
   }, []);
 
+  /**
+   * 保持済みのセッションを保護 API で検証する。
+   *
+   * 起動時に先にセッションを画面へ反映すると、失効済み JWT でも一瞬だけ
+   * 保護画面が表示され、各画面の初期 API 呼び出しがエラーになる。そのため
+   * 検証が完了するまでセッション状態は更新しない。
+   */
+  const validateStoredSession = useCallback(async (): Promise<CategorySummary[]> => {
+    const catRes = await categoryApi.listCategories();
+    if (!catRes.success) {
+      throw new Error('保存済みセッションの検証に失敗しました');
+    }
+    return catRes.data;
+  }, []);
+
   const clearSessionState = useCallback(() => {
     setUserToken(null);
     setCurrentMemberId(null);
@@ -73,8 +88,15 @@ export function useAppSession() {
             setPendingSession(session);
             setBiometricLockActive(true);
           } else {
-            applySession(session);
-            await fetchCategoriesForSession();
+            try {
+              const initialCategories = await validateStoredSession();
+              setCategories(initialCategories);
+              applySession(session);
+            } catch (sessionError) {
+              // 期限切れや署名変更後のJWTは、保護画面を表示せずログインからやり直す。
+              console.warn('保存済みセッションを破棄します:', sessionError);
+              await authService.logout();
+            }
           }
         }
       } catch (e) {
@@ -85,7 +107,7 @@ export function useAppSession() {
       }
     };
     void initializeApp();
-  }, [applySession, fetchCategoriesForSession]);
+  }, [applySession, validateStoredSession]);
 
   useEffect(() => {
     setOnUnauthorized(() => {
