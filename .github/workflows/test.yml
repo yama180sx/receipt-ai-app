@@ -15,6 +15,15 @@ jobs:
       - name: Verify production Compose boundary
         run: bash scripts/security/test-production-compose-contract.sh
 
+  vps-expo-vpn-compose-contract:
+    name: VPS Expo VPN Compose contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify VPN-only Expo Go boundary
+        run: bash scripts/security/test-vps-expo-vpn-compose-contract.sh
+
   backend-unit:
     name: Backend unit tests
     runs-on: ubuntu-latest

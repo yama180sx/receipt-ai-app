@@ -1,11 +1,11 @@
-# Issue #118-2: VPS production Compose契約
+# Issue #118-2 / #118-2-1: VPS production Compose契約
 
 作成日: 2026-09-29
 対象: `docker-compose.production.yml`
 
 ## 1. 目的と境界
 
-この契約は、特定のCloud事業者に依存しないLinux VPSで、RecAIptのstableを安全に検証・公開するための最小Compose境界を定義する。初期の実機検証候補はWebARENA Indigo Linux 2GBだが、資源作成、DNS、TLS、本番データ・Secretの移送は対象外である。
+この契約は、特定のCloud事業者に依存しないLinux VPSで、RecAIptのstableを安全に検証・公開するための最小Compose境界を定義する。初期の実機検証候補はKAGOYA CLOUD VPS 2GBであり、家族限定Expo GoはVPN overlayで提供する。資源作成、DNS、TLS、本番データ・Secretの移送は対象外である。
 
 対象はbackend、frontend、PostgreSQL、Valkeyだけである。T320のdev/stable runtime、MacBookの開発環境、Cloudflare R2上のobjectを変更しない。
 
@@ -21,26 +21,29 @@ Internet
 
 - Compose単体ではfrontendを`127.0.0.1:${WEB_PORT}:80`へだけbindする。backend、PostgreSQL、Valkeyにhost portを定義しない。
 - TLS終端後に外部公開できるのは443だけとする。80はHTTPS redirectに限る。
-- frontend-dev、Expo/Metro port、source bind mount、TTYをVPSのstable Composeへ追加しない。
+- 基底Composeへfrontend-dev、Expo/Metro port、source bind mount、TTYを追加しない。
 - TRUST_PROXY_HOPSはreverse proxyとbackend間のhop数・header上書き防御を実機で確認してから設定する。確認前は既定値0を維持する。
 
-## 3. Expo Goとデータ境界
+## 3. 家族限定Expo Go VPN overlay
 
-Expo Go用のdevelopment serverはT320またはMacBookで起動する。iPhone/Androidが自宅LANまたはVPNからserverへ接続してbundleを受け取ることは許可する。
+`docker-compose.vps-expo-vpn.yml`は、基底ComposeとSecrets Composeの後にだけ重ねる任意overlayである。これを指定しない限り、VPS上のExpo Go用Metroは起動しない。
 
-bundleのEXPO_PUBLIC_API_URLはCloud VPSの正規HTTPS API URLだけを指定する。これは公開値であり、Secretではない。DB、uploads、backend credential、R2 credentialはCloud VPSだけに置き、Expo development serverへ渡さない。
+- `EXPO_VPN_BIND_IP`には、Tailscale等のVPN interfaceに割り当てられた単一IPだけを設定する。`0.0.0.0`、public IP、loopbackへのbindは認めない。
+- frontendとMetroはこのVPN IPにだけbindし、Expo Goは`exp://<VPN host>:<Expo port>`でbundleを取得する。backend、PostgreSQL、Valkey、SSHはhost portを持たない。
+- Expo serviceにはSecret、`env_file`、永続volume、source bind mount、TTYを渡さない。`EXPO_PUBLIC_*`とAPI URLは公開設定であり、VPN内frontendの`/api`だけを指定する。
+- 家族端末はVPNへ参加し、Expo GoのSDK互換性を確認する。VPN未参加端末および家族外へMetroを提供しない。
 
 モバイルWebとExpo Goのデータ正本は同じCloud VPS PostgreSQLであり、T320/MacBookに業務データの別系統を作らない。
 
-## 4. 2GiB / 40GB検証の受入
+## 4. KAGOYA 2GiB / 200GB検証の受入
 
 1. production Composeのbuild、Prisma migration、db/Valkey healthcheck、backend healthが成功する。
-2. Webログイン、TOTP、レシート画像登録、Gemini解析、画像表示をtest-only dataで確認する。
+2. VPN参加済みの家族相当4〜5端末で、WebまたはExpo Goのログイン、TOTP、レシート画像登録、Gemini解析、画像表示をtest-only dataで確認する。
 3. DB/uploads backup、R2 readback、隔離restore手順をtest-only dataで確認する。
 4. 通常時と画像処理・backup・migration後のmemory、swap、disk使用量を記録する。
 5. 稼働中imageと直前rollback imageを保護した状態で、diskに十分な空きが残ることを確認する。
 
-memory pressure、swap常用、disk逼迫、安定性低下が確認された場合は、本番データを移送せず4GiB以上のplanで再検証する。
+memory pressure、swap常用、disk逼迫、安定性低下が確認された場合は、本番データを移送せず4GiBへ増強して再検証する。
 
 ## 5. image lifecycle
 
@@ -52,4 +55,5 @@ memory pressure、swap常用、disk逼迫、安定性低下が確認された場
 
 ```bash
 bash scripts/security/test-production-compose-contract.sh
+bash scripts/security/test-vps-expo-vpn-compose-contract.sh
 ```
