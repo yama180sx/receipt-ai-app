@@ -1,0 +1,27 @@
+# Issue #118-2-1: KAGOYA VPS上の家族限定Expo Go用overlay。
+# 単体では使用せず、production Composeとdocker-compose.secrets.ymlの後に重ねる。
+# EXPO_VPN_BIND_IPはTailscale等VPN interfaceのIPだけを指定する。0.0.0.0は禁止。
+services:
+  frontend:
+    ports: !override
+      - ${EXPO_VPN_BIND_IP:?EXPO_VPN_BIND_IP is required}:${WEB_PORT:?WEB_PORT is required}:80
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.runtime-dev
+    restart: unless-stopped
+    command: sh /app/scripts/expo-dev-server.sh
+    ports:
+      - ${EXPO_VPN_BIND_IP:?EXPO_VPN_BIND_IP is required}:${EXPO_DEV_PORT:?EXPO_DEV_PORT is required}:${EXPO_DEV_PORT:?EXPO_DEV_PORT is required}
+    environment:
+      TZ: Asia/Tokyo
+      ENV_NAME: ${ENV_NAME:?ENV_NAME is required}
+      HOST_IP: ${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}
+      DEV_PORT: ${EXPO_DEV_PORT:?EXPO_DEV_PORT is required}
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}
+      EXPO_PACKAGER_PROXY_URL: http://${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}:${EXPO_DEV_PORT:?EXPO_DEV_PORT is required}
+      EXPO_PUBLIC_APP_ENV: ${ENV_NAME:?ENV_NAME is required}
+      # VPN内部のfrontend Nginx経由でAPIを利用する。Secretを渡してはならない。
+      EXPO_PUBLIC_API_URL: http://${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}:${WEB_PORT:?WEB_PORT is required}/api
