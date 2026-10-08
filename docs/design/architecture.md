@@ -729,9 +729,9 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 - frontendは`127.0.0.1:${WEB_PORT}:80`だけにbindする。TLS未導入の検証段階ではSSH port forwardで確認し、インターネット公開しない。
 - 対象host内でbackendの`npm ci`とPrisma Client生成、frontend Web buildを行う。別アーキテクチャで作った`node_modules`を持ち込まない。
 - 実credentialはCompose Secret論理名で渡す。T320のencrypted credentialはCloud VPSへコピーせず、検証・本番環境ごとに新規発行・一時配布する。
-- Expo Go向けの`frontend-dev`はこのComposeに含めない。日常利用はモバイルWebを正規入口とし、Expo GoはT320またはMacBookの開発・確認用serverから、Cloud VPSのHTTPS APIへ接続する。
+- Expo Go向けの`frontend-dev`は基底Composeに含めない。家族限定の遠隔Expo Goは、`docker-compose.vps-expo-vpn.yml`を明示して重ね、frontendとMetroをVPN interface IPへだけbindする。backend、DB、Valkey、SSH、Expo/Metroをインターネットへ直接公開しない。overlay内の`frontend-dev`はSecret、永続volume、source bind mount、TTYを持たない。
 
-Compose境界は`bash scripts/security/test-production-compose-contract.sh`で継続検証する。VPS検証の契約は[Issue #118-2 VPS production Compose契約](../reviews/issue-118-2/vps-production-compose-contract.md)を参照する。
+Compose境界は`bash scripts/security/test-production-compose-contract.sh`と`bash scripts/security/test-vps-expo-vpn-compose-contract.sh`で継続検証する。VPS検証の契約は[Issue #118-2 VPS production Compose契約](../reviews/issue-118-2/vps-production-compose-contract.md)を参照する。
 
 運用詳細（バックアップ・Discord 通知・リストア・DB マスタ運用）は [operations.md](./operations.md)（#90-6）を参照。コマンド全文は [db-operations.md](../db-operations.md), [restore-manual.md](../restore-manual.md) にも維持。
 
