@@ -94,5 +94,6 @@ fi
 
 grep -Fq 'internal: true' "${rendered_compose}"
 grep -Fq 'FROM node:22-slim' "${repo_root}/frontend/Dockerfile.runtime-dev"
+grep -Fq 'exec npx expo start --offline --port "${PORT}" --host lan' "${repo_root}/frontend/scripts/expo-dev-server.sh"
 
 echo '[OK] VPS Expo VPN Compose contract is valid.'
