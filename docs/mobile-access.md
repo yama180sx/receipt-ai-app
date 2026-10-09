@@ -24,7 +24,7 @@ dev 環境は Web `:8080`、Expo dev `:8081`、API `:3001`。
 
 Expo Go は不要。`:8082` も不要。
 
-## 開発・動確（Expo Go）
+## 開発・動確（Expo Go / Android development build）
 
 ネイティブ挙動（カメラ切り取り・生体認証等）の検証用。**本番運用の入口ではない。**
 
@@ -34,6 +34,8 @@ Expo Go は不要。`:8082` も不要。
 4. 招待コードでログイン
 
 stable の backend は `:80` に加え `:8082` / `exp://` を CORS 許可している（Issue #94-1）。
+
+AndroidでExpo GoがVPN内Metroへ接続できない場合は、[Android development build運用](./android-development-build.md)の`development` profileを使う。専用APKでもVPN接続は必要であり、実endpoint・署名情報・APK配布URLをGitやIssueへ記録しない。`stable` APKはbundleを内包するためMetroを必要としない。
 
 ## トラブルシュート
 

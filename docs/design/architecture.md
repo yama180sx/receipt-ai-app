@@ -70,7 +70,7 @@ flowchart TB
 
 | レイヤー | 技術 |
 |----------|------|
-| Frontend | Expo ~57, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
+| Frontend | Expo ~57, Expo development build（Android）, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
 | Backend | Node.js 20, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
 | Queue | BullMQ 5 + Valkey 8.1.10（Redis互換、Issue #119で移行完了） |
@@ -730,6 +730,7 @@ PostgreSQLの`ReceiptAnalysisJob`が未完了解析の正本であり、Valkey�
 - 対象host内でbackendの`npm ci`とPrisma Client生成、frontend Web buildを行う。別アーキテクチャで作った`node_modules`を持ち込まない。
 - 実credentialはCompose Secret論理名で渡す。T320のencrypted credentialはCloud VPSへコピーせず、検証・本番環境ごとに新規発行・一時配布する。
 - Expo Go向けの`frontend-dev`は基底Composeに含めない。家族限定の遠隔Expo Goは、`docker-compose.vps-expo-vpn.yml`を明示して重ね、frontendとMetroをVPN interface IPへだけbindする。backend、DB、Valkey、SSH、Expo/Metroをインターネットへ直接公開しない。overlay内の`frontend-dev`はSecret、永続volume、source bind mount、TTYを持たない。
+- Android development buildは`frontend/eas.json`の`development` profileでMetroへ接続し、`stable` profileはbundleをAPKへ内包する。どちらもVPN内frontend Nginxの`/api`だけへ接続し、実endpointや署名情報はGitへ置かない。詳細は[Android development build運用](../android-development-build.md)と[ADR-016](../adr/ADR-016-android-development-build-distribution.md)を参照する。
 
 Compose境界は`bash scripts/security/test-production-compose-contract.sh`と`bash scripts/security/test-vps-expo-vpn-compose-contract.sh`で継続検証する。VPS検証の契約は[Issue #118-2 VPS production Compose契約](../reviews/issue-118-2/vps-production-compose-contract.md)を参照する。
 
