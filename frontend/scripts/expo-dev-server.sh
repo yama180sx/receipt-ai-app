@@ -24,8 +24,4 @@ if [ ! -f node_modules/expo-router/build/global-state/storeContext.js ]; then
   echo ""
 fi
 
-# VPSの家族限定検証では、Expo CLIが外部の更新情報を問い合わせないようにする。
-# SDK 57のAndroid Expo Goでは、この問い合わせ失敗がローカルMetro接続の
-# `Failed to download remote update` として表面化することがあるため、
-# VPN内で配信するbundleだけを使用する。
-exec npx expo start --offline --port "${PORT}" --host lan
+exec npx expo start --port "${PORT}" --host lan
