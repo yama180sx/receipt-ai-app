@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "recaipt",
     "name": "RecAIpt",
     "slug": "recaipt",
     "version": "1.0.0",
@@ -31,6 +32,11 @@
       "backgroundColor": "#ffffff"
     },
     "scheme": "recaipt",
+    "extra": {
+      "eas": {
+        "projectId": "2afb32e6-5d7a-4ffa-8b4d-62a54e8b0e9f"
+      }
+    },
     "plugins": [
       "expo-router",
       "expo-font",
