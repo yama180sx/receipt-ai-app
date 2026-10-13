@@ -17,6 +17,8 @@ describe('Android development build configuration', () => {
   it('explicitly applies the development client native configuration', () => {
     const config = appConfig({ config: baseConfig.expo });
 
-    expect(config.plugins).toContain('expo-dev-client');
+    expect(config.plugins).toEqual(
+      expect.arrayContaining(['expo-dev-client', './plugins/withAndroidCleartextTraffic']),
+    );
   });
 });
