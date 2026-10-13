@@ -39,6 +39,7 @@
     },
     "plugins": [
       "expo-dev-client",
+      "./plugins/withAndroidCleartextTraffic",
       "expo-router",
       "expo-font",
       [
