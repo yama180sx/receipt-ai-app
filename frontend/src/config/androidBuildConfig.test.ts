@@ -13,4 +13,10 @@ describe('Android development build configuration', () => {
       usesCleartextTraffic: true,
     });
   });
+
+  it('explicitly applies the development client native configuration', () => {
+    const config = appConfig({ config: baseConfig.expo });
+
+    expect(config.plugins).toContain('expo-dev-client');
+  });
 });
