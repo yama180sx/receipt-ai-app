@@ -95,4 +95,12 @@ fi
 grep -Fq 'internal: true' "${rendered_compose}"
 grep -Fq 'FROM node:22-slim' "${repo_root}/frontend/Dockerfile.runtime-dev"
 
+# Issue #118-2-1: Expo manifestのbundle URL / debuggerHostは、Metroを起動する
+# プロセスの環境から生成される。VPNの到達先を起動直前にも固定し、npxの環境解決を
+# 介さずプロジェクト固定CLIを利用することを契約化する。
+expo_start_script="${repo_root}/frontend/scripts/expo-dev-server.sh"
+grep -Fq 'export REACT_NATIVE_PACKAGER_HOSTNAME="${HOST}"' "${expo_start_script}"
+grep -Fq 'export EXPO_PACKAGER_PROXY_URL="http://${HOST}:${PORT}"' "${expo_start_script}"
+grep -Fq 'exec ./node_modules/.bin/expo start --port "${PORT}" --host lan --clear' "${expo_start_script}"
+
 echo '[OK] VPS Expo VPN Compose contract is valid.'
