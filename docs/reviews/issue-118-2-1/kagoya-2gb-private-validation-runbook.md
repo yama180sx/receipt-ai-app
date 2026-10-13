@@ -83,6 +83,55 @@ KAGOYA会員サイトの「アカウント一覧」→「アカウントを一�
 - 通常時、画像処理中、migration後、backup後、image build後にmemory、swap、disk、backend healthを記録する。
 - OOM、swap常用、画像処理の継続的な応答悪化、稼働imageと直前rollback imageを残せないdisk逼迫のいずれかがあれば、データ移送を行わずKAGOYA 4GBへの増強を提案する。
 
+## Android / Expo Go・Development Build のMetro接続診断（Issue #118-2-1 の知見）
+
+### 前提
+
+Expo Go と Android Development Build は、最初にMetroのmanifestを取得し、manifest内で案内されたbundle URLとWebSocket接続先へ進む。端末が入力したURLだけでなく、少なくとも次の値が同じVPN内の到達先を指す必要がある。
+
+- `launchAsset.url`
+- `extra.expoClient.hostUri`
+- `extra.expoGo.debuggerHost`
+
+VPSのWeb画面やMetroのWeb表示がAndroidブラウザーで開けても、上記のいずれかが端末で解決できない名前を返していれば、Expo Go／Development Buildは起動できない。ブラウザーでの到達確認だけを合格条件にしてはならない。
+
+### 発生した症状と判定
+
+次の組み合わせは、AndroidアプリのHTTP許可やSDK依存関係より先に、manifestの接続先を確認する。
+
+- AndroidブラウザーではVPN内Web・Metroの表示やAndroid bundle取得ができる。
+- Expo Goではリモート更新の取得に失敗する。
+- Development Buildでは `Unable to load script` が表示される。
+- ADBログで、Development BuildがVPN内IPではない名前へWebSocket接続を試みる。
+
+この場合、端末、Expo Go、Development Buildを繰り返し再インストールしたり、根拠なくComposeを変更したりしない。Android端末からのMetroアクセスログとmanifestの接続先を先に照合する。
+
+### 非秘密の診断手順
+
+1. `frontend-dev` がVPN interfaceだけへbindされ、`frontend-dev`以外のbackend、DB、Valkeyにhost portがないことをCompose契約テストで確認する。
+2. Android向けmanifestを取得し、上記3項目の**値は出力せず**、`ip`、`fqdn`、`localhost`、`missing`だけを分類する。
+3. 実行中のExpoプロセスについて、`EXPO_PACKAGER_PROXY_URL`と`REACT_NATIVE_PACKAGER_HOSTNAME`も値を伏せて同様に分類する。
+4. manifestがFQDNで、プロセス環境がIPの場合もある。環境変数の確認だけで合格とせず、manifestの3項目がすべて `ip:<port>` であることを受入条件とする。
+5. 反映後はAndroid Development Buildを先に確認する。Expo Goは `exp://<VPN内IP>:<port>`、Development Buildは `http://<VPN内IP>:<port>` で接続する。実値はチャット、Issue、PR、作業ログへ記録しない。
+
+ADBログを共有する必要がある場合は、URL、IP、host、token、authorization、password、secretを伏せる。特にWebSocket URLは端末が実際に試行した接続先を含むため、未加工のログを共有しない。
+
+### 恒久対応
+
+`frontend/scripts/expo-dev-server.sh` は、`HOST_IP`と`DEV_PORT`から次を**Expo CLI起動直前に**exportする。
+
+- `REACT_NATIVE_PACKAGER_HOSTNAME`
+- `EXPO_PACKAGER_PROXY_URL`
+
+同スクリプトは、プロジェクトに固定されたExpo CLIを直接起動し、Metro変換キャッシュをクリアしてから起動する。これにより、Compose設定、CLIプロセス、manifestが案内する到達先を同一のVPN内IPへそろえる。Compose契約テストでは、この起動契約を静的に検査する。
+
+この修正後は、Android Development BuildとAndroid Expo Goで招待コード画面まで表示できることを確認した。iPhoneのExpo Goも同じVPN内IP経路を使える見込みがあるが、端末ごとのTailscale接続、Expo GoのSDK互換性、必要時のExpoアカウント要件は別途確認する。
+
+### 境界
+
+- この診断を理由に、インターネット公開、HTTP公開範囲の拡大、トンネルサービス導入、R2設定変更を行わない。
+- Development BuildのMetro接続失敗は、正式なストア向けproduction buildの可否を直接示すものではない。production buildではJavaScript bundleの配布形態とAPIの公開設計を別途検証する。
+
 ## 運用とrollback
 
 - image buildは初回検証と計画的な更新時だけ行う。稼働image、直前rollback image、永続volume、R2 backupを自動cleanup対象にしない。
