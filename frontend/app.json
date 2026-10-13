@@ -38,6 +38,7 @@
       }
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       "expo-font",
       [
