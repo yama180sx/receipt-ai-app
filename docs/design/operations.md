@@ -265,9 +265,12 @@ Index対応の補足:
 |------------|----------------|------|------|
 | `backend/prisma/seed.ts` | `npm run prisma:seed`（`prisma db seed`） | 開発環境の初期化 | **全データ削除後、再投入** |
 | `backend/prisma/update-master.ts` | `npm run prisma:update` | 運用中のマスタ更新 | **マスタのみ upsert**（Receipt 等は不変） |
+| `backend/prisma/kagoya-baseline.ts` | `npm run prisma:kagoya-baseline` | Issue #118-2-2 の検証環境baseline | **不足する共通・世帯別マスタだけを追加** |
 | `backend/prisma/run-sync-sequences.ts` | `npm run prisma:sync-sequences` | id シーケンス修復 | データ削除なし |
 
 > **注意:** `npm run prisma:init` は `backend/package.json` に存在しない。開発環境の初期化には `npm run prisma:seed` を、非破壊のマスタ同期には `npm run prisma:update` を使用する。
+
+Issue #118-2-2で世帯別のCategory／Store／PromptTemplateも不足分だけ補う必要がある場合は、`prisma:kagoya-baseline` と `prisma:kagoya-baseline:check` を使用する。既存レコードは更新せず、既存の無効な `RECEIPT_ANALYSIS` も再有効化しない。詳細な受入境界は[レビュー資料](../reviews/issue-118-2-2/kagoya-baseline-and-acceptance.md)を参照する。
 
 Docker 経由の例:
 

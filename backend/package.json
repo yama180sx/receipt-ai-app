@@ -10,6 +10,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:update": "npx tsx prisma/update-master.ts",
+    "prisma:kagoya-baseline": "npx tsx prisma/kagoya-baseline.ts",
+    "prisma:kagoya-baseline:check": "npx tsx prisma/check-kagoya-baseline.ts",
     "prisma:sync-sequences": "npx tsx prisma/run-sync-sequences.ts",
     "ai-pricing:add": "npx tsx prisma/add-ai-pricing-revision.ts",
     "ai-budget:bootstrap-manager": "npx tsx prisma/bootstrap-global-ai-budget-manager.ts",
