@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { loadSecretFiles } from '../src/config/secretFiles';
 import { syncStandardProductClassificationMasters } from './syncStandardProductClassificationMasters';
 import { syncHouseholdBaseline } from './syncHouseholdBaseline';
 
+// Compose supplies production credentials through *_FILE variables.
+// Load them before constructing PrismaClient, without printing a value or path.
+loadSecretFiles();
 const prisma = new PrismaClient();
 
 async function main() {
