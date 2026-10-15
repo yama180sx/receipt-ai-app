@@ -37,6 +37,8 @@ for file in \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
+  ops/systemd/libexec/receipt-rotate-db-credentials \
+  ops/systemd/libexec/receipt-provision-a5m-readonly \
   ops/systemd/units/receipt-deploy-dev.service \
   ops/systemd/units/receipt-deploy-stable.service \
   ops/systemd/units/receipt-backup-dev.service \
@@ -52,7 +54,11 @@ for file in \
   ops/systemd/units/receipt-offsite-restore-isolated-dev.service \
   ops/systemd/units/receipt-offsite-restore-isolated-stable.service \
   ops/systemd/units/receipt-rotate-invitation-codes-dev.service \
-  ops/systemd/units/receipt-rotate-invitation-codes-stable.service; do
+  ops/systemd/units/receipt-rotate-invitation-codes-stable.service \
+  ops/systemd/units/receipt-rotate-db-credentials-dev.service \
+  ops/systemd/units/receipt-rotate-db-credentials-stable.service \
+  ops/systemd/units/receipt-provision-a5m-readonly-dev.service \
+  ops/systemd/units/receipt-provision-a5m-readonly-stable.service; do
   test -f "${file}" || {
     echo "[ERROR] missing managed runtime artifact: ${file}" >&2
     exit 1
@@ -71,7 +77,9 @@ for helper in \
   ops/systemd/libexec/receipt-register-offsite-credentials \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
-  ops/systemd/libexec/receipt-rollback-invitation-codes; do
+  ops/systemd/libexec/receipt-rollback-invitation-codes \
+  ops/systemd/libexec/receipt-rotate-db-credentials \
+  ops/systemd/libexec/receipt-provision-a5m-readonly; do
   bash -n "${helper}"
 done
 
@@ -106,6 +114,50 @@ require_exact_line 'RuntimeDirectory=receipt-ai-app-invitation-code-rotation-dev
   ops/systemd/units/receipt-rotate-invitation-codes-dev.service
 require_exact_line 'RuntimeDirectory=receipt-ai-app-invitation-code-rotation-stable' \
   ops/systemd/units/receipt-rotate-invitation-codes-stable.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-db-credential-rotation-dev' \
+  ops/systemd/units/receipt-rotate-db-credentials-dev.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-db-credential-rotation-stable' \
+  ops/systemd/units/receipt-rotate-db-credentials-stable.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-a5m-readonly-dev' \
+  ops/systemd/units/receipt-provision-a5m-readonly-dev.service
+require_exact_line 'RuntimeDirectory=receipt-ai-app-a5m-readonly-stable' \
+  ops/systemd/units/receipt-provision-a5m-readonly-stable.service
+
+for helper in \
+  ops/systemd/libexec/receipt-rotate-db-credentials \
+  ops/systemd/libexec/receipt-provision-a5m-readonly; do
+  if ! grep -Fq 'export DOCKER_CONFIG="${docker_config_directory}"' "${helper}"; then
+    echo "[ERROR] Issue #132-1 helper must keep Docker CLI state in its root-only runtime directory." >&2
+    exit 1
+  fi
+done
+
+for expected_line in \
+  'systemctl start "${backup_unit}"' \
+  'systemctl start "${deploy_unit}"' \
+  'password_changed=true' \
+  'credentials_installed=true' \
+  'completed without exposing credential values'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-rotate-db-credentials; then
+    echo "[ERROR] Issue #132-1 rotation helper safety contract is incomplete." >&2
+    exit 1
+  fi
+done
+if grep -Fq 'docker exec -e PGPASSWORD=' ops/systemd/libexec/receipt-rotate-db-credentials; then
+  echo "[ERROR] Issue #132-1 rotation helper must not pass a DB password via argv." >&2
+  exit 1
+fi
+
+for expected_line in \
+  'GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${role_name};' \
+  'ALTER DEFAULT PRIVILEGES FOR ROLE cntadm IN SCHEMA public GRANT SELECT ON TABLES TO ${role_name};' \
+  'systemd-creds encrypt --name=' \
+  'completed without exposing credential values'; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-provision-a5m-readonly; then
+    echo "[ERROR] Issue #132-1 A5M2 readonly provisioning contract is incomplete." >&2
+    exit 1
+  fi
+done
 
 for compose_file in docker-compose.yml docker-compose.secrets.yml docker-compose.runtime.yml; do
   if ! grep -Fq -- "-f \"\${APP_DIRECTORY}/${compose_file}\"" ops/systemd/libexec/receipt-deploy; then

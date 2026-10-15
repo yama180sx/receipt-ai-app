@@ -40,6 +40,10 @@ services:
       - /etc/localtime:/etc/localtime:ro
 
   db:
+    # Issue #132-1: T320のDBはhost loopbackだけへbindする。A5M2は自宅LANの
+    # SSHローカルポートフォワード経由だけを許可し、LAN／インターネットへ直接公開しない。
+    ports: !override
+      - "127.0.0.1:${DB_PORT}:5432"
     volumes: !override
       - ${RECAIPT_PGDATA_DIR}:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro

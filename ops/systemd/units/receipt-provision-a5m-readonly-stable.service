@@ -1,0 +1,18 @@
+[Unit]
+Description=RecAIpt stable A5M2 read-only database role provision
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=receipt-ai-app-a5m-readonly-stable
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/libexec/receipt-provision-a5m-readonly stable
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/receipt-ai-app/stable/a5m-credentials /run/receipt-ai-app-a5m-readonly-stable
