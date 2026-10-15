@@ -135,7 +135,8 @@ done
 for expected_line in \
   'systemctl start "${backup_unit}"' \
   'systemctl start "${deploy_unit}"' \
-  'IFS= read -r PGPASSWORD || [ -n "${PGPASSWORD:-}" ]' \
+  'const { PrismaClient } = require("@prisma/client");' \
+  'await prisma.$queryRawUnsafe("SELECT 1");' \
   'backup_credentials_reconciled=true' \
   'pre_rotation_backup_completed=true' \
   'password_changed=true' \
@@ -148,6 +149,10 @@ for expected_line in \
 done
 if grep -Fq 'docker exec -e PGPASSWORD=' ops/systemd/libexec/receipt-rotate-db-credentials; then
   echo "[ERROR] Issue #132-1 rotation helper must not pass a DB password via argv." >&2
+  exit 1
+fi
+if grep -Fq 'docker exec -i "${database_container}" sh -ceu' ops/systemd/libexec/receipt-rotate-db-credentials; then
+  echo "[ERROR] Issue #132-1 rotation helper must validate the active backend Prisma connection." >&2
   exit 1
 fi
 
