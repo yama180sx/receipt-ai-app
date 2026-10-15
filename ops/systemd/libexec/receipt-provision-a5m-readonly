@@ -1,0 +1,69 @@
+#!/bin/bash
+# Issue #132-1: A5M2用の参照専用DBロールを値非表示で発行する。
+set -euo pipefail
+
+die() { echo "[receipt-a5m-readonly] $1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+
+case "$1" in
+  dev|stable) readonly environment="$1" ;;
+  *) die 'unknown fixed environment' ;;
+esac
+
+readonly role_name='receipt_a5m_ro'
+readonly database_container="receipt-${environment}-db"
+readonly backup_unit="receipt-backup-${environment}.service"
+readonly delivery_directory="/var/lib/receipt-ai-app/${environment}/a5m-credentials"
+readonly runtime_directory="/run/receipt-ai-app-a5m-readonly-${environment}"
+
+install -d -o root -g root -m 0700 "${delivery_directory}" "${runtime_directory}"
+readonly temporary_directory="$(mktemp -d -p "${runtime_directory}" provision.XXXXXX)"
+trap 'rm -rf -- "${temporary_directory}"' EXIT
+readonly docker_config_directory="${temporary_directory}/docker-config"
+install -d -o root -g root -m 0700 "${docker_config_directory}"
+export DOCKER_CONFIG="${docker_config_directory}"
+
+[ "$(docker inspect --format '{{.State.Running}}' "${database_container}" 2>/dev/null || true)" = true ] \
+  || die 'database container is not running'
+
+systemctl start "${backup_unit}"
+[ "$(systemctl show "${backup_unit}" -p Result --value)" = success ] \
+  || die 'pre-provision backup did not succeed'
+
+readonly password="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+readonly provision_id="a5m-$(date -u +%Y%m%d%H%M%S)-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+readonly delivery_file="${delivery_directory}/${provision_id}.cred"
+readonly manifest_file="${temporary_directory}/delivery.json"
+
+# passwordは乱数hexのみなのでSQLリテラルを壊さず、stdinだけでPostgreSQLへ渡す。
+cat <<SQL | docker exec -i "${database_container}" psql -U cntadm -d receipt_db -v ON_ERROR_STOP=1 >/dev/null
+BEGIN;
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role_name}') THEN
+    CREATE ROLE ${role_name} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION PASSWORD '${password}';
+  ELSE
+    ALTER ROLE ${role_name} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION PASSWORD '${password}';
+  END IF;
+END
+\$\$;
+REVOKE ALL ON DATABASE receipt_db FROM ${role_name};
+GRANT CONNECT ON DATABASE receipt_db TO ${role_name};
+GRANT USAGE ON SCHEMA public TO ${role_name};
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${role_name};
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO ${role_name};
+ALTER DEFAULT PRIVILEGES FOR ROLE cntadm IN SCHEMA public GRANT SELECT ON TABLES TO ${role_name};
+ALTER DEFAULT PRIVILEGES FOR ROLE cntadm IN SCHEMA public GRANT SELECT ON SEQUENCES TO ${role_name};
+COMMIT;
+SQL
+
+# artifactだけがA5M2用passwordを含む。標準出力、DB監査、journalには出さない。
+printf '{"schemaVersion":1,"environment":"%s","role":"%s","password":"%s"}\n' \
+  "${environment}" "${role_name}" "${password}" > "${manifest_file}"
+chmod 0600 "${manifest_file}"
+systemd-creds encrypt --name="$(basename "${delivery_file}")" "${manifest_file}" "${delivery_file}"
+chown root:root "${delivery_file}"
+chmod 0600 "${delivery_file}"
+
+echo "[receipt-a5m-readonly] ${environment} provision ${provision_id} completed without exposing credential values"
