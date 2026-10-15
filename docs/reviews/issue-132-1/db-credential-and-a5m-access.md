@@ -13,8 +13,8 @@
 
 `receipt-rotate-db-credentials {dev|stable}`は、環境を固定して次を行う。
 
-1. 現在のroot管理backupを成功させる。
-2. backendが実際に使うDB接続URLでTCP認証できることを、値を出さずに確認する。
+1. backendが実際に使うDB接続URLでTCP認証できることを、値を出さずに確認する。
+2. 既存の`postgres_password`または`db_password`が古い場合は、検証済みの実働値へ値非表示で整合化してからroot管理backupを成功させる。DB passwordとbackend URLはこの段階で変更しない。
 3. `cntadm`のDB password、`backend_database_url`、`postgres_password`、`db_password`を新しい乱数へ同期更新する。
 4. 固定deployと更新後backupの成功を確認する。
 
