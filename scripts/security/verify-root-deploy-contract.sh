@@ -122,6 +122,14 @@ require_exact_line 'RuntimeDirectory=receipt-ai-app-a5m-readonly-dev' \
   ops/systemd/units/receipt-provision-a5m-readonly-dev.service
 require_exact_line 'RuntimeDirectory=receipt-ai-app-a5m-readonly-stable' \
   ops/systemd/units/receipt-provision-a5m-readonly-stable.service
+require_exact_line 'StateDirectory=receipt-ai-app/dev/a5m-credentials' \
+  ops/systemd/units/receipt-provision-a5m-readonly-dev.service
+require_exact_line 'StateDirectory=receipt-ai-app/stable/a5m-credentials' \
+  ops/systemd/units/receipt-provision-a5m-readonly-stable.service
+require_exact_line 'ReadWritePaths=/run/receipt-ai-app-a5m-readonly-dev' \
+  ops/systemd/units/receipt-provision-a5m-readonly-dev.service
+require_exact_line 'ReadWritePaths=/run/receipt-ai-app-a5m-readonly-stable' \
+  ops/systemd/units/receipt-provision-a5m-readonly-stable.service
 
 for helper in \
   ops/systemd/libexec/receipt-rotate-db-credentials \
