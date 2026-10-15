@@ -135,6 +135,8 @@ done
 for expected_line in \
   'systemctl start "${backup_unit}"' \
   'systemctl start "${deploy_unit}"' \
+  'backup_credentials_reconciled=true' \
+  'pre_rotation_backup_completed=true' \
   'password_changed=true' \
   'credentials_installed=true' \
   'completed without exposing credential values'; do
