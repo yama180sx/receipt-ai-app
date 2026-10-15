@@ -135,6 +135,7 @@ done
 for expected_line in \
   'systemctl start "${backup_unit}"' \
   'systemctl start "${deploy_unit}"' \
+  'IFS= read -r PGPASSWORD || [ -n "${PGPASSWORD:-}" ]' \
   'backup_credentials_reconciled=true' \
   'pre_rotation_backup_completed=true' \
   'password_changed=true' \
