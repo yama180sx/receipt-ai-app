@@ -76,6 +76,9 @@ verify_command() {
   grep -Fq "      - ${expected##* }" "${output}"
   grep -Fq 'DATABASE_URL_FILE: /run/secrets/backend_database_url' "${output}"
   grep -Fq 'LOG_LEVEL: contract-test' "${output}"
+  grep -Fq 'host_ip: 127.0.0.1' "${output}"
+  grep -Fq 'published: "15432"' "${output}"
+  grep -Fq 'target: 5432' "${output}"
   grep -Fq 'image: valkey/valkey:8.1.10-alpine3.24@sha256:d2e18f3410b6f616de1417f570fa55261af2898b9c5b2cfb6781ce2373ea43d1' "${output}"
   grep -Fq '      - valkey-cli' "${output}"
 }
