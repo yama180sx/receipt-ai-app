@@ -149,6 +149,7 @@ model FamilyMember {
   id                                        Int                                        @id @default(autoincrement())
   name                                      String
   password_hash                             String?
+  authVersion                               Int                                        @default(1) // [Issue #132-2] password再設定時にJWTを失効させる版
   familyGroupId                             Int // ★ 所属世帯
   role                                      Role                                       @default(USER) // [Issue #73] デフォルトは一般ユーザー
   totpSecret                                String? // [Issue #93-5] TOTP シークレット（暗号化保存）
@@ -174,6 +175,19 @@ model FamilyMember {
   receivedTransfers SettlementTransfer[] @relation("TransferReceiver")
 
   @@unique([name, familyGroupId]) // 同一世帯内での名前重複を禁止
+}
+
+// [Issue #132-2] root限定の緊急password再設定について、password・hash・氏名を保存しない監査。
+model EmergencyPasswordResetAudit {
+  id            Int      @id @default(autoincrement())
+  resetId       String   @unique @db.VarChar(80)
+  memberId      Int
+  familyGroupId Int
+  authVersion   Int
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([memberId, createdAt])
+  @@index([familyGroupId, createdAt])
 }
 
 // [Issue #131-4] root専用CLIによるTOTP再暗号化の値なし監査記録。
