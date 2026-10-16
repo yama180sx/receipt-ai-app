@@ -44,6 +44,7 @@ function buildAccessSession(member: AuthMemberSource): LoginSessionDomain {
       name: record.name,
       familyGroupId: record.familyGroupId,
       role: record.role,
+      authVersion: record.authVersion,
     }),
     pendingToken: null,
     requiresTotpVerification: false,
@@ -65,6 +66,7 @@ function buildPendingSession(
         name: record.name,
         familyGroupId: record.familyGroupId,
         role: record.role,
+        authVersion: record.authVersion,
       },
       purpose
     ),

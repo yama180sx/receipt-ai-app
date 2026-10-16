@@ -1,4 +1,4 @@
-import { prisma } from '../utils/prismaClient';
+import { globalPrisma, prisma } from '../utils/prismaClient';
 
 export async function findFamilyGroupByInviteCode(inviteCode: string) {
   return prisma.familyGroup.findUnique({
@@ -31,6 +31,13 @@ export async function findMemberByIdWithFamily(memberId: number) {
 
 export async function findMemberById(memberId: number) {
   return prisma.familyMember.findUnique({ where: { id: memberId } });
+}
+
+export async function findMemberAuthVersion(memberId: number) {
+  return globalPrisma.familyMember.findUnique({
+    where: { id: memberId },
+    select: { authVersion: true },
+  });
 }
 
 export async function saveMemberTotpSetup(

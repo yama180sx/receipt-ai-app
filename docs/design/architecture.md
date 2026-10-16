@@ -174,7 +174,7 @@ flowchart TB
 
 | ミドルウェア / ユーティリティ | 役割 |
 |------------------------------|------|
-| `authMiddleware` | Bearer JWT 検証（`purpose: access`）、`req.user` 設定。認証失敗は **ミドルウェア直返し**（[api-spec.md](./api-spec.md) §2.3） |
+| `authMiddleware` | Bearer JWT 検証（`purpose: access`）とDBの`authVersion`照合、`req.user` 設定。認証失敗は **ミドルウェア直返し**（[api-spec.md](./api-spec.md) §2.3） |
 | `tenantMiddleware` | `memberId` → DB で `familyGroupId` 取得、`AsyncLocalStorage` にテナントコンテキスト設定 |
 | `pendingAuthMiddleware` | TOTP セットアップ・検証用短期トークン（10 分） |
 | `rateLimitMiddleware` | 認証前はIP、認証後のTOTP・画像アップロードはメンバーID+IPで固定ウィンドウ制限。超過時は429と`Retry-After`を直返しする。`TRUST_PROXY_HOPS=0`では転送ヘッダーを信頼しない。 |
@@ -388,6 +388,7 @@ sequenceDiagram
 - テナント = `FamilyGroup`。メンバーは招待コードで世帯を解決してログインする。
 - 全メンバーに TOTP セットアップが必須（初回ログイン時）。
 - 管理者 API は `ADMIN` ロール + TOTP 有効が追加要件。
+- 緊急password再設定はroot限定helperで行い、対象メンバーの`authVersion`を増加させて既存access／pending tokenを無効化する。TOTP secretは変更しない。
 - フロントエンドは毎リクエストに `Authorization: Bearer` と `x-member-id` を付与する。
 
 ### 5.2 レシート解析（非同期）

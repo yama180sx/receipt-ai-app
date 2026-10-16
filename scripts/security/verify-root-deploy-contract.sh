@@ -37,6 +37,7 @@ for file in \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
+  ops/systemd/libexec/receipt-emergency-password-reset \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly \
   ops/systemd/units/receipt-deploy-dev.service \
@@ -78,6 +79,7 @@ for helper in \
   ops/systemd/libexec/receipt-restore \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
+  ops/systemd/libexec/receipt-emergency-password-reset \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly; do
   bash -n "${helper}"
@@ -157,6 +159,24 @@ for expected_line in \
 done
 if grep -Fq 'docker exec -e PGPASSWORD=' ops/systemd/libexec/receipt-rotate-db-credentials; then
   echo "[ERROR] Issue #132-1 rotation helper must not pass a DB password via argv." >&2
+  exit 1
+fi
+
+for expected_line in \
+  '[ -t 0 ] && [ -t 1 ] || die' \
+  'systemctl start "${backup_unit}"' \
+  'read -r -s -p' \
+  'bcrypt.hash(password, 12)' \
+  'const authVersion = member.authVersion + 1' \
+  'emergencyPasswordResetAudit.create' \
+  'completed resetId='; do
+  if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-emergency-password-reset; then
+    echo "[ERROR] Issue #132-2 emergency password reset safety contract is incomplete." >&2
+    exit 1
+  fi
+done
+if grep -Fq 'docker exec -e ' ops/systemd/libexec/receipt-emergency-password-reset; then
+  echo "[ERROR] Issue #132-2 helper must not pass a password via environment variables." >&2
   exit 1
 fi
 if grep -Fq 'docker exec -i "${database_container}" sh -ceu' ops/systemd/libexec/receipt-rotate-db-credentials; then

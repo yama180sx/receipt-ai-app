@@ -68,6 +68,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | id | Int | No | autoincrement() | Yes | — | — | — |
 | name | String | No | — | — | — | 複合 | — |
 | password_hash | String | Yes | — | — | — | — | — |
+| authVersion | Int | No | 1 | — | — | — | — |
 | familyGroupId | Int | No | — | — | FamilyGroup.id | 複合 | — |
 | role | Role | No | USER | — | — | — | — |
 | totpSecret | String | Yes | — | — | — | — | — |
@@ -79,6 +80,23 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 **Unique:** `(name, familyGroupId)`
 
 `totpSecret` と `totpKeyVersion` はともにnull、またはともに非nullである。鍵の実値は保存しない。稼働中に許可する鍵バージョンは専用TOTP鍵の `totp-v1` だけである。`totp-old-v1` はIssue #131-4の完了済みデータ移行を示す履歴値であり、復号経路としては許可しない。
+
+`authVersion` はJWTに含め、DBの現行値と一致しないtokenを拒否する。緊急password再設定ではpassword hash更新と同一transactionで値を増加させ、対象メンバーの既存access／pending tokenを失効させる。
+
+---
+
+### EmergencyPasswordResetAudit
+
+root限定の緊急password再設定に対する値なし監査。password、hash、氏名、招待コード、TOTP secretは保存しない。
+
+| カラム | 型 | Nullable | Default | PK | FK | Unique | Index |
+|--------|-----|----------|---------|----|----|--------|-------|
+| id | Int | No | autoincrement() | Yes | — | — | — |
+| resetId | String | No | — | — | — | Yes | — |
+| memberId | Int | No | — | — | — | — | Yes |
+| familyGroupId | Int | No | — | — | — | — | Yes |
+| authVersion | Int | No | — | — | — | — | — |
+| createdAt | DateTime | No | now() | — | — | — | — |
 
 ---
 
