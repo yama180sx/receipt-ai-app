@@ -184,7 +184,7 @@ class AppError extends Error {
 | `totp_setup` | TOTP 初回セットアップ | 10 分 | `pendingAuthMiddleware('totp_setup', 'access')` |
 | `totp_pending` | ログイン後 TOTP 検証 | 10 分 | `pendingAuthMiddleware('totp_pending')` |
 
-JWT ペイロード（access）: `{ id, name, familyGroupId, role, purpose: 'access' }`
+JWT ペイロード（access）: `{ id, name, familyGroupId, role, authVersion, purpose: 'access' }`。`authMiddleware`と`pendingAuthMiddleware`はDBの現行`authVersion`と照合し、不一致のtokenを401として拒否する。緊急password再設定時はversionを増加させ、対象メンバーの既存access／pending tokenを失効させる。
 
 ### 3.2 ログインフロー
 

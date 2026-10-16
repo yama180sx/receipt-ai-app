@@ -1,15 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/auth';
 import logger from '../utils/logger';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { findMemberAuthVersion } from '../repositories/memberRepository';
+import { globalPrisma } from '../utils/prismaClient';
 
 /**
  * [Issue #51] JWT認証ミドルウェア
  * トークンの検証を行い、結果を req.user に格納します。
  */
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -33,9 +32,21 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  req.user = decoded;
-  
-  next();
+  try {
+    const member = await findMemberAuthVersion(decoded.memberId);
+    if (!member || member.authVersion !== decoded.authVersion) {
+      logger.warn(`[AUTH] Superseded session: ${req.path}`);
+      return res.status(401).json({
+        success: false,
+        code: 'TOKEN_INVALID_OR_EXPIRED',
+        message: 'セッションが切れたか、無効なトークンです',
+      });
+    }
+    req.user = decoded;
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
@@ -51,7 +62,7 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction) =
       return res.status(401).json({ success: false, message: 'ユーザー情報が取得できません' });
     }
 
-    const user = await prisma.familyMember.findUnique({
+    const user = await globalPrisma.familyMember.findUnique({
       where: { id: userId },
       select: { role: true, totpEnabled: true },
     });

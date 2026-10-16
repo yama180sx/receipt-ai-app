@@ -13,6 +13,7 @@ describe('authMapper', () => {
     name: '太郎',
     familyGroupId: 1,
     role: 'ADMIN' as const,
+    authVersion: 1,
     totpEnabled: true,
   };
 

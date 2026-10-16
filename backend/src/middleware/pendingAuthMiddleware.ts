@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenPurpose, verifyToken } from '../utils/auth';
 import logger from '../utils/logger';
+import { findMemberAuthVersion } from '../repositories/memberRepository';
 
 export function pendingAuthMiddleware(...allowedPurposes: TokenPurpose[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: '認証が必要です' });
@@ -16,7 +17,16 @@ export function pendingAuthMiddleware(...allowedPurposes: TokenPurpose[]) {
       return res.status(401).json({ success: false, message: 'セッションが無効です。再度ログインしてください。' });
     }
 
-    (req as Request & { user: typeof decoded }).user = decoded;
-    next();
+    try {
+      const member = await findMemberAuthVersion(decoded.memberId);
+      if (!member || member.authVersion !== decoded.authVersion) {
+        logger.warn(`[AUTH] Superseded pending token: ${req.path}`);
+        return res.status(401).json({ success: false, message: 'セッションが無効です。再度ログインしてください。' });
+      }
+      (req as Request & { user: typeof decoded }).user = decoded;
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
 }

@@ -46,6 +46,7 @@
 | `libexec/receipt-rollback-invitation-codes` | `/usr/local/libexec/receipt-rollback-invitation-codes` | root:root / 0750 |
 | `libexec/receipt-rotate-db-credentials` | `/usr/local/libexec/receipt-rotate-db-credentials` | root:root / 0750 |
 | `libexec/receipt-provision-a5m-readonly` | `/usr/local/libexec/receipt-provision-a5m-readonly` | root:root / 0750 |
+| `libexec/receipt-emergency-password-reset` | `/usr/local/libexec/receipt-emergency-password-reset` | root:root / 0750 |
 | `units/*.service`, `units/*.timer` | `/etc/systemd/system/` | root:root / 0644 |
 | `config/{dev,stable}.env.example` | `/etc/receipt-ai-app/{dev,stable}.env` | root:root / 0600 |
 | `config/offsite-{dev,stable}.env.example` | `/etc/receipt-ai-app/offsite-{dev,stable}.env` | root:root / 0600 |

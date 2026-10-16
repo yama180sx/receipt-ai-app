@@ -21,6 +21,7 @@ export interface JWTPayload {
   familyGroupId: number;
   name: string;
   role?: string;
+  authVersion: number;
   purpose?: TokenPurpose;
 }
 
@@ -29,6 +30,7 @@ type MemberTokenInput = {
   name: string;
   familyGroupId: number;
   role: string;
+  authVersion: number;
 };
 
 function toPayload(member: MemberTokenInput, purpose: TokenPurpose): JWTPayload {
@@ -38,6 +40,7 @@ function toPayload(member: MemberTokenInput, purpose: TokenPurpose): JWTPayload 
     familyGroupId: member.familyGroupId,
     name: member.name,
     role: member.role,
+    authVersion: member.authVersion,
     purpose,
   };
 }

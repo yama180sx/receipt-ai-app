@@ -80,6 +80,20 @@ describe.skipIf(!shouldRunDbIntegration())('Auth API integration', () => {
     expect(verifyRes.body.data.member.familyGroupId).toBe(1);
   });
 
+  it('rejects an access token after its member authVersion changes', async () => {
+    const token = await loginAsTestMember(app, 1);
+    await prisma.familyMember.update({
+      where: { id: 1 },
+      data: { authVersion: { increment: 1 } },
+    });
+
+    const response = await request(app)
+      .get('/api/receipts')
+      .set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('TOKEN_INVALID_OR_EXPIRED');
+  });
+
   describe('Auth API (#93-2)', () => {
     const YAMAMOTO_INVITE = 'YAMAMOTO-2026';
     const SATO_INVITE = 'SATO-2026';

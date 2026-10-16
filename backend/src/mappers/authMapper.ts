@@ -12,6 +12,7 @@ export type AuthMemberRecord = {
   name: string;
   familyGroupId: number;
   role: Role;
+  authVersion: number;
   totpEnabled: boolean;
 };
 
@@ -83,6 +84,7 @@ export function toAuthMemberRecord(member: {
   name: string;
   familyGroupId: number;
   role: Role;
+  authVersion: number;
   totpEnabled: boolean;
 }): AuthMemberRecord {
   return {
@@ -90,6 +92,7 @@ export function toAuthMemberRecord(member: {
     name: member.name,
     familyGroupId: member.familyGroupId,
     role: member.role,
+    authVersion: member.authVersion,
     totpEnabled: member.totpEnabled,
   };
 }
