@@ -10,6 +10,7 @@ declare -a forbidden_paths=(
   '.env.secret'
   'backend/.env'
   'frontend/.env'
+  'runtime/example.cred'
 )
 
 failed=0
