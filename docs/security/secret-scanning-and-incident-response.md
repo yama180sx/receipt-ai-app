@@ -42,6 +42,8 @@ hook が検知してcommitを停止した場合、`SKIP=gitleaks` で回避し�
 ./scripts/security/diagnose-secret-safety.sh
 ```
 
+この診断は`.env`に加え、root管理領域でのみ扱う暗号化credential artifact（`*.cred`）がGit追跡されずignoreされることを確認する。環境の識別・接続経路の扱いは[環境・接続経路の運用台帳](../environment-access-registry.md)を参照する。
+
 実行結果に秘密値を加えて共有してはならない。runtime credential の読取り主体・権限・到達性の診断は、サービス別Secrets配布を実装する Issue #131-3 で追加する。
 
 ## 4. 漏えい疑い時の初動
