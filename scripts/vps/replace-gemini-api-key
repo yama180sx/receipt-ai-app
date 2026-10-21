@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Issue #132-6: KAGOYA VPSのGemini API keyだけを対話的に差し替える。
+# 値をargv・標準出力・journalへ渡さない。rootでのみ実行する。
+set -Eeuo pipefail
+
+readonly COMPOSE_ENV_FILE='/etc/receipt-ai-app/kagoya-validation/compose.env'
+readonly CREDENTIAL_NAME='backend_gemini_api_key'
+readonly CONFIRMATION='replace-gemini-key'
+
+temporary_file=''
+
+die() {
+  echo "[kagoya-gemini-credential] $1" >&2
+  exit 1
+}
+
+cleanup() {
+  if [ -n "${temporary_file}" ] && [ -e "${temporary_file}" ]; then
+    rm -f -- "${temporary_file}"
+  fi
+}
+trap cleanup EXIT
+
+[ "${EUID}" -eq 0 ] || die 'run as root via sudo bash -c; do not pass the key as an argument'
+[ "$#" -eq 0 ] || die 'this helper accepts no arguments'
+[ -r "${COMPOSE_ENV_FILE}" ] || die 'compose environment file is unavailable'
+
+# このroot所有設定はCompose実行時にも読む正本である。値は表示しない。
+set -a
+# shellcheck disable=SC1090
+. "${COMPOSE_ENV_FILE}"
+set +a
+
+: "${RECAIPT_SECRETS_DIR:?RECAIPT_SECRETS_DIR is required by compose.env}"
+[ -d "${RECAIPT_SECRETS_DIR}" ] || die 'secret directory is unavailable'
+
+target_file="${RECAIPT_SECRETS_DIR}/${CREDENTIAL_NAME}"
+[ ! -L "${target_file}" ] || die 'refusing a symbolic-link credential target'
+
+echo '[kagoya-gemini-credential] Enter the newly issued KAGOYA-only Gemini API key. Input is hidden.' >&2
+IFS= read -r -s -p 'New Gemini API key: ' new_value
+printf '\n' >&2
+[ -n "${new_value}" ] || die 'credential input is empty'
+
+IFS= read -r -p "Type ${CONFIRMATION} to continue: " confirmation
+printf '\n' >&2
+[ "${confirmation}" = "${CONFIRMATION}" ] || die 'confirmation did not match'
+
+IFS= read -r -s -p 'Confirm new Gemini API key: ' confirmation_value
+printf '\n' >&2
+[ "${new_value}" = "${confirmation_value}" ] || die 'credential confirmation did not match'
+
+umask 077
+temporary_file="$(mktemp "${RECAIPT_SECRETS_DIR}/.${CREDENTIAL_NAME}.tmp.XXXXXX")"
+printf '%s' "${new_value}" > "${temporary_file}"
+chown root:root "${temporary_file}"
+chmod 0600 "${temporary_file}"
+mv -f -- "${temporary_file}" "${target_file}"
+temporary_file=''
+unset new_value confirmation_value confirmation
+
+echo '[kagoya-gemini-credential] credential file replaced without exposing its value; recreate backend before testing.' >&2
