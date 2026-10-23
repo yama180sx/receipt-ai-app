@@ -92,7 +92,7 @@ grep -Fq 'internal: true' "${rendered_compose}"
 
 grep -Fq 'RUN npm ci' "${repo_root}/backend/Dockerfile.runtime"
 grep -Fq 'RUN npx prisma generate' "${repo_root}/backend/Dockerfile.runtime"
-grep -Fq 'FROM node:20-slim' "${repo_root}/backend/Dockerfile.runtime"
+grep -Fq 'FROM node:22-slim' "${repo_root}/backend/Dockerfile.runtime"
 grep -Fq 'FROM node:22-alpine AS builder' "${repo_root}/frontend/Dockerfile.web"
 
 echo '[OK] production Compose contract is valid.'
