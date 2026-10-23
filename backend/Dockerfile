@@ -1,5 +1,5 @@
 # 安定版のNode.jsを使用
-FROM node:20-slim
+FROM node:22-slim
 
 # OSの依存パッケージをインストール（Prisma等の動作に必要）
 RUN apt-get update && apt-get install -y \
