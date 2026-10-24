@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# KAGOYA検証環境のDB/uploadsをrootだけでローカル世代backupする。
+set -euo pipefail
+
+die() { echo "[receipt-backup-kagoya-validation] $1" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 0 ] || die 'this helper accepts no arguments'
+
+readonly compose_env='/etc/receipt-ai-app/kagoya-validation/compose.env'
+readonly app_directory='/srv/receipt-ai-app/kagoya-validation-node22'
+readonly backup_directory='/var/backups/receipt-ai-app/kagoya-validation'
+readonly runtime_directory='/run/receipt-ai-app-backup-kagoya-validation'
+
+[ -r "${compose_env}" ] || die 'compose environment file is unavailable'
+[ -d "${app_directory}" ] || die 'managed application directory is unavailable'
+
+set -a
+# shellcheck disable=SC1090
+. "${compose_env}"
+set +a
+
+: "${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}"
+: "${DB_USER:?DB_USER is required}"
+: "${DB_NAME:?DB_NAME is required}"
+: "${RECAIPT_UPLOADS_DIR:?RECAIPT_UPLOADS_DIR is required}"
+: "${RECAIPT_SECRETS_DIR:?RECAIPT_SECRETS_DIR is required}"
+[[ "${COMPOSE_PROJECT_NAME}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die 'compose project name is invalid'
+[ -d "${RECAIPT_UPLOADS_DIR}" ] || die 'uploads directory is unavailable'
+[ -r "${RECAIPT_SECRETS_DIR}/postgres_password" ] || die 'database credential is unavailable'
+
+readonly database_container="${COMPOSE_PROJECT_NAME}-db-1"
+readonly timestamp="$(date +%Y%m%d_%H%M%S)"
+readonly database_archive="${backup_directory}/db/db_backup_${timestamp}.sql.gz"
+readonly uploads_archive="${backup_directory}/uploads/uploads_backup_${timestamp}.tar.gz"
+readonly docker_config_directory="${runtime_directory}/docker-config"
+
+install -d -o root -g root -m 0700 "${docker_config_directory}"
+install -d -o root -g root -m 0700 "${backup_directory}/db" "${backup_directory}/uploads"
+export DOCKER_CONFIG="${docker_config_directory}"
+
+docker inspect --format '{{.State.Running}}' "${database_container}" 2>/dev/null | grep -Fxq true \
+  || die 'database container is not running'
+
+if ! <"${RECAIPT_SECRETS_DIR}/postgres_password" \
+  docker exec -i "${database_container}" sh -c '
+    IFS= read -r PGPASSWORD || exit 1
+    export PGPASSWORD
+    exec pg_dump -U "$1" "$2"
+  ' sh "${DB_USER}" "${DB_NAME}" | gzip >"${database_archive}"; then
+  rm -f -- "${database_archive}"
+  die 'database dump failed'
+fi
+
+uploads_parent="$(dirname "${RECAIPT_UPLOADS_DIR}")"
+uploads_name="$(basename "${RECAIPT_UPLOADS_DIR}")"
+if ! tar -czf "${uploads_archive}" -C "${uploads_parent}" "${uploads_name}"; then
+  rm -f -- "${uploads_archive}"
+  die 'uploads archive failed'
+fi
+
+find "${backup_directory}/db" -maxdepth 1 -type f -name 'db_backup_*.sql.gz' -mtime +7 -delete
+find "${backup_directory}/uploads" -maxdepth 1 -type f -name 'uploads_backup_*.tar.gz' -mtime +7 -delete
+echo '[receipt-backup-kagoya-validation] generation completed successfully'

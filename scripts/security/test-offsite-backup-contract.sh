@@ -8,7 +8,7 @@ helper="${project_root}/ops/systemd/libexec/receipt-offsite-backup"
 test -f "${helper}"
 bash -n "${helper}"
 
-for environment in dev stable; do
+for environment in dev stable kagoya-validation; do
   unit="${project_root}/ops/systemd/units/receipt-offsite-backup-${environment}.service"
   test -f "${unit}"
   for expected in \
