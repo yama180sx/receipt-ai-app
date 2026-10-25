@@ -338,6 +338,12 @@ stable初回移行はIssue #131-3-3の開始ゲート、事前backup、停止時
 
 詳細: [architecture.md §8.3](./architecture.md)
 
+### 6.1 T320 stable から KAGOYA への選択移行
+
+`backend/prisma/kagoya-selective-migration.ts` は、KAGOYA初回受入のための手動専用ツールである。T320側では世帯・利用者（password hash、role、authVersion）、カテゴリ、店舗、プロンプト、送金履歴だけを root 専用の一時ファイルへ出力する。KAGOYA側では空の対象DBにだけ取り込む。
+
+`Receipt`、`Item`、uploads、解析ジョブ、Redisキュー、明細由来の分類・AI利用履歴、T320の秘密情報は対象外とする。TOTPの暗号化シークレット・有効状態も移行せず、取り込み時に必ず無効化する。実行前には両環境のbackup成功、dry-run、転送経路、作業担当者の承認を確認する。
+
 ---
 
 ## 7. 運用フロー図
@@ -377,6 +383,7 @@ flowchart LR
 | `backend/prisma/seed.ts` | 全削除 + 初期データ投入 |
 | `backend/prisma/update-master.ts` | マスタ upsert（運用向け） |
 | `backend/prisma/reset-test-data-preserve-auth.ts` | 承認済みの認証保持テストデータ再構築（手動専用） |
+| `backend/prisma/kagoya-selective-migration.ts` | T320 stable → KAGOYA の認証・基本設定のみを移す手動専用ツール |
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
