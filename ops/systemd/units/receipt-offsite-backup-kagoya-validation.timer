@@ -1,0 +1,11 @@
+[Unit]
+Description=Run RecAIpt KAGOYA validation encrypted R2 offsite backup daily and after boot
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Tokyo
+OnBootSec=10min
+Persistent=true
+Unit=receipt-offsite-backup-kagoya-validation.service
+
+[Install]
+WantedBy=timers.target

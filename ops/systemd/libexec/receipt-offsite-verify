@@ -30,7 +30,7 @@ validate_uploads_archive() {
 [ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
 
 case "$1" in
-  dev|stable) ;;
+  dev|stable|kagoya-validation) ;;
   *) die 'unknown fixed environment' ;;
 esac
 readonly environment="$1"

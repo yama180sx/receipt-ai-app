@@ -18,7 +18,7 @@ require_text() {
 
 for expected in \
   "[ \"\$(id -u)\" -eq 0 ]" \
-  "usage: receipt-register-offsite-credentials {dev|stable}" \
+  "usage: receipt-register-offsite-credentials {dev|stable|kagoya-validation}" \
   'IFS= read -r -s value' \
   'rclone obscure -' \
   'systemd-creds encrypt --name="${name}" - "${temporary}"' \
