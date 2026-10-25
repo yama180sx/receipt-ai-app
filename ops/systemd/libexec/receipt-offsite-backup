@@ -33,6 +33,7 @@ validate_uploads_archive() {
 case "$1" in
   dev) backup_dir='/mnt/raid_1t/backups/receipt-app-dev'; backup_unit='receipt-backup-dev.service' ;;
   stable) backup_dir='/mnt/raid_1t/backups/receipt-app'; backup_unit='receipt-backup-stable.service' ;;
+  kagoya-validation) backup_dir='/var/backups/receipt-ai-app/kagoya-validation'; backup_unit='receipt-backup-kagoya-validation.service' ;;
   *) die 'unknown fixed environment' ;;
 esac
 readonly environment="$1"

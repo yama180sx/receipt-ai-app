@@ -1,0 +1,23 @@
+[Unit]
+Description=RecAIpt KAGOYA validation encrypted R2 offsite backup readback verification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/etc/receipt-ai-app/offsite-kagoya-validation.env
+RuntimeDirectory=receipt-ai-app-offsite-verify-kagoya-validation
+RuntimeDirectoryMode=0700
+LoadCredentialEncrypted=r2_access_key_id:/etc/receipt-ai-app/credentials/kagoya-validation/r2_access_key_id.cred
+LoadCredentialEncrypted=r2_secret_access_key:/etc/receipt-ai-app/credentials/kagoya-validation/r2_secret_access_key.cred
+LoadCredentialEncrypted=rclone_crypt_password:/etc/receipt-ai-app/credentials/kagoya-validation/rclone_crypt_password.cred
+LoadCredentialEncrypted=rclone_crypt_salt:/etc/receipt-ai-app/credentials/kagoya-validation/rclone_crypt_salt.cred
+ExecStart=/usr/local/libexec/receipt-offsite-verify kagoya-validation
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-offsite-verify-kagoya-validation

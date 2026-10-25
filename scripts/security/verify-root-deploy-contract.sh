@@ -94,6 +94,7 @@ done
 "${project_root}/scripts/security/test-isolated-backend-entrypoint-contract.sh"
 "${project_root}/scripts/security/test-offsite-isolated-login-acceptance-contract.sh"
 "${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
+"${project_root}/scripts/security/test-kagoya-backup-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"

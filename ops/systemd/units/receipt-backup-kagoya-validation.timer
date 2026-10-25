@@ -1,0 +1,11 @@
+[Unit]
+Description=Run RecAIpt KAGOYA validation backup daily and after boot
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Tokyo
+OnBootSec=2min
+Persistent=true
+Unit=receipt-backup-kagoya-validation.service
+
+[Install]
+WantedBy=timers.target
