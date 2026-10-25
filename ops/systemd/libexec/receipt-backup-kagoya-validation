@@ -42,8 +42,12 @@ export DOCKER_CONFIG="${docker_config_directory}"
 docker inspect --format '{{.State.Running}}' "${database_container}" 2>/dev/null | grep -Fxq true \
   || die 'database container is not running'
 
-if ! <"${RECAIPT_SECRETS_DIR}/postgres_password" \
-  docker exec -i "${database_container}" sh -c '
+# The secret file is intentionally not assumed to end in a newline.  Append
+# one to the stream so POSIX read succeeds for both common secret-file forms.
+if ! {
+  cat -- "${RECAIPT_SECRETS_DIR}/postgres_password"
+  printf '\n'
+} | docker exec -i "${database_container}" sh -c '
     IFS= read -r PGPASSWORD || exit 1
     export PGPASSWORD
     exec pg_dump -U "$1" "$2"
