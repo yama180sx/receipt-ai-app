@@ -82,7 +82,7 @@ export function ReceiptHistoryList({
             )}
           </TouchableOpacity>
         </View>
-      ) : null}
+      ) : undefined}
       initialNumToRender={15}
     />
   );
