@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ScrollView } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { devUiColors, isDevAppEnv } from '../../../config/appEnv';
 import { loginService } from '../../../services/loginService';
 import { theme } from '../../../theme';
@@ -18,7 +18,7 @@ type UseLoginFlowOptions = {
 };
 
 export function useLoginFlow({ onLoginSuccess }: UseLoginFlowOptions) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const [step, setStep] = useState<LoginStep>('invite');
   const [inviteCode, setInviteCode] = useState('');
   const [family, setFamily] = useState<ResolvedFamily | null>(null);
