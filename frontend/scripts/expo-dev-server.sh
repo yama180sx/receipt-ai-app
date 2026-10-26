@@ -6,7 +6,7 @@ PORT="${DEV_PORT:-8081}"
 HOST="${HOST_IP:-localhost}"
 ENV="${ENV_NAME:-dev}"
 
-# Expo SDK 57 の manifest は、CLIを起動したプロセス自身の環境を基に
+# Expo SDK 58 の manifest は、CLIを起動したプロセス自身の環境を基に
 # bundle URL / debuggerHost を生成する。Composeの環境変数をそのまま継承する
 # だけにせず、起動直前に同じVPN到達先を明示して、Metro・manifest・表示URLを
 # 一つの接続先へそろえる。

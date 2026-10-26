@@ -82,6 +82,14 @@ jobs:
       - name: Verify OpenAPI generated types
         run: npm run check:api
 
+      - name: Verify Expo SDK diagnostics
+        run: npx expo-doctor
+
+      - name: Verify Expo web and Android bundles
+        run: |
+          npx expo export --platform web
+          npx expo export --platform android
+
   backend-integration:
     name: Backend API integration (Postgres)
     runs-on: ubuntu-latest

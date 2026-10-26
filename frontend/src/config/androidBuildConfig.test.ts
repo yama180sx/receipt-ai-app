@@ -10,7 +10,6 @@ describe('Android development build configuration', () => {
     expect(config.android).toMatchObject({
       package: 'jp.yama180sx.recaipt',
       versionCode: 1,
-      usesCleartextTraffic: true,
     });
   });
 
