@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { OpenApiHttpError } from '../api/openapiHttpError';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getApiErrorMessage,
@@ -17,16 +16,6 @@ describe('apiError', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  it('extracts error field from OpenApiHttpError', () => {
-    const error = new OpenApiHttpError(new Response(null, { status: 403 }), {
-      error: '権限がありません',
-    });
-
-    expect(getApiErrorStatus(error)).toBe(403);
-    expect(getApiErrorResponseData(error)).toEqual({ error: '権限がありません' });
-    expect(getApiErrorMessage(error)).toBe('権限がありません');
   });
 
   it('extracts error field from axios response', () => {

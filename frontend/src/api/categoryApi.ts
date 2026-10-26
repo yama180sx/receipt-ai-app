@@ -1,16 +1,14 @@
-import { openapiClient } from './openapiClient';
-import { unwrapOpenApiResponse } from './openapiHttpError';
+import apiClient from '../utils/apiClient';
 import type {
   ApiSuccessResponse,
   Category,
 } from './generated';
 
-/** カテゴリ API（/api/categories）— openapi-fetch + generated paths（#105-5 PoC） */
+/** カテゴリ API（/api/categories） */
 export const categoryApi = {
   async listCategories(): Promise<ApiSuccessResponse<Category[]>> {
-    return (await unwrapOpenApiResponse(
-      openapiClient.GET('/categories')
-    )) as ApiSuccessResponse<Category[]>;
+    const response = await apiClient.get<ApiSuccessResponse<Category[]>>('/categories');
+    return response.data;
   },
 };
 
