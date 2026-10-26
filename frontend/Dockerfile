@@ -1,4 +1,4 @@
-# Expo SDK 57 の要件を満たす Node.js を使用
+# Expo SDK 58 の要件を満たす Node.js を使用
 FROM node:22-slim
 
 # OSの依存パッケージをインストール
