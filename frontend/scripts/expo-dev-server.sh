@@ -5,6 +5,9 @@ set -e
 PORT="${DEV_PORT:-8081}"
 HOST="${HOST_IP:-localhost}"
 ENV="${ENV_NAME:-dev}"
+# Expo Go と development build のどちらにも接続先を案内できるよう、
+# development build にインストール済みの scheme を明示する。
+DEV_CLIENT_SCHEME="${EXPO_DEV_CLIENT_SCHEME:-exp+recaipt}"
 
 # Expo SDK 58 の manifest は、CLIを起動したプロセス自身の環境を基に
 # bundle URL / debuggerHost を生成する。Composeの環境変数をそのまま継承する
@@ -33,10 +36,16 @@ fi
 
 # expo-dev-client が依存関係にあると、Expo CLI は指定なしでは development build を
 # 自動選択し、QRを exp+<scheme>:// にする。frontend-devの既定QRはExpo Go用なので
-# --go を明示する。Android development buildはランチャーから同じMetro URLを指定して
-# 利用できるため、この既定値の変更で利用不能にはならない。
+# --go を明示する。一方で --go だけでは development build 用のURLを組み立てる scheme
+# が未設定となり、/_expo/open?runtime=custom が空URLを返す。--scheme も明示して、
+# Expo Go 用の既定QRと development build 用の起動URLを両方提供する。
 #
 # npx経由ではなくプロジェクトに固定されたCLIを直接起動する。--clear は前回の
 # Metro変換キャッシュが接続先の変更をまたがないようにするためで、アプリデータや
 # 永続データは削除しない。
-exec ./node_modules/.bin/expo start --port "${PORT}" --host lan --go --clear
+exec ./node_modules/.bin/expo start \
+  --port "${PORT}" \
+  --host lan \
+  --go \
+  --scheme "${DEV_CLIENT_SCHEME}" \
+  --clear

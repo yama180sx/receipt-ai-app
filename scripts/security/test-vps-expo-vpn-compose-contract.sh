@@ -101,6 +101,8 @@ grep -Fq 'FROM node:22-slim' "${repo_root}/frontend/Dockerfile.runtime-dev"
 expo_start_script="${repo_root}/frontend/scripts/expo-dev-server.sh"
 grep -Fq 'export REACT_NATIVE_PACKAGER_HOSTNAME="${HOST}"' "${expo_start_script}"
 grep -Fq 'export EXPO_PACKAGER_PROXY_URL="http://${HOST}:${PORT}"' "${expo_start_script}"
-grep -Fq 'exec ./node_modules/.bin/expo start --port "${PORT}" --host lan --go --clear' "${expo_start_script}"
+grep -Fq 'DEV_CLIENT_SCHEME="${EXPO_DEV_CLIENT_SCHEME:-exp+recaipt}"' "${expo_start_script}"
+grep -Fq -- '--go' "${expo_start_script}"
+grep -Fq -- '--scheme "${DEV_CLIENT_SCHEME}"' "${expo_start_script}"
 
 echo '[OK] VPS Expo VPN Compose contract is valid.'
