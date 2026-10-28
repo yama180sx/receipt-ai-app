@@ -14,4 +14,11 @@ describe('categoryApi', () => {
     await expect(categoryApi.listCategories()).resolves.toEqual(payload);
     expect(apiClient.get).toHaveBeenCalledWith('/categories');
   });
+
+  it('identifies a malformed category response without exposing a raw TypeError', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: undefined } as never);
+
+    await expect(categoryApi.listCategories())
+      .rejects.toThrow('/categories の応答形式が不正です。');
+  });
 });
