@@ -19,6 +19,7 @@ import type {
   ProductClassificationLearningData,
   ProductTypeStatus,
 } from './generated';
+import { requireSuccessResponse } from './responseContract';
 
 export type ListReceiptsParams = {
   month?: string;
@@ -55,7 +56,7 @@ export type ListProductClassificationReviewItemsParams = {
 export const receiptApi = {
   async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptListPage>> {
     const res = await apiClient.get('/receipts', { params });
-    return res.data;
+    return requireSuccessResponse<ReceiptListPage>('/receipts', res?.data);
   },
 
   async getReceipt(receiptId: number): Promise<ApiSuccessResponse<ReceiptDetail>> {
@@ -172,7 +173,7 @@ export const receiptApi = {
 
   async getFamilyMembers(): Promise<ApiSuccessResponse<FamilyMemberSummary[]>> {
     const res = await apiClient.get('/family-groups/members');
-    return res.data;
+    return requireSuccessResponse<FamilyMemberSummary[]>('/family-groups/members', res?.data);
   },
 
   async saveItemSplits(
