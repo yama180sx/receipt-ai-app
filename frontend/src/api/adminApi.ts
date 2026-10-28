@@ -12,46 +12,47 @@ import type {
   PromptTemplate,
   UpdatePromptTemplateRequest,
 } from './generated';
+import { requireSuccessResponse } from './responseContract';
 
 /** 管理 API（/api/admin/*）— ADMIN + TOTP 必須 */
 export const adminApi = {
   async getGlobalAiBudget(): Promise<ApiSuccessResponse<{ setting: GlobalAiBudgetSetting | null }>> {
-    const res = await apiClient.get('/admin/ai-budget'); return res.data;
+    const res = await apiClient.get('/admin/ai-budget'); return requireSuccessResponse('/admin/ai-budget', res?.data);
   },
   async updateGlobalAiBudget(input: UpdateGlobalAiBudgetInput): Promise<ApiSuccessResponse<GlobalAiBudgetSetting>> {
-    const res = await apiClient.put('/admin/ai-budget', input); return res.data;
+    const res = await apiClient.put('/admin/ai-budget', input); return requireSuccessResponse('/admin/ai-budget', res?.data);
   },
   async testGlobalAiBudgetNotification(channels: Array<'DISCORD' | 'EMAIL'>): Promise<ApiMessageResponse> {
     const res = await apiClient.post('/admin/ai-budget/notifications/test', { channels }); return res.data;
   },
   async listGlobalAiBudgetNotificationDeliveries(): Promise<ApiSuccessResponse<AiBudgetNotificationDelivery[]>> {
-    const res = await apiClient.get('/admin/ai-budget/notifications'); return res.data;
+    const res = await apiClient.get('/admin/ai-budget/notifications'); return requireSuccessResponse('/admin/ai-budget/notifications', res?.data);
   },
   async listGlobalAiBudgetManagers(): Promise<ApiSuccessResponse<GlobalAiBudgetManager[]>> {
-    const res = await apiClient.get('/admin/ai-budget/managers'); return res.data;
+    const res = await apiClient.get('/admin/ai-budget/managers'); return requireSuccessResponse('/admin/ai-budget/managers', res?.data);
   },
   async listGlobalAiBudgetManagerCandidates(): Promise<ApiSuccessResponse<GlobalAiBudgetManagerCandidate[]>> {
-    const res = await apiClient.get('/admin/ai-budget/manager-candidates'); return res.data;
+    const res = await apiClient.get('/admin/ai-budget/manager-candidates'); return requireSuccessResponse('/admin/ai-budget/manager-candidates', res?.data);
   },
   async addGlobalAiBudgetManager(memberId: number, reason: string): Promise<ApiSuccessResponse<GlobalAiBudgetManager>> {
-    const res = await apiClient.post('/admin/ai-budget/managers', { memberId, reason }); return res.data;
+    const res = await apiClient.post('/admin/ai-budget/managers', { memberId, reason }); return requireSuccessResponse('/admin/ai-budget/managers', res?.data);
   },
   async removeGlobalAiBudgetManager(memberId: number, reason: string): Promise<ApiMessageResponse> {
     const res = await apiClient.delete(`/admin/ai-budget/managers/${memberId}`, { data: { reason } }); return res.data;
   },
   async getCostStats(): Promise<ApiSuccessResponse<AdminCostStatRow[]>> {
     const res = await apiClient.get('/admin/stats');
-    return res.data;
+    return requireSuccessResponse<AdminCostStatRow[]>('/admin/stats', res?.data);
   },
 
   async listPrompts(): Promise<ApiSuccessResponse<PromptTemplate[]>> {
     const res = await apiClient.get('/admin/prompts');
-    return res.data;
+    return requireSuccessResponse<PromptTemplate[]>('/admin/prompts', res?.data);
   },
 
   async createPrompt(input: CreatePromptTemplateRequest): Promise<ApiSuccessResponse<PromptTemplate>> {
     const res = await apiClient.post('/admin/prompts', input);
-    return res.data;
+    return requireSuccessResponse<PromptTemplate>('/admin/prompts', res?.data);
   },
 
   async updatePrompt(
@@ -59,7 +60,7 @@ export const adminApi = {
     input: UpdatePromptTemplateRequest
   ): Promise<ApiSuccessResponse<PromptTemplate>> {
     const res = await apiClient.patch(`/admin/prompts/${id}`, input);
-    return res.data;
+    return requireSuccessResponse<PromptTemplate>(`/admin/prompts/${id}`, res?.data);
   },
 
   async activatePrompt(id: number): Promise<ApiMessageResponse> {
@@ -76,32 +77,50 @@ export const adminApi = {
     input: CreateProductClassificationReclassificationRunRequest
   ): Promise<ApiSuccessResponse<ProductClassificationReclassificationRun>> {
     const res = await apiClient.post('/admin/product-classification/reclassification-runs', input);
-    return res.data;
+    return requireSuccessResponse<ProductClassificationReclassificationRun>(
+      '/admin/product-classification/reclassification-runs',
+      res?.data
+    );
   },
 
   async listStandardProductClassificationRules(includeInactive = true): Promise<ApiSuccessResponse<StandardProductClassificationRule[]>> {
     const res = await apiClient.get('/admin/product-classification/standard-rules', { params: { includeInactive } });
-    return res.data;
+    return requireSuccessResponse<StandardProductClassificationRule[]>(
+      '/admin/product-classification/standard-rules',
+      res?.data
+    );
   },
 
   async previewStandardProductClassificationRule(keyword: string): Promise<ApiSuccessResponse<StandardProductClassificationRulePreview>> {
     const res = await apiClient.post('/admin/product-classification/standard-rules/preview', { keyword });
-    return res.data;
+    return requireSuccessResponse<StandardProductClassificationRulePreview>(
+      '/admin/product-classification/standard-rules/preview',
+      res?.data
+    );
   },
 
   async createStandardProductClassificationRule(input: UpsertStandardProductClassificationRuleRequest): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
     const res = await apiClient.post('/admin/product-classification/standard-rules', input);
-    return res.data;
+    return requireSuccessResponse<StandardProductClassificationRule>(
+      '/admin/product-classification/standard-rules',
+      res?.data
+    );
   },
 
   async updateStandardProductClassificationRule(id: number, input: UpsertStandardProductClassificationRuleRequest): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
     const res = await apiClient.patch(`/admin/product-classification/standard-rules/${id}`, input);
-    return res.data;
+    return requireSuccessResponse<StandardProductClassificationRule>(
+      `/admin/product-classification/standard-rules/${id}`,
+      res?.data
+    );
   },
 
   async deactivateStandardProductClassificationRule(id: number, reason: string): Promise<ApiSuccessResponse<StandardProductClassificationRule>> {
     const res = await apiClient.patch(`/admin/product-classification/standard-rules/${id}/deactivate`, { reason });
-    return res.data;
+    return requireSuccessResponse<StandardProductClassificationRule>(
+      `/admin/product-classification/standard-rules/${id}/deactivate`,
+      res?.data
+    );
   },
 };
 
