@@ -177,7 +177,13 @@ EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"
 INSTANCE_NAME="${INSTANCE_NAME:-${ENVIRONMENT}}"
 [[ "${INSTANCE_NAME}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "instance name is invalid"
 readonly INSTANCE_NAME
-readonly PROJECT_NAME="${INSTANCE_NAME}"
+case "${ENVIRONMENT}" in
+  # T320の既存Compose project名（receipt-dev / receipt-stable）を維持する。
+  # コンテナ名だけでなくCompose labelも一致させ、DB/Valkeyを別project扱いしない。
+  dev|stable) readonly PROJECT_NAME="receipt-${INSTANCE_NAME}" ;;
+  # MacBookは既存の独立project名を維持する。
+  mb-stable) readonly PROJECT_NAME="${INSTANCE_NAME}" ;;
+esac
 if [ "${ENVIRONMENT}" = "mb-stable" ]; then
   readonly BACKEND_RUNTIME_DOCKERFILE="Dockerfile.runtime-macbook"
 else
@@ -265,6 +271,18 @@ run_compose() {
       "$@"
 }
 
+verify_existing_managed_containers() {
+  local service container actual_project
+  for service in backend frontend frontend-dev frontend-go db redis; do
+    container="receipt-${INSTANCE_NAME}-${service}"
+    if ! actual_project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "${container}" 2>/dev/null)"; then
+      continue
+    fi
+    [ "${actual_project}" = "${PROJECT_NAME}" ] || \
+      die 'existing managed container has an incompatible Compose project'
+  done
+}
+
 # Prisma CLIは *_FILE を解決しないため、コンテナ内だけでDATABASE_URLを設定して実行する。
 # 値をhostの引数・ログ・作業ディレクトリへ出さない。
 run_prisma_migration() {
@@ -316,6 +334,8 @@ verify_backend_health() {
   die "backend health check failed after deployment"
 }
 
+# 既存containerのlabelが不一致なら、DB/Valkeyを削除・再作成せずに停止する。
+verify_existing_managed_containers
 run_compose build backend frontend frontend-dev frontend-go
 # DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
 # 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
