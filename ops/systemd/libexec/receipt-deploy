@@ -45,7 +45,7 @@ load_non_secret_config() {
       *) die "non-secret config has an invalid line" ;;
     esac
     case "${key}" in
-      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA|INSTANCE_NAME)
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|EXPO_GO_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA|INSTANCE_NAME)
         printf -v "${key}" '%s' "${value}"
         export "${key}"
         ;;
@@ -129,6 +129,9 @@ write_runtime_env() {
     printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${app_environment}" "${HOST_IP}" "${WEB_PORT}"
   } > "${APP_DIRECTORY}/frontend/.env"
 
+  printf 'EXPO_GO_PORT=%s\n' "${EXPO_GO_PORT}" >> "${destination}/compose.env"
+  # Expo Go専用Metroはdevelopment buildと別portを使うため、CORS許可も別に保持する。
+  printf 'CORS_ORIGIN=http://%s,http://%s:%s,http://%s:%s,exp://%s:%s,exp://%s:%s,http://localhost:%s,http://127.0.0.1:%s\n' "${HOST_IP}" "${HOST_IP}" "${WEB_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${EXPO_GO_PORT}" "${DEV_PORT}" "${DEV_PORT}" >> "${APP_DIRECTORY}/backend/.env"
   chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
 }
 
@@ -170,6 +173,7 @@ require_root_owned_directory "${DATA_ROOT}"
 require_root_owned_directory "${DATA_DIRECTORY}"
 require_root_owned_directory "${RUNTIME_DIRECTORY}"
 load_non_secret_config "${CONFIG_FILE}"
+EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"
 INSTANCE_NAME="${INSTANCE_NAME:-${ENVIRONMENT}}"
 [[ "${INSTANCE_NAME}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "instance name is invalid"
 readonly INSTANCE_NAME
@@ -312,7 +316,7 @@ verify_backend_health() {
   die "backend health check failed after deployment"
 }
 
-run_compose build backend frontend frontend-dev
+run_compose build backend frontend frontend-dev frontend-go
 # DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
 # 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
 # 永続データはRECAIPT_PGDATA_DIRとRECAIPT_QUEUE_DATA_DIRのbind mountに残るため削除しない。

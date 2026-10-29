@@ -25,6 +25,7 @@ fi
 
 for file in \
   ops/systemd/libexec/receipt-deploy \
+  ops/systemd/libexec/receipt-expo-go \
   ops/systemd/libexec/receipt-backup \
   ops/systemd/libexec/receipt-offsite-backup \
   ops/systemd/libexec/receipt-offsite-backup-failure \
@@ -42,6 +43,8 @@ for file in \
   ops/systemd/libexec/receipt-provision-a5m-readonly \
   ops/systemd/units/receipt-deploy-dev.service \
   ops/systemd/units/receipt-deploy-stable.service \
+  ops/systemd/units/receipt-expo-go-dev.service \
+  ops/systemd/units/receipt-expo-go-stable.service \
   ops/systemd/units/receipt-backup-dev.service \
   ops/systemd/units/receipt-backup-stable.service \
   ops/systemd/units/receipt-offsite-backup-dev.service \
@@ -68,6 +71,7 @@ done
 
 for helper in \
   ops/systemd/libexec/receipt-deploy \
+  ops/systemd/libexec/receipt-expo-go \
   ops/systemd/libexec/receipt-backup \
   ops/systemd/libexec/receipt-offsite-backup \
   ops/systemd/libexec/receipt-offsite-backup-failure \
@@ -96,6 +100,7 @@ done
 "${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 "${project_root}/scripts/security/test-kagoya-backup-contract.sh"
 "${project_root}/scripts/security/test-kagoya-selective-migration-contract.sh"
+"${project_root}/scripts/security/test-expo-go-runtime-contract.sh"
 
 require_exact_line() {
   local expected_line="$1"
