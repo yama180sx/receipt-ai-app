@@ -109,7 +109,9 @@ systemd-creds decrypt --name=db_password "${CREDENTIAL_FILE}" "${DATABASE_SECRET
 [ -s "${DATABASE_SECRET_FILE}" ] || die "database credential is empty"
 
 echo "[receipt-restore] stopping application containers"
-docker stop "receipt-${ENVIRONMENT}-backend" "receipt-${ENVIRONMENT}-frontend" "receipt-${ENVIRONMENT}-frontend-dev" >/dev/null
+# Expo Go専用Metroが起動中なら同時に停止する。旧checkoutとの互換のため、存在しない場合は従来3コンテナだけを停止する。
+docker stop "receipt-${ENVIRONMENT}-backend" "receipt-${ENVIRONMENT}-frontend" "receipt-${ENVIRONMENT}-frontend-dev" "receipt-${ENVIRONMENT}-frontend-go" >/dev/null 2>&1 || \
+  docker stop "receipt-${ENVIRONMENT}-backend" "receipt-${ENVIRONMENT}-frontend" "receipt-${ENVIRONMENT}-frontend-dev" >/dev/null
 
 # uploadsを先にstagingへ展開する。既存uploadsは削除せず、同一filesystem内に退避する。
 tar -xzf "${UPLOADS_BACKUP}" --no-same-owner --no-same-permissions -C "${UPLOADS_STAGING_DIRECTORY}"

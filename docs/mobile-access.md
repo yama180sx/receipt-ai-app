@@ -24,28 +24,49 @@ dev 環境は Web `:8080`、Expo dev `:8081`、API `:3001`。
 
 Expo Go は不要。`:8082` も不要。
 
-## 開発・動確（Expo Go / Android development build）
+## 開発・動確（Android development build）
 
 ネイティブ挙動（カメラ切り取り・生体認証等）の検証用。**本番運用の入口ではない。**
 
 1. T320 で `frontend-dev` コンテナが Up であること
-2. PC で `http://HOST_IP:8082` を開き QR を表示
-3. スマホに **Expo Go** をインストール、同一 Wi-Fi で QR をスキャン
+2. Androidには、EASの`development` profileから配布した **RecAIpt (dev)** をインストールする
+3. RecAIpt (dev)をホーム画面から起動して、development build用Metroへ接続する
 4. 招待コードでログイン
 
-stable の backend は `:80` に加え `:8082` / `exp://` を CORS 許可している（Issue #94-1）。
+`frontend-dev`はdevelopment build専用である。Expo GoのQRをここで読ませてはいけない。
 
-AndroidでExpo GoがVPN内Metroへ接続できない場合は、[Android development build運用](./android-development-build.md)の`development` profileを使う。専用APKでもVPN接続は必要であり、実endpoint・署名情報・APK配布URLをGitやIssueへ記録しない。`stable` APKはbundleを内包するためMetroを必要としない。
+## Expo Go（補助検証だけ）
+
+Expo Goは日常利用・Android development buildの代替ではない。SDK互換性の確認など、Issueで必要とした補助検証にだけ使う。
+
+Expo Goとdevelopment buildは同じMetroを共有しない。root管理のT320では、管理担当者が対象環境のExpo Go専用Metroを明示的に開始する。
+
+```bash
+# dev環境
+sudo systemctl start receipt-expo-go-dev.service
+
+# stable環境
+sudo systemctl start receipt-expo-go-stable.service
+```
+
+PCでは、対象環境のroot所有設定にある`HOST_IP`と`EXPO_GO_PORT`でExpo Go専用Metroを開き、そのQRだけをExpo Goでスキャンする。値やQRのURLはIssue、PR、Git、チャットへ記録しない。終了時は同じ環境のserviceを停止する。
+
+```bash
+sudo systemctl stop receipt-expo-go-dev.service
+# または stable: receipt-expo-go-stable.service
+```
+
+Expo GoはプロジェクトのSDK 58と互換のある版を使用する。Expo Goの障害時に`frontend-dev`を`--go`へ戻したり、development APKを削除・再作成したりしない。
 
 ## トラブルシュート
 
 | 症状 | 確認 |
 |------|------|
-| Expo Go / Web dev の URL | ログ冒頭の案内を参照。stable は `http://HOST_IP:8082`（dev は `:8081`）。Expo 標準ログの `localhost:8081` は無視 |
-| `:8082` の QR が `8081` になる / Expo Go が繋がらない | root管理設定の`DEV_PORT`を確認し、管理担当者が固定unitでstableを再デプロイする。`docker compose`を直接実行しない。 |
+| development build / Web dev の URL | `frontend-dev`のログ冒頭の案内を参照。Expo標準ログのlocalhost URLは使わない。 |
+| Expo GoのQRがdevelopment buildを開く、またはその逆 | 対象のMetroを停止し、用途に合うroot管理serviceだけを開始する。`frontend-dev`と`frontend-go`を兼用しない。 |
 | `:8082` で招待コードが通らない | root所有設定のCORS関連値と`HOST_IP`を確認し、管理担当者が固定unitでstableを再デプロイする。`setup-env.sh`やユーザー所有Composeは使わない。別PC／スマホからは`http://HOST_IP:8082`を使う。 |
 | 招待コード入力後に進まない（Android Web） | 旧ビルドは `:3000` 直叩きで CORS / ポート到達性の問題あり。**frontend を再ビルド**（`/api` 同一 Origin プロキシ）。それでも失敗する場合は Wi‑Fi 同一 LAN・`http://HOST_IP` でアクセスしているか確認 |
-| Expo Go が繋がらない | 同一 Wi-Fi、`HOST_IP` が QR の URL と一致するか |
+| Expo Go が繋がらない | AndroidのExpo GoがSDK 58互換か、VPN/Wi-Fi到達性、Expo Go専用Metroの`HOST_IP`・`EXPO_GO_PORT`を管理担当者が確認する。 |
 | iPhone でカメラが起動しない | HTTP 制限の可能性 — ギャラリーから選択、または Web 切り取り UI（#94-4）を利用 |
 
 ## 関連 Issue

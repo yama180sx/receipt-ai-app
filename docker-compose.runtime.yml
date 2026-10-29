@@ -39,6 +39,28 @@ services:
     volumes: !override
       - /etc/localtime:/etc/localtime:ro
 
+  # Expo Goはdevelopment buildと別のMetroを必要時だけ起動する。Secret、source bind mount、TTYは渡さない。
+  frontend-go:
+    build:
+      dockerfile: Dockerfile.runtime-dev
+    user: "1000:1000"
+    command: sh /app/scripts/expo-go-server.sh
+    stdin_open: false
+    tty: false
+    env_file: !reset []
+    environment: !override
+      TZ: Asia/Tokyo
+      ENV_NAME: ${ENV_NAME}
+      HOST_IP: ${HOST_IP}
+      EXPO_GO_PORT: ${EXPO_GO_PORT:-8083}
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_IP}
+      EXPO_PACKAGER_PROXY_URL: http://${HOST_IP}:${EXPO_GO_PORT:-8083}
+      EXPO_PUBLIC_APP_ENV: ${ENV_NAME}
+      EXPO_PUBLIC_API_URL: http://${HOST_IP}:${WEB_PORT}/api
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
+
   db:
     # Issue #132-1: T320のDBはhost loopbackだけへbindする。A5M2は自宅LANの
     # SSHローカルポートフォワード経由だけを許可し、LAN／インターネットへ直接公開しない。
