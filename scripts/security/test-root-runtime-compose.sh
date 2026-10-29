@@ -55,6 +55,10 @@ verify_legacy_runtime_compatibility() {
   grep -Fq 'RECAIPT_REDISDATA_DIR=%s/redisdata' "${deploy_helper}"
   grep -Fq 'RECAIPT_QUEUE_DATA_DIR=%s/valkeydata' "${deploy_helper}"
   grep -Fq '"${DATA_DIRECTORY}/redisdata"' "${deploy_helper}"
+  grep -Fq 'dev|stable) readonly PROJECT_NAME="receipt-${INSTANCE_NAME}" ;;' "${deploy_helper}"
+  grep -Fq 'mb-stable) readonly PROJECT_NAME="${INSTANCE_NAME}" ;;' "${deploy_helper}"
+  grep -Fq 'verify_existing_managed_containers' "${deploy_helper}"
+  grep -Fq 'existing managed container has an incompatible Compose project' "${deploy_helper}"
 }
 
 verify_command() {
