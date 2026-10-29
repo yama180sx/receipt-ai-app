@@ -5,7 +5,6 @@ set -e
 PORT="${DEV_PORT:-8081}"
 HOST="${HOST_IP:-localhost}"
 ENV="${ENV_NAME:-dev}"
-# Expo Go と development build のどちらにも接続先を案内できるよう、
 # development build にインストール済みの scheme を明示する。
 DEV_CLIENT_SCHEME="${EXPO_DEV_CLIENT_SCHEME:-exp+recaipt}"
 
@@ -19,7 +18,7 @@ export EXPO_PACKAGER_PROXY_URL="http://${HOST}:${PORT}"
 echo ""
 echo "=============================================="
 echo " RecAIpt Expo Dev Server (${ENV})"
-echo " Expo Go:  exp://${HOST}:${PORT}"
+echo " Dev build: exp+recaipt://expo-development-client/?url=http%3A%2F%2F${HOST}%3A${PORT}"
 echo " Web:      http://${HOST}:${PORT}"
 if [ "$ENV" = "stable" ]; then
   echo " 本番 Web: http://${HOST} （port 80）"
@@ -34,11 +33,11 @@ if [ ! -f node_modules/expo-router/build/global-state/storeContext.js ]; then
   echo ""
 fi
 
-# expo-dev-client が依存関係にあると、Expo CLI は指定なしでは development build を
-# 自動選択し、QRを exp+<scheme>:// にする。frontend-devの既定QRはExpo Go用なので
-# --go を明示する。一方で --go だけでは development build 用のURLを組み立てる scheme
-# が未設定となり、/_expo/open?runtime=custom が空URLを返す。--scheme も明示して、
-# Expo Go 用の既定QRと development build 用の起動URLを両方提供する。
+# frontend-dev は Android development build 専用の Metro サーバーである。
+# Expo Go 用の --go と development build 用の exp+<scheme> URL を同じ起動プロセスへ
+# 混在させると、端末がどちらのランタイム向け bundle を実行するか判別できない。
+# --dev-client を明示して、manifest・QR・手入力URLを development build の経路に統一する。
+# Expo Go は別の起動経路（Issue #142）で扱う。
 #
 # npx経由ではなくプロジェクトに固定されたCLIを直接起動する。--clear は前回の
 # Metro変換キャッシュが接続先の変更をまたがないようにするためで、アプリデータや
@@ -46,6 +45,6 @@ fi
 exec ./node_modules/.bin/expo start \
   --port "${PORT}" \
   --host lan \
-  --go \
+  --dev-client \
   --scheme "${DEV_CLIENT_SCHEME}" \
   --clear
