@@ -45,7 +45,7 @@ load_non_secret_config() {
       *) die "non-secret config has an invalid line" ;;
     esac
     case "${key}" in
-      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA|INSTANCE_NAME)
+      HOST_IP|WEB_PORT|BACKEND_PORT|DEV_PORT|EXPO_GO_PORT|DB_PORT|REDIS_PORT|EXPO_PORT_1|EXPO_PORT_2|REDIS_PORT_INTERNAL|SMTP_HOST|SMTP_PORT|SMTP_SECURE|GEMINI_RECEIPT_MODEL|GEMINI_PRODUCT_CLASSIFICATION_MODEL|RECEIPT_MANUAL_RETRY_LIMIT|RECEIPT_MANUAL_RETRY_FAILURE_CODES|RECEIPT_ANALYSIS_MAINTENANCE_MODE|LOG_LEVEL|TRUST_PROXY_HOPS|STABLE_RELEASE_SHA|INSTANCE_NAME)
         printf -v "${key}" '%s' "${value}"
         export "${key}"
         ;;
@@ -129,6 +129,9 @@ write_runtime_env() {
     printf 'EXPO_PUBLIC_APP_ENV=%s\nEXPO_PUBLIC_API_URL=http://%s:%s/api\n' "${app_environment}" "${HOST_IP}" "${WEB_PORT}"
   } > "${APP_DIRECTORY}/frontend/.env"
 
+  printf 'EXPO_GO_PORT=%s\n' "${EXPO_GO_PORT}" >> "${destination}/compose.env"
+  # Expo Go専用Metroはdevelopment buildと別portを使うため、CORS許可も別に保持する。
+  printf 'CORS_ORIGIN=http://%s,http://%s:%s,http://%s:%s,exp://%s:%s,exp://%s:%s,http://localhost:%s,http://127.0.0.1:%s\n' "${HOST_IP}" "${HOST_IP}" "${WEB_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${DEV_PORT}" "${HOST_IP}" "${EXPO_GO_PORT}" "${DEV_PORT}" "${DEV_PORT}" >> "${APP_DIRECTORY}/backend/.env"
   chmod 0600 "${destination}/compose.env" "${APP_DIRECTORY}/backend/.env" "${APP_DIRECTORY}/frontend/.env"
 }
 
@@ -170,10 +173,17 @@ require_root_owned_directory "${DATA_ROOT}"
 require_root_owned_directory "${DATA_DIRECTORY}"
 require_root_owned_directory "${RUNTIME_DIRECTORY}"
 load_non_secret_config "${CONFIG_FILE}"
+EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"
 INSTANCE_NAME="${INSTANCE_NAME:-${ENVIRONMENT}}"
 [[ "${INSTANCE_NAME}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "instance name is invalid"
 readonly INSTANCE_NAME
-readonly PROJECT_NAME="${INSTANCE_NAME}"
+case "${ENVIRONMENT}" in
+  # T320の既存Compose project名（receipt-dev / receipt-stable）を維持する。
+  # コンテナ名だけでなくCompose labelも一致させ、DB/Valkeyを別project扱いしない。
+  dev|stable) readonly PROJECT_NAME="receipt-${INSTANCE_NAME}" ;;
+  # MacBookは既存の独立project名を維持する。
+  mb-stable) readonly PROJECT_NAME="${INSTANCE_NAME}" ;;
+esac
 if [ "${ENVIRONMENT}" = "mb-stable" ]; then
   readonly BACKEND_RUNTIME_DOCKERFILE="Dockerfile.runtime-macbook"
 else
@@ -261,6 +271,18 @@ run_compose() {
       "$@"
 }
 
+verify_existing_managed_containers() {
+  local service container actual_project
+  for service in backend frontend frontend-dev frontend-go db redis; do
+    container="receipt-${INSTANCE_NAME}-${service}"
+    if ! actual_project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "${container}" 2>/dev/null)"; then
+      continue
+    fi
+    [ "${actual_project}" = "${PROJECT_NAME}" ] || \
+      die 'existing managed container has an incompatible Compose project'
+  done
+}
+
 # Prisma CLIは *_FILE を解決しないため、コンテナ内だけでDATABASE_URLを設定して実行する。
 # 値をhostの引数・ログ・作業ディレクトリへ出さない。
 run_prisma_migration() {
@@ -312,7 +334,9 @@ verify_backend_health() {
   die "backend health check failed after deployment"
 }
 
-run_compose build backend frontend frontend-dev
+# 既存containerのlabelが不一致なら、DB/Valkeyを削除・再作成せずに停止する。
+verify_existing_managed_containers
+run_compose build backend frontend frontend-dev frontend-go
 # DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
 # 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
 # 永続データはRECAIPT_PGDATA_DIRとRECAIPT_QUEUE_DATA_DIRのbind mountに残るため削除しない。

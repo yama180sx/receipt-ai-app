@@ -2,6 +2,16 @@ import baseConfig from '../../app.json';
 import { describe, expect, it } from 'vitest';
 
 const appConfig = require('../../app.config.js') as (args: { config: typeof baseConfig.expo }) => typeof baseConfig.expo;
+const easConfig = require('../../eas.json') as {
+  build: {
+    development: {
+      developmentClient: boolean;
+      distribution: string;
+      environment?: string;
+      android: { buildType: string };
+    };
+  };
+};
 
 describe('Android development build configuration', () => {
   it('keeps the private-VPN HTTP API available to Android builds', () => {
@@ -19,5 +29,14 @@ describe('Android development build configuration', () => {
     expect(config.plugins).toEqual(
       expect.arrayContaining(['expo-dev-client', './plugins/withAndroidCleartextTraffic']),
     );
+  });
+
+  it('uses the dedicated EAS development environment for development APKs', () => {
+    expect(easConfig.build.development).toMatchObject({
+      developmentClient: true,
+      distribution: 'internal',
+      environment: 'development',
+      android: { buildType: 'apk' },
+    });
   });
 });

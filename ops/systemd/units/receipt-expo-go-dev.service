@@ -1,0 +1,19 @@
+[Unit]
+Description=RecAIpt dev Expo Go Metro (on demand)
+After=network-online.target docker.service receipt-deploy-dev.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/receipt-expo-go dev start
+ExecStop=/usr/local/libexec/receipt-expo-go dev stop
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/receipt-ai-app-dev

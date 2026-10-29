@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { categoryApi, receiptApi } from '../../../api';
+import type { ApiSuccessResponse } from '../../../api/generated';
 import { useIsWideLayout } from '../../../hooks/useIsWideLayout';
 import type { CategorySummary, ReceiptDetail } from '../../../types/receipt';
 import type { FamilyMemberSummary } from '../../../types/settlement';
@@ -15,6 +16,20 @@ import {
 type UseReceiptHistoryOptions = {
   currentMemberId: number;
 };
+
+/**
+ * API client は成功 envelope を返す契約だが、実行環境で値が欠落した場合にも
+ * 画面側で `undefined.success` とせず、失敗した取得先を明示する。
+ */
+function requireHistoryResponse<T>(
+  endpoint: string,
+  response: ApiSuccessResponse<T> | null | undefined
+): ApiSuccessResponse<T> {
+  if (!response) {
+    throw new Error(`${endpoint} の応答を取得できませんでした。`);
+  }
+  return response;
+}
 
 export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions) {
   const isWide = useIsWideLayout();
@@ -59,10 +74,8 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await categoryApi.listCategories();
-      if (res.success) {
-        setCategories(res.data);
-      }
+      const { data } = requireHistoryResponse('/categories', await categoryApi.listCategories());
+      setCategories(data);
     } catch (err) {
       showApiErrorAlert('エラー', err, 'カテゴリーの取得に失敗しました。');
     }
@@ -70,10 +83,8 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await receiptApi.getFamilyMembers();
-      if (res.success) {
-        setMembers(res.data);
-      }
+      const { data } = requireHistoryResponse('/family-groups/members', await receiptApi.getFamilyMembers());
+      setMembers(data);
     } catch (err) {
       showApiErrorAlert('エラー', err, '世帯メンバーの取得に失敗しました。');
     }
@@ -96,20 +107,17 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
         setPagination({ items: [], nextCursor: null, hasNext: false });
         setSelectedReceipt(null);
       }
-      const res = await receiptApi.listReceipts(getListParams());
+      const res = requireHistoryResponse('/receipts', await receiptApi.listReceipts(getListParams()));
       if (requestId !== receiptRequestIdRef.current) return;
-      if (res.success) {
-        const data = res.data;
-        const nextPage = replaceReceiptHistoryPage(data);
-        setReceipts(nextPage.items);
-        setPagination(nextPage);
+      const nextPage = replaceReceiptHistoryPage(res.data);
+      setReceipts(nextPage.items);
+      setPagination(nextPage);
 
-        if (!clearSelection && selectedReceipt) {
-          const updated = nextPage.items.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
-          if (updated) setSelectedReceipt(updated);
-        } else if (isWide && nextPage.items.length > 0) {
-          setSelectedReceipt(nextPage.items[0]);
-        }
+      if (!clearSelection && selectedReceipt) {
+        const updated = nextPage.items.find((r: ReceiptDetail) => r.id === selectedReceipt.id);
+        if (updated) setSelectedReceipt(updated);
+      } else if (isWide && nextPage.items.length > 0) {
+        setSelectedReceipt(nextPage.items[0]);
       }
     } catch (err) {
       if (requestId === receiptRequestIdRef.current) {
@@ -127,13 +135,11 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
     const requestId = ++receiptRequestIdRef.current;
     try {
       setLoadingMore(true);
-      const res = await receiptApi.listReceipts(getListParams(cursor));
+      const res = requireHistoryResponse('/receipts', await receiptApi.listReceipts(getListParams(cursor)));
       if (requestId !== receiptRequestIdRef.current) return;
-      if (res.success) {
-        const nextPage = appendReceiptHistoryPage(pagination, res.data);
-        setReceipts(nextPage.items);
-        setPagination(nextPage);
-      }
+      const nextPage = appendReceiptHistoryPage(pagination, res.data);
+      setReceipts(nextPage.items);
+      setPagination(nextPage);
     } catch (err) {
       if (requestId === receiptRequestIdRef.current) {
         showApiErrorAlert('エラー', err, '追加の履歴取得に失敗しました。');
@@ -155,22 +161,22 @@ export function useReceiptHistory({ currentMemberId }: UseReceiptHistoryOptions)
   const handleCategoryChange = async (itemId: number, categoryId: number | null) => {
     if (!categoryId) return;
     try {
-      const response = await receiptApi.updateItemCategory(itemId, Number(categoryId));
+      const response = requireHistoryResponse(
+        `/receipts/items/${itemId}`,
+        await receiptApi.updateItemCategory(itemId, Number(categoryId))
+      );
+      const updatedItem = response.data;
+      const mapper = (r: ReceiptDetail): ReceiptDetail => ({
+        ...r,
+        items: r.items.map((item) =>
+          item.id === itemId
+            ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category }
+            : item
+        ),
+      });
 
-      if (response.success) {
-        const updatedItem = response.data;
-        const mapper = (r: ReceiptDetail): ReceiptDetail => ({
-          ...r,
-          items: r.items.map((item) =>
-            item.id === itemId
-              ? { ...item, categoryId: updatedItem.categoryId, category: updatedItem.category }
-              : item
-          ),
-        });
-
-        setReceipts((prev) => prev.map(mapper));
-        if (selectedReceipt) setSelectedReceipt((prev) => (prev ? mapper(prev) : null));
-      }
+      setReceipts((prev) => prev.map(mapper));
+      if (selectedReceipt) setSelectedReceipt((prev) => (prev ? mapper(prev) : null));
     } catch (err) {
       showApiErrorAlert('エラー', err, 'カテゴリーの更新に失敗しました。');
     }

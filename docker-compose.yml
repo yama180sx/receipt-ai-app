@@ -75,6 +75,37 @@ services:
     depends_on:
       - backend
 
+  # --- Frontend (Expo Go Server; opt-in only) ---
+  # development build用frontend-devとは別Metroにして、QR/manifestのruntimeを混在させない。
+  frontend-go:
+    profiles: ["expo-go"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: receipt-${INSTANCE_NAME:-${ENV_NAME}}-frontend-go
+    restart: unless-stopped
+    user: "${UID}:${GID}"
+    command: sh /app/scripts/expo-go-server.sh
+    volumes:
+      - ./frontend:/app
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "${EXPO_GO_PORT:-8083}:${EXPO_GO_PORT:-8083}"
+    stdin_open: true
+    tty: true
+    env_file:
+      - ./frontend/.env
+    environment:
+      - TZ=Asia/Tokyo
+      - ENV_NAME=${ENV_NAME}
+      - HOST_IP=${HOST_IP}
+      - EXPO_GO_PORT=${EXPO_GO_PORT:-8083}
+      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - REACT_NATIVE_PACKAGER_HOSTNAME=${HOST_IP}
+      - EXPO_PACKAGER_PROXY_URL=http://${HOST_IP}:${EXPO_GO_PORT:-8083}
+    depends_on:
+      - frontend
+
   # --- Database ---
   db:
     image: postgres:18

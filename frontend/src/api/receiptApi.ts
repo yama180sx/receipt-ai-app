@@ -19,6 +19,7 @@ import type {
   ProductClassificationLearningData,
   ProductTypeStatus,
 } from './generated';
+import { requireSuccessResponse } from './responseContract';
 
 export type ListReceiptsParams = {
   month?: string;
@@ -55,17 +56,17 @@ export type ListProductClassificationReviewItemsParams = {
 export const receiptApi = {
   async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptListPage>> {
     const res = await apiClient.get('/receipts', { params });
-    return res.data;
+    return requireSuccessResponse<ReceiptListPage>('/receipts', res?.data);
   },
 
   async getReceipt(receiptId: number): Promise<ApiSuccessResponse<ReceiptDetail>> {
     const res = await apiClient.get(`/receipts/${receiptId}`);
-    return res.data;
+    return requireSuccessResponse<ReceiptDetail>(`/receipts/${receiptId}`, res?.data);
   },
 
   async getLatestReceipt(memberId: number): Promise<ApiSuccessResponse<ReceiptDetail | null>> {
     const res = await apiClient.get('/receipts/latest', { params: { memberId } });
-    return res.data;
+    return requireSuccessResponse<ReceiptDetail | null>('/receipts/latest', res?.data);
   },
 
   async updateReceipt(
@@ -73,7 +74,7 @@ export const receiptApi = {
     payload: Record<string, unknown>
   ): Promise<ApiSuccessResponse<ReceiptDetail>> {
     const res = await apiClient.patch(`/receipts/${receiptId}`, payload);
-    return res.data;
+    return requireSuccessResponse<ReceiptDetail>(`/receipts/${receiptId}`, res?.data);
   },
 
   async updateItemCategory(
@@ -81,12 +82,12 @@ export const receiptApi = {
     categoryId: number
   ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
     const res = await apiClient.patch(`/receipts/items/${itemId}`, { categoryId });
-    return res.data;
+    return requireSuccessResponse<ReceiptItemDetail>(`/receipts/items/${itemId}`, res?.data);
   },
 
   async listProductTypes(): Promise<ApiSuccessResponse<ProductTypeSummary[]>> {
     const res = await apiClient.get('/product-types');
-    return res.data;
+    return requireSuccessResponse<ProductTypeSummary[]>('/product-types', res?.data);
   },
 
   async updateItemProductClassification(
@@ -94,14 +95,20 @@ export const receiptApi = {
     payload: ProductClassificationCorrectionPayload
   ): Promise<ApiSuccessResponse<ReceiptItemDetail>> {
     const res = await apiClient.patch(`/receipts/items/${itemId}/product-classification`, payload);
-    return res.data;
+    return requireSuccessResponse<ReceiptItemDetail>(
+      `/receipts/items/${itemId}/product-classification`,
+      res?.data
+    );
   },
 
   async getItemProductClassificationCandidates(
     itemId: number
   ): Promise<ApiSuccessResponse<ProductClassificationCandidateSummary[]>> {
     const res = await apiClient.get(`/receipts/items/${itemId}/product-classification-candidates`);
-    return res.data;
+    return requireSuccessResponse<ProductClassificationCandidateSummary[]>(
+      `/receipts/items/${itemId}/product-classification-candidates`,
+      res?.data
+    );
   },
 
   async listProductClassificationReviewItems(
@@ -111,12 +118,18 @@ export const receiptApi = {
     const res = await apiClient.get('/product-classification/review-items', {
       params: { ...rest, ...(statuses?.length ? { status: statuses.join(',') } : {}) },
     });
-    return res.data;
+    return requireSuccessResponse<ProductClassificationReviewItem[]>(
+      '/product-classification/review-items',
+      res?.data
+    );
   },
 
   async listProductClassificationLearningData(): Promise<ApiSuccessResponse<ProductClassificationLearningData[]>> {
     const res = await apiClient.get('/product-classification/learning-data');
-    return res.data;
+    return requireSuccessResponse<ProductClassificationLearningData[]>(
+      '/product-classification/learning-data',
+      res?.data
+    );
   },
 
   async deactivateProductClassificationLearningData(
@@ -125,19 +138,22 @@ export const receiptApi = {
     reason: string
   ): Promise<ApiSuccessResponse<ProductClassificationLearningData>> {
     const res = await apiClient.patch(`/product-classification/learning-data/${type}/${id}/deactivate`, { reason });
-    return res.data;
+    return requireSuccessResponse<ProductClassificationLearningData>(
+      `/product-classification/learning-data/${type}/${id}/deactivate`,
+      res?.data
+    );
   },
 
   async commitReceipt(payload: CommitReceiptPayload): Promise<ApiSuccessResponse<ReceiptDetail>> {
     const res = await apiClient.post('/receipts/commit', payload);
-    return res.data;
+    return requireSuccessResponse<ReceiptDetail>('/receipts/commit', res?.data);
   },
 
   async createManualReceipt(
     payload: ManualReceiptRequest
   ): Promise<ApiSuccessResponse<ReceiptDetail>> {
     const res = await apiClient.post('/receipts', payload);
-    return res.data;
+    return requireSuccessResponse<ReceiptDetail>('/receipts', res?.data);
   },
 
   async uploadReceipt(
@@ -147,17 +163,17 @@ export const receiptApi = {
     const res = await apiClient.post('/receipts/upload', formData, {
       headers: { 'x-member-id': memberId.toString() },
     });
-    return res.data;
+    return requireSuccessResponse<{ jobId: string; status?: string }>('/receipts/upload', res?.data);
   },
 
   async listJobs(): Promise<ApiSuccessResponse<ReceiptJobListItem[]>> {
     const res = await apiClient.get('/receipts/jobs');
-    return res.data;
+    return requireSuccessResponse<ReceiptJobListItem[]>('/receipts/jobs', res?.data);
   },
 
   async getJobStatus(jobId: string): Promise<ReceiptJobStatusResponse> {
     const res = await apiClient.get(`/receipts/status/${jobId}`);
-    return res.data;
+    return requireSuccessResponse<ReceiptJobStatus>(`/receipts/status/${jobId}`, res?.data);
   },
 
   async discardJob(jobId: string): Promise<ApiMessageResponse> {
@@ -167,12 +183,12 @@ export const receiptApi = {
 
   async retryJob(jobId: string): Promise<ApiSuccessResponse<UploadJobResponse>> {
     const res = await apiClient.post(`/receipts/jobs/${jobId}/retry`);
-    return res.data;
+    return requireSuccessResponse<UploadJobResponse>(`/receipts/jobs/${jobId}/retry`, res?.data);
   },
 
   async getFamilyMembers(): Promise<ApiSuccessResponse<FamilyMemberSummary[]>> {
     const res = await apiClient.get('/family-groups/members');
-    return res.data;
+    return requireSuccessResponse<FamilyMemberSummary[]>('/family-groups/members', res?.data);
   },
 
   async saveItemSplits(
@@ -180,6 +196,9 @@ export const receiptApi = {
     splits: ItemSplitInput[]
   ): Promise<ApiSuccessResponse<ItemSplitSummary[] | { message: string }>> {
     const res = await apiClient.post(`/receipts/items/${itemId}/splits`, { splits });
-    return res.data;
+    return requireSuccessResponse<ItemSplitSummary[] | { message: string }>(
+      `/receipts/items/${itemId}/splits`,
+      res?.data
+    );
   },
 };

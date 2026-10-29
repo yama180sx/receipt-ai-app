@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# root所有で /usr/local/libexec/receipt-expo-go として設置するExpo Go専用Metro制御ヘルパー。
+# 任意Compose引数・任意パス・任意環境は受け取らない。
+set -euo pipefail
+
+readonly APP_ROOT='/srv/receipt-ai-app'
+
+die() {
+  echo "[receipt-expo-go] $1" >&2
+  exit 1
+}
+
+require_secure_root_directory() {
+  local directory="$1"
+  [ -d "${directory}" ] || die 'managed directory is unavailable'
+  [ "$(stat -c '%u:%g' "${directory}")" = '0:0' ] || die 'managed directory ownership is invalid'
+  [ $((8#$(stat -c '%a' "${directory}") & 8#022)) -eq 0 ] || die 'managed directory is writable by group or others'
+}
+
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 2 ] || die 'usage: receipt-expo-go {dev|stable} {start|stop}'
+
+readonly ENVIRONMENT="$1"
+readonly ACTION="$2"
+case "${ENVIRONMENT}" in
+  dev|stable) ;;
+  *) die 'unknown fixed environment' ;;
+esac
+case "${ACTION}" in
+  start|stop) ;;
+  *) die 'unknown fixed action' ;;
+esac
+
+readonly APP_DIRECTORY="${APP_ROOT}/${ENVIRONMENT}"
+readonly RUNTIME_DIRECTORY="/run/receipt-ai-app-${ENVIRONMENT}"
+readonly COMPOSE_ENV_FILE="${RUNTIME_DIRECTORY}/compose.env"
+readonly DOCKER_CONFIG_DIRECTORY="${RUNTIME_DIRECTORY}/expo-go-docker-config"
+
+require_secure_root_directory "${APP_DIRECTORY}"
+require_secure_root_directory "${RUNTIME_DIRECTORY}"
+[ -f "${COMPOSE_ENV_FILE}" ] || die 'deployment runtime configuration is unavailable'
+[ "$(stat -c '%u:%g' "${COMPOSE_ENV_FILE}")" = '0:0' ] || die 'runtime configuration ownership is invalid'
+[ $((8#$(stat -c '%a' "${COMPOSE_ENV_FILE}") & 8#077)) -eq 0 ] || die 'runtime configuration permissions are invalid'
+
+install -d -o root -g root -m 0700 "${DOCKER_CONFIG_DIRECTORY}"
+
+run_compose() {
+  env DOCKER_CONFIG="${DOCKER_CONFIG_DIRECTORY}" \
+    docker compose --ansi never --profile expo-go --project-directory "${APP_DIRECTORY}" \
+      --env-file "${COMPOSE_ENV_FILE}" \
+      -f "${APP_DIRECTORY}/docker-compose.yml" \
+      -f "${APP_DIRECTORY}/docker-compose.runtime.yml" \
+      "$@"
+}
+
+case "${ACTION}" in
+  start)
+    # frontend/backendはroot管理deploy済みであることが前提。依存サービスを暗黙起動しない。
+    run_compose up -d --no-deps --force-recreate frontend-go
+    echo '[receipt-expo-go] Expo Go Metro started without exposing secrets'
+    ;;
+  stop)
+    run_compose stop frontend-go >/dev/null || true
+    echo '[receipt-expo-go] Expo Go Metro stopped'
+    ;;
+esac

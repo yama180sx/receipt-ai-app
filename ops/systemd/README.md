@@ -32,6 +32,7 @@
 | リポジトリ上のテンプレート | root上の設置先 | 所有者・mode |
 | --- | --- | --- |
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
+| `libexec/receipt-expo-go` | `/usr/local/libexec/receipt-expo-go` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup-failure` | `/usr/local/libexec/receipt-offsite-backup-failure` | root:root / 0750 |
