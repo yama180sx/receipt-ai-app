@@ -70,7 +70,7 @@ flowchart TB
 
 | レイヤー | 技術 |
 |----------|------|
-| Frontend | Expo ~57, Expo development build（Android）, React 19.2, React Native 0.86, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
+| Frontend | Expo ~58, Expo development build（Android）, React 19.2, React Native 0.88, TypeScript, Axios（Web build / frontend CI は Node.js 22） |
 | Backend | Node.js 22, Express 5, TypeScript, Prisma 6 |
 | DB | PostgreSQL 18 |
 | Queue | BullMQ 5 + Valkey 8.1.10（Redis互換、Issue #119で移行完了） |
