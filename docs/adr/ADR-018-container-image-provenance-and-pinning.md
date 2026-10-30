@@ -14,7 +14,8 @@ RecAIptではValkeyをタグとdigestで固定している一方、backend／fro
 
 - アプリのbuild／runtimeで使用するNode.js、Nginx、PostgreSQL、Valkeyは、採用時にタグと検証済みのmanifest digestを組にして記録する。
 - digest採用前に、公式供給元、AMD64と将来使用し得るARM64のmanifest、ライセンス、対象タグのサポート状態を確認する。単一アーキテクチャのimage digestを、複数環境向けのmanifest digestとして扱わない。
-- 新しいdigestは、リポジトリの静的契約テスト、Docker build、backend／frontend testを通し、T320 devで主要機能とbackupを受入してから採用する。stableはADR-011の固定SHA、事前backup、人間承認を満たす場合だけ反映する。
+- 新しいdigestは、リポジトリの静的契約テスト、Docker build、backend／frontend testを通し、T320 devで主要機能とbackupを受入してから採用する。T320 stableはADR-011の固定SHA、事前backup、人間承認を満たす場合だけ反映する。
+- KAGOYAは将来の家族向け本番環境であり、T320 stable受入の後に同じrelease候補が正常動作することを検証する到達目標に含める。KAGOYAの認証・解析受入などの前提Issueが未完了の間は、KAGOYA受入を完了として記録しない。このADRだけでKAGOYAの設定変更や主系切替を行わない。
 - release記録にはアプリSHA、各採用タグ・digest、受入結果、直前の採用組を残す。秘密情報、接続先、利用者データは記録しない。
 - 緊急の供給元脆弱性対応も、未検証digestを直接stableへ反映しない。まずdevで最小限の検証を行い、安定性または復旧可能性に影響する場合はstable反映を停止して判断する。
 - digestの定期確認頻度、更新候補の検知方法、契約テストで禁止する可変タグの範囲は、本ADRをAcceptedにした後にIssue #152で具体化する。
@@ -23,4 +24,5 @@ RecAIptではValkeyをタグとdigestで固定している一方、backend／fro
 
 - 同じアプリSHAの再ビルドにおける供給元差分を追跡できるようになる。
 - digest更新はアプリ依存更新と同じrelease判断を必要とし、Dockerfile／Composeだけの直接変更では完結しない。
+- 通常の変更も、T320 dev、T320 stable、KAGOYAの順で将来本番への互換性を確認できる。KAGOYAの前提が未完了の場合は、その未達を明示し、KAGOYAへの反映や主系切替を推測で進めない。
 - 現在の可変タグは、本ADRがAcceptedになり、対象イメージごとの検証済みdigestと更新手順が確定するまで維持する。
