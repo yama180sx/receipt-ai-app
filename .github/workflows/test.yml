@@ -6,6 +6,15 @@ on:
     branches: [develop, main]
 
 jobs:
+  container-image-pinning-contract:
+    name: Container image pinning contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify build and runtime image pins
+        run: bash scripts/security/test-container-image-pinning-contract.sh
+
   production-compose-contract:
     name: Production Compose contract
     runs-on: ubuntu-latest
