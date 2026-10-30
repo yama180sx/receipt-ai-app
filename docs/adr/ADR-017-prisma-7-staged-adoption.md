@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-関連: Issue #138、[ADR-010](./ADR-010-secret-lifecycle-and-runtime-delivery.md)、[ADR-011](./ADR-011-stable-release-promotion-control.md)
+関連: Issue #138、Issue #151、[ADR-010](./ADR-010-secret-lifecycle-and-runtime-delivery.md)、[ADR-011](./ADR-011-stable-release-promotion-control.md)
 
 ## 背景
 
@@ -14,7 +14,7 @@ stableのDB接続、migration、secret deliveryを依存監査の自動更新で
 
 ## 決定
 
-- Prisma 7は、Issue #138内の専用設計・実装フェーズとして扱い、通常の`npm audit fix`やPrisma 6 patch更新と混在させない。
+- Prisma 7は、Issue #151の専用設計・実装フェーズとして扱い、通常の`npm audit fix`やPrisma 6 patch更新と混在させない。
 - `prisma`と`@prisma/client`は同じmajor/minorで更新する。Prisma 7への更新前に、ESM互換のpackage設定・TypeScript設定・全import経路を検証する。
 - PostgreSQL driver adapterとconnection pool設定を明示し、既存のtimeout・TLS・接続失敗時の挙動をdevで比較する。
 - `prisma.config.ts`はschema、migration、seed、datasourceを定義する。ただしroot管理encrypted credentialやsecret fileを直接読まない。root deploy helperだけがsecret fileから短命の`DATABASE_URL`を解決し、Prisma CLI実行時のコンテナ環境へ渡す。
