@@ -1,6 +1,6 @@
 # ADR-018: コンテナイメージは検証済みdigestを段階的に固定する
 
-Status: Proposed
+Status: Accepted
 
 関連: Issue #152、[ADR-011](./ADR-011-stable-release-promotion-control.md)、[ADR-012](./ADR-012-valkey-queue-store-adoption.md)
 
