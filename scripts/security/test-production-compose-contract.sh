@@ -92,7 +92,7 @@ grep -Fq 'internal: true' "${rendered_compose}"
 
 grep -Fq 'RUN npm ci' "${repo_root}/backend/Dockerfile.runtime"
 grep -Fq 'RUN npx prisma generate' "${repo_root}/backend/Dockerfile.runtime"
-grep -Fq 'FROM node:22-slim' "${repo_root}/backend/Dockerfile.runtime"
-grep -Fq 'FROM node:22-alpine AS builder' "${repo_root}/frontend/Dockerfile.web"
+grep -Fq 'FROM node:22-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da' "${repo_root}/backend/Dockerfile.runtime"
+grep -Fq 'FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS builder' "${repo_root}/frontend/Dockerfile.web"
 
 echo '[OK] production Compose contract is valid.'
