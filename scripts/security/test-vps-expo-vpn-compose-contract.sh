@@ -93,7 +93,7 @@ if grep -Eq 'host_ip: (0\.0\.0\.0|127\.0\.0\.1)' "${rendered_compose}"; then
 fi
 
 grep -Fq 'internal: true' "${rendered_compose}"
-grep -Fq 'FROM node:22-slim' "${repo_root}/frontend/Dockerfile.runtime-dev"
+grep -Fq 'FROM node:22-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da' "${repo_root}/frontend/Dockerfile.runtime-dev"
 
 # Issue #118-2-1: Expo manifestのbundle URL / debuggerHostは、Metroを起動する
 # プロセスの環境から生成される。VPNの到達先を起動直前にも固定し、npxの環境解決を
