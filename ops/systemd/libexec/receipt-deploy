@@ -336,7 +336,13 @@ verify_backend_health() {
 
 # 既存containerのlabelが不一致なら、DB/Valkeyを削除・再作成せずに停止する。
 verify_existing_managed_containers
-run_compose build backend frontend frontend-dev frontend-go
+# helperだけを先に更新した場合でも、承認済みの旧releaseを再deployできるようにする。
+# Expo Go runtimeはopt-inであり、旧Composeにはfrontend-goが定義されていない。
+build_services=(backend frontend frontend-dev)
+if grep -Eq '^[[:space:]]{2}frontend-go:[[:space:]]*$' "${APP_DIRECTORY}/docker-compose.yml"; then
+  build_services+=(frontend-go)
+fi
+run_compose build "${build_services[@]}"
 # DBはpostgres_passwordをbind mountする。/runの旧世代を参照する既存コンテナを
 # 起動しないよう、現在の世代で必ずrecreateしてからhealthcheckを待つ。
 # 永続データはRECAIPT_PGDATA_DIRとRECAIPT_QUEUE_DATA_DIRのbind mountに残るため削除しない。

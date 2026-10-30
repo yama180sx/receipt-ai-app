@@ -59,6 +59,10 @@ verify_legacy_runtime_compatibility() {
   grep -Fq 'mb-stable) readonly PROJECT_NAME="${INSTANCE_NAME}" ;;' "${deploy_helper}"
   grep -Fq 'verify_existing_managed_containers' "${deploy_helper}"
   grep -Fq 'existing managed container has an incompatible Compose project' "${deploy_helper}"
+  grep -Fq 'build_services=(backend frontend frontend-dev)' "${deploy_helper}"
+  grep -Fq "grep -Eq '^[[:space:]]{2}frontend-go:[[:space:]]*\$'" "${deploy_helper}"
+  grep -Fq 'build_services+=(frontend-go)' "${deploy_helper}"
+  grep -Fq 'run_compose build "${build_services[@]}"' "${deploy_helper}"
 }
 
 verify_command() {
