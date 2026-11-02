@@ -17,7 +17,7 @@
     "kagoya-development": {
       "developmentClient": true,
       "distribution": "internal",
-      "environment": "kagoya",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       },

@@ -61,7 +61,7 @@ describe('Android development build configuration', () => {
     expect(easConfig.build['kagoya-development']).toMatchObject({
       developmentClient: true,
       distribution: 'internal',
-      environment: 'kagoya',
+      environment: 'preview',
       android: { buildType: 'apk' },
     });
   });
