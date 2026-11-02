@@ -25,6 +25,7 @@
 - [運用・障害対応](./design/operations.md) — RecAIptの環境構築、バックアップ、復旧、デプロイ
 - [環境・接続経路の運用台帳](./environment-access-registry.md) — 秘密値を置かない環境識別・接続前確認・パスワードマネージャー命名規約
 - [KAGOYA Gemini認証の再発行・解析受入](./reviews/issue-132-6/kagoya-gemini-credential-recovery.md) — Issue #132-6 の秘密値を出さない復旧手順
+- [KAGOYA選択移行runbook](./reviews/issue-132-7/kagoya-selective-migration-runbook.md) — Issue #132-7 の認証・基本設定を安全に移行する手順
 
 ## 既存資料の棚卸し
 

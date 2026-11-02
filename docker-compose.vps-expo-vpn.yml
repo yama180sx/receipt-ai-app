@@ -22,6 +22,8 @@ services:
       EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
       REACT_NATIVE_PACKAGER_HOSTNAME: ${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}
       EXPO_PACKAGER_PROXY_URL: http://${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}:${EXPO_DEV_PORT:?EXPO_DEV_PORT is required}
-      EXPO_PUBLIC_APP_ENV: ${ENV_NAME:?ENV_NAME is required}
+      # コンテナ識別用ENV_NAMEとは別に、KAGOYA APK専用の公開アプリ環境を渡す。
+      EXPO_PUBLIC_APP_ENV: ${EXPO_PUBLIC_APP_ENV:-kagoya}
+      EXPO_DEV_CLIENT_SCHEME: ${EXPO_DEV_CLIENT_SCHEME:-exp+recaipt-kagoya}
       # VPN内部のfrontend Nginx経由でAPIを利用する。Secretを渡してはならない。
       EXPO_PUBLIC_API_URL: http://${EXPO_VPN_HOST:?EXPO_VPN_HOST is required}:${WEB_PORT:?WEB_PORT is required}/api

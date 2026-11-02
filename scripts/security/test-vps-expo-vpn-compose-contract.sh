@@ -85,6 +85,8 @@ fi
 
 service_block frontend-dev | grep -Fq 'EXPO_PUBLIC_API_URL: http://100.64.0.10:18080/api'
 service_block frontend-dev | grep -Fq 'REACT_NATIVE_PACKAGER_HOSTNAME: 100.64.0.10'
+service_block frontend-dev | grep -Fq 'EXPO_PUBLIC_APP_ENV: kagoya'
+service_block frontend-dev | grep -Fq 'EXPO_DEV_CLIENT_SCHEME: exp+recaipt-kagoya'
 service_block frontend-dev | grep -Fq 'restart: unless-stopped'
 
 if grep -Eq 'host_ip: (0\.0\.0\.0|127\.0\.0\.1)' "${rendered_compose}"; then

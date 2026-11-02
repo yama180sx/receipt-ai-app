@@ -1,7 +1,8 @@
-export type AppEnv = 'dev' | 'stable';
+export type AppEnv = 'dev' | 'kagoya' | 'stable';
 
 export function getAppEnv(): AppEnv {
-  return process.env.EXPO_PUBLIC_APP_ENV === 'dev' ? 'dev' : 'stable';
+  const appEnv = process.env.EXPO_PUBLIC_APP_ENV;
+  return appEnv === 'dev' || appEnv === 'kagoya' ? appEnv : 'stable';
 }
 
 export function isDevAppEnv(): boolean {
@@ -9,7 +10,8 @@ export function isDevAppEnv(): boolean {
 }
 
 export function getAppDisplayName(): string {
-  return isDevAppEnv() ? 'RecAIpt (dev)' : 'RecAIpt';
+  if (isDevAppEnv()) return 'RecAIpt (dev)';
+  return getAppEnv() === 'kagoya' ? 'RecAIpt (KAGOYA)' : 'RecAIpt';
 }
 
 /** ホーム見出し: 「{名前}のメニュー」 */

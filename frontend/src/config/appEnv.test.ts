@@ -31,6 +31,13 @@ describe('appEnv', () => {
     expect(getAppDisplayName()).toBe('RecAIpt (dev)');
   });
 
+  it('detects the KAGOYA app env without treating it as T320 dev', () => {
+    process.env.EXPO_PUBLIC_APP_ENV = 'kagoya';
+    expect(getAppEnv()).toBe('kagoya');
+    expect(isDevAppEnv()).toBe(false);
+    expect(getAppDisplayName()).toBe('RecAIpt (KAGOYA)');
+  });
+
   it('builds member menu title', () => {
     expect(getMemberMenuTitle('山本')).toBe('山本のメニュー');
     expect(getMemberMenuTitle('')).toBe('RecAIpt メニュー');
