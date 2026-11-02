@@ -13,7 +13,7 @@ Issue #118-2-1のKAGOYA VPS検証では、Android Expo GoがTailscale経由のMe
 - Androidは`expo-dev-client`を使うdevelopment buildを実機検証の標準とする。
 - `development`はT320 dev用Metroを使う内部配布APK、`kagoya-development`はKAGOYA専用Metroを使う内部配布APK、`stable`はbundleを内包する内部配布APKとする。Google Play公開は本決定の対象外である。
 - Android packageは`jp.yama180sx.recaipt`、初期`versionCode`は1とする。
-- `kagoya-development`はT320 dev APKを上書きしない専用Android packageとdevelopment-client schemeを使う。EASの`kagoya`環境に管理する公開API設定だけをAPKへ含める。
+- `kagoya-development`はT320 dev APKを上書きしない専用Android packageとdevelopment-client schemeを使う。標準のEAS `preview`環境に管理するKAGOYA向け公開API設定だけをAPKへ含める。
 - 現在のVPN内HTTP APIへ接続するため、Androidでcleartext HTTPを許可する。APIはTailscale等VPN内のfrontend Nginx `/api`だけへ向け、公開HTTP endpointやSecretをGitへ記録しない。
 - iPhoneのExpo GoとWebは同じフロントエンドコードを継続して利用する。
 

@@ -19,7 +19,7 @@ Android Expo Goが使えない場合でも、RecAIpt専用のAndroid APKで家�
 ## ビルド前提
 
 - `frontend/eas.json` のprofileを使う。
-- `development` profileはEASの`development`環境を、`kagoya-development` profileはEASの`kagoya`環境を明示的に使う。
+- `development` profileはEASの`development`環境を、`kagoya-development` profileは標準のEAS `preview`環境を明示的に使う。
 - `EXPO_PUBLIC_API_URL`は各EAS環境で管理する。値はGit、Issue、PR、チャット、端末ログへ書かない。
 - `kagoya-development`はT320 devのAPKと異なるAndroid package・development-client schemeを持つ。既存の`RecAIpt (dev)`を上書きせず、両方を同じ端末に置ける。
 - `EXPO_PUBLIC_*`はAPKに含まれるため、認証情報、API token、鍵を渡してはならない。
