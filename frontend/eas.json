@@ -14,6 +14,17 @@
         "EXPO_PUBLIC_APP_ENV": "dev"
       }
     },
+    "kagoya-development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "kagoya",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "kagoya"
+      }
+    },
     "stable": {
       "distribution": "internal",
       "android": {

@@ -11,15 +11,17 @@ Android Expo Goが使えない場合でも、RecAIpt専用のAndroid APKで家�
 | profile | 用途 | Metro | 配布物 |
 |---|---|---|---|
 | `development` | 実装・ネイティブ機能の検証 | 必要。VPN内の`frontend-dev`を利用 | 内部配布APK |
+| `kagoya-development` | KAGOYAの家族利用候補環境をAndroidで受入 | 必要。KAGOYA専用の`frontend-dev`を利用 | 内部配布APK |
 | `stable` | 家族限定の動作確認 | 不要。JavaScript bundleをAPKへ内包 | 内部配布APK |
 
-両方ともAPIへはTailscale等のVPN経由で接続する。`EXPO_PUBLIC_API_URL`にはVPN内frontendの`/api` URLだけを設定する。実値はGit、Issue、PR、チャットに書かない。
+各profileはAPIへTailscale等のVPN経由で接続する。`EXPO_PUBLIC_API_URL`にはVPN内frontendの`/api` URLだけを設定する。実値はGit、Issue、PR、チャットに書かない。
 
 ## ビルド前提
 
 - `frontend/eas.json` のprofileを使う。
-- `development` profileはEASの`development`環境を明示的に使う。
-- `EXPO_PUBLIC_API_URL`はEASの`development`環境で管理する。値はGit、Issue、PR、チャット、端末ログへ書かない。
+- `development` profileはEASの`development`環境を、`kagoya-development` profileはEASの`kagoya`環境を明示的に使う。
+- `EXPO_PUBLIC_API_URL`は各EAS環境で管理する。値はGit、Issue、PR、チャット、端末ログへ書かない。
+- `kagoya-development`はT320 devのAPKと異なるAndroid package・development-client schemeを持つ。既存の`RecAIpt (dev)`を上書きせず、両方を同じ端末に置ける。
 - `EXPO_PUBLIC_*`はAPKに含まれるため、認証情報、API token、鍵を渡してはならない。
 - EASアカウント、署名情報、APK配布は外部状態を変更する。対象commit・profile・配布先・影響範囲を確認して明示承認を得てから行う。
 
@@ -60,17 +62,17 @@ npx expo-doctor@latest
 npx expo export --platform android
 ```
 
-EASへのログイン後、`development`環境に`EXPO_PUBLIC_API_URL`という**名前**が存在することだけを確認する。値は表示・転記しない。存在しない場合は、ビルドを開始せずEASダッシュボード上でdevelopment環境の設定を復旧する。
+EASへのログイン後、対象profileのEAS環境に`EXPO_PUBLIC_API_URL`という**名前**が存在することだけを確認する。値は表示・転記しない。存在しない場合は、ビルドを開始せずEASダッシュボード上で対象環境の設定を復旧する。
 
 ### 3. EAS Build
 
 事前確認と明示承認が完了した場合だけ、次を実行する。
 
 ```bash
-npx eas-cli@latest build --platform android --profile development
+npx eas-cli@latest build --platform android --profile <対象profile>
 ```
 
-- `development` profileはinternal distributionのAPKを作る。Google Playへのsubmitはしない。
+- `development`と`kagoya-development` profileはinternal distributionのAPKを作る。Google Playへのsubmitはしない。
 - EAS Buildが作成するAPKはSDKまたはnative設定を含む。SDK更新、`expo-dev-client`更新、Android plugin／app config変更後は、Metroの再起動やキャッシュ削除だけで済ませず新しいAPKを作る。
 - buildの開始元は専用作業場所だけとし、T320やKAGOYAでEAS CLIへログインしない。
 
@@ -80,6 +82,8 @@ npx eas-cli@latest build --platform android --profile development
 2. `RecAIpt (dev)`が起動することを確認し、VPN接続下でdevelopment build用のMetroへ接続する。
 3. ログイン、TOTP、履歴、画像選択・撮影、アップロード、解析結果・画像表示、確認保存をtest-only dataで確認する。
 4. SDK／native設定変更の受入では、端末が新APKへ置き換わったことを確認してから、JavaScript側の画面不具合を調査する。
+
+KAGOYA用の受入では、KAGOYA APKでログイン、履歴、画像表示を先に確認する。Gemini認証復旧（Issue #132-6）が完了してから、撮影、解析結果表示、確認保存をtest-only dataで確認する。T320 dev APKをKAGOYAへ向け直したり、KAGOYA APKでT320のMetroへ接続したりしない。
 
 ## EAS認証と整理
 
