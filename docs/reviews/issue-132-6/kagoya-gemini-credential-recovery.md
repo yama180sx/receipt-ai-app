@@ -16,7 +16,7 @@ KAGOYAは環境専用の認証情報を用いる。T320 dev/stable、MacBook、G
 ## 実施順序
 
 1. 管理者がGemini提供者側でKAGOYA専用の新しい認証情報を作成する。値はパスワードマネージャーだけへ保存し、会話、端末履歴、Gitへ入力しない。
-2. 本IssueのPRがmainへマージされた後、KAGOYAでroot経由のhelperを実行する。helperは引数を受け取らず、値を非表示で2回入力させ、root所有・mode `0600` のファイルを原子的に置換する。
+2. 本IssueのPRがmainへマージされた後、KAGOYAでroot経由のhelperを実行する。helperは引数を受け取らず、値を非表示で2回入力させ、root所有・mode `0444` のファイルを原子的に置換する。親ディレクトリはroot専用のまま維持し、Docker Composeのfile secretを非rootのbackend実行ユーザーがmount先で読むために必要なmodeだけを与える。
 3. backendだけを再作成する。認証情報の値を環境変数、docker引数、ログへ渡さない。
 4. 値を含まないアプリ診断でGemini認証エラーが解消していることを確認する。
 5. Android Development Buildで、撮影、アップロード、解析結果表示、確認保存を連続して確認する。Expo Goは同じ経路の補助確認とする。

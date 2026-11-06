@@ -54,7 +54,10 @@ umask 077
 temporary_file="$(mktemp "${RECAIPT_SECRETS_DIR}/.${CREDENTIAL_NAME}.tmp.XXXXXX")"
 printf '%s' "${new_value}" > "${temporary_file}"
 chown root:root "${temporary_file}"
-chmod 0600 "${temporary_file}"
+# Docker Compose の file secret は host file を bind mount する。backend は非root
+# ユーザーで実行するため、root専用の親ディレクトリを維持したうえで、mount先を読める
+# mode にする。0600 では backend が起動できない。
+chmod 0444 "${temporary_file}"
 mv -f -- "${temporary_file}" "${target_file}"
 temporary_file=''
 unset new_value confirmation_value confirmation
