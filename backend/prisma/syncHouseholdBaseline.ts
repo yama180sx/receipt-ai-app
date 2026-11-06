@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 import { loadInitialData, type HouseholdSetting, type PromptSeed } from './initialData';
 
 type HouseholdBaselineClient = {

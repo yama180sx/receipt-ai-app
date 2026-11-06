@@ -1,4 +1,4 @@
-import { ClassificationCorrectionScope, ProductTypeStatus } from '@prisma/client';
+import { ClassificationCorrectionScope, ProductTypeStatus } from '#prisma';
 import { z } from 'zod';
 
 /**

@@ -1,4 +1,4 @@
-import { AiUsagePurpose, ProductClassificationAiRunStatus } from '@prisma/client';
+import { AiUsagePurpose, ProductClassificationAiRunStatus } from '#prisma';
 import { afterEach, describe, expect, it } from 'vitest';
 import { queryGlobalAiCostStats } from '../../repositories/apiUsageLogRepository';
 import { prisma } from '../../utils/prismaClient';

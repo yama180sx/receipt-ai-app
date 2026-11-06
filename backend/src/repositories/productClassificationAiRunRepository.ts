@@ -1,4 +1,4 @@
-import { ProductClassificationAiRunStatus } from '@prisma/client';
+import { ProductClassificationAiRunStatus } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
 export async function createProductClassificationAiRun(input: {

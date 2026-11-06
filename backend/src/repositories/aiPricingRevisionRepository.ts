@@ -1,4 +1,4 @@
-import { AiUsagePurpose } from '@prisma/client';
+import { AiUsagePurpose } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
 /**

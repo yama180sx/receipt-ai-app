@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '#prisma';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import { receiptQueue } from '../src/queues/receiptQueue';
 import { loadInitialData } from './initialData';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 const CONFIRMATION = 'RESET_TEST_DATA';
 const LOCK_KEY = 1175_2026;
 

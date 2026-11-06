@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '#prisma';
 import fs from 'fs';
 import path from 'path';
 import logger from '../src/utils/logger';

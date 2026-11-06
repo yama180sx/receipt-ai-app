@@ -11,7 +11,7 @@ import { checkDuplicateReceipt } from './duplicateReceiptService';
 import { findReceiptIdByImagePath } from '../repositories/receiptRepository';
 import { AppError } from '../utils/appError';
 import { getReceiptManualRetryInfo } from '../config/receiptRetryPolicy';
-import { ReceiptAnalysisJobStatus } from '@prisma/client';
+import { ReceiptAnalysisJobStatus } from '#prisma';
 import {
   deleteReceiptAnalysisJob,
   findReceiptAnalysisJob,

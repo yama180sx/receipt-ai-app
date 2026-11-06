@@ -3,7 +3,7 @@ import {
   ClassificationCorrectionScope,
   ClassificationSource,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import { AppError } from '../../utils/appError';
 import { getCleanText } from '../../utils/normalizer';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';

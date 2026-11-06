@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 
 /** Receipt include 形状の SSOT */
 export const receiptWithItemsCategorySplits = {

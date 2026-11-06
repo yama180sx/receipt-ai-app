@@ -1,4 +1,4 @@
-import { AiUsagePurpose } from '@prisma/client';
+import { AiUsagePurpose } from '#prisma';
 
 export type CreateAiPricingRevisionInput = {
   purpose: AiUsagePurpose;

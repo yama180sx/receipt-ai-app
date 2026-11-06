@@ -2,7 +2,7 @@ import {
   ProductClassificationReclassificationItemOutcome,
   ProductClassificationReclassificationRunStatus,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import { runInTransaction, type PrismaTx } from '../../utils/prismaTransaction';
 import { updateItemCategoryInTx } from '../../repositories/receiptRepository';
 import {

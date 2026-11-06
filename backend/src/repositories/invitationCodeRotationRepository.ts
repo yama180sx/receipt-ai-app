@@ -1,4 +1,4 @@
-import { InvitationCodeRotationAction, InvitationCodeRotationStatus, Prisma } from '@prisma/client';
+import { InvitationCodeRotationAction, InvitationCodeRotationStatus, Prisma } from '#prisma';
 import type { InvitationCodeRollbackManifest, InvitationCodeRotationPlan, InvitationCodeRotationTarget } from '../services/invitationCodeRotation';
 import { globalPrisma } from '../utils/prismaClient';
 

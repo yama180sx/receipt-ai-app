@@ -1,5 +1,5 @@
 import { authenticator } from 'otplib';
-import { Role } from '@prisma/client';
+import { Role } from '#prisma';
 import {
   CURRENT_TOTP_KEY_VERSION,
   encryptTotpSecret,

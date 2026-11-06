@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export type StandardCategorySeed = { code: string; name: string; parentCode: string | null; displayOrder: number };
 export type ProductTypeSeed = { code: string; name: string; standardCategoryCode: string; displayOrder: number };
@@ -8,7 +9,8 @@ export type HouseholdSetting = { inviteCode: string; categories: Array<{ name: s
 export type PromptSeed = { key: string; name?: string; description?: string; systemPrompt: string; domainHints: Record<string, string> | null; isActive: boolean; version: number };
 
 function readJson<T>(name: string): T {
-  return JSON.parse(fs.readFileSync(path.join(__dirname, 'seeds', name), 'utf8')) as T;
+  const prismaDirectory = path.dirname(fileURLToPath(import.meta.url));
+  return JSON.parse(fs.readFileSync(path.join(prismaDirectory, 'seeds', name), 'utf8')) as T;
 }
 
 export function loadInitialData() {

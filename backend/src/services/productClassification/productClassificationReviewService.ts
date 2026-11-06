@@ -1,4 +1,4 @@
-import { ProductTypeStatus } from '@prisma/client';
+import { ProductTypeStatus } from '#prisma';
 import {
   findProductClassificationReviewItems,
 } from '../../repositories/productClassificationRepository';

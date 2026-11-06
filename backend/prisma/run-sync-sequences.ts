@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import { syncAllSeedTableSequences } from './syncSequences';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 syncAllSeedTableSequences(prisma)
   .catch((e) => {

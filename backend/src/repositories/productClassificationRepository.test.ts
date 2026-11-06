@@ -1,4 +1,4 @@
-import { ProductTypeStatus } from '@prisma/client';
+import { ProductTypeStatus } from '#prisma';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMocks = vi.hoisted(() => ({

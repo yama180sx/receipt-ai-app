@@ -6,7 +6,7 @@ import { runWithTenant } from '../utils/context';
 import logger from '../utils/logger';
 import { getErrorMessage, isGeminiDailyQuotaError, isRetryableHttpError } from '../utils/httpError';
 import { getReceiptAnalysisFailureCode } from '../config/receiptRetryPolicy';
-import { ReceiptAnalysisJobStatus } from '@prisma/client';
+import { ReceiptAnalysisJobStatus } from '#prisma';
 import { updateReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
 import { AppError } from '../utils/appError';
 

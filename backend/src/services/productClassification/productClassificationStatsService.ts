@@ -1,4 +1,4 @@
-import { ProductTypeStatus } from '@prisma/client';
+import { ProductTypeStatus } from '#prisma';
 import { findProductClassificationStatsItems } from '../../repositories/productClassificationRepository';
 import { getLocalMonthDateRange, normalizeYearMonth } from '../../utils/yearMonth';
 import { AppError } from '../../utils/appError';

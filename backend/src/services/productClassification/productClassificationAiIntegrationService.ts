@@ -4,8 +4,8 @@ import {
   ClassificationSource,
   ProductTypeStatus,
   ProductClassificationAiRunStatus,
-} from '@prisma/client';
-import { Prisma } from '@prisma/client';
+} from '#prisma';
+import { Prisma } from '#prisma';
 import { classifyProductsWithAi } from '../../ai';
 import { getConfiguredProductClassificationModelId } from '../../ai/geminiProductClassificationProvider';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';

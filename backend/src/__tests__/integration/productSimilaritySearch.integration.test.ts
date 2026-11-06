@@ -1,6 +1,6 @@
 import '../../test/mockReceiptQueue';
 
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 import { afterEach, describe, expect, it } from 'vitest';
 import { findProductSimilarityCandidates } from '../../services/productClassification/productSimilaritySearchService';
 import { prisma } from '../../utils/prismaClient';
