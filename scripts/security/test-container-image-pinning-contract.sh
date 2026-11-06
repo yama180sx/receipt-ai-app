@@ -18,6 +18,28 @@ require_line() {
   fi
 }
 
+require_pinned_from() {
+  local file="$1"
+  if grep -Eq '^FROM [^[:space:]]+@sha256:[0-9a-f]{64}([[:space:]]|$)' "${repo_root}/${file}" && \
+    ! grep -Eq '^FROM [^[:space:]@]+($|[[:space:]]+(AS|as)[[:space:]])' "${repo_root}/${file}"; then
+    return
+  fi
+
+  echo "[ERROR] every Dockerfile base image must use a tag and sha256 manifest digest: ${file}" >&2
+  exit 1
+}
+
+require_pinned_compose_images() {
+  local file="$1"
+  if grep -Eq '^[[:space:]]+image: [^[:space:]]+@sha256:[0-9a-f]{64}$' "${repo_root}/${file}" && \
+    ! grep -Eq '^[[:space:]]+image: [^[:space:]@]+(:[^[:space:]@]+)?$' "${repo_root}/${file}"; then
+    return
+  fi
+
+  echo "[ERROR] every Compose image must use a tag and sha256 manifest digest: ${file}" >&2
+  exit 1
+}
+
 for dockerfile in \
   backend/Dockerfile \
   backend/Dockerfile.runtime \
@@ -25,11 +47,15 @@ for dockerfile in \
   frontend/Dockerfile \
   frontend/Dockerfile.runtime-dev; do
   require_line "${dockerfile}" "FROM ${node_slim}"
+  require_pinned_from "${dockerfile}"
 done
 
 require_line frontend/Dockerfile.web "FROM ${node_alpine} AS builder"
 require_line frontend/Dockerfile.web "FROM ${nginx_alpine}"
+require_pinned_from frontend/Dockerfile.web
 require_line docker-compose.yml "    image: ${postgres}"
 require_line docker-compose.production.yml "    image: ${postgres}"
+require_pinned_compose_images docker-compose.yml
+require_pinned_compose_images docker-compose.production.yml
 
 echo '[OK] build and runtime container images are pinned to manifest digests.'

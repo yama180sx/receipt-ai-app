@@ -25,6 +25,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | オフサイトバックアップ／DR設計・導入 | [Issue #57 R2設計](../reviews/issue-57/r2-offsite-backup-design.md)、[root運用手順](../../ops/systemd/README.md) | devの暗号化送信を導入済み。stable適用、定期化、オフサイト復元演習は未完了 |
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
+| コンテナイメージdigestの定期確認・更新・rollback | [Issue #152 runbook](../reviews/issue-152/container-image-update-runbook.md) | ADR-018に従いdev → stable → KAGOYAで受入する |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
 | 秘密情報の検知・安全診断・漏えい時の初動 | [secret-scanning-and-incident-response.md](../security/secret-scanning-and-incident-response.md) | GitHub Secret Scanning、Gitleaks、診断スクリプト |
 | 招待コードの安全な再発行・配布・対象限定ロールバック | [Issue #131-7 runbook](../reviews/issue-131-7/invitation-code-rotation-runbook.md) | root専用serviceと暗号化artifact |
