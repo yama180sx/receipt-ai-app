@@ -100,6 +100,7 @@ done
 "${project_root}/scripts/security/test-offsite-credential-registration-contract.sh"
 "${project_root}/scripts/security/test-kagoya-backup-contract.sh"
 "${project_root}/scripts/security/test-kagoya-selective-migration-contract.sh"
+"${project_root}/scripts/security/test-kagoya-emergency-password-reset-contract.sh"
 "${project_root}/scripts/security/test-expo-go-runtime-contract.sh"
 
 require_exact_line() {
