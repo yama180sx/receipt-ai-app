@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { receiptQueue } from '../src/queues/receiptQueue';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 /**
  * 開発用: レシート由来の業務データだけを初期化する。

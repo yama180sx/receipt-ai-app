@@ -1,4 +1,4 @@
-import { AiUsagePurpose, Prisma } from '@prisma/client';
+import { AiUsagePurpose, Prisma } from '#prisma';
 import { queryGlobalAiCostStats } from '../../repositories/apiUsageLogRepository';
 import {
   createBudgetReservationWithNotificationDeliveries,

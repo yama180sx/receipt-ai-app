@@ -1,4 +1,4 @@
-import { ReceiptAnalysisJobStatus } from '@prisma/client';
+import { ReceiptAnalysisJobStatus } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
 export async function createReceiptAnalysisJob(input: { familyGroupId: number; memberId: number; imagePath: string }) {

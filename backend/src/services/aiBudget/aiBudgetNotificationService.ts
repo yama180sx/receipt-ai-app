@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import nodemailer from 'nodemailer';
-import { AiBudgetNotificationChannel, AiBudgetNotificationKind } from '@prisma/client';
+import { AiBudgetNotificationChannel, AiBudgetNotificationKind } from '#prisma';
 import { createNotificationDeliveries, findNotificationDelivery, listPendingNotificationDeliveries, startNotificationDelivery, completeNotificationDelivery, failNotificationDelivery } from '../../repositories/aiBudgetNotificationRepository';
 import { createGlobalAiBudgetAudit } from '../../repositories/globalAiBudgetRepository';
 import { enqueueAiBudgetNotification } from '../../queues/aiBudgetNotificationQueue';

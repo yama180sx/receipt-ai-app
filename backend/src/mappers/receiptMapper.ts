@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq';
-import type { Category, ItemSplit, ProductType } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import type { Category, ItemSplit, ProductType } from '#prisma';
+import { Prisma } from '#prisma';
 import type {
   CategorySummary,
   ClassificationConfidence,

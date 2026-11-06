@@ -1,4 +1,4 @@
-import { AiUsagePurpose, Prisma } from '@prisma/client';
+import { AiUsagePurpose, Prisma } from '#prisma';
 import {
   queryGlobalAiCostStats,
   type GlobalAiCostStatRow,

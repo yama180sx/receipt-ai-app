@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ClassificationCorrectionScope, ProductTypeStatus } from '@prisma/client';
+import { ClassificationCorrectionScope, ProductTypeStatus } from '#prisma';
 import {
   deactivateProductClassificationLearningDataSchema,
   manualReceiptSchema,

@@ -33,6 +33,7 @@ backend/logs/
 # --- Database & Prisma ---
 /backend/prisma/generated-client/
 /backend/src/generated/
+/backend/generated/
 
 # --- System & IDE ---
 .DS_Store

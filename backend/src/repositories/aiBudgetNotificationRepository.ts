@@ -1,4 +1,4 @@
-import { AiBudgetNotificationChannel, AiBudgetNotificationKind, AiBudgetNotificationStatus } from '@prisma/client';
+import { AiBudgetNotificationChannel, AiBudgetNotificationKind, AiBudgetNotificationStatus } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
 export type CreateDelivery = { dedupeKey: string; kind: AiBudgetNotificationKind; month: string; thresholdPercent: number; channel: AiBudgetNotificationChannel; recipient: string };

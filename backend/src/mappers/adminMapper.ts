@@ -1,4 +1,4 @@
-import type { PromptTemplate as PromptTemplateRecord } from '@prisma/client';
+import type { PromptTemplate as PromptTemplateRecord } from '#prisma';
 import type { AdminCostStatRow, PromptTemplate } from '../types/apiSchemas';
 
 export function mapPromptTemplateToApi(record: PromptTemplateRecord): PromptTemplate {

@@ -1,4 +1,5 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '#prisma';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { loadSecretFiles } from '../src/config/secretFiles';
@@ -91,7 +92,7 @@ async function importDocument(prisma: PrismaClient, dryRun: boolean) {
 }
 
 async function main() {
-  loadSecretFiles(); const prisma = new PrismaClient();
+  loadSecretFiles(); const prisma = createPrismaClient();
   try { if (process.argv[2] === 'export') await exportDocument(prisma); else if (process.argv[2] === 'import') await importDocument(prisma, process.argv.includes('--dry-run')); else fail('usage: kagoya-selective-migration.ts {export|import [--dry-run]}'); }
   finally { await prisma.$disconnect(); }
 }

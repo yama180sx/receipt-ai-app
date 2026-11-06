@@ -1,4 +1,4 @@
-import { Prisma, ProductTypeStatus } from '@prisma/client';
+import { Prisma, ProductTypeStatus } from '#prisma';
 import { prisma } from '../../utils/prismaClient';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';

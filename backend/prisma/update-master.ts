@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import { syncStandardProductClassificationMasters } from './syncStandardProductClassificationMasters';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 /** 共通マスタ更新（運用環境 — 全データ削除なし） */
 async function main() {

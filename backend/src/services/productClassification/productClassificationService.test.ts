@@ -1,4 +1,4 @@
-import { ClassificationSource } from '@prisma/client';
+import { ClassificationSource } from '#prisma';
 import { describe, expect, it, vi } from 'vitest';
 import { classifyItemByExactMatch, isNonProductAdjustmentLine } from './productClassificationService';
 

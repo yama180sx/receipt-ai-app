@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 import { AppError } from '../../utils/appError';
 import type { TenantContext } from '../../utils/context';
 import {

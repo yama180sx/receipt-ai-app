@@ -4,7 +4,7 @@ import {
   ClassificationSource,
   ProductClassificationAiRunStatus,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import { ProductClassificationResponseValidationError } from '../../ai/productClassificationContract';
 
 const { aiMocks, receiptRepositoryMocks, productRepositoryMocks, runRepositoryMocks, pricingRevisionMocks, budgetMocks } = vi.hoisted(() => ({
