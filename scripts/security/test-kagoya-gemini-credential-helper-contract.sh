@@ -22,7 +22,7 @@ for required in \
   "read -r -s -p 'Confirm new Gemini API key: ' confirmation_value" \
   'mktemp "${RECAIPT_SECRETS_DIR}/.${CREDENTIAL_NAME}.tmp.XXXXXX"' \
   "chown root:root \"\${temporary_file}\"" \
-  "chmod 0600 \"\${temporary_file}\"" \
+  "chmod 0444 \"\${temporary_file}\"" \
   "mv -f -- \"\${temporary_file}\" \"\${target_file}\"" \
   'credential file replaced without exposing its value'; do
   grep -Fq "${required}" "${helper}" || fail "missing required helper contract: ${required}"
