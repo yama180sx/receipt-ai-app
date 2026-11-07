@@ -3,7 +3,7 @@ import {
   ClassificationConfidence,
   ClassificationSource,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import {
   mapCategoriesToSummary,
   mapFamilyMembersToSummary,

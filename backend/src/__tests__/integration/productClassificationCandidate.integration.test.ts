@@ -1,6 +1,6 @@
 import '../../test/mockReceiptQueue';
 
-import { ProductClassificationCandidateSource } from '@prisma/client';
+import { ProductClassificationCandidateSource } from '#prisma';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';

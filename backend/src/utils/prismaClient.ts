@@ -1,6 +1,7 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '#prisma';
 import fs from 'fs/promises';
 import path from 'path';
+import { createPrismaClient } from './prismaFactory';
 import logger from './logger';
 import { tenantStorage } from './context';
 import { getErrorMessage, getNodeErrorCode } from './httpError';
@@ -11,14 +12,7 @@ const prismaLogLevels: Prisma.LogLevel[] = process.env.NODE_ENV === 'production'
   : ['query', 'info', 'warn', 'error'];
 
 // ベースとなるクライアント
-const basePrisma = new PrismaClient({
-  log: prismaLogLevels,
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
+const basePrisma = createPrismaClient(prismaLogLevels);
 
 /**
  * 全体権限を別途検証済みの、世帯横断運用処理専用クライアント。

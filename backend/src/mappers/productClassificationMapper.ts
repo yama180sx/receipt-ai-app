@@ -1,4 +1,4 @@
-import type { ProductClassificationCandidate, ProductType } from '@prisma/client';
+import type { ProductClassificationCandidate, ProductType } from '#prisma';
 import type {
   ProductClassificationLearningData,
   ProductClassificationCandidateSummary,

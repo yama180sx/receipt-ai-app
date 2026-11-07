@@ -1,4 +1,4 @@
-import { AiBudgetReservationStatus, AiUsagePurpose, Prisma } from '@prisma/client';
+import { AiBudgetReservationStatus, AiUsagePurpose, Prisma } from '#prisma';
 import { globalPrisma, prisma } from '../utils/prismaClient';
 
 export async function findGlobalAiBudgetSetting() {

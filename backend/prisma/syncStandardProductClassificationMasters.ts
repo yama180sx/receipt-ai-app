@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '#prisma';
 import { loadInitialData } from './initialData';
 
 type StandardMasterClient = Pick<PrismaClient, 'standardCategory' | 'productType' | 'standardProductClassificationRule'>;

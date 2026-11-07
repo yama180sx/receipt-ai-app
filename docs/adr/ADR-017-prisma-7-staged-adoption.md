@@ -1,6 +1,6 @@
 # ADR-017: Prisma ORM 7は専用設計と段階受入を経て採用する
 
-Status: Proposed
+Status: Accepted
 
 関連: Issue #138、Issue #151、[ADR-010](./ADR-010-secret-lifecycle-and-runtime-delivery.md)、[ADR-011](./ADR-011-stable-release-promotion-control.md)
 

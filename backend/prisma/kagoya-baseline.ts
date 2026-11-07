@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import { loadSecretFiles } from '../src/config/secretFiles';
 import { syncStandardProductClassificationMasters } from './syncStandardProductClassificationMasters';
 import { syncHouseholdBaseline } from './syncHouseholdBaseline';
@@ -6,7 +6,7 @@ import { syncHouseholdBaseline } from './syncHouseholdBaseline';
 // Compose supplies production credentials through *_FILE variables.
 // Load them before constructing PrismaClient, without printing a value or path.
 loadSecretFiles();
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   // This command is intentionally additive. It neither deletes nor updates household records.

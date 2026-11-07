@@ -3,7 +3,7 @@ import {
   ProductClassificationCandidateSource,
   ClassificationSource,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { getCleanText } from '../../utils/normalizer';
 import { isNonProductAdjustmentLine } from '../../utils/nonProductAdjustment';

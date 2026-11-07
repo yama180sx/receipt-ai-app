@@ -1,9 +1,9 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 import { AppError } from '../../utils/appError';
 import { addGlobalAiBudgetManager, createGlobalAiBudgetAudit, findEligibleGlobalAiBudgetManagerMember, findGlobalAiBudgetSetting, listGlobalAiBudgetManagerCandidates, listGlobalAiBudgetManagers, removeGlobalAiBudgetManager, resumeGlobalAiBudget, upsertGlobalAiBudgetSetting } from '../../repositories/globalAiBudgetRepository';
 import { getGlobalAiCostStats } from './globalAiCostService';
 import { createTestNotifications, validNotificationEmail } from './aiBudgetNotificationService';
-import { AiBudgetNotificationChannel } from '@prisma/client';
+import { AiBudgetNotificationChannel } from '#prisma';
 import { listNotificationDeliveries } from '../../repositories/aiBudgetNotificationRepository';
 
 export async function getGlobalAiBudgetOverview() {

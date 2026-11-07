@@ -4,7 +4,7 @@ import type {
   ClassificationSource,
   ProductClassificationCandidateSource,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import type { PrismaTx } from '../../utils/prismaTransaction';
 import { AppError } from '../../utils/appError';
 import { getCleanText } from '../../utils/normalizer';

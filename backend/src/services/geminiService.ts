@@ -10,8 +10,8 @@ import {
   incrementApiUsageLogTokens,
 } from "../repositories/apiUsageLogRepository";
 import { findEffectiveAiPricingRevision } from '../repositories/aiPricingRevisionRepository';
-import { AiUsagePurpose, type AiPricingRevision } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import { AiUsagePurpose, type AiPricingRevision } from '#prisma';
+import { Prisma } from '#prisma';
 import { releaseAiBudgetReservation, reserveAiBudget } from './aiBudget/aiBudgetGuardService';
 import { getConfiguredReceiptModelId } from '../config/geminiModel';
 

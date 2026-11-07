@@ -1,10 +1,11 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '#prisma';
+import { createPrismaClient } from '../src/utils/prismaFactory';
 import bcrypt from 'bcrypt';
 import { loadInitialData } from './initialData';
 import { syncStandardProductClassificationMasters } from './syncStandardProductClassificationMasters';
 import { syncAllSeedTableSequences } from './syncSequences';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function seedHouseholdSettings(familyGroupId: number, inviteCode: string) {
   const { households } = loadInitialData();

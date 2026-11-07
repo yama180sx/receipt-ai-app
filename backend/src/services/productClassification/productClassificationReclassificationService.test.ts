@@ -4,7 +4,7 @@ import {
   ProductClassificationReclassificationItemOutcome,
   ProductClassificationReclassificationRunStatus,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const repositoryMocks = vi.hoisted(() => ({

@@ -1,6 +1,6 @@
 import '../../test/mockReceiptQueue';
 
-import { ClassificationCorrectionScope, ClassificationSource, ProductTypeStatus } from '@prisma/client';
+import { ClassificationCorrectionScope, ClassificationSource, ProductTypeStatus } from '#prisma';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';

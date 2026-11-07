@@ -3,7 +3,7 @@ import {
   ClassificationSource,
   ProductClassificationCandidateSource,
   ProductTypeStatus,
-} from '@prisma/client';
+} from '#prisma';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const similaritySearchMocks = vi.hoisted(() => ({

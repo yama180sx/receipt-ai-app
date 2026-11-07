@@ -9,7 +9,7 @@ import { clearMockReceiptJobs, mockReceiptJobs, registerMockReceiptJob } from '.
 import { prisma } from '../../utils/prismaClient';
 import { getCleanText } from '../../utils/normalizer';
 import { recoverReceiptAnalysisJobs } from '../../services/receiptJobService';
-import { ReceiptAnalysisJobStatus } from '@prisma/client';
+import { ReceiptAnalysisJobStatus } from '#prisma';
 import {
   ensureTestMemberPassword,
   getTenantBItemId,

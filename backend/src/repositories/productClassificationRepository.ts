@@ -8,7 +8,7 @@ import {
   Prisma,
   type ClassificationCorrectionScope,
   type ProductClassificationCandidateSource,
-} from '@prisma/client';
+} from '#prisma';
 import { prisma } from '../utils/prismaClient';
 import type { PrismaTx } from '../utils/prismaTransaction';
 

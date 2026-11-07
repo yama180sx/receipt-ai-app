@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '#prisma';
 
 /** seed / upsert で明示 id を入れたあと、PostgreSQL の serial を MAX(id) に合わせる */
 const TABLES_WITH_EXPLICIT_SEED_IDS = [

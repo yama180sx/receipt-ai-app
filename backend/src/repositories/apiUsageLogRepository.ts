@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prismaClient';
-import { AiUsagePurpose, Prisma } from '@prisma/client';
+import { AiUsagePurpose, Prisma } from '#prisma';
 
 export async function createApiUsageLog(data: {
   familyMemberId: number | null;

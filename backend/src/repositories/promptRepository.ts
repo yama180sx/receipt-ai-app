@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
 type PromptDomainHints = Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;

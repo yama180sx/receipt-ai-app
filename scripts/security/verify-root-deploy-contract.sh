@@ -153,8 +153,7 @@ done
 for expected_line in \
   'systemctl start "${backup_unit}"' \
   'systemctl start "${deploy_unit}"' \
-  'const { PrismaClient } = require("@prisma/client");' \
-  'await prisma.$queryRawUnsafe("SELECT 1");' \
+  'npm exec tsx prisma/verify-active-db-credential.ts' \
   'backup_credentials_reconciled=true' \
   'pre_rotation_backup_completed=true' \
   'password_changed=true' \
@@ -174,9 +173,7 @@ for expected_line in \
   '[ -t 0 ] && [ -t 1 ] || die' \
   'systemctl start "${backup_unit}"' \
   'read -r -s -p' \
-  'bcrypt.hash(password, 12)' \
-  'const authVersion = member.authVersion + 1' \
-  'emergencyPasswordResetAudit.create' \
+  'npm exec tsx prisma/emergency-password-reset.ts' \
   'completed resetId='; do
   if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-emergency-password-reset; then
     echo "[ERROR] Issue #132-2 emergency password reset safety contract is incomplete." >&2

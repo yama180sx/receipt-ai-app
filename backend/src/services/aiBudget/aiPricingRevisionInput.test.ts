@@ -1,4 +1,4 @@
-import { AiUsagePurpose } from '@prisma/client';
+import { AiUsagePurpose } from '#prisma';
 import { describe, expect, it } from 'vitest';
 import { parseAiPricingRevisionArgs } from './aiPricingRevisionInput';
 
