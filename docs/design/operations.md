@@ -158,6 +158,8 @@ npx expo export --platform web
 
 Expo SDK 58はTypeScript 6を要求する一方、OpenAPI生成に使用する`openapi-typescript`の現行版はTypeScript 5系だけをpeer dependencyとして宣言している。`frontend/.npmrc` の `legacy-peer-deps=true` はこの上流制約に限る一時対応である。`npm run check:api`、型チェック、Expo Doctor、Web書き出しが通ることを更新ごとに確認し、上流がTypeScript 6対応を公開した時点で設定を削除する。
 
+CIは`frontend`のlockfileで固定した`expo-doctor`を使う。通常のPRでDoctor自体を最新版取得しない。SDKまたはExpo依存を更新する専用PRでは、まず`npx expo-doctor@latest`で最新の診断結果を確認し、依存整合・実機受入が完了した場合にだけ、プロジェクト側のDoctor固定版も同じPRで更新する。
+
 iPhoneではExpo Goの旧版を個別に固定・再導入できないため、SDK不一致中はモバイルWebを利用する。Androidで対応SDK版のExpo Goを一時利用する場合も、恒久的な固定運用にはせず、対応Issueの更新完了までに限定する。
 
 ---

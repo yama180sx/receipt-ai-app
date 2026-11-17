@@ -92,7 +92,7 @@ jobs:
         run: npm run check:api
 
       - name: Verify Expo SDK diagnostics
-        run: npx expo-doctor
+        run: npx --no-install expo-doctor
 
       - name: Verify Expo web and Android bundles
         run: |
