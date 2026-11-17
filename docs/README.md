@@ -22,6 +22,7 @@
 ## 運用手順
 
 - [MacBook（Linux Mint 22.3）へのDocker導入手順](./macbook-linux-server-setup.md) — Issue #128 のサーバー環境構築の初期手順
+- [T320でのCodex CLI・tmux コマンド集](./t320-codex-cli-command-guide.md) — このPC・MacBookから同じT320上の開発会話を継続する日常操作
 - [運用・障害対応](./design/operations.md) — RecAIptの環境構築、バックアップ、復旧、デプロイ
 - [環境・接続経路の運用台帳](./environment-access-registry.md) — 秘密値を置かない環境識別・接続前確認・パスワードマネージャー命名規約
 - [KAGOYA Gemini認証の再発行・解析受入](./reviews/issue-132-6/kagoya-gemini-credential-recovery.md) — Issue #132-6 の秘密値を出さない復旧手順
