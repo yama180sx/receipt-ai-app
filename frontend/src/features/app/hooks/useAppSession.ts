@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Platform } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { categoryApi } from '../../../api/categoryApi';
 import { setOnUnauthorized } from '../../../utils/apiClient';
 import { showAlert } from '../../../utils/alertMessage';
 import { showConfirmDialog } from '../../../utils/confirmDialog';
+import { createSessionExpiryRecovery } from '../../../utils/sessionExpiryRecovery';
 import { authService } from '../../../services/authService';
 import { canUseBiometric } from '../../../services/biometricService';
 import type { LoginResult, StoredSession } from '../../../types/auth';
@@ -72,6 +73,18 @@ export function useAppSession() {
     clearSessionState();
   }, [clearSessionState]);
 
+  const sessionExpiryRecovery = useMemo(
+    () =>
+      createSessionExpiryRecovery({
+        clearInMemorySession: clearSessionState,
+        clearPersistedSession: () => authService.logout(),
+        notifyUser: () => {
+          showAlert('セッション切れ', 'セッションが無効になったため、再度ログインしてください。');
+        },
+      }),
+    [clearSessionState]
+  );
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -110,11 +123,9 @@ export function useAppSession() {
   }, [applySession, validateStoredSession]);
 
   useEffect(() => {
-    setOnUnauthorized(() => {
-      void handleLogout();
-      showAlert('セッション切れ', '有効期限が切れたため、再度ログインしてください。');
-    });
-  }, [handleLogout]);
+    setOnUnauthorized(sessionExpiryRecovery.recover);
+    return () => setOnUnauthorized(null);
+  }, [sessionExpiryRecovery]);
 
   const promptEnableBiometric = useCallback(async () => {
     if (Platform.OS === 'web') return;
@@ -146,6 +157,7 @@ export function useAppSession() {
         inviteCode: context.inviteCode,
       });
 
+      sessionExpiryRecovery.reset();
       applySession({
         token: result.token,
         memberId: result.member.id,
@@ -160,7 +172,7 @@ export function useAppSession() {
       await fetchCategoriesForSession();
       await promptEnableBiometric();
     },
-    [applySession, fetchCategoriesForSession, promptEnableBiometric]
+    [applySession, fetchCategoriesForSession, promptEnableBiometric, sessionExpiryRecovery]
   );
 
   const handleBiometricUnlock = useCallback(async () => {
