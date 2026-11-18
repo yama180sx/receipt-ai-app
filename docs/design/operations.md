@@ -141,7 +141,23 @@ sudo docker exec receipt-stable-backend \
 
 このCLIは有効な管理者が既に存在する場合に失敗する。出力や操作記録に秘密情報を含めず、監査記録へ対象者、実行者、理由、実行経路を追記する。実行前にDB migrationが適用済みであることを確認する。
 
-### 2.7 Expo SDK と Expo Go の運用
+### 2.7 dev検証用世帯・一般ユーザーの準備
+
+継続的な手動受入は、既存の利用者アカウントではなく、dev専用の固定世帯`dev検証世帯`と一般ユーザー`dev検証ユーザー`を使う。これはRecAIptの通常画面から作成する機能ではない。rootが設置した固定helperを、許可された管理用LinuxユーザーがTTYから実行する。
+
+1. 招待コードと15〜128文字のpasswordを、実行前にパスワードマネージャーへ保存する。値はGit、Issue、PR、端末ログへ記録しない。
+2. dev backendが稼働し、最新のroot管理runtimeへhelperとsudoersテンプレートが設置済みであることを確認する。
+3. 対話端末で次を実行する。
+
+```bash
+sudo /usr/local/libexec/receipt-provision-dev-verification-user dev
+```
+
+helperは確認語、招待コード、passwordを非表示で受け取り、先にdev backupを成功させる。初回は世帯と一般ユーザーを作成し、同じ招待コードで再実行した場合は認証情報を変更せず作成済みとして終了する。非TTY、非root、`dev`以外の引数は拒否する。作成後の初回ログインではTOTPセットアップを完了する。
+
+本helperはstable／KAGOYAを対象にせず、既存の世帯、メンバー、レシート、認証情報を変更しない。検証用管理者が必要になった場合は、権限・TOTP・影響範囲を別Issueで設計する。
+
+### 2.8 Expo SDK と Expo Go の運用
 
 Expo Go は開発・検証用であり、家族の日常利用の正規入口はモバイルWebとする。Expo Go はプロジェクトのExpo SDKと一致しない場合に起動できないため、端末でSDK不一致を確認した場合、またはExpo Goの新SDK公開を確認した場合は、**翌営業日までに**対応Issueを起票してdev環境で更新を開始する。
 
@@ -388,6 +404,7 @@ flowchart LR
 | `backend/prisma/reset-test-data-preserve-auth.ts` | 承認済みの認証保持テストデータ再構築（手動専用） |
 | `backend/prisma/kagoya-selective-migration.ts` | T320 stable → KAGOYA の認証・基本設定のみを移す手動専用ツール |
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
+| `ops/systemd/libexec/receipt-provision-dev-verification-user` | dev限定の手動受入用世帯・一般ユーザーの冪等作成 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
 | `ops/systemd/libexec/receipt-restore` | root管理DB・uploads復旧ヘルパー |
