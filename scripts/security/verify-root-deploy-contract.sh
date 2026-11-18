@@ -39,6 +39,7 @@ for file in \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/libexec/receipt-emergency-password-reset \
+  ops/systemd/libexec/receipt-provision-dev-verification-user \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly \
   ops/systemd/units/receipt-deploy-dev.service \
@@ -84,6 +85,7 @@ for helper in \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/libexec/receipt-emergency-password-reset \
+  ops/systemd/libexec/receipt-provision-dev-verification-user \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly; do
   bash -n "${helper}"
@@ -101,6 +103,7 @@ done
 "${project_root}/scripts/security/test-kagoya-backup-contract.sh"
 "${project_root}/scripts/security/test-kagoya-selective-migration-contract.sh"
 "${project_root}/scripts/security/test-kagoya-emergency-password-reset-contract.sh"
+"${project_root}/scripts/security/test-dev-verification-user-provision-contract.sh"
 "${project_root}/scripts/security/test-expo-go-runtime-contract.sh"
 
 require_exact_line() {
