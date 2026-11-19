@@ -8,6 +8,17 @@ import {
 } from '../services/devVerificationUserProvision';
 
 export const devVerificationUserProvisionRepository: DevVerificationUserProvisionRepository = {
+  async findVerificationFamilies(): Promise<DevVerificationFamily[]> {
+    return globalPrisma.familyGroup.findMany({
+      where: { name: devVerificationFamilyName },
+      select: {
+        id: true,
+        name: true,
+        members: { select: { id: true, name: true, role: true } },
+      },
+    });
+  },
+
   async findFamilyByInviteCode(inviteCode): Promise<DevVerificationFamily | null> {
     return globalPrisma.familyGroup.findUnique({
       where: { inviteCode },

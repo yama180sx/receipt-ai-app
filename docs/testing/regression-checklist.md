@@ -32,7 +32,7 @@
 
 ## 0. 認証・セッション
 
-devの継続的な手動受入では、既存の管理用Linuxユーザーから `sudo /usr/local/libexec/receipt-provision-dev-verification-user dev` を対話端末で実行して作成する専用世帯・一般ユーザーを使用する。招待コードとpasswordは実行前にパスワードマネージャーへ保存して非表示入力し、Git、Issue、PR、端末ログへ記録しない。作成helperはdev固定で、再実行時に認証情報を変更しない。
+devの継続的な手動受入では、既存の管理用Linuxユーザーから `sudo /usr/local/libexec/receipt-provision-dev-verification-user dev` を対話端末で実行して作成する専用世帯・一般ユーザーを使用する。招待コードとpasswordは実行前にパスワードマネージャーへ保存して非表示入力し、Git、Issue、PR、端末ログへ記録しない。作成helperはdev固定で、入力する招待コードが異なっても既存の検証用世帯・ユーザーが1組なら認証情報を変更せず再利用する。検証用世帯が複数ある場合は失敗する。
 
 | # | 確認項目 | Web | スマホ | 結果 | 備考 |
 |---|----------|-----|--------|------|------|
