@@ -24,7 +24,8 @@ async function main() {
       devVerificationUserProvisionRepository,
       (password) => bcrypt.hash(password, 12)
     );
-    console.log(JSON.stringify({ status: result }));
+    // memberIdは秘密値ではなく、緊急password再設定時の対象指定にだけ使う。
+    console.log(JSON.stringify(result));
   } finally {
     await prisma.$disconnect();
   }
