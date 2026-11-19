@@ -2,6 +2,8 @@
 
 KAGOYAでpasswordを失念した場合は、rootがTTYから`receipt-emergency-password-reset-kagoya`を直接実行する。DB直接更新、seed、通常ユーザーのDocker操作は使わない。
 
+失敗時は、対象指定・password入力・対象不在・DB更新・backend起動の値なし分類だけを表示する。例外本文、password、hash、接続情報は表示しない。
+
 - helperは引数を受け取らず、固定backendとKAGOYA backup unitだけを使う。
 - 対象のFamilyMember IDと確認語を端末で入力する。利用者名、password、hash、招待コードは表示・記録しない。
 - 事前backup成功後だけ、15〜128文字のpasswordを非表示入力で2回受け取り、stdinでbackendへ渡す。
