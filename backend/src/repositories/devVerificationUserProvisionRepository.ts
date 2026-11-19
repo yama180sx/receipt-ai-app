@@ -3,6 +3,7 @@ import {
   devVerificationFamilyName,
   devVerificationMemberName,
   type DevVerificationFamily,
+  type DevVerificationMember,
   type DevVerificationUserProvisionRepository,
 } from '../services/devVerificationUserProvision';
 
@@ -18,8 +19,8 @@ export const devVerificationUserProvisionRepository: DevVerificationUserProvisio
     });
   },
 
-  async createFamilyWithUser({ inviteCode, passwordHash }): Promise<void> {
-    await globalPrisma.familyGroup.create({
+  async createFamilyWithUser({ inviteCode, passwordHash }): Promise<DevVerificationMember> {
+    const family = await globalPrisma.familyGroup.create({
       data: {
         name: devVerificationFamilyName,
         inviteCode,
@@ -31,6 +32,12 @@ export const devVerificationUserProvisionRepository: DevVerificationUserProvisio
           },
         },
       },
+      select: {
+        members: { select: { id: true, name: true, role: true } },
+      },
     });
+    const member = family.members[0];
+    if (!member) throw new Error('Verification-user provision did not create a member.');
+    return member;
   },
 };

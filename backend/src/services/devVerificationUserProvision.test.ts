@@ -9,7 +9,7 @@ import {
 function repository(overrides: Partial<DevVerificationUserProvisionRepository> = {}): DevVerificationUserProvisionRepository {
   return {
     findFamilyByInviteCode: vi.fn().mockResolvedValue(null),
-    createFamilyWithUser: vi.fn().mockResolvedValue(undefined),
+    createFamilyWithUser: vi.fn().mockResolvedValue({ id: 2, name: devVerificationMemberName, role: 'USER' }),
     ...overrides,
   };
 }
@@ -21,7 +21,7 @@ describe('provisionDevVerificationUser', () => {
     const store = repository();
     const hashPassword = vi.fn().mockResolvedValue('hash');
 
-    await expect(provisionDevVerificationUser(input, store, hashPassword)).resolves.toBe('CREATED');
+    await expect(provisionDevVerificationUser(input, store, hashPassword)).resolves.toEqual({ status: 'CREATED', memberId: 2 });
     expect(hashPassword).toHaveBeenCalledWith(input.password);
     expect(store.createFamilyWithUser).toHaveBeenCalledWith({ inviteCode: input.inviteCode, passwordHash: 'hash' });
   });
@@ -36,7 +36,7 @@ describe('provisionDevVerificationUser', () => {
     });
     const hashPassword = vi.fn();
 
-    await expect(provisionDevVerificationUser(input, store, hashPassword)).resolves.toBe('ALREADY_EXISTS');
+    await expect(provisionDevVerificationUser(input, store, hashPassword)).resolves.toEqual({ status: 'ALREADY_EXISTS', memberId: 2 });
     expect(hashPassword).not.toHaveBeenCalled();
     expect(store.createFamilyWithUser).not.toHaveBeenCalled();
   });

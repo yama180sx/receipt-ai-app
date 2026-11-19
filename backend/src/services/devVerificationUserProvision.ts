@@ -15,12 +15,17 @@ export type DevVerificationFamily = {
 
 export type DevVerificationUserProvisionRepository = {
   findFamilyByInviteCode: (inviteCode: string) => Promise<DevVerificationFamily | null>;
-  createFamilyWithUser: (input: { inviteCode: string; passwordHash: string }) => Promise<void>;
+  createFamilyWithUser: (input: { inviteCode: string; passwordHash: string }) => Promise<DevVerificationMember>;
 };
 
 export type DevVerificationUserProvisionInput = {
   inviteCode: string;
   password: string;
+};
+
+export type DevVerificationUserProvisionResult = {
+  status: 'CREATED' | 'ALREADY_EXISTS';
+  memberId: number;
 };
 
 function assertInput(input: DevVerificationUserProvisionInput): void {
@@ -40,7 +45,7 @@ export async function provisionDevVerificationUser(
   input: DevVerificationUserProvisionInput,
   repository: DevVerificationUserProvisionRepository,
   hashPassword: (password: string) => Promise<string>
-): Promise<'CREATED' | 'ALREADY_EXISTS'> {
+): Promise<DevVerificationUserProvisionResult> {
   assertInput(input);
   const existing = await repository.findFamilyByInviteCode(input.inviteCode);
 
@@ -53,10 +58,10 @@ export async function provisionDevVerificationUser(
     ) {
       throw new Error('Verification-user provision target conflicts with existing data.');
     }
-    return 'ALREADY_EXISTS';
+    return { status: 'ALREADY_EXISTS', memberId: member.id };
   }
 
   const passwordHash = await hashPassword(input.password);
-  await repository.createFamilyWithUser({ inviteCode: input.inviteCode, passwordHash });
-  return 'CREATED';
+  const member = await repository.createFamilyWithUser({ inviteCode: input.inviteCode, passwordHash });
+  return { status: 'CREATED', memberId: member.id };
 }
