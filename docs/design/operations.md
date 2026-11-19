@@ -153,7 +153,7 @@ sudo docker exec receipt-stable-backend \
 sudo /usr/local/libexec/receipt-provision-dev-verification-user dev
 ```
 
-helperは確認語、招待コード、passwordを非表示で受け取り、先にdev backupを成功させる。初回は世帯と一般ユーザーを作成し、同じ招待コードで再実行した場合は認証情報を変更せず作成済みとして終了する。終了時は秘密値を含まない`status`と`memberId`だけを表示する。`memberId`は緊急password再設定で対象を指定するために使う。非TTY、非root、`dev`以外の引数は拒否する。作成後の初回ログインではTOTPセットアップを完了する。
+helperは確認語、招待コード、passwordを非表示で受け取り、先にdev backupを成功させる。初回は世帯と一般ユーザーを作成する。以後は入力した招待コードが異なっていても、固定名称の検証用世帯・ユーザーがちょうど1組あれば、認証情報を変更せず作成済みとして終了する。固定名称の世帯が複数、または構成が想定外の場合は、何も変更せず失敗する。終了時は秘密値を含まない`status`と`memberId`だけを表示する。`memberId`は緊急password再設定で対象を指定するために使う。非TTY、非root、`dev`以外の引数は拒否する。作成後の初回ログインではTOTPセットアップを完了する。
 
 本helperはstable／KAGOYAを対象にせず、既存の世帯、メンバー、レシート、認証情報を変更しない。検証用管理者が必要になった場合は、権限・TOTP・影響範囲を別Issueで設計する。
 
