@@ -9,6 +9,7 @@
 - rootがTTYから固定環境を指定して起動する`receipt-emergency-password-reset {dev|stable}`だけを緊急復旧に使う。
 - 対象`FamilyMember` ID、明示確認語、成功済みroot管理backupを必要とする。
 - 新passwordは15〜128文字、非表示入力と確認入力だけで受け取り、stdinでbackendへ渡す。平文・hashをargv、環境変数、journal、監査へ出さない。
+- root管理runtimeでは`DATABASE_URL_FILE`をPrisma生成前に解決する。通常のbackendとCLIでcredential読込順を一致させる。
 
 ## session無効化
 

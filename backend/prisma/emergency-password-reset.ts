@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import fs from 'node:fs';
+import { loadSecretFiles } from '../src/config/secretFiles';
 import { createPrismaClient } from '../src/utils/prismaFactory';
 
 const [memberIdRaw, resetId] = process.argv.slice(2);
@@ -8,6 +9,8 @@ const password = fs.readFileSync(0, 'utf8');
 if (!Number.isSafeInteger(memberId) || memberId < 1 || !/^reset-[0-9]{14}-[0-9a-f]{16}$/.test(resetId)) process.exit(20);
 if (password.length < 15 || password.length > 128) process.exit(21);
 
+// root管理runtimeでは、Prisma生成前にDATABASE_URL_FILEを解決する。
+loadSecretFiles();
 const prisma = createPrismaClient();
 try {
   const passwordHash = await bcrypt.hash(password, 12);
