@@ -174,6 +174,8 @@ for expected_line in \
   'systemctl start "${backup_unit}"' \
   'read -r -s -p' \
   'npm exec tsx prisma/emergency-password-reset.ts' \
+  'readonly reset_member_password_status="${PIPESTATUS[1]}"' \
+  'database update did not complete' \
   'completed resetId='; do
   if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-emergency-password-reset; then
     echo "[ERROR] Issue #132-2 emergency password reset safety contract is incomplete." >&2

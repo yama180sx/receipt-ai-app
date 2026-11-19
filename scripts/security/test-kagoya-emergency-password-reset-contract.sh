@@ -16,6 +16,8 @@ for required in \
   'systemctl start "${backup_unit}"' \
   "read -r -s -p 'New password: ' new_password" \
   'npm exec tsx prisma/emergency-password-reset.ts' \
+  'readonly reset_member_password_status="${PIPESTATUS[1]}"' \
+  'database update did not complete' \
   'without exposing password values'; do
   grep -Fq "${required}" "${helper}" || fail "missing required helper contract: ${required}"
 done
