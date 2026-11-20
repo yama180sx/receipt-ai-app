@@ -16,12 +16,18 @@ for required in \
   'systemctl start "${backup_unit}"' \
   "read -r -s -p 'New password: ' new_password" \
   'npm exec tsx prisma/emergency-password-reset.ts' \
+  'readonly reset_member_password_status="${PIPESTATUS[1]}"' \
+  'database update did not complete' \
   'without exposing password values'; do
   grep -Fq "${required}" "${helper}" || fail "missing required helper contract: ${required}"
 done
 for required in 'bcrypt.hash(password, 12)' 'const authVersion = member.authVersion + 1' 'emergencyPasswordResetAudit.create' 'createPrismaClient'; do
   grep -Fq "${required}" "${runtime}" || fail "missing required Prisma runtime contract: ${required}"
 done
+secret_load_line="$(grep -nF 'loadSecretFiles();' "${runtime}" | head -n 1 | cut -d: -f1)"
+prisma_create_line="$(grep -nF 'const prisma = createPrismaClient();' "${runtime}" | head -n 1 | cut -d: -f1)"
+[ -n "${secret_load_line}" ] && [ -n "${prisma_create_line}" ] && [ "${secret_load_line}" -lt "${prisma_create_line}" ] \
+  || fail 'emergency password reset must load file-backed secrets before creating Prisma.'
 if grep -Fq 'docker exec -e ' "${helper}"; then fail 'helper must not pass a password via environment variables.'; fi
 if grep -Eq 'totpSecret:|totpEnabled:|totpKeyVersion:|totpVerifiedAt:' "${helper}"; then
   fail 'helper must not modify TOTP state.'

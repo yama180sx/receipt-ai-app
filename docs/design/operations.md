@@ -141,7 +141,23 @@ sudo docker exec receipt-stable-backend \
 
 このCLIは有効な管理者が既に存在する場合に失敗する。出力や操作記録に秘密情報を含めず、監査記録へ対象者、実行者、理由、実行経路を追記する。実行前にDB migrationが適用済みであることを確認する。
 
-### 2.7 Expo SDK と Expo Go の運用
+### 2.7 dev検証用世帯・一般ユーザーの準備
+
+継続的な手動受入は、既存の利用者アカウントではなく、dev専用の固定世帯`dev検証世帯`と一般ユーザー`dev検証ユーザー`を使う。これはRecAIptの通常画面から作成する機能ではない。rootが設置した固定helperを、許可された管理用LinuxユーザーがTTYから実行する。
+
+1. 招待コードと15〜128文字のpasswordを、実行前にパスワードマネージャーへ保存する。値はGit、Issue、PR、端末ログへ記録しない。
+2. dev backendが稼働し、最新のroot管理runtimeへhelperとsudoersテンプレートが設置済みであることを確認する。
+3. 対話端末で次を実行する。
+
+```bash
+sudo /usr/local/libexec/receipt-provision-dev-verification-user dev
+```
+
+helperは確認語、招待コード、passwordを非表示で受け取り、先にdev backupを成功させる。初回は世帯と一般ユーザーを作成する。以後は入力した招待コードが異なっていても、固定名称の検証用世帯・ユーザーがちょうど1組あれば、認証情報を変更せず作成済みとして終了する。固定名称の世帯が複数、または構成が想定外の場合は、何も変更せず失敗する。終了時は秘密値を含まない`status`と`memberId`だけを表示する。`memberId`は緊急password再設定で対象を指定するために使う。非TTY、非root、`dev`以外の引数は拒否する。作成後の初回ログインではTOTPセットアップを完了する。
+
+本helperはstable／KAGOYAを対象にせず、既存の世帯、メンバー、レシート、認証情報を変更しない。検証用管理者が必要になった場合は、権限・TOTP・影響範囲を別Issueで設計する。
+
+### 2.8 Expo SDK と Expo Go の運用
 
 Expo Go は開発・検証用であり、家族の日常利用の正規入口はモバイルWebとする。Expo Go はプロジェクトのExpo SDKと一致しない場合に起動できないため、端末でSDK不一致を確認した場合、またはExpo Goの新SDK公開を確認した場合は、**翌営業日までに**対応Issueを起票してdev環境で更新を開始する。
 
@@ -157,6 +173,8 @@ npx expo export --platform web
 ```
 
 Expo SDK 58はTypeScript 6を要求する一方、OpenAPI生成に使用する`openapi-typescript`の現行版はTypeScript 5系だけをpeer dependencyとして宣言している。`frontend/.npmrc` の `legacy-peer-deps=true` はこの上流制約に限る一時対応である。`npm run check:api`、型チェック、Expo Doctor、Web書き出しが通ることを更新ごとに確認し、上流がTypeScript 6対応を公開した時点で設定を削除する。
+
+CIは`frontend`のlockfileで固定した`expo-doctor`を使う。通常のPRでDoctor自体を最新版取得しない。SDKまたはExpo依存を更新する専用PRでは、まず`npx expo-doctor@latest`で最新の診断結果を確認し、依存整合・実機受入が完了した場合にだけ、プロジェクト側のDoctor固定版も同じPRで更新する。
 
 iPhoneではExpo Goの旧版を個別に固定・再導入できないため、SDK不一致中はモバイルWebを利用する。Androidで対応SDK版のExpo Goを一時利用する場合も、恒久的な固定運用にはせず、対応Issueの更新完了までに限定する。
 
@@ -386,6 +404,7 @@ flowchart LR
 | `backend/prisma/reset-test-data-preserve-auth.ts` | 承認済みの認証保持テストデータ再構築（手動専用） |
 | `backend/prisma/kagoya-selective-migration.ts` | T320 stable → KAGOYA の認証・基本設定のみを移す手動専用ツール |
 | `backend/prisma/run-sync-sequences.ts` | PostgreSQL id シーケンス同期 |
+| `ops/systemd/libexec/receipt-provision-dev-verification-user` | dev限定の手動受入用世帯・一般ユーザーの冪等作成 |
 | `.github/workflows/deploy.yml` | stable CD |
 | `docs/db-operations.md` | DB 運用詳細（移行期間維持） |
 | `ops/systemd/libexec/receipt-restore` | root管理DB・uploads復旧ヘルパー |

@@ -39,6 +39,7 @@ for file in \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/libexec/receipt-emergency-password-reset \
+  ops/systemd/libexec/receipt-provision-dev-verification-user \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly \
   ops/systemd/units/receipt-deploy-dev.service \
@@ -84,6 +85,7 @@ for helper in \
   ops/systemd/libexec/receipt-rotate-invitation-codes \
   ops/systemd/libexec/receipt-rollback-invitation-codes \
   ops/systemd/libexec/receipt-emergency-password-reset \
+  ops/systemd/libexec/receipt-provision-dev-verification-user \
   ops/systemd/libexec/receipt-rotate-db-credentials \
   ops/systemd/libexec/receipt-provision-a5m-readonly; do
   bash -n "${helper}"
@@ -101,6 +103,7 @@ done
 "${project_root}/scripts/security/test-kagoya-backup-contract.sh"
 "${project_root}/scripts/security/test-kagoya-selective-migration-contract.sh"
 "${project_root}/scripts/security/test-kagoya-emergency-password-reset-contract.sh"
+"${project_root}/scripts/security/test-dev-verification-user-provision-contract.sh"
 "${project_root}/scripts/security/test-expo-go-runtime-contract.sh"
 
 require_exact_line() {
@@ -174,6 +177,8 @@ for expected_line in \
   'systemctl start "${backup_unit}"' \
   'read -r -s -p' \
   'npm exec tsx prisma/emergency-password-reset.ts' \
+  'readonly reset_member_password_status="${PIPESTATUS[1]}"' \
+  'database update did not complete' \
   'completed resetId='; do
   if ! grep -Fq "${expected_line}" ops/systemd/libexec/receipt-emergency-password-reset; then
     echo "[ERROR] Issue #132-2 emergency password reset safety contract is incomplete." >&2

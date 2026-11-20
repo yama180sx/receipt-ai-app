@@ -9,7 +9,7 @@ import { shouldClearSessionAfterUnauthorized } from './unauthorizedResponse';
  */
 let onUnauthorizedHandler: (() => void) | null = null;
 
-export const setOnUnauthorized = (handler: () => void) => {
+export const setOnUnauthorized = (handler: (() => void) | null) => {
   onUnauthorizedHandler = handler;
 };
 

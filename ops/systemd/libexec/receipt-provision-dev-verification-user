@@ -1,0 +1,44 @@
+#!/bin/bash
+# Issue #159: dev限定の手動受入用RecAIpt世帯・一般ユーザーを一度だけ作成する。
+set -euo pipefail
+
+die() { echo "[receipt-provision-dev-verification-user] $1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 1 ] || die 'environment is fixed by the systemd unit'
+[ -t 0 ] && [ -t 1 ] || die 'must run from an interactive terminal'
+[ "$1" = dev ] || die 'only the dev environment is allowed'
+
+readonly environment=dev
+readonly backend_container="receipt-${environment}-backend"
+readonly backup_unit="receipt-backup-${environment}.service"
+
+[ "$(docker inspect --format '{{.State.Running}}' "${backend_container}" 2>/dev/null || true)" = true ] \
+  || die 'backend container is not running'
+
+read -r -p 'Type provision-dev-verification-user to continue: ' confirmation
+[ "${confirmation}" = 'provision-dev-verification-user' ] || die 'confirmation did not match'
+
+# 値は事前にパスワードマネージャーへ保存してから貼り付ける。端末表示・journalへ残さない。
+read -r -s -p 'Verification invite code: ' invite_code
+echo
+read -r -s -p 'Verification user password: ' password
+echo
+read -r -s -p 'Repeat verification user password: ' password_confirmation
+echo
+[ "${password}" = "${password_confirmation}" ] || die 'password confirmation did not match'
+[ "${#password}" -ge 15 ] && [ "${#password}" -le 128 ] || die 'password must be 15-128 characters'
+
+# backupが失敗した場合は、世帯・memberのいずれも変更しない。
+systemctl start "${backup_unit}"
+[ "$(systemctl show "${backup_unit}" -p Result --value)" = success ] \
+  || die 'pre-provision backup did not succeed'
+
+# invite codeとpasswordはstdinだけでbackendへ渡す。argv、環境変数、journalへ出さない。
+if ! printf '%s\n%s' "${invite_code}" "${password}" | docker exec -i "${backend_container}" \
+  npm exec tsx prisma/provision-dev-verification-user.ts; then
+  unset invite_code password password_confirmation
+  die 'verification user provision did not complete'
+fi
+unset invite_code password password_confirmation
+
+echo '[receipt-provision-dev-verification-user] dev completed without exposing credential values'
