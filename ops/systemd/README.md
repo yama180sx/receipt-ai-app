@@ -32,6 +32,7 @@
 | リポジトリ上のテンプレート | root上の設置先 | 所有者・mode |
 | --- | --- | --- |
 | `libexec/receipt-deploy` | `/usr/local/libexec/receipt-deploy` | root:root / 0750 |
+| `libexec/receipt-deploy-kagoya-validation` | `/usr/local/libexec/receipt-deploy-kagoya-validation` | root:root / 0750 |
 | `libexec/receipt-expo-go` | `/usr/local/libexec/receipt-expo-go` | root:root / 0750 |
 | `libexec/receipt-backup` | `/usr/local/libexec/receipt-backup` | root:root / 0750 |
 | `libexec/receipt-offsite-backup` | `/usr/local/libexec/receipt-offsite-backup` | root:root / 0750 |
@@ -51,6 +52,7 @@
 | `libexec/receipt-provision-dev-verification-user` | `/usr/local/libexec/receipt-provision-dev-verification-user` | root:root / 0750 |
 | `units/*.service`, `units/*.timer` | `/etc/systemd/system/` | root:root / 0644 |
 | `config/{dev,stable}.env.example` | `/etc/receipt-ai-app/{dev,stable}.env` | root:root / 0600 |
+| `config/kagoya-validation-deploy.env.example` | `/etc/receipt-ai-app/kagoya-validation/deploy.env` | root:root / 0600 |
 | `config/offsite-{dev,stable}.env.example` | `/etc/receipt-ai-app/offsite-{dev,stable}.env` | root:root / 0600 |
 | `sudoers.d/receipt-deploy` | `/etc/sudoers.d/receipt-deploy` | root:root / 0440 |
 

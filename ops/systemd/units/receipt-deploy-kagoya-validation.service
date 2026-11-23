@@ -1,0 +1,17 @@
+[Unit]
+Description=RecAIpt KAGOYA validation root helper synchronization
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/local/libexec/receipt-deploy-kagoya-validation
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/receipt-ai-app/kagoya-validation-node22 /usr/local/libexec
+ReadOnlyPaths=/etc/receipt-ai-app/kagoya-validation
