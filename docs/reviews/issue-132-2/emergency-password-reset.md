@@ -11,6 +11,7 @@
 - 新passwordは15〜128文字、非表示入力と確認入力だけで受け取り、stdinでbackendへ渡す。平文・hashをargv、環境変数、journal、監査へ出さない。
 - 実行失敗時は、値を含めない分類（対象指定・password入力・対象不在・DB更新・backend起動）だけを表示する。例外本文、password、hash、接続情報は表示しない。
 - root管理runtimeでは`DATABASE_URL_FILE`をPrisma生成前に解決する。通常のbackendとCLIでcredential読込順を一致させる。
+- 実行失敗時は、値を含めない分類（対象指定・password入力・対象不在・DB更新・backend起動）だけを表示する。例外本文、password、hash、接続情報は表示しない。
 
 ## session無効化
 
