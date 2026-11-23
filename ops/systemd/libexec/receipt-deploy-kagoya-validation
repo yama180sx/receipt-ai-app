@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# KAGOYA validation の root helper を固定releaseから同期する。
+set -euo pipefail
+
+readonly repository_url='https://github.com/yama180sx/receipt-ai-app.git'
+readonly config_file='/etc/receipt-ai-app/kagoya-validation/deploy.env'
+readonly app_directory='/srv/receipt-ai-app/kagoya-validation-node22'
+readonly source_helper='scripts/vps/receipt-emergency-password-reset-kagoya'
+readonly installed_helper='/usr/local/libexec/receipt-emergency-password-reset-kagoya'
+
+die() { echo "[receipt-deploy-kagoya-validation] $1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die 'must run as root'
+[ "$#" -eq 0 ] || die 'this helper accepts no arguments'
+
+require_root_owned_safe_path() {
+  local path="$1"
+  [ -e "${path}" ] || die 'managed path is unavailable'
+  [ "$(stat -c '%u:%g' "${path}")" = '0:0' ] || die 'managed path ownership is invalid'
+  [ $((8#$(stat -c '%a' "${path}") & 8#022)) -eq 0 ] || die 'managed path is writable by group or others'
+}
+
+[ -r "${config_file}" ] || die 'release config is unavailable'
+require_root_owned_safe_path "${config_file}"
+
+release_sha=''
+while IFS= read -r line || [ -n "${line}" ]; do
+  case "${line}" in ''|'#'*) continue ;; KAGOYA_RELEASE_SHA=*) release_sha="${line#*=}" ;; *) die 'release config contains a disallowed key' ;; esac
+done < "${config_file}"
+[[ "${release_sha}" =~ ^[0-9a-f]{40}$ ]] || die 'release SHA is invalid'
+
+if [ ! -d "${app_directory}/.git" ]; then
+  install -d -o root -g root -m 0750 "$(dirname "${app_directory}")"
+  git clone --no-checkout "${repository_url}" "${app_directory}"
+fi
+require_root_owned_safe_path "${app_directory}"
+git -C "${app_directory}" fetch --depth=1 origin "${release_sha}"
+git -C "${app_directory}" checkout --detach --force "${release_sha}"
+[ "$(git -C "${app_directory}" rev-parse HEAD)" = "${release_sha}" ] || die 'checked out release does not match config'
+
+source_path="${app_directory}/${source_helper}"
+[ -f "${source_path}" ] || die 'allowlisted helper source is unavailable'
+require_root_owned_safe_path "${source_path}"
+install -T -o root -g root -m 0750 "${source_path}" "${installed_helper}"
+require_root_owned_safe_path "${installed_helper}"
+cmp -s "${source_path}" "${installed_helper}" || die 'installed helper does not match release source'
+
+echo '[receipt-deploy-kagoya-validation] helper synchronization completed'
