@@ -2,6 +2,8 @@ import '../../test/mockReceiptQueue';
 
 import path from 'path';
 import fs from 'fs';
+import { createHash } from 'crypto';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app';
@@ -31,6 +33,46 @@ describe.skipIf(!shouldRunDbIntegration())('Receipt API integration', () => {
 
   afterAll(() => {
     clearMockReceiptJobs();
+  });
+
+  it('同じ元画像が保存済みならGemini用ジョブを新規作成せずに返す', async () => {
+    const suffix = Date.now();
+    const image = await sharp(Buffer.from(`
+      <svg width="320" height="480" xmlns="http://www.w3.org/2000/svg">
+        <rect width="320" height="480" fill="white"/>
+        <rect x="20" y="20" width="280" height="80" fill="black"/>
+        <rect x="20" y="140" width="240" height="30" fill="black"/>
+        <rect x="20" y="220" width="180" height="30" fill="black"/>
+      </svg>
+    `)).png().toBuffer();
+    const imageHash = createHash('sha256').update(image).digest('hex');
+    const receipt = await prisma.receipt.create({
+      data: {
+        familyGroupId: 1,
+        memberId: 1,
+        storeName: `画像照合店${suffix}`,
+        normalizedStoreName: getCleanText(`画像照合店${suffix}`),
+        date: new Date('2026-11-24T00:00:00.000Z'),
+        totalAmount: 100,
+        imageHash,
+        items: { create: { name: '画像照合品', normalizedName: '画像照合品', price: 100, quantity: 1 } },
+      },
+    });
+
+    try {
+      const token = await loginAsTestMember(app);
+      const res = await request(app)
+        .post('/api/receipts/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .field('memberId', '1')
+        .attach('image', image, { filename: 'same-receipt.png', contentType: 'image/png' });
+
+      expect(res.status).toBe(202);
+      expect(res.body).toMatchObject({ success: true, data: { status: 'already_saved', existingReceiptId: receipt.id } });
+      expect(res.body.data.jobId).toBeUndefined();
+    } finally {
+      await prisma.receipt.delete({ where: { id: receipt.id } });
+    }
   });
 
   it('GET /api/receipts with token returns success envelope', async () => {

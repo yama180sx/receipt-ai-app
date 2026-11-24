@@ -1,8 +1,15 @@
 import path from 'path';
+import { createHash } from 'crypto';
+import fs from 'fs/promises';
 import sharp from 'sharp';
 import { AppError } from '../utils/appError';
 import { receiptQueue } from '../queues/receiptQueue';
-import { createReceiptAnalysisJob, findReceiptAnalysisJob } from '../repositories/receiptAnalysisJobRepository';
+import {
+  createReceiptAnalysisJob,
+  findReceiptAnalysisJob,
+  findReceiptAnalysisJobByImageHash,
+} from '../repositories/receiptAnalysisJobRepository';
+import { findReceiptByImageHash } from '../repositories/receiptRepository';
 import { enqueueReceiptAnalysisJob } from '../services/receiptJobService';
 import { isReceiptAnalysisMaintenanceMode } from '../config/receiptAnalysisMaintenance';
 import {
@@ -147,6 +154,21 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
   // Issue #136: 白紙など明らかに解析不能な画像は、保存・キュー投入・AI 呼び出しの前に止める。
   await assertReceiptImageCanBeAnalyzed(file.buffer);
 
+  // 元アップロードのバイト列だけから算出する。照合キーは DB 内だけで扱い、応答・ログには含めない。
+  const imageHash = createHash('sha256').update(file.buffer).digest('hex');
+  const existingReceipt = await findReceiptByImageHash(familyGroupId, imageHash);
+  if (existingReceipt) {
+    sendSuccess(res, mapUploadJobResponse(undefined, 'already_saved', existingReceipt.id), 202);
+    return;
+  }
+
+  const existingJob = await findReceiptAnalysisJobByImageHash(familyGroupId, imageHash);
+  if (existingJob) {
+    // ジョブ一覧は本人だけのため、別メンバーのジョブIDは返さない。
+    sendSuccess(res, mapUploadJobResponse(existingJob.memberId === memberId ? existingJob.id : undefined, 'existing_job'), 202);
+    return;
+  }
+
   const timestamp = Date.now();
   const baseFileName = `receipt-${timestamp}-${Math.round(Math.random() * 1e9)}`;
   const uploadDir = 'uploads';
@@ -158,12 +180,28 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
     .webp({ quality: 75, effort: 6 })
     .toFile(imagePath);
 
-  const job = await createReceiptAnalysisJob({ memberId, familyGroupId, imagePath });
+  let job;
+  try {
+    job = await createReceiptAnalysisJob({ memberId, familyGroupId, imagePath, imageHash });
+  } catch (error) {
+    // 同時アップロードで一意制約に先行された場合は、作成した未参照ファイルを消して既存状態を返す。
+    if ((error as { code?: string }).code !== 'P2002') throw error;
+    await fs.unlink(imagePath).catch(() => undefined);
+    const savedAfterRace = await findReceiptByImageHash(familyGroupId, imageHash);
+    if (savedAfterRace) {
+      sendSuccess(res, mapUploadJobResponse(undefined, 'already_saved', savedAfterRace.id), 202);
+      return;
+    }
+    const jobAfterRace = await findReceiptAnalysisJobByImageHash(familyGroupId, imageHash);
+    if (!jobAfterRace) throw error;
+    sendSuccess(res, mapUploadJobResponse(jobAfterRace.memberId === memberId ? jobAfterRace.id : undefined, 'existing_job'), 202);
+    return;
+  }
   await enqueueReceiptAnalysisJob({ id: job.id, memberId, familyGroupId, imagePath });
 
   logger.info(`[Queue] 解析ジョブ登録: ID ${job.id} (世帯: ${familyGroupId}, 会員: ${memberId})`);
 
-  sendSuccess(res, { ...mapUploadJobResponse(job.id), status: 'queued' }, 202);
+  sendSuccess(res, mapUploadJobResponse(job.id, 'queued'), 202);
 });
 
 export const commitReceipt = asyncHandler(async (req, res) => {

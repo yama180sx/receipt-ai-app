@@ -159,11 +159,11 @@ export const receiptApi = {
   async uploadReceipt(
     formData: FormData,
     memberId: number
-  ): Promise<ApiSuccessResponse<{ jobId: string; status?: string }>> {
+  ): Promise<ApiSuccessResponse<UploadJobResponse>> {
     const res = await apiClient.post('/receipts/upload', formData, {
       headers: { 'x-member-id': memberId.toString() },
     });
-    return requireSuccessResponse<{ jobId: string; status?: string }>('/receipts/upload', res?.data);
+    return requireSuccessResponse<UploadJobResponse>('/receipts/upload', res?.data);
   },
 
   async listJobs(): Promise<ApiSuccessResponse<ReceiptJobListItem[]>> {

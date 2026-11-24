@@ -22,6 +22,7 @@ export type ReceiptCommitTxInput = {
   totalAmount: number;
   taxAmount: number;
   imagePath: string;
+  imageHash?: string;
   isSuspicious: boolean;
   warnings: string[];
   usageLogId: number | null;
@@ -44,6 +45,7 @@ export async function persistReceiptCommitInTx(
     totalAmount,
     taxAmount,
     imagePath,
+    imageHash,
     isSuspicious,
     warnings,
     usageLogId,
@@ -84,6 +86,7 @@ export async function persistReceiptCommitInTx(
     totalAmount,
     taxAmount,
     imagePath,
+    imageHash,
     rawText: JSON.stringify({ ...parsedData, validation: { isSuspicious, warnings } }),
     items: itemsToCreate,
   });

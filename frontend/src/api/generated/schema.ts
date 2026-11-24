@@ -1022,7 +1022,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 画像アップロード → 解析ジョブ投入 */
+        /**
+         * 画像アップロード → 解析ジョブ投入
+         * @description 同一世帯で同じ元画像を再送した場合は、SHA-256照合によりGeminiを再実行せず、保存済みまたは既存ジョブの状態を返す。照合値そのものは応答に含めない。
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2743,8 +2746,10 @@ export interface components {
             existingId?: number;
         };
         UploadJobResponse: {
-            jobId: string;
-            status?: string;
+            jobId?: string | null;
+            /** @enum {string} */
+            status?: "queued" | "existing_job" | "already_saved";
+            existingReceiptId?: number | null;
         };
         ReceiptJobListItem: {
             id: string;

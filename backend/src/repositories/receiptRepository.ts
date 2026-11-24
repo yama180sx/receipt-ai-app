@@ -11,6 +11,7 @@ export {
   findLatestReceipt,
   findReceiptById,
   findReceiptByImagePath,
+  findReceiptByImageHash,
   findReceiptIdByImagePath,
   findReceiptForDuplicate,
   listFamilyMembers,

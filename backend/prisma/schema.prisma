@@ -308,6 +308,8 @@ model ReceiptAnalysisJob {
   memberId         Int
   member           FamilyMember             @relation(fields: [memberId], references: [id], onDelete: Cascade)
   imagePath        String
+  /// 元アップロードの SHA-256。世帯内で同一画像の解析を一度だけにするための非公開照合キー。
+  imageHash        String?                  @db.Char(64)
   status           ReceiptAnalysisJobStatus @default(QUEUED)
   failureCode      String?
   failureReason    String?
@@ -318,6 +320,7 @@ model ReceiptAnalysisJob {
 
   @@index([familyGroupId, memberId, createdAt])
   @@index([status, updatedAt])
+  @@unique([familyGroupId, imageHash])
 }
 
 // 費目カテゴリー (世帯別マスタ — Issue #93-4)
@@ -363,12 +366,15 @@ model Receipt {
   taxAmount                   Float                        @default(0.0)
   rawText                     Json?
   imagePath                   String?
+  /// 元アップロードの SHA-256。API・ログには公開しない。
+  imageHash                   String?                      @db.Char(64)
   items                       Item[]
   apiUsageLogs                ApiUsageLog[] // [Issue #59] トークンログとのリレーション
   productClassificationAiRuns ProductClassificationAiRun[]
   createdAt                   DateTime                     @default(now()) @db.Timestamptz(3)
 
   @@index([familyGroupId, date]) // 検索効率化
+  @@unique([familyGroupId, imageHash])
 }
 
 model Item {

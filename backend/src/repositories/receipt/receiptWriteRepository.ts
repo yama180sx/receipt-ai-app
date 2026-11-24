@@ -26,6 +26,7 @@ export type ReceiptCreateWithItemsInput = {
   totalAmount: number;
   taxAmount: number;
   imagePath: string;
+  imageHash?: string;
   rawText: string;
   items: Array<{
     name: string;
@@ -60,6 +61,7 @@ export async function createReceiptInTx(tx: PrismaTx, input: ReceiptCreateWithIt
       totalAmount: input.totalAmount,
       taxAmount: input.taxAmount,
       imagePath: input.imagePath,
+      imageHash: input.imageHash,
       items: {
         create: input.items.map(({ productClassificationCandidates = [], ...item }) => ({
           ...item,

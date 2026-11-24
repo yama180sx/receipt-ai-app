@@ -1,8 +1,17 @@
 import { ReceiptAnalysisJobStatus } from '#prisma';
 import { prisma } from '../utils/prismaClient';
 
-export async function createReceiptAnalysisJob(input: { familyGroupId: number; memberId: number; imagePath: string }) {
+export async function createReceiptAnalysisJob(input: {
+  familyGroupId: number; memberId: number; imagePath: string; imageHash?: string;
+}) {
   return prisma.receiptAnalysisJob.create({ data: input });
+}
+
+export async function findReceiptAnalysisJobByImageHash(familyGroupId: number, imageHash: string) {
+  return prisma.receiptAnalysisJob.findFirst({
+    where: { familyGroupId, imageHash },
+    select: { id: true, memberId: true },
+  });
 }
 
 export async function findReceiptAnalysisJob(id: string, familyGroupId: number, memberId?: number) {

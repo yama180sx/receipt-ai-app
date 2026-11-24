@@ -5,6 +5,7 @@ import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptServ
 import type { ReceiptCommitPayload } from '../../types/receipt';
 import {
   findReceiptById,
+  findReceiptByImageHash,
   findReceiptByImagePath,
 } from '../../repositories/receiptRepository';
 import { DuplicateReceiptError } from './receiptDuplicateError';
@@ -22,7 +23,8 @@ export async function saveParsedReceipt(
   parsedData: ReceiptCommitPayload,
   imagePath: string,
   isSuspicious: boolean,
-  warnings: string[]
+  warnings: string[],
+  imageHash?: string
 ) {
   const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
@@ -32,6 +34,14 @@ export async function saveParsedReceipt(
 
   const usageLogIdStr = parsedData.usageLogId !== undefined ? String(parsedData.usageLogId) : null;
   const usageLogId = usageLogIdStr ? parseInt(usageLogIdStr, 10) : null;
+
+  if (imageHash) {
+    const existingByHash = await findReceiptByImageHash(familyGroupId, imageHash);
+    if (existingByHash) {
+      logger.info(`[Idempotent] 同一画像のため既存レシートを返却: ID ${existingByHash.id}`);
+      return { ...existingByHash, isSuspicious, warnings };
+    }
+  }
 
   if (imagePath) {
     const existingByImage = await findReceiptByImagePath(familyGroupId, imagePath);
@@ -60,6 +70,7 @@ export async function saveParsedReceipt(
       totalAmount,
       taxAmount,
       imagePath,
+      imageHash,
       isSuspicious,
       warnings,
       usageLogId,
@@ -88,7 +99,8 @@ export async function saveConfirmedReceipt(
   parsedData: ReceiptCommitPayload,
   imagePath: string,
   isSuspicious: boolean,
-  warnings: string[]
+  warnings: string[],
+  imageHash?: string
 ) {
-  return saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings);
+  return saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings, imageHash);
 }
