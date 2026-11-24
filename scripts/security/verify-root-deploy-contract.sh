@@ -335,6 +335,16 @@ for expected_line in \
   fi
 done
 
+if ! grep -Fq 'HOST_IP WEB_PORT BACKEND_PORT DEV_PORT EXPO_GO_PORT DB_PORT REDIS_PORT' \
+  ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must require an explicit Expo Go port." >&2
+  exit 1
+fi
+if grep -Fq 'EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"' ops/systemd/libexec/receipt-deploy; then
+  echo "[ERROR] root deploy helper must not default a missing Expo Go port." >&2
+  exit 1
+fi
+
 for expected_line in \
   'STABLE_RELEASE_SHA=<approved-40-character-lowercase-commit-sha>' \
   '[[ "${STABLE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "stable release commit must be a lowercase full SHA"' \
