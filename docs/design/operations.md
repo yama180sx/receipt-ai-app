@@ -159,7 +159,9 @@ helperは確認語、招待コード、passwordを非表示で受け取り、先
 
 ### 2.8 Expo SDK と Expo Go の運用
 
-Expo Go は開発・検証用であり、家族の日常利用の正規入口はモバイルWebとする。Expo Go はプロジェクトのExpo SDKと一致しない場合に起動できないため、端末でSDK不一致を確認した場合、またはExpo Goの新SDK公開を確認した場合は、**翌営業日までに**対応Issueを起票してdev環境で更新を開始する。
+Expo Go は開発・検証用であり、家族の日常利用の正規入口はモバイルWebとする。Expo Go はプロジェクトのExpo SDKと一致しない場合にJavaScript bundleを起動できない。起動前の不一致はアプリ内で検知・案内できないため、iPhoneはモバイルWebを使う。Apple App Store版Expo Goが対応しないSDKを使うために、プロジェクトSDKをiPhoneだけのために下げることはしない。詳細な端末別の入口と復旧経路は[ADR-019](../adr/ADR-019-expo-runtime-compatibility-and-ios-web-access.md)および[モバイル・Webアクセスガイド](../mobile-access.md)を正とする。
+
+管理担当者は、月次の保守確認、Expoの新SDK公開、SDK不一致の報告、native依存またはapp設定を変更する予定のいずれかを契機に対応Issueを起票し、更新要否を判断する。SDK更新は自動化せず、SDK更新専用PRでだけ実施する。
 
 更新は1メジャーずつ行い、各段階で次を確認する。
 
@@ -176,7 +178,7 @@ Expo SDK 58はTypeScript 6を要求する一方、OpenAPI生成に使用する`o
 
 CIは`frontend`のlockfileで固定した`expo-doctor`を使う。通常のPRでDoctor自体を最新版取得しない。SDKまたはExpo依存を更新する専用PRでは、まず`npx expo-doctor@latest`で最新の診断結果を確認し、依存整合・実機受入が完了した場合にだけ、プロジェクト側のDoctor固定版も同じPRで更新する。
 
-iPhoneではExpo Goの旧版を個別に固定・再導入できないため、SDK不一致中はモバイルWebを利用する。Androidで対応SDK版のExpo Goを一時利用する場合も、恒久的な固定運用にはせず、対応Issueの更新完了までに限定する。
+iPhoneのApp Store版Expo GoはSDK 58のサポート対象ではないため、SDK不一致中に限らずモバイルWebを利用する。Androidで対応SDK版のExpo Goを一時利用する場合も、恒久的な固定運用にはせず、対応Issueの補助検証に限定する。SDK、native依存、app設定を変更した場合はAndroid development buildを再build・再配布する。
 
 ---
 
