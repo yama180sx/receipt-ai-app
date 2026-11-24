@@ -63,7 +63,13 @@ if grep -Fq 'docker-compose.secrets.yml' "${go_helper}"; then
   exit 1
 fi
 
-grep -Fq 'EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"' "${root}/ops/systemd/libexec/receipt-deploy"
+grep -Fq 'HOST_IP WEB_PORT BACKEND_PORT DEV_PORT EXPO_GO_PORT DB_PORT REDIS_PORT' \
+  "${root}/ops/systemd/libexec/receipt-deploy"
+if grep -Fq 'EXPO_GO_PORT="${EXPO_GO_PORT:-8083}"' \
+  "${root}/ops/systemd/libexec/receipt-deploy"; then
+  echo '[ERROR] root deployment must reject a missing Expo Go port instead of sharing a default port.' >&2
+  exit 1
+fi
 grep -Fq 'run_compose build backend frontend frontend-dev frontend-go' "${root}/ops/systemd/libexec/receipt-deploy"
 
 temporary_directory="$(mktemp -d)"
