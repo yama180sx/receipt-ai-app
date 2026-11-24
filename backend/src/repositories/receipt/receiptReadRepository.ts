@@ -136,6 +136,18 @@ export async function findReceiptByImagePath(
   });
 }
 
+/** SHA-256 は世帯内だけで照合し、値そのものを外部へ返さない。 */
+export async function findReceiptByImageHash(
+  familyGroupId: number,
+  imageHash: string,
+  include: Prisma.ReceiptInclude = receiptWithItemsCategory
+) {
+  return prisma.receipt.findFirst({
+    where: { familyGroupId, imageHash },
+    include,
+  });
+}
+
 export async function findReceiptIdByImagePath(familyGroupId: number, imagePath: string) {
   return prisma.receipt.findFirst({
     where: { familyGroupId, imagePath },

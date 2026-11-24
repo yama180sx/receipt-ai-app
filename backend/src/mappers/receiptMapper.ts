@@ -197,8 +197,16 @@ export function mapFamilyMembersToSummary(
   return members.map(mapFamilyMemberToSummary);
 }
 
-export function mapUploadJobResponse(jobId: string | number | undefined): UploadJobResponse {
-  return { jobId: String(jobId ?? '') };
+export function mapUploadJobResponse(
+  jobId?: string | number,
+  status?: UploadJobResponse['status'],
+  existingReceiptId?: number
+): UploadJobResponse {
+  return {
+    ...(jobId === undefined ? {} : { jobId: String(jobId) }),
+    ...(status === undefined ? {} : { status }),
+    ...(existingReceiptId === undefined ? {} : { existingReceiptId }),
+  };
 }
 
 export function mapItemSplitsUpdateResult(

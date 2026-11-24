@@ -56,7 +56,14 @@ export function useReceiptUpload({
         const uploadRes = await receiptApi.uploadReceipt(formData, currentMemberId);
 
         if (uploadRes.success) {
-          showAcceptanceFeedback('受付しました。解析結果は下の一覧に表示されます。');
+          const status = uploadRes.data.status;
+          showAcceptanceFeedback(
+            status === 'already_saved'
+              ? '同じ画像のレシートはすでに保存済みです。履歴を確認してください。'
+              : status === 'existing_job'
+                ? '同じ画像はすでに受け付け済みです。解析一覧を確認してください。'
+                : '受付しました。解析結果は下の一覧に表示されます。'
+          );
           await onUploadAccepted();
           return;
         }

@@ -651,6 +651,8 @@ sequenceDiagram
 | メンテナンス | `RECEIPT_ANALYSIS_MAINTENANCE_MODE=true` の間はアップロードと手動再実行を503で停止し、閲覧と確定保存は継続する。 |
 | commit 後 | `jobId` 指定時、キューと復旧台帳からジョブを削除する |
 
+アップロード時は元画像の SHA-256 を世帯内だけで照合する。同じ画像が保存済みなら `202` と `status: "already_saved"`、未確定ジョブがあるなら `202` と `status: "existing_job"` を返し、Gemini を再実行しない。初回は `jobId` と `status: "queued"` を返す。ハッシュ値は照合専用であり、API・画面・ログには含めない。
+
 ---
 
 ## 7. テストとの整合（#91-3）

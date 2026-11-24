@@ -238,8 +238,9 @@ export type ReceiptJobStatus = {
 };
 
 export type UploadJobResponse = {
-  jobId: string;
-  status?: string;
+  jobId?: string | null;
+  status?: 'queued' | 'existing_job' | 'already_saved';
+  existingReceiptId?: number | null;
 };
 
 export type ItemSplitInput = {

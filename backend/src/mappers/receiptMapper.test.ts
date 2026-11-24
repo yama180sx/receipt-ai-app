@@ -196,5 +196,9 @@ describe('receiptMapper', () => {
 
   it('maps upload job response', () => {
     expect(mapUploadJobResponse('job-1')).toEqual({ jobId: 'job-1' });
+    expect(mapUploadJobResponse(undefined, 'already_saved', 10)).toEqual({
+      status: 'already_saved',
+      existingReceiptId: 10,
+    });
   });
 });

@@ -147,6 +147,7 @@ root専用CLIによるTOTP再暗号化の追記型監査。利用者名、TOTP�
 | familyGroupId | Int | No | — | — | FamilyGroup.id | — | 複合 |
 | memberId | Int | No | — | — | FamilyMember.id | — | 複合 |
 | imagePath | String | No | — | — | — | — | — |
+| imageHash | String(64) | Yes | — | — | — | `(familyGroupId, imageHash)` | — |
 | status | ReceiptAnalysisJobStatus | No | QUEUED | — | — | — | 複合 |
 | failureCode | String | Yes | — | — | — | — | — |
 | failureReason | String | Yes | — | — | — | — | — |
@@ -157,6 +158,7 @@ root専用CLIによるTOTP再暗号化の追記型監査。利用者名、TOTP�
 
 **FK:** `familyGroupId` → `FamilyGroup.id` (**onDelete: Cascade**), `memberId` → `FamilyMember.id` (**onDelete: Cascade**)
 **Index:** `(familyGroupId, memberId, createdAt)`, `(status, updatedAt)`
+**Unique:** `(familyGroupId, imageHash)`（SHA-256。世帯内の同一元画像を一つの未確定ジョブに保つ。`NULL` は既存台帳を表す）
 
 ---
 
@@ -212,10 +214,12 @@ root専用CLIによるTOTP再暗号化の追記型監査。利用者名、TOTP�
 | taxAmount | Float | No | 0.0 | — | — | — | — |
 | rawText | Json | Yes | — | — | — | — | — |
 | imagePath | String | Yes | — | — | — | — | — |
+| imageHash | String(64) | Yes | — | — | — | `(familyGroupId, imageHash)` | — |
 | createdAt | DateTime | No | now() | — | — | — | — |
 
 **FK:** `familyGroupId` → `FamilyGroup.id`, `memberId` → `FamilyMember.id`  
 **Index:** `(familyGroupId, date)`, `GIN(normalizedStoreName gin_trgm_ops)`
+**Unique:** `(familyGroupId, imageHash)`（SHA-256。照合専用でAPI・ログには公開しない。`NULL` は既存・手動登録を表す）
 
 > `memberId` は立替者（支払者）。業務意味は [domain-model.md §3.2](./domain-model.md)。
 
@@ -485,6 +489,7 @@ erDiagram
 | 20260513〜 | taxAmount |
 | 20260514〜 | PromptTemplate |
 | 20260818 | ReceiptAnalysisJob（キュー復旧台帳） |
+| 20261124 | Receipt / ReceiptAnalysisJob の世帯内画像SHA-256照合キー |
 | 20260728〜 | 商品分類モデル導入・ProductMaster廃止 |
 | 20260523〜 | ItemSplit |
 | 20260525〜 | SettlementTransfer |
