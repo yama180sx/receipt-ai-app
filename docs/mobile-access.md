@@ -37,7 +37,14 @@ Expo Go は不要。`:8082` も不要。
 
 ## Expo Go（補助検証だけ）
 
-Expo Goは日常利用・Android development buildの代替ではない。SDK互換性の確認など、Issueで必要とした補助検証にだけ使う。
+Expo Goは日常利用・Android development buildの代替ではない。SDK互換性の確認など、Issueで必要とした補助検証にだけ使う。**iPhoneのApp Store版Expo GoはSDK 58を実行できないため、iPhoneでは使用しない。** iPhoneの入口は本番Webである。
+
+| 端末・用途 | 正規入口 | SDK不一致時の復旧 |
+| --- | --- | --- |
+| iPhone（日常利用・通常受入） | モバイルWeb | Expo Goを閉じ、本番Webを開く。SDKをiPhoneのためだけに下げない。 |
+| Android（ネイティブ検証） | development build | SDK・native依存・app設定を変更した場合は、対応するdevelopment buildを再配布する。 |
+| Android（補助検証） | 対応SDK版Expo Go | 個別Issueで承認した場合だけ使う。互換版を恒久的に固定しない。 |
+| PC / モバイルWeb | Web | 通常のWebリリース・接続確認に従う。 |
 
 Expo Goとdevelopment buildは同じMetroを共有しない。root管理のT320では、管理担当者が対象環境のExpo Go専用Metroを明示的に開始する。
 
@@ -56,7 +63,7 @@ sudo systemctl stop receipt-expo-go-dev.service
 # または stable: receipt-expo-go-stable.service
 ```
 
-Expo GoはプロジェクトのSDK 58と互換のある版を使用する。Expo Goの障害時に`frontend-dev`を`--go`へ戻したり、development APKを削除・再作成したりしない。
+Expo GoはAndroidでプロジェクトのSDK 58と互換のある版だけを使用する。Expo Goの障害時に`frontend-dev`を`--go`へ戻したり、development APKを削除・再作成したりしない。iPhone用のEAS Go／TestFlightやdevelopment buildは、Apple Developer Program、署名、配布を含む別Issueで承認するまで導入しない。
 
 ## トラブルシュート
 
@@ -66,7 +73,8 @@ Expo GoはプロジェクトのSDK 58と互換のある版を使用する。Expo
 | Expo GoのQRがdevelopment buildを開く、またはその逆 | 対象のMetroを停止し、用途に合うroot管理serviceだけを開始する。`frontend-dev`と`frontend-go`を兼用しない。 |
 | `:8082` で招待コードが通らない | root所有設定のCORS関連値と`HOST_IP`を確認し、管理担当者が固定unitでstableを再デプロイする。`setup-env.sh`やユーザー所有Composeは使わない。別PC／スマホからは`http://HOST_IP:8082`を使う。 |
 | 招待コード入力後に進まない（Android Web） | 旧ビルドは `:3000` 直叩きで CORS / ポート到達性の問題あり。**frontend を再ビルド**（`/api` 同一 Origin プロキシ）。それでも失敗する場合は Wi‑Fi 同一 LAN・`http://HOST_IP` でアクセスしているか確認 |
-| Expo Go が繋がらない | AndroidのExpo GoがSDK 58互換か、VPN/Wi-Fi到達性、Expo Go専用Metroの`HOST_IP`・`EXPO_GO_PORT`を管理担当者が確認する。 |
+| iPhoneのExpo GoがSDK不一致を表示する | 想定内。Expo Goを閉じてモバイルWebを開く。接続先やQRをIssueへ記録しない。 |
+| AndroidのExpo Go が繋がらない | SDK 58互換版か、VPN/Wi-Fi到達性、Expo Go専用Metroの`HOST_IP`・`EXPO_GO_PORT`を管理担当者が確認する。 |
 | iPhone でカメラが起動しない | HTTP 制限の可能性 — ギャラリーから選択、または Web 切り取り UI（#94-4）を利用 |
 
 ## 関連 Issue
