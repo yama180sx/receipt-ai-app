@@ -16,7 +16,11 @@ export async function analyzeOnly(ctx: TenantContext, imagePath: string) {
   const { memberId, familyGroupId } = ctx;
   logger.info(`[Analyze] 解析開始: ${imagePath} (Member: ${memberId}, 世帯: ${familyGroupId})`);
 
-  const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(imagePath, memberId);
+  const parsedData = await getReceiptAnalysisProvider().analyzeReceiptImage(
+    imagePath,
+    memberId,
+    familyGroupId
+  );
   assertReceiptAnalysisContainsData(parsedData);
   const itemsWithCategories = await Promise.all(
     parsedData.items.map(async (item) => {

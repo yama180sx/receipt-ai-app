@@ -672,6 +672,10 @@ model ApiUsageLog {
   receiptId            Int? // 関連するレシート
   receipt              Receipt?           @relation(fields: [receiptId], references: [id])
   modelId              String // 例: "gemini-1.5-flash"
+  // OCR品質の比較・再現に必要なプロンプト来歴。テンプレート削除後も監査できるようRelationは持たない。
+  promptTemplateId     Int?
+  promptTemplateVersion Int?
+  promptFingerprint    String?            @db.Char(64)
   promptTokens         Int // 入力トークン
   candidatesTokens     Int // 出力トークン
   totalTokens          Int // 合計トークン

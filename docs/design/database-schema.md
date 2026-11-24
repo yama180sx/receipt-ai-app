@@ -383,6 +383,9 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | familyMemberId | Int | Yes | — | — | FamilyMember.id | — | Yes |
 | receiptId | Int | Yes | — | — | Receipt.id | — | — |
 | modelId | String | No | — | — | — | — | — |
+| promptTemplateId | Int | Yes | — | — | — | — | 複合 |
+| promptTemplateVersion | Int | Yes | — | — | — | — | 複合 |
+| promptFingerprint | String(64) | Yes | — | — | — | — | — |
 | promptTokens | Int | No | — | — | — | — | — |
 | candidatesTokens | Int | No | — | — | — | — | — |
 | totalTokens | Int | No | — | — | — | — | — |
@@ -392,10 +395,12 @@ Rule はキーワード、商品種別・標準カテゴリ、優先度、有効
 | createdAt | DateTime | No | now() | — | — | — | Yes |
 
 **FK:** `familyMemberId` → `FamilyMember.id`, `receiptId` → `Receipt.id`, `pricingRevisionId` → `AiPricingRevision.id`
-**Index:** `familyMemberId`, `createdAt`
+**Index:** `familyMemberId`, `createdAt`, `(modelId, promptTemplateId, promptTemplateVersion)`
 
 `pricingRevisionId` はGemini呼出し開始時点で有効な単価改定を記録する。実装前の行と単価未登録時の行は
 `null`であり、過去ログを単価から推測して補完しない。
+
+OCRログは、実行時の世帯別プロンプトのID・版・レンダリング後本文のSHA-256も保存する。本文や画像、Gemini生応答は保存しない。
 
 ---
 
