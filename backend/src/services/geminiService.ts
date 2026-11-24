@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createHash } from 'crypto';
 import * as fs from "fs";
 import * as path from "path";
 import logger from "../utils/logger";
 import { getHttpStatusFromError, isRetryableHttpError } from "../utils/httpError";
 import type { ParsedReceipt } from "../types/receipt";
-import { findActivePromptTemplateByKey } from "../repositories/promptRepository";
+import { findActivePromptTemplateByKeyForFamilyGroup } from "../repositories/promptRepository";
 import {
   createApiUsageLog,
   incrementApiUsageLogTokens,
@@ -56,8 +57,16 @@ async function withRetry<T>(
 /**
  * [Issue #72/76] プロンプトをDBから取得し、ドメインヒントを結合
  */
-async function buildPrompt(): Promise<string> {
-  const template = await findActivePromptTemplateByKey("RECEIPT_ANALYSIS");
+async function buildPrompt(familyGroupId: number): Promise<{
+  prompt: string;
+  templateId: number;
+  templateVersion: number;
+  fingerprint: string;
+}> {
+  const template = await findActivePromptTemplateByKeyForFamilyGroup(
+    familyGroupId,
+    "RECEIPT_ANALYSIS"
+  );
 
   if (!template) {
     throw new Error("プロンプトテンプレート(RECEIPT_ANALYSIS)がDBに見つかりません。");
@@ -73,7 +82,12 @@ async function buildPrompt(): Promise<string> {
     prompt += `\n\n### 業態別特別指示:\n${hintText}`;
   }
 
-  return prompt;
+  return {
+    prompt,
+    templateId: template.id,
+    templateVersion: template.version,
+    fingerprint: createHash('sha256').update(prompt).digest('hex'),
+  };
 }
 
 /**
@@ -94,8 +108,9 @@ function validateArithmetic(data: ParsedReceipt): { isValid: boolean; diff: numb
  * - [Issue #63] usageLogId の返却（自己修復時の累積トークン合算に対応）
  */
 export const analyzeReceiptImage = async (
-  imagePath: string, 
-  familyMemberId?: number
+  imagePath: string,
+  familyMemberId: number | undefined,
+  familyGroupId: number
 ): Promise<ParsedReceipt> => {
   // #124 がPaid Tier有効時の「単価未登録なら停止」を担当するまで、単価解決失敗は既存OCRを阻害しない。
   // 有効な改定があれば開始時点のIDだけをログへ固定し、後からの単価変更で過去額を変えない。
@@ -109,6 +124,8 @@ export const analyzeReceiptImage = async (
     logger.error('❌ AI単価改定の取得に失敗しました:', error);
   }
 
+  const promptProvenance = await buildPrompt(familyGroupId);
+
   const processAnalysis = async (
     retryWithCorrection: boolean = false, 
     previousErrorData?: string,
@@ -119,7 +136,7 @@ export const analyzeReceiptImage = async (
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    let prompt = await buildPrompt();
+    let prompt = promptProvenance.prompt;
 
     if (retryWithCorrection && previousErrorData) {
       prompt += `\n\n⚠️ 前回の解析結果で算術矛盾が発生しました: ${previousErrorData}\n「(各品目の price * quantity の合計) + taxAmount = totalAmount」が厳密に一致するように数値を再精査してください。特に数量が小数（ガソリン等）の場合は注意してください。`;
@@ -157,6 +174,9 @@ export const analyzeReceiptImage = async (
           const log = await createApiUsageLog({
             familyMemberId: familyMemberId || null,
             modelId: GEMINI_MODEL,
+            promptTemplateId: promptProvenance.templateId,
+            promptTemplateVersion: promptProvenance.templateVersion,
+            promptFingerprint: promptProvenance.fingerprint,
             promptTokens: usage.promptTokenCount ?? 0,
             candidatesTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,

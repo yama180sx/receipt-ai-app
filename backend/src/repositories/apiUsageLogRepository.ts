@@ -4,6 +4,9 @@ import { AiUsagePurpose, Prisma } from '#prisma';
 export async function createApiUsageLog(data: {
   familyMemberId: number | null;
   modelId: string;
+  promptTemplateId: number;
+  promptTemplateVersion: number;
+  promptFingerprint: string;
   promptTokens: number;
   candidatesTokens: number;
   totalTokens: number;

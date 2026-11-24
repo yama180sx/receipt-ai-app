@@ -29,7 +29,7 @@ describe('receiptAnalysisProviderRegistry', () => {
     setReceiptAnalysisProvider(mockProvider);
 
     await expect(
-      getReceiptAnalysisProvider().analyzeReceiptImage('/tmp/mock.jpg', 1)
+      getReceiptAnalysisProvider().analyzeReceiptImage('/tmp/mock.jpg', 1, 1)
     ).resolves.toEqual(mockParsed);
 
     resetReceiptAnalysisProvider();

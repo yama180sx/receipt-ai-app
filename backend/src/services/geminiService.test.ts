@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   generateContent: vi.fn(),
-  findActivePromptTemplateByKey: vi.fn(),
+  findActivePromptTemplateByKeyForFamilyGroup: vi.fn(),
   createApiUsageLog: vi.fn(),
   incrementApiUsageLogTokens: vi.fn(),
   findEffectiveAiPricingRevision: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('../repositories/promptRepository', () => ({
-  findActivePromptTemplateByKey: mocks.findActivePromptTemplateByKey,
+  findActivePromptTemplateByKeyForFamilyGroup: mocks.findActivePromptTemplateByKeyForFamilyGroup,
 }));
 
 vi.mock('../repositories/apiUsageLogRepository', () => ({
@@ -61,7 +61,12 @@ const invalidReceipt = {
 describe('analyzeReceiptImage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findActivePromptTemplateByKey.mockResolvedValue({ systemPrompt: 'prompt', domainHints: null });
+    mocks.findActivePromptTemplateByKeyForFamilyGroup.mockResolvedValue({
+      id: 10,
+      version: 3,
+      systemPrompt: 'prompt',
+      domainHints: null,
+    });
     mocks.createApiUsageLog.mockResolvedValue({ id: 123 });
     mocks.findEffectiveAiPricingRevision.mockResolvedValue({ id: 77, maxInputTokens: 4096, maxOutputTokens: 1024, inputPriceJpyPerMillion: '48', outputPriceJpyPerMillion: '394' });
   });
@@ -80,7 +85,7 @@ describe('analyzeReceiptImage', () => {
       .mockResolvedValueOnce(resultFor(invalidReceipt))
       .mockResolvedValueOnce(resultFor(invalidReceipt));
 
-    await expect(analyzeReceiptImage('uploads/test.webp', 1))
+    await expect(analyzeReceiptImage('uploads/test.webp', 1, 2))
       .rejects.toThrow('Gemini解析結果の算術整合性を確認できませんでした');
 
     expect(mocks.incrementApiUsageLogTokens).toHaveBeenCalledWith(123, {
@@ -91,6 +96,13 @@ describe('analyzeReceiptImage', () => {
       durationMs: 40,
     });
 
-    expect(mocks.createApiUsageLog).toHaveBeenCalledWith(expect.objectContaining({ durationMs: 25, pricingRevisionId: 77 }));
+    expect(mocks.findActivePromptTemplateByKeyForFamilyGroup).toHaveBeenCalledWith(2, 'RECEIPT_ANALYSIS');
+    expect(mocks.createApiUsageLog).toHaveBeenCalledWith(expect.objectContaining({
+      durationMs: 25,
+      pricingRevisionId: 77,
+      promptTemplateId: 10,
+      promptTemplateVersion: 3,
+      promptFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    }));
   });
 });

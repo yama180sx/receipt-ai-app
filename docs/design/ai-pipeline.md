@@ -323,7 +323,7 @@ flowchart TB
 
 ### 6.2 解析処理（`analyzeReceiptImage`）
 
-1. **プロンプト構築** — DB から `PromptTemplate`（`key=RECEIPT_ANALYSIS`, `isActive=true`）を取得。`domainHints` があれば業態別指示を追記
+1. **プロンプト構築** — DB から**解析対象世帯に限定して** `PromptTemplate`（`key=RECEIPT_ANALYSIS`, `isActive=true`）を取得。`domainHints` があれば業態別指示を追記
 2. **JSON モード** — `responseMimeType: "application/json"` で構造化出力
 3. **算術整合性チェック** — `(Σ price×quantity) + taxAmount = totalAmount`（許容誤差 1 円）
 4. **自己修復リトライ** — 不整合時、前回 JSON をプロンプトに含めて 1 回再解析。トークンは同一 `ApiUsageLog` に累積
@@ -354,12 +354,18 @@ flowchart TB
 
 | タイミング | 操作 |
 |------------|------|
-| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`, 有効なら`pricingRevisionId`） |
+| 初回解析 | `ApiUsageLog.create`（`familyMemberId`, トークン数, `modelId`, `durationMs`, 有効なら`pricingRevisionId`、世帯別プロンプトID・版・本文SHA-256） |
 | 自己修復リトライ | 同一レコードへtokenと`durationMs`を`increment`で累積し、`selfRepairRetryCount`を加算 |
 | commit 成功 | `ApiUsageLog.receiptId` を更新（1 対 1 紐付け） |
 | 手動登録 | `usageLogId` なし（AI コスト対象外） |
 
 管理者は `GET /api/admin/stats/cost` で世帯別トークン使用量・概算コストを参照できる（[api-spec.md §4.7](./api-spec.md)）。
+
+### 6.5 抽出安定性の評価
+
+`npm run ocr:stability-evaluate` は、秘密情報・実利用者データを含まないテスト用レシートを同一条件で2〜10回解析し、`storeName`・`purchaseDate`・`totalAmount` の組合せが何通りになったかを集計する。実行には `RECEIPT_STABILITY_IMAGE_PATH`、`RECEIPT_TEST_FAMILY_GROUP_ID`、`RECEIPT_TEST_MEMBER_ID` を明示指定する。API呼び出しと通常の利用量ログを発生させるため、dev環境のテスト画像だけに使用する。
+
+出力はモデルID、実行回数、組合せ数、各組合せの件数だけであり、画像本文・明細・認証情報は表示しない。モデルまたはプロンプトを変える前後で同じ画像・同じ回数を比較し、`ApiUsageLog` のプロンプト来歴と併せて評価する。
 
 ---
 
