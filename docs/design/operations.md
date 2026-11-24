@@ -26,6 +26,7 @@ Epic: [#276 Issue #90](https://github.com/yama180sx/receipt-ai-app/issues/276)
 | マスタデータの追加・更新 | 本書 §4 → [db-operations.md](../db-operations.md) | seed / update-master |
 | 本番デプロイの流れ | [architecture.md §8.3](./architecture.md) | `.github/workflows/deploy.yml` |
 | コンテナイメージdigestの定期確認・更新・rollback | [Issue #152 runbook](../reviews/issue-152/container-image-update-runbook.md) | ADR-018に従いdev → stable → KAGOYAで受入する |
+| T320ホストのNode.js・キャッシュ棚卸し | [Issue #160 棚卸し記録](../reviews/issue-160/t320-host-runtime-audit.md) | RecAIptはDockerで管理するが、host側の別プロジェクトへの影響を確認してから判断する |
 | バックアップ失敗の Discord 通知 | 本書 §3.3 | `scripts/backup.sh` |
 | 秘密情報の検知・安全診断・漏えい時の初動 | [secret-scanning-and-incident-response.md](../security/secret-scanning-and-incident-response.md) | GitHub Secret Scanning、Gitleaks、診断スクリプト |
 | 招待コードの安全な再発行・配布・対象限定ロールバック | [Issue #131-7 runbook](../reviews/issue-131-7/invitation-code-rotation-runbook.md) | root専用serviceと暗号化artifact |
