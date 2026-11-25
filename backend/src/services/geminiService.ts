@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import * as fs from "fs";
 import * as path from "path";
 import logger from "../utils/logger";
@@ -17,6 +17,29 @@ import { releaseAiBudgetReservation, reserveAiBudget } from './aiBudget/aiBudget
 import { getConfiguredReceiptModelId } from '../config/geminiModel';
 
 export type { ParsedItem, ParsedReceipt } from "../types/receipt";
+
+/** 実データは呼出元のメモリだけで扱い、ログやDBには保存しない。 */
+export type ReceiptDiagnosticAttempt = {
+  phase: 'initial' | 'repair';
+  data: ParsedReceipt;
+  arithmeticDiff: number | null;
+  durationMs: number;
+  promptTemplateId: number;
+  promptTemplateVersion: number;
+  promptFingerprint: string;
+  promptSource: 'template' | 'diagnostic_override';
+  promptTokens: number | null;
+  responseTokens: number | null;
+  pricingRevisionId: number | null;
+  estimatedCostJpy: string | null;
+};
+
+export class ReceiptArithmeticError extends Error {
+  constructor(diff: number) {
+    super(`Gemini解析結果の算術整合性を確認できませんでした（差分:${diff}円）。`);
+    this.name = 'ReceiptArithmeticError';
+  }
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -57,11 +80,12 @@ async function withRetry<T>(
 /**
  * [Issue #72/76] プロンプトをDBから取得し、ドメインヒントを結合
  */
-async function buildPrompt(familyGroupId: number): Promise<{
+async function buildPrompt(familyGroupId: number, diagnosticPromptOverride?: string): Promise<{
   prompt: string;
   templateId: number;
   templateVersion: number;
   fingerprint: string;
+  source: 'template' | 'diagnostic_override';
 }> {
   const template = await findActivePromptTemplateByKeyForFamilyGroup(
     familyGroupId,
@@ -72,7 +96,7 @@ async function buildPrompt(familyGroupId: number): Promise<{
     throw new Error("プロンプトテンプレート(RECEIPT_ANALYSIS)がDBに見つかりません。");
   }
 
-  let prompt = template.systemPrompt;
+  let prompt = diagnosticPromptOverride ?? template.systemPrompt;
 
   if (template.domainHints) {
     const hints = template.domainHints as Record<string, string>;
@@ -89,6 +113,7 @@ async function buildPrompt(familyGroupId: number): Promise<{
     templateId: template.id,
     templateVersion: template.version,
     fingerprint: createHash('sha256').update(prompt).digest('hex'),
+    source: diagnosticPromptOverride === undefined ? 'template' : 'diagnostic_override',
   };
 }
 
@@ -112,8 +137,11 @@ function validateArithmetic(data: ParsedReceipt): { isValid: boolean; diff: numb
 export const analyzeReceiptImage = async (
   imagePath: string,
   familyMemberId: number | undefined,
-  familyGroupId: number
+  familyGroupId: number,
+  onDiagnosticAttempt?: (attempt: ReceiptDiagnosticAttempt) => void,
+  diagnosticPromptOverride?: string
 ): Promise<ParsedReceipt> => {
+  if (diagnosticPromptOverride !== undefined && !onDiagnosticAttempt) throw new Error('Diagnostic prompt requires an observer.');
   // #124 がPaid Tier有効時の「単価未登録なら停止」を担当するまで、単価解決失敗は既存OCRを阻害しない。
   // 有効な改定があれば開始時点のIDだけをログへ固定し、後からの単価変更で過去額を変えない。
   let pricingRevision: AiPricingRevision | null | undefined;
@@ -126,7 +154,7 @@ export const analyzeReceiptImage = async (
     logger.error('❌ AI単価改定の取得に失敗しました:', error);
   }
 
-  const promptProvenance = await buildPrompt(familyGroupId);
+  const promptProvenance = await buildPrompt(familyGroupId, diagnosticPromptOverride);
 
   const processAnalysis = async (
     retryWithCorrection: boolean = false, 
@@ -208,20 +236,35 @@ export const analyzeReceiptImage = async (
     // 算術整合性チェック
     if (!Array.isArray(data.items)) throw new Error('Gemini解析結果の明細形式が不正です。');
     // 合計が不明な場合は推測や再試行で値を作らず、確認画面で入力してもらう。
-    if (data.totalAmount == null) return data;
-    const { isValid, diff } = validateArithmetic(data);
+    const arithmetic = data.totalAmount == null ? null : validateArithmetic(data);
+    onDiagnosticAttempt?.({
+      phase: retryWithCorrection ? 'repair' : 'initial', data,
+      arithmeticDiff: arithmetic && Number.isFinite(arithmetic.diff) ? arithmetic.diff : null,
+      durationMs, promptTemplateId: promptProvenance.templateId,
+      promptTemplateVersion: promptProvenance.templateVersion,
+      promptFingerprint: promptProvenance.fingerprint,
+      promptSource: promptProvenance.source,
+      promptTokens: usage?.promptTokenCount ?? null, responseTokens: usage?.candidatesTokenCount ?? null,
+      pricingRevisionId: pricingRevision?.id ?? null,
+      estimatedCostJpy: pricingRevision && usage?.promptTokenCount != null && usage.candidatesTokenCount != null
+        ? new Prisma.Decimal(usage.promptTokenCount).mul(pricingRevision.inputPriceJpyPerMillion).plus(new Prisma.Decimal(usage.candidatesTokenCount).mul(pricingRevision.outputPriceJpyPerMillion)).div(1_000_000).toString()
+        : null,
+    });
+    if (!arithmetic) return data;
+    const { isValid, diff } = arithmetic;
     if (!isValid) {
       if (!retryWithCorrection) {
         logger.warn(`[Issue #72] 算術不整合(差分:${diff}円)。自己修復リトライを開始します。`);
         return await processAnalysis(true, text, usageLogId);
       }
-      throw new Error(`Gemini解析結果の算術整合性を確認できませんでした（差分:${diff}円）。`);
+      throw new ReceiptArithmeticError(diff);
     }
 
     return data;
   };
 
-  const jobKey = `ocr:${imagePath}:${Math.random()}`;
+  // 一時画像のパスを予算予約テーブルへ残さない。
+  const jobKey = `ocr:${randomUUID()}`;
   const maxCostJpy = pricingRevision
     ? new Prisma.Decimal(pricingRevision.maxInputTokens)
       .mul(pricingRevision.inputPriceJpyPerMillion)
