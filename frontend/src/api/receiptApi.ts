@@ -18,6 +18,7 @@ import type {
   ProductClassificationReviewItem,
   ProductClassificationLearningData,
   ProductTypeStatus,
+  DuplicateCandidate,
 } from './generated';
 import { requireSuccessResponse } from './responseContract';
 
@@ -31,6 +32,7 @@ export type ListReceiptsParams = {
 
 export type CommitReceiptPayload = {
   jobId?: string;
+  reviewedDuplicateIds?: number[];
   parsedData: ParsedReceiptData & { totalAmount: number; taxAmount: number };
   imagePath: string;
   validation: { isSuspicious: boolean; warnings: string[] };
@@ -54,6 +56,10 @@ export type ListProductClassificationReviewItemsParams = {
 
 /** レシート・ジョブ・按分 API（/api/receipts/*, /family-groups/members） */
 export const receiptApi = {
+  async findDuplicateCandidates(input: { storeName: string; purchaseDate: string; totalAmount: number }): Promise<{ candidates: DuplicateCandidate[]; hasMore: boolean }> {
+    const res = await apiClient.post('/receipts/duplicate-candidates', input);
+    return requireSuccessResponse<{ candidates: DuplicateCandidate[]; hasMore: boolean }>('/receipts/duplicate-candidates', res?.data).data;
+  },
   async listReceipts(params: ListReceiptsParams = {}): Promise<ApiSuccessResponse<ReceiptListPage>> {
     const res = await apiClient.get('/receipts', { params });
     return requireSuccessResponse<ReceiptListPage>('/receipts', res?.data);

@@ -1,12 +1,16 @@
 import logger from '../../utils/logger';
-import { normalizeStoreName } from '../../utils/normalizer';
+import { AppError } from '../../utils/appError';
+import { normalizeStoreName, normalizeStoreNames } from '../../utils/normalizer';
 import { runReceiptCommitTransaction } from '../../utils/prismaTransaction';
-import { checkDuplicateReceipt, parseReceiptDate } from '../duplicateReceiptService';
+import { findDuplicateCandidates, parseReceiptDate, unreviewedDuplicateId } from '../duplicateReceiptService';
 import type { ReceiptCommitPayload } from '../../types/receipt';
 import {
   findReceiptById,
   findReceiptByImageHash,
   findReceiptByImagePath,
+  findDuplicateReceiptCandidatesInTx,
+  lockReceiptFamilyInTx,
+  findStoresForNormalizationInTx,
 } from '../../repositories/receiptRepository';
 import { DuplicateReceiptError } from './receiptDuplicateError';
 import { persistReceiptCommitInTx } from './receiptCommitPersistence';
@@ -24,10 +28,12 @@ export async function saveParsedReceipt(
   imagePath: string,
   isSuspicious: boolean,
   warnings: string[],
-  imageHash?: string
+  imageHash?: string,
+  reviewedDuplicateIds?: number[]
 ) {
   const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
   const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
+  if (!jstDate) throw new AppError('購入日時を確認してください。', 400);
 
   const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
   const taxAmount = parsedData.taxAmount ? parseFloat(String(parsedData.taxAmount)) : 0;
@@ -55,13 +61,16 @@ export async function saveParsedReceipt(
     }
   }
 
-  const duplicate = await checkDuplicateReceipt(familyGroupId, parsedData, imagePath);
-  if (duplicate.duplicateSuspected) {
-    throw new DuplicateReceiptError(duplicate.existingReceiptId);
-  }
-
-  const savedId = await runReceiptCommitTransaction((tx) =>
-    persistReceiptCommitInTx(tx, {
+  const savedId = await runReceiptCommitTransaction(async (tx) => {
+    await lockReceiptFamilyInTx(tx, familyGroupId);
+    const candidates = await findDuplicateCandidates(familyGroupId, parsedData, (where) => findDuplicateReceiptCandidatesInTx(tx, where), (names, familyId) => normalizeStoreNames(names, familyId, true, (id) => findStoresForNormalizationInTx(tx, id)));
+    if (reviewedDuplicateIds) {
+      const unreviewed = unreviewedDuplicateId(candidates, reviewedDuplicateIds);
+      if (unreviewed !== null || candidates.length > 50) throw new DuplicateReceiptError(unreviewed);
+    } else if (candidates.length) {
+      throw new DuplicateReceiptError(candidates[0].id);
+    }
+    return persistReceiptCommitInTx(tx, {
       memberId,
       familyGroupId,
       parsedData,
@@ -74,8 +83,8 @@ export async function saveParsedReceipt(
       isSuspicious,
       warnings,
       usageLogId,
-    })
-  );
+    });
+  });
 
   // 外部AIはDB commit後に実行する。失敗時も保存済みレシートはそのまま返す。
   const savedBeforeAi = await findReceiptById(savedId);
@@ -100,7 +109,8 @@ export async function saveConfirmedReceipt(
   imagePath: string,
   isSuspicious: boolean,
   warnings: string[],
-  imageHash?: string
+  imageHash?: string,
+  reviewedDuplicateIds?: number[]
 ) {
-  return saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings, imageHash);
+  return saveParsedReceipt(memberId, familyGroupId, parsedData, imagePath, isSuspicious, warnings, imageHash, reviewedDuplicateIds);
 }

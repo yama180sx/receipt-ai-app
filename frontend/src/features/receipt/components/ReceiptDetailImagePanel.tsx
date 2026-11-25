@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { ReceiptImageViewer } from './ReceiptImageViewer';
 import type { ReceiptImageSource } from '../../../utils/receiptImageSource';
 import type { ReceiptDetail } from '../../../types/receipt';
 import { receiptDetailStyles as styles } from '../styles/receiptDetailStyles';
@@ -14,7 +15,7 @@ export const ReceiptDetailImagePanel: React.FC<Props> = ({ receipt, imageSource,
   <View style={isWide ? styles.wideImageColumn : styles.mobileImageArea}>
     <View style={[styles.imageWrapper, !isWide && styles.mobileImageWrapper]}>
       {receipt.imagePath && imageSource ? (
-        <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
+        <ReceiptImageViewer source={imageSource} style={styles.receiptImage} />
       ) : (
         <View style={styles.noImagePlaceholder}>
           <Text style={styles.emptyText}>画像なし</Text>

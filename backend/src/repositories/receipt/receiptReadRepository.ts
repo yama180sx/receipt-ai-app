@@ -162,6 +162,26 @@ export async function findReceiptForDuplicate(
   return prisma.receipt.findFirst({ where, select });
 }
 
+export async function findDuplicateReceiptCandidates(where: Prisma.ReceiptWhereInput) {
+  return prisma.receipt.findMany({
+    where,
+    select: { id: true, storeName: true, date: true, totalAmount: true, imagePath: true },
+    orderBy: { id: 'desc' },
+  });
+}
+
+export async function findDuplicateReceiptCandidatesInTx(tx: PrismaTx, where: Prisma.ReceiptWhereInput) {
+  return tx.receipt.findMany({ where, select: { id: true, storeName: true, date: true, totalAmount: true, imagePath: true }, orderBy: { id: 'desc' } });
+}
+
+export async function lockReceiptFamilyInTx(tx: PrismaTx, familyGroupId: number): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(74157, ${familyGroupId})`;
+}
+
+export async function findStoresForNormalizationInTx(tx: PrismaTx, familyGroupId: number) {
+  return tx.store.findMany({ where: { familyGroupId }, select: { officialName: true, aliases: true } });
+}
+
 export async function listFamilyMembers(familyGroupId: number) {
   return prisma.familyMember.findMany({
     where: { familyGroupId },

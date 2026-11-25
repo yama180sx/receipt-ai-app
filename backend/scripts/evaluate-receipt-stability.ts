@@ -32,16 +32,16 @@ function requiredImagePath(): string {
 }
 
 type CoreFields = {
-  storeName: string;
-  purchaseDate: string;
-  totalAmount: number;
+  storeName: string | null;
+  purchaseDate: string | null;
+  totalAmount: number | null;
 };
 
 function toCoreFields(value: CoreFields): CoreFields {
   return {
-    storeName: value.storeName.trim(),
-    purchaseDate: value.purchaseDate.trim(),
-    totalAmount: Math.round(value.totalAmount),
+    storeName: value.storeName?.trim() ?? null,
+    purchaseDate: value.purchaseDate?.trim() ?? null,
+    totalAmount: value.totalAmount == null ? null : Math.round(value.totalAmount),
   };
 }
 

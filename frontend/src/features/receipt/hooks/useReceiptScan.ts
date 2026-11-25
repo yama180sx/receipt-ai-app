@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { receiptApi } from '../../../api/receiptApi';
+import type { DuplicateCandidate } from '../../../api/generated';
 import type { ParsedReceiptItemInput } from '../../../types/receipt';
 import type { ReceiptScanInitialData } from '../../../types/receiptScan';
 import { showAlert } from '../../../utils/alertMessage';
@@ -24,6 +25,8 @@ export function useReceiptScan({
   onCancel,
 }: UseReceiptScanOptions) {
   const [loading, setLoading] = useState(false);
+  const [totalOverride, setTotalOverride] = useState(() => initialData.parsedData.totalAmount == null ? '' : String(initialData.parsedData.totalAmount));
+  const [candidates, setCandidates] = useState<DuplicateCandidate[] | null>(null);
   const [receiptData, setReceiptData] = useState<ReceiptFormData>({
     ...initialData.parsedData,
     taxAmount: initialData.parsedData.taxAmount ?? '0',
@@ -67,15 +70,32 @@ export function useReceiptScan({
     setReceiptData({ ...receiptData, items: newItems });
   };
 
-  const handleCommit = async () => {
+  const handleCommit = async (reviewed?: number[]) => {
     if (loading) return;
+    if (!receiptData.storeName?.trim()) { showAlert('店舗名を確認してください', 'レシートの店舗名を入力してください。'); return; }
+    if (!receiptData.purchaseDate?.trim()) {
+      showAlert('購入日時を確認してください', 'レシートの日付を入力してください。');
+      return;
+    }
+    if ((receiptData.totalAmount == null || !Number.isFinite(Number(receiptData.totalAmount))) && totalOverride.trim() === '') {
+      showAlert('合計金額を確認してください', 'レシートの合計金額を入力してください。');
+      return;
+    }
     setLoading(true);
     try {
+      const totalAmount = totalOverride.trim() === '' ? calculatedTotal : Number(totalOverride);
+      if (!Number.isFinite(totalAmount) || !Number.isInteger(totalAmount) || totalAmount < 0) { showAlert('金額を確認してください', '正しい合計金額を入力してください。'); return; }
+      if (!reviewed) {
+        const result = await receiptApi.findDuplicateCandidates({ storeName: receiptData.storeName, purchaseDate: receiptData.purchaseDate, totalAmount });
+        if (result.hasMore) { showAlert('候補が多すぎます', '履歴で確認してください。'); return; }
+        if (result.candidates.length) { setCandidates(result.candidates); return; }
+      }
       const payload = {
         jobId: initialData.jobId,
+        reviewedDuplicateIds: reviewed ?? [],
         parsedData: {
           ...receiptData,
-          totalAmount: calculatedTotal,
+          totalAmount,
           taxAmount: parseFloat(String(receiptData.taxAmount)) || 0,
           items: receiptData.items.map((item) => ({
             ...item,
@@ -98,10 +118,8 @@ export function useReceiptScan({
       const message = getApiErrorMessage(err, '保存に失敗しました。');
 
       if (message === 'DUPLICATE') {
-        const duplicateMessage = initialData.warnedDuplicateFromTray
-          ? '確認トレイで重複の疑いが表示されていました。同じ内容のレシートは保存できません。トレイから破棄するか、履歴で既存レシートを確認してください。'
-          : '同じ店名・日付・金額のレシートが世帯内に存在します。履歴画面で確認してください。';
-        showAlert('既に登録済みです', duplicateMessage, { onOk: onCancel });
+        setCandidates(null);
+        showAlert('候補が変更されました', 'もう一度保存を押して候補を確認してください。');
         return;
       }
 
@@ -119,6 +137,11 @@ export function useReceiptScan({
     categorySelectOptions,
     imageSource,
     calculatedTotal,
+    totalOverride,
+    setTotalOverride,
+    candidates,
+    closeCandidates: () => setCandidates(null),
+    confirmCandidates: () => { if (candidates) { const ids = candidates.map((candidate) => candidate.id); setCandidates(null); void handleCommit(ids); } },
     updateItem,
     removeItem,
     addItem,

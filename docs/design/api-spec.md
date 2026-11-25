@@ -292,6 +292,7 @@ sequenceDiagram
 | GET | `/receipts/items/:itemId/product-classification-candidates` | JWT + tenant | 商品分類候補一覧 |
 | POST | `/receipts/items/:itemId/splits` | JWT + tenant | 明細按分（ItemSplit）保存 |
 | POST | `/receipts/commit` | JWT + tenant | AI 解析結果の確定保存 |
+| POST | `/receipts/duplicate-candidates` | JWT + tenant | 店舗名・購入日時・金額に基づく世帯内の重複候補 |
 
 **クエリパラメータ**
 
@@ -480,6 +481,8 @@ memberId=1
 ```
 
 **POST `/api/receipts/commit`**
+
+解析結果の保存前に `POST /api/receipts/duplicate-candidates` へ確認後の店舗名・日時・金額を渡す。候補を確認した場合は、そのIDを commit の `reviewedDuplicateIds` に指定する。候補がない場合は空配列を指定する。保存時に新たな未確認候補があれば 409 を返す。詳細は OpenAPI を正とする。
 
 ```json
 {

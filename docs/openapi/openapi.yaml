@@ -633,6 +633,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiMessageEnvelope'
 
+  /receipts/duplicate-candidates:
+    post:
+      tags: [receipt]
+      summary: 確認済み店舗名・日時・金額で世帯内の重複候補を検索
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storeName, purchaseDate, totalAmount]
+              properties:
+                storeName: { type: string }
+                purchaseDate: { type: string }
+                totalAmount: { type: number }
+      responses:
+        '200':
+          description: 最大50件。hasMoreは追加候補の存在を示す。
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [candidates, hasMore]
+                        properties:
+                          hasMore: { type: boolean }
+                          candidates:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DuplicateReceiptCandidate'
+        '400':
+          description: 日時または金額が不正
+
   /receipts/commit:
     post:
       tags: [receipt]
@@ -2025,12 +2064,26 @@ components:
           type: integer
           nullable: true
 
+    DuplicateReceiptCandidate:
+      type: object
+      required: [id, storeName, date, totalAmount, imagePath]
+      properties:
+        id: { type: integer }
+        storeName: { type: string }
+        date: { type: string, format: date-time }
+        totalAmount: { type: number }
+        imagePath: { type: string, nullable: true }
+
     CommitReceiptRequest:
       type: object
       required: [parsedData, imagePath, validation]
       properties:
         jobId:
           type: string
+        reviewedDuplicateIds:
+          description: 内容を確認して別のレシートと判断した候補ID。保存直前の再照合に使用。
+          type: array
+          items: { type: integer, minimum: 1 }
         parsedData:
           $ref: '#/components/schemas/ParsedReceiptCommitData'
         imagePath:
