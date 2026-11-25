@@ -69,6 +69,13 @@ export function ReceiptJobTrayRow({
         <Text style={styles.subtitle} numberOfLines={2}>
           {getReceiptTrayItemSubtitle(item)}
         </Text>
+        <View style={[styles.badge, badgeStyle(display.kind)]}>
+          {display.isActive ? (
+            <ActivityIndicator size="small" color={theme.colors.text.inverse} />
+          ) : (
+            <Text style={styles.badgeText}>{display.label}</Text>
+          )}
+        </View>
         {isDuplicate ? (
           <Text style={styles.duplicateHint}>
             同じ店名・日付・金額のレシートが登録済みの可能性があります
@@ -80,13 +87,6 @@ export function ReceiptJobTrayRow({
             Geminiの無料枠が回復後に再実行できます（{new Date(retryAvailableAt).toLocaleString('ja-JP')}）
           </Text>
         ) : null}
-      </View>
-      <View style={[styles.badge, badgeStyle(display.kind)]}>
-        {display.isActive ? (
-          <ActivityIndicator size="small" color={theme.colors.text.inverse} />
-        ) : (
-          <Text style={styles.badgeText}>{display.label}</Text>
-        )}
       </View>
     </>
   );
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
@@ -169,6 +169,9 @@ const styles = StyleSheet.create({
   },
   badge: {
     minWidth: 72,
+    maxWidth: '100%',
+    alignSelf: 'flex-start',
+    marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: theme.borderRadius.sm,
