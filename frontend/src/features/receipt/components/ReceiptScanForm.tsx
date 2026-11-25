@@ -20,14 +20,15 @@ export function ReceiptScanForm({ scan }: Props) {
       <Text style={styles.sectionLabel}>基本情報</Text>
       <AppFormField label="店舗名">
         <AppTextInput
-          value={scan.receiptData.storeName}
+          value={scan.receiptData.storeName ?? ''}
           onChangeText={(val) => scan.setReceiptData({ ...scan.receiptData, storeName: val })}
           placeholder="店舗名"
         />
       </AppFormField>
       <AppFormField label="購入日時">
+        {!scan.receiptData.purchaseDate?.trim() && <Text>日付を読み取れませんでした。レシートを確認して入力してください。</Text>}
         <AppTextInput
-          value={scan.receiptData.purchaseDate}
+          value={scan.receiptData.purchaseDate ?? ''}
           onChangeText={(val) => scan.setReceiptData({ ...scan.receiptData, purchaseDate: val })}
           placeholder="YYYY-MM-DD HH:mm"
         />
@@ -46,9 +47,13 @@ export function ReceiptScanForm({ scan }: Props) {
       </AppFormField>
 
       <View style={styles.totalDisplay}>
-        <Text style={styles.totalLabel}>支払合計 (税込)</Text>
+        <Text style={styles.totalLabel}>明細から計算した金額</Text>
         <Text style={styles.totalValue}>¥ {scan.calculatedTotal.toLocaleString()}</Text>
       </View>
+      <AppFormField label="レシートの合計金額">
+        {scan.receiptData.totalAmount == null && <Text>合計金額を読み取れませんでした。レシートを確認して入力してください。</Text>}
+        <AppTextInput value={scan.totalOverride} onChangeText={scan.setTotalOverride} keyboardType="number-pad" placeholder={String(scan.calculatedTotal)} />
+      </AppFormField>
     </View>
   );
 }

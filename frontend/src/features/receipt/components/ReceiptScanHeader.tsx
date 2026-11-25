@@ -21,7 +21,7 @@ export function ReceiptScanHeader({ onCancel, scan }: Props) {
       <Text style={[screenLayout.headerTitle, styles.headerTitleScan]}>解析結果の確認</Text>
       <AppButton
         title={BUTTON_LABELS.save}
-        onPress={scan.handleCommit}
+        onPress={() => { void scan.handleCommit(); }}
         loading={scan.loading}
         disabled={scan.loading}
         size="sm"

@@ -26,6 +26,7 @@ import {
   retryReceiptJob,
   getAdvancedStats,
   commitReceipt,
+  getDuplicateCandidates,
   getFamilyMembers,
   updateItemSplits,
   uploadReceipt,
@@ -85,6 +86,7 @@ router.get('/receipts/status/:jobId', getJobStatus);
 router.get('/stats/monthly', getMonthlyStats);
 router.get('/stats/advanced', getAdvancedStats);
 router.post('/receipts', validate(manualReceiptSchema), createReceipt);
+router.post('/receipts/duplicate-candidates', getDuplicateCandidates);
 router.get('/receipts/:id', getReceipt);
 router.delete('/receipts/:id', deleteReceipt);
 router.patch('/receipts/:id', updateReceipt);

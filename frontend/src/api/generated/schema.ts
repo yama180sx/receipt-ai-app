@@ -962,6 +962,62 @@ export interface paths {
         };
         trace?: never;
     };
+    "/receipts/duplicate-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 確認済み店舗名・日時・金額で世帯内の重複候補を検索 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        storeName: string;
+                        purchaseDate: string;
+                        totalAmount: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description 最大50件。hasMoreは追加候補の存在を示す。 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiSuccessEnvelope"] & {
+                            data?: {
+                                hasMore: boolean;
+                                candidates: components["schemas"]["DuplicateReceiptCandidate"][];
+                            };
+                        };
+                    };
+                };
+                /** @description 日時または金額が不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receipts/commit": {
         parameters: {
             query?: never;
@@ -2713,8 +2769,18 @@ export interface components {
             quantity: number;
             categoryId?: number | null;
         };
+        DuplicateReceiptCandidate: {
+            id: number;
+            storeName: string;
+            /** Format: date-time */
+            date: string;
+            totalAmount: number;
+            imagePath: string | null;
+        };
         CommitReceiptRequest: {
             jobId?: string;
+            /** @description 内容を確認して別のレシートと判断した候補ID。保存直前の再照合に使用。 */
+            reviewedDuplicateIds?: number[];
             parsedData: components["schemas"]["ParsedReceiptCommitData"];
             imagePath: string;
             validation: components["schemas"]["ReceiptValidation"];

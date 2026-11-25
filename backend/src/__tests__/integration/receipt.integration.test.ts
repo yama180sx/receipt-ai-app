@@ -35,6 +35,32 @@ describe.skipIf(!shouldRunDbIntegration())('Receipt API integration', () => {
     clearMockReceiptJobs();
   });
 
+  it('finds only matching store candidates and rejects a newly unreviewed receipt at commit', async () => {
+    const suffix = Date.now();
+    const name = `DAISO 試験店${suffix}`;
+    const alias = `ダイソー 試験店${suffix}`;
+    const date = new Date(2026, 10, 23, 17, 27);
+    const created = await Promise.all([name, `別店舗${suffix}`].map((storeName) => prisma.receipt.create({
+      data: { familyGroupId: 1, memberId: 1, storeName, normalizedStoreName: getCleanText(storeName), date, totalAmount: 314159 },
+    })));
+    try {
+      const token = await loginAsTestMember(app);
+      const result = await request(app).post('/api/receipts/duplicate-candidates')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ storeName: alias, purchaseDate: '2026-11-23 17:27', totalAmount: 314159 });
+      expect(result.status).toBe(200);
+      expect(result.body.data.candidates.map((candidate: { id: number }) => candidate.id)).toContain(created[0].id);
+      expect(result.body.data.candidates.map((candidate: { id: number }) => candidate.id)).not.toContain(created[1].id);
+      const commit = await request(app).post('/api/receipts/commit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ imagePath: 'uploads/test-review-fixture.webp', parsedData: { storeName: alias, purchaseDate: '2026-11-23 17:27', totalAmount: 314159, items: [] }, validation: { isSuspicious: false, warnings: [] }, reviewedDuplicateIds: [] });
+      expect(commit.status).toBe(409);
+      expect(commit.body.existingId).toBe(created[0].id);
+    } finally {
+      for (const receipt of created) await prisma.receipt.delete({ where: { id: receipt.id } });
+    }
+  });
+
   it('同じ元画像が保存済みならGemini用ジョブを新規作成せずに返す', async () => {
     const suffix = Date.now();
     const image = await sharp(Buffer.from(`

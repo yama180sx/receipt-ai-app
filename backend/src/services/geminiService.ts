@@ -82,6 +82,8 @@ async function buildPrompt(familyGroupId: number): Promise<{
     prompt += `\n\n### 業態別特別指示:\n${hintText}`;
   }
 
+  prompt += '\n\n### 読み取りの確認\n店舗名はレシートに印字された表記を忠実に転記し、アルファベットとカタカナを勝手に変換しない。店舗名、購入日時、合計金額が読み取れない場合は推測や現在日時を使わず、その項目を null とする。日時は日付だけ分かる場合は YYYY-MM-DD とする。';
+
   return {
     prompt,
     templateId: template.id,
@@ -196,7 +198,7 @@ export const analyzeReceiptImage = async (
     try {
       data = JSON.parse(text) as ParsedReceipt;
     } catch (e) {
-      logger.error(`[JSON Parse Error] Raw: ${text}`);
+      logger.error('[JSON Parse Error] Gemini response was not valid JSON');
       throw new Error("Geminiのレスポンスが正しいJSON形式ではありません。");
     }
 
@@ -204,6 +206,9 @@ export const analyzeReceiptImage = async (
     data.usageLogId = usageLogId;
 
     // 算術整合性チェック
+    if (!Array.isArray(data.items)) throw new Error('Gemini解析結果の明細形式が不正です。');
+    // 合計が不明な場合は推測や再試行で値を作らず、確認画面で入力してもらう。
+    if (data.totalAmount == null) return data;
     const { isValid, diff } = validateArithmetic(data);
     if (!isValid) {
       if (!retryWithCorrection) {

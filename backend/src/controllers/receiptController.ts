@@ -59,6 +59,7 @@ import { getCleanText } from '../utils/normalizer';
 import { decodeReceiptCursor, type ReceiptPaginationFilters } from '../utils/receiptPaginationCursor';
 import { normalizeYearMonth } from '../utils/yearMonth';
 import { assertReceiptImageCanBeAnalyzed } from '../services/receipt/receiptImagePreflightService';
+import { findDuplicateCandidates, parseReceiptDate } from '../services/duplicateReceiptService';
 
 function invalidQueryParameter(message: string): never {
   throw new AppError(message, 400);
@@ -204,11 +205,22 @@ export const uploadReceipt = asyncHandler(async (req, res) => {
   sendSuccess(res, mapUploadJobResponse(job.id, 'queued'), 202);
 });
 
+export const getDuplicateCandidates = asyncHandler(async (req, res) => {
+  const { familyGroupId } = requireTenantContext();
+  const { storeName, purchaseDate, totalAmount } = req.body ?? {};
+  if (typeof storeName !== 'string' || !storeName.trim() || typeof purchaseDate !== 'string' || !parseReceiptDate(purchaseDate) || typeof totalAmount !== 'number' || !Number.isSafeInteger(totalAmount) || totalAmount < 0) {
+    throw new AppError('店舗名・購入日時・金額を確認してください。', 400);
+  }
+  const candidates = await findDuplicateCandidates(familyGroupId, { storeName, purchaseDate, totalAmount });
+  sendSuccess(res, { candidates: candidates.slice(0, 50), hasMore: candidates.length > 50 });
+});
+
 export const commitReceipt = asyncHandler(async (req, res) => {
   const ctx = requireTenantContext();
-  const { parsedData, imagePath, validation, jobId } = req.body;
+  const { parsedData, imagePath, validation, jobId, reviewedDuplicateIds } = req.body;
 
   if (!parsedData || !imagePath) throw new AppError('必要なデータが不足しています。', 400);
+  if (reviewedDuplicateIds !== undefined && (!Array.isArray(reviewedDuplicateIds) || reviewedDuplicateIds.length > 50 || reviewedDuplicateIds.some((id: unknown) => !Number.isSafeInteger(id) || (id as number) < 1))) throw new AppError('確認済み候補が不正です。', 400);
 
   const result = await commitReceiptService({
     ctx,
@@ -217,6 +229,7 @@ export const commitReceipt = asyncHandler(async (req, res) => {
     isSuspicious: validation?.isSuspicious || false,
     warnings: validation?.warnings || [],
     jobId,
+    reviewedDuplicateIds,
   });
 
   sendSuccess(res, mapReceiptToDetail(result), 201);

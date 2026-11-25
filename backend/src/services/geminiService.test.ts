@@ -105,4 +105,12 @@ describe('analyzeReceiptImage', () => {
       promptFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     }));
   });
+
+  it('leaves an unreadable total for user review without inventing a value', async () => {
+    mocks.generateContent.mockResolvedValueOnce(resultFor({ ...invalidReceipt, totalAmount: null, purchaseDate: null }));
+    const result = await analyzeReceiptImage('uploads/test.webp', 1, 2);
+    expect(result.totalAmount).toBeNull();
+    expect(result.purchaseDate).toBeNull();
+    expect(mocks.generateContent).toHaveBeenCalledTimes(1);
+  });
 });

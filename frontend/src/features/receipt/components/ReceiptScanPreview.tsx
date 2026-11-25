@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ImageSourcePropType } from 'react-native';
+import { View, Text, StyleSheet, ImageSourcePropType } from 'react-native';
+import { ReceiptImageViewer } from './ReceiptImageViewer';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { borderRadius } from '../../../theme/radii';
@@ -31,7 +32,7 @@ export function ReceiptScanPreview({ initialData, imageSource }: Props) {
 
       {imageSource ? (
         <View style={styles.imageContainer}>
-          <Image source={imageSource} style={styles.receiptImage} resizeMode="contain" />
+          <ReceiptImageViewer source={imageSource} style={styles.receiptImage} />
           <View style={styles.imageLabel}>
             <Text style={styles.imageLabelText}>加工済みプレビュー</Text>
           </View>

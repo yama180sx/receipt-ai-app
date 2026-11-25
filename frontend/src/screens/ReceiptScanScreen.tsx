@@ -11,6 +11,7 @@ import {
 import { colors } from '../theme/colors';
 import { screenLayout } from '../theme/screenLayout';
 import type { ReceiptScanInitialData } from '../types/receiptScan';
+import { DuplicateReceiptReview } from '../features/receipt/components/DuplicateReceiptReview';
 
 const s = colors.semantic.scan;
 
@@ -34,6 +35,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
 
   return (
     <SafeAreaView style={[screenLayout.container, styles.containerScan]}>
+      {scan.candidates && <DuplicateReceiptReview candidates={scan.candidates} currentImage={scan.imageSource} currentStore={scan.receiptData.storeName} currentDate={scan.receiptData.purchaseDate} currentTotal={scan.totalOverride.trim() === '' ? scan.calculatedTotal : Number(scan.totalOverride)} onClose={scan.closeCandidates} onConfirm={scan.confirmCandidates} />}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ReceiptScanHeader onCancel={onCancel} scan={scan} />
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
