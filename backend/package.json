@@ -27,6 +27,7 @@
     "prisma:reset-receipt-data": "npx tsx prisma/reset-receipt-data-preserve-auth.ts",
     "prisma:reset-test-data": "npx tsx prisma/reset-test-data-preserve-auth.ts",
     "ocr:stability-evaluate": "tsx scripts/evaluate-receipt-stability.ts",
+    "ocr:diagnose": "tsx scripts/evaluate-receipt-diagnostics.ts",
     "install:sharp-wasm": "sh scripts/install-sharp-wasm.sh",
     "test": "vitest run",
     "test:integration": "RUN_API_INTEGRATION=1 vitest run --config vitest.integration.config.ts",

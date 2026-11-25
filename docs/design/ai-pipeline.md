@@ -363,6 +363,8 @@ flowchart TB
 
 ### 6.5 抽出安定性の評価
 
+算術不整合を含む試行を継続して調査する `npm run ocr:diagnose` の安全な実行・期待値・比較手順は [receipt-ai-diagnostics.md](../testing/receipt-ai-diagnostics.md) を参照する。実値の出力は明示指定時のみである。
+
 `npm run ocr:stability-evaluate` は、秘密情報・実利用者データを含まないテスト用レシートを同一条件で2〜10回解析し、`storeName`・`purchaseDate`・`totalAmount` の組合せが何通りになったかを集計する。実行には `RECEIPT_STABILITY_IMAGE_PATH`、`RECEIPT_TEST_FAMILY_GROUP_ID`、`RECEIPT_TEST_MEMBER_ID` を明示指定する。API呼び出しと通常の利用量ログを発生させるため、dev環境のテスト画像だけに使用する。
 
 出力にはモデルID、実行回数、組合せ数、各組合せの件数と店名・日時・金額が含まれる。画像本文・明細・認証情報は表示しない。実在レシートを扱う場合、結果の共有時には店名・日時・金額を伏せる。モデルまたはプロンプトを変える前後で同じ画像・同じ回数を比較し、`ApiUsageLog` のプロンプト来歴と併せて評価する。

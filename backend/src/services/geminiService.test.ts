@@ -39,7 +39,8 @@ vi.mock('./aiBudget/aiBudgetGuardService', () => ({ reserveAiBudget: mocks.reser
 
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
-import { analyzeReceiptImage } from './geminiService';
+import { analyzeReceiptImage, ReceiptArithmeticError } from './geminiService';
+import { runReceiptDiagnostics } from './receipt/receiptDiagnosticRunner';
 
 function resultFor(data: unknown) {
   return {
@@ -112,5 +113,47 @@ describe('analyzeReceiptImage', () => {
     expect(result.totalAmount).toBeNull();
     expect(result.purchaseDate).toBeNull();
     expect(mocks.generateContent).toHaveBeenCalledTimes(1);
+    const reservation = mocks.reserveAiBudget.mock.calls[0][0];
+    expect(reservation.jobKey).toMatch(/^ocr:[0-9a-f-]{36}$/);
+    expect(reservation.jobKey).not.toContain('uploads/test.webp');
+    expect(mocks.releaseAiBudgetReservation).toHaveBeenCalledWith(reservation.jobKey);
+  });
+
+  it('reports both attempts only to the explicit diagnostic observer on arithmetic failure', async () => {
+    mocks.generateContent.mockResolvedValueOnce(resultFor(invalidReceipt)).mockResolvedValueOnce(resultFor(invalidReceipt));
+    const observer = vi.fn();
+    await expect(analyzeReceiptImage('uploads/test.webp', 1, 2, observer)).rejects.toThrow('Gemini解析結果の算術整合性を確認できませんでした');
+    expect(observer).toHaveBeenCalledTimes(2);
+    expect(observer.mock.calls[0][0]).toMatchObject({ phase: 'initial', arithmeticDiff: 50, promptTemplateId: 10, promptTemplateVersion: 3 });
+    expect(observer.mock.calls[1][0]).toMatchObject({ phase: 'repair', arithmeticDiff: 50 });
+  });
+
+  it('aggregates repeated real-service arithmetic failures without disclosing extracted values', async () => {
+    mocks.generateContent.mockResolvedValue(resultFor(invalidReceipt));
+    const report = await runReceiptDiagnostics({
+      runs: 2,
+      showValues: false,
+      analyze: (observer) => analyzeReceiptImage('uploads/test.webp', 1, 2, observer),
+      classify: (error) => error instanceof ReceiptArithmeticError ? 'arithmetic_mismatch' : 'analysis_error',
+    });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(4);
+    expect(report.trials.map((trial) => trial.status)).toEqual(['arithmetic_mismatch', 'arithmetic_mismatch']);
+    expect(report.trials[0].attempts).toHaveLength(2);
+    expect(report.observedFinalFieldsStable).toEqual({ storeName: true, purchaseDate: true, totalAmount: true });
+    expect(JSON.stringify(report)).not.toContain('"Store"');
+    expect(JSON.stringify(report)).not.toContain('"Item"');
+  });
+
+  it('applies an isolated diagnostic prompt while retaining safety instructions and identifying provenance', async () => {
+    mocks.generateContent.mockResolvedValue(resultFor({ ...invalidReceipt, totalAmount: 50 }));
+    const baseline = vi.fn();
+    const changed = vi.fn();
+    await analyzeReceiptImage('uploads/test.webp', 1, 2, baseline);
+    await analyzeReceiptImage('uploads/test.webp', 1, 2, changed, 'diagnostic prompt');
+    const sent = mocks.generateContent.mock.calls[1][0][0] as string;
+    expect(sent).toContain('diagnostic prompt');
+    expect(sent).toContain('読み取れない場合は推測や現在日時を使わず');
+    expect(changed.mock.calls[0][0]).toMatchObject({ promptSource: 'diagnostic_override', promptTemplateId: 10 });
+    expect(changed.mock.calls[0][0].promptFingerprint).not.toEqual(baseline.mock.calls[0][0].promptFingerprint);
   });
 });
