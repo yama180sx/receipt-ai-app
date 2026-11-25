@@ -507,6 +507,28 @@ describe.skipIf(!shouldRunDbIntegration())('Tenant isolation (#93-1)', () => {
     expect(job.parsedData.storeName).toBe('山本家テスト店');
   });
 
+  it('flags store-name variants in the tray even with another store at the same time and amount', async () => {
+    clearMockReceiptJobs();
+    const suffix = Date.now();
+    const date = new Date(2026, 10, 23, 17, 27);
+    const first = await prisma.receipt.create({ data: { familyGroupId: 1, memberId: 1, storeName: `DAISO テスト店${suffix}`, date, totalAmount: 314158 } });
+    const second = await prisma.receipt.create({ data: { familyGroupId: 1, memberId: 1, storeName: `別店舗${suffix}`, date, totalAmount: 314158 } });
+    try {
+      registerMockReceiptJob('alias-tray-job', { memberId: 1, familyGroupId: 1, imagePath: 'uploads/alias-tray.webp' }, {
+        returnvalue: { parsedData: { storeName: `ダイソー テスト店${suffix}`, purchaseDate: '2026-11-23 17:27', totalAmount: 314158, items: [] }, imagePath: 'uploads/alias-tray.webp' },
+      });
+      const token = await loginAsTestMember(app, 1);
+      const response = await request(app).get('/api/receipts/jobs').set('Authorization', `Bearer ${token}`);
+      expect(response.status).toBe(200);
+      const job = response.body.data.find((item: { id: string }) => item.id === 'alias-tray-job');
+      expect(job).toMatchObject({ duplicateSuspected: true, existingReceiptId: first.id });
+    } finally {
+      await prisma.receipt.delete({ where: { id: first.id } });
+      await prisma.receipt.delete({ where: { id: second.id } });
+      clearMockReceiptJobs();
+    }
+  });
+
   it('getJobStatus enriches completed jobs with duplicate flags', async () => {
     registerMockReceiptJob('dup-status-job', {
       memberId: 1,

@@ -28,10 +28,10 @@ describe('getReceiptJobDisplay', () => {
     });
   });
 
-  it('maps completed duplicate to 重複の疑い', () => {
+  it('maps completed duplicate to a plain-language warning', () => {
     expect(
       getReceiptJobDisplay(baseJob({ state: 'completed', duplicateSuspected: true }))
-    ).toMatchObject({ kind: 'duplicate_suspected', label: '重複の疑い' });
+    ).toMatchObject({ kind: 'duplicate_suspected', label: '同じレシートかもしれません' });
   });
 
   it('maps completed job to 確認待ち', () => {

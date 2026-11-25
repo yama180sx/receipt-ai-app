@@ -22,7 +22,7 @@ export function DuplicateReceiptReview({ candidates, currentImage, currentStore,
   return (
     <Modal visible onRequestClose={onClose} animationType="slide">
       <View style={styles.page}>
-        <Text style={styles.title}>重複の可能性を確認</Text>
+        <Text style={styles.title}>登録済みのレシートと比べる</Text>
         <Text>候補 {index + 1} / {candidates.length}　{candidate.storeName}　{candidate.totalAmount}円</Text>
         <Text>登録日時: {new Date(candidate.date).toLocaleString()}</Text>
         <Text>今回: {currentStore}　{currentDate}　{currentTotal}円</Text>
@@ -39,9 +39,9 @@ export function DuplicateReceiptReview({ candidates, currentImage, currentStore,
           </View>
         </ScrollView>
         <View style={styles.row}>
-          <Pressable onPress={onClose}><Text style={styles.action}>戻る</Text></Pressable>
+          <Pressable onPress={onClose}><Text style={styles.action}>登録せず戻る</Text></Pressable>
           {index > 0 && <Pressable onPress={() => { setSeen(reviewed); setIndex(index - 1); }}><Text style={styles.action}>前の候補</Text></Pressable>}
-          {index < candidates.length - 1 ? <Pressable onPress={() => { setSeen(reviewed); setIndex(index + 1); }}><Text style={styles.action}>次の候補</Text></Pressable> : <Pressable onPress={onConfirm} disabled={reviewed.length !== candidates.length}><Text style={styles.action}>別のレシートとして保存</Text></Pressable>}
+          {index < candidates.length - 1 ? <Pressable onPress={() => { setSeen(reviewed); setIndex(index + 1); }}><Text style={styles.action}>次の候補</Text></Pressable> : <Pressable onPress={onConfirm} disabled={reviewed.length !== candidates.length}><Text style={styles.action}>別のレシートとして登録</Text></Pressable>}
         </View>
       </View>
     </Modal>

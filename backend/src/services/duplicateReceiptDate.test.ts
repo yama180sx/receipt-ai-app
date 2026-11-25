@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../utils/normalizer', () => ({ getCleanText: (value: string) => value.toLowerCase(), normalizeStoreName: async (value: string) => value, normalizeStoreNames: async (values: string[]) => values.map((value) => value === 'ダイソー' ? 'DAISO' : value) }));
 vi.mock('../repositories/receiptRepository', () => ({ findReceiptForDuplicate: vi.fn(), findDuplicateReceiptCandidates: vi.fn().mockResolvedValue([]) }));
 
-import { comparableStoreName, findDuplicateCandidates, parseReceiptDate, unreviewedDuplicateId } from './duplicateReceiptService';
+import { checkDuplicateReceipt, comparableStoreName, findDuplicateCandidates, parseReceiptDate, unreviewedDuplicateId } from './duplicateReceiptService';
 import { findDuplicateReceiptCandidates } from '../repositories/receiptRepository';
 
 describe('receipt date parsing', () => {
@@ -44,6 +44,14 @@ it('returns only matching store names after aliases are resolved', async () => {
   ]);
   const result = await findDuplicateCandidates(3, { storeName: 'ダイソー', purchaseDate: '2026-11-23 17:27', totalAmount: 1430 });
   expect(result.map((item) => item.id)).toEqual([1]);
+});
+
+it('marks a tray item as a possible duplicate even if a different store is returned first', async () => {
+  vi.mocked(findDuplicateReceiptCandidates).mockResolvedValueOnce([
+    { id: 2, storeName: '別店舗', date: new Date(), totalAmount: 1430, imagePath: null },
+    { id: 1, storeName: 'DAISO イオン店', date: new Date(), totalAmount: 1430, imagePath: null },
+  ]);
+  expect(await checkDuplicateReceipt(3, { storeName: 'ダイソー イオン店', purchaseDate: '2026-11-23 17:27', totalAmount: 1430 })).toEqual({ duplicateSuspected: true, existingReceiptId: 1 });
 });
 
 it('does not search if essential data is missing', async () => {

@@ -1,4 +1,4 @@
-import { getCleanText, normalizeStoreName, normalizeStoreNames } from '../utils/normalizer';
+import { getCleanText, normalizeStoreNames } from '../utils/normalizer';
 import type { ReceiptDuplicateCheckInput } from '../types/receipt';
 import { findDuplicateReceiptCandidates, findReceiptForDuplicate } from '../repositories/receiptRepository';
 
@@ -80,41 +80,6 @@ export async function checkDuplicateReceipt(
     }
   }
 
-  const officialStoreName = await normalizeStoreName(parsedData.storeName || '', familyGroupId);
-  const cleanStore = getCleanText(officialStoreName);
-  const jstDate = parseReceiptDate(parsedData.purchaseDate || parsedData.date);
-  if (!jstDate) return { duplicateSuspected: false };
-  const totalAmount = Math.round(Number(parsedData.totalAmount || 0));
-
-  const duplicateWhere: {
-    familyGroupId: number;
-    totalAmount: number;
-    date: { gte: Date; lte: Date };
-  } = {
-    familyGroupId,
-    totalAmount,
-    date: { gte: new Date(), lte: new Date() },
-  };
-
-  if (jstDate.getHours() === 0 && jstDate.getMinutes() === 0) {
-    const startOfDay = new Date(jstDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(jstDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    duplicateWhere.date = { gte: startOfDay, lte: endOfDay };
-  } else {
-    const margin = 1 * 60 * 1000;
-    duplicateWhere.date = {
-      gte: new Date(jstDate.getTime() - margin),
-      lte: new Date(jstDate.getTime() + margin),
-    };
-  }
-
-  const existing = await findReceiptForDuplicate(duplicateWhere, { id: true, storeName: true });
-
-  if (existing && getCleanText(existing.storeName) === cleanStore) {
-    return { duplicateSuspected: true, existingReceiptId: existing.id };
-  }
-
-  return { duplicateSuspected: false };
+  const [existing] = await findDuplicateCandidates(familyGroupId, parsedData);
+  return existing ? { duplicateSuspected: true, existingReceiptId: existing.id } : { duplicateSuspected: false };
 }

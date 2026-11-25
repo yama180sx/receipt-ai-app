@@ -34,7 +34,7 @@ export function getReceiptJobDisplay(job: ReceiptJobListItem): ReceiptJobDisplay
   }
 
   if (job.duplicateSuspected) {
-    return { kind: 'duplicate_suspected', label: '重複の疑い', isActive: false };
+    return { kind: 'duplicate_suspected', label: '同じレシートかもしれません', isActive: false };
   }
 
   return { kind: 'ready', label: '確認待ち', isActive: false };
@@ -108,7 +108,7 @@ const TRAY_SECTIONS: { kind: ReceiptJobDisplayKind; title: string }[] = [
   { kind: 'processing', title: '解析中' },
   { kind: 'queued', title: '待機中' },
   { kind: 'ready', title: '確認待ち' },
-  { kind: 'duplicate_suspected', title: '重複の疑い' },
+  { kind: 'duplicate_suspected', title: '同じレシートかもしれません' },
   { kind: 'failed', title: '失敗' },
 ];
 

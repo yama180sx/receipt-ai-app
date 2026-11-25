@@ -18,6 +18,7 @@ export function ReceiptScanForm({ scan }: Props) {
   return (
     <View style={[cardStyles.chartCard, styles.card]}>
       <Text style={styles.sectionLabel}>基本情報</Text>
+      {scan.lookupFailed && <Text>登録済みのレシートを確認できませんでした。「再確認」を押してください。</Text>}
       <AppFormField label="店舗名">
         <AppTextInput
           value={scan.receiptData.storeName ?? ''}

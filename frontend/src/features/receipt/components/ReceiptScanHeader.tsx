@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AppBackButton, AppButton } from '../../../components/ui';
-import { BUTTON_LABELS } from '../../../constants/buttonLabels';
 import { colors } from '../../../theme/colors';
 import { screenLayout } from '../../../theme/screenLayout';
 import type { ReceiptScanFlow } from '../hooks/useReceiptScan';
@@ -20,10 +19,10 @@ export function ReceiptScanHeader({ onCancel, scan }: Props) {
       <AppBackButton onPress={onCancel} style={styles.headerBack} />
       <Text style={[screenLayout.headerTitle, styles.headerTitleScan]}>解析結果の確認</Text>
       <AppButton
-        title={BUTTON_LABELS.save}
-        onPress={() => { void scan.handleCommit(); }}
+        title={scan.lookupPending ? '確認中' : scan.submitLabel}
+        onPress={scan.handleSubmit}
         loading={scan.loading}
-        disabled={scan.loading}
+        disabled={scan.loading || scan.lookupPending}
         size="sm"
       />
     </View>

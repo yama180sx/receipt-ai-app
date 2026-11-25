@@ -181,7 +181,7 @@ sequenceDiagram
     API-->>C: 202 { jobId }
     end
 
-    loop ポーリング（約 2 秒間隔）
+    loop トレイ表示中・解析中のみポーリング（約 5 秒間隔）
         C->>API: GET /api/receipts/jobs
         API->>Q: getJobs（本人ジョブのみ）
         API-->>C: ジョブ一覧（state, parsedData サマリ）
@@ -222,7 +222,7 @@ sequenceDiagram
 
 | 項目 | 内容 |
 |------|------|
-| ポーリング | `useReceiptJobs` — `GET /api/receipts/jobs` を定期取得 |
+| ポーリング | 確認トレイの表示中かつ解析中ジョブがある間、５秒ごとに `GET /api/receipts/jobs` を取得。アプリが非アクティブの間は取得しない |
 | 確認トレイ | `ReceiptTrayContext` — 完了ジョブを一覧表示し、`ReceiptScanScreen` へ遷移 |
 | 重複警告 | 完了ジョブに `duplicateSuspected` / `existingReceiptId` を enrich |
 | 破棄 | `DELETE /api/receipts/jobs/:jobId` — キュー除去 + 未保存画像削除 |
@@ -278,7 +278,7 @@ flowchart TB
 | ジョブ名 | `analyze-receipt` |
 | ジョブデータ | `{ memberId, familyGroupId, imagePath }` |
 | リトライ | `attempts: 3`, exponential backoff 5s |
-| 完了保持 | `removeOnComplete: { age: 1800 }`（30 分 — ポーリング用） |
+| 完了保持 | `removeOnComplete: false`（利用者が登録または破棄するまで保持。変更前に投入されたジョブには従来設定が残る） |
 | 失敗保持 | `removeOnFail: false` |
 
 **責務**: ジョブの enqueue のみ。Gemini は呼ばない。

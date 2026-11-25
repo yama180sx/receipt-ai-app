@@ -4,28 +4,23 @@ import { ReceiptImageViewer } from './ReceiptImageViewer';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { borderRadius } from '../../../theme/radii';
-import type { ReceiptScanInitialData } from '../../../types/receiptScan';
 
 const c = colors;
 const s = colors.semantic.scan;
 
 type Props = {
-  initialData: ReceiptScanInitialData;
+  showDuplicate: boolean;
   imageSource: ImageSourcePropType | null;
 };
 
-export function ReceiptScanPreview({ initialData, imageSource }: Props) {
+export function ReceiptScanPreview({ showDuplicate, imageSource }: Props) {
   return (
     <>
-      {initialData.duplicateSuspected ? (
+      {showDuplicate ? (
         <View style={styles.duplicateBanner}>
-          <Text style={styles.duplicateBannerTitle}>重複の疑い</Text>
+          <Text style={styles.duplicateBannerTitle}>同じレシートかもしれません</Text>
           <Text style={styles.duplicateBannerText}>
-            同じ店名・日付・金額のレシートが登録済みの可能性があります。
-            {initialData.existingReceiptId
-              ? `（既存レシート ID: ${initialData.existingReceiptId}）`
-              : ''}
-            {' '}内容を確認のうえ、問題なければ保存できます。
+            似た内容のレシートが登録されています。画像を比べて確認してください。
           </Text>
         </View>
       ) : null}

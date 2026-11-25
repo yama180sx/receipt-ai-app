@@ -121,8 +121,8 @@ export function useReceiptTrayController({
 
       if (item.duplicateSuspected) {
         showConfirmDialog(
-          '重複の疑い',
-          '同じ店名・日付・金額のレシートが既に登録されている可能性があります。内容を確認しますか？',
+          '同じレシートかもしれません',
+          '似た内容のレシートが登録されています。内容を確認しますか？',
           [
             { text: 'キャンセル', style: 'cancel' },
             {
