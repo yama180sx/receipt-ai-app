@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import fs from 'node:fs';
 import { loadSecretFiles } from '../src/config/secretFiles';
+import { ensureVerificationUserPrompts } from './verificationUserPrompts';
 
 function readInput(): { inviteCode: string; password: string } {
   const [inviteCode, password, ...rest] = fs.readFileSync(0, 'utf8').split('\n');
@@ -24,6 +25,8 @@ async function main() {
       devVerificationUserProvisionRepository,
       (password) => bcrypt.hash(password, 12)
     );
+    const member = await prisma.familyMember.findUniqueOrThrow({ where: { id: result.memberId }, select: { familyGroupId: true } });
+    await prisma.$transaction((tx) => ensureVerificationUserPrompts(tx, member.familyGroupId));
     // memberIdは秘密値ではなく、緊急password再設定時の対象指定にだけ使う。
     console.log(JSON.stringify(result));
   } finally {

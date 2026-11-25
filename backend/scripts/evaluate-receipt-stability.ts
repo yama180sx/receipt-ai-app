@@ -2,8 +2,8 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { analyzeReceiptImage } from '../src/services/geminiService';
 import { getConfiguredReceiptModelId } from '../src/config/geminiModel';
+import { loadSecretFiles } from '../src/config/secretFiles';
 
 function requiredPositiveInteger(name: string): number {
   const value = Number(process.env[name]);
@@ -46,6 +46,8 @@ function toCoreFields(value: CoreFields): CoreFields {
 }
 
 async function main() {
+  loadSecretFiles();
+  const { analyzeReceiptImage } = await import('../src/services/geminiService.js');
   const imagePath = requiredImagePath();
   const familyGroupId = requiredPositiveInteger('RECEIPT_TEST_FAMILY_GROUP_ID');
   const memberId = requiredPositiveInteger('RECEIPT_TEST_MEMBER_ID');
