@@ -39,7 +39,7 @@ export const ReceiptScanScreen: React.FC<ReceiptScanScreenProps> = ({
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ReceiptScanHeader onCancel={onCancel} scan={scan} />
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <ReceiptScanPreview initialData={initialData} imageSource={scan.imageSource} />
+          <ReceiptScanPreview showDuplicate={scan.showDuplicate} imageSource={scan.imageSource} />
           <ReceiptScanForm scan={scan} />
           <ReceiptScanItemList scan={scan} />
         </ScrollView>

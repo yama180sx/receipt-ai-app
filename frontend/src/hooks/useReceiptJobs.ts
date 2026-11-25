@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { receiptApi } from '../api/receiptApi';
 import { showApiErrorAlert } from '../utils/apiError';
 import { countActiveReceiptJobs } from '../utils/receiptJobDisplay';
@@ -15,10 +15,12 @@ type RefreshOptions = {
 export function useReceiptJobs(enabled: boolean) {
   const [jobs, setJobs] = useState<ReceiptJobListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const inFlight = useRef(false);
 
   const refresh = useCallback(
     async (options?: RefreshOptions) => {
-      if (!enabled) return;
+      if (!enabled || inFlight.current) return;
+      inFlight.current = true;
       const userInitiated = options?.userInitiated ?? false;
       if (userInitiated) setRefreshing(true);
       try {
@@ -33,6 +35,7 @@ export function useReceiptJobs(enabled: boolean) {
           console.error('[ReceiptJobs] refresh failed:', error);
         }
       } finally {
+        inFlight.current = false;
         if (userInitiated) setRefreshing(false);
       }
     },

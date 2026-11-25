@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { receiptApi } from '../../../api/receiptApi';
 import type { DuplicateCandidate } from '../../../api/generated';
 import type { ParsedReceiptItemInput } from '../../../types/receipt';
@@ -6,6 +6,7 @@ import type { ReceiptScanInitialData } from '../../../types/receiptScan';
 import { showAlert } from '../../../utils/alertMessage';
 import { getApiErrorMessage, getApiErrorResponseData } from '../../../utils/apiError';
 import { useReceiptImageSource } from '../../../utils/receiptImageSource';
+import { isValidReceiptDate, resolveReviewButton } from '../utils/receiptReviewButton';
 
 type ReceiptFormData = ReceiptScanInitialData['parsedData'] & {
   taxAmount: string | number;
@@ -31,6 +32,8 @@ export function useReceiptScan({
     ...initialData.parsedData,
     taxAmount: initialData.parsedData.taxAmount ?? '0',
   });
+  const [lookup, setLookup] = useState<{ key: string; status: 'ready' | 'error'; count: number }>({ key: '', status: 'ready', count: 0 });
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   const categorySelectOptions = useMemo(
     () => categories.map((c) => ({ label: c.name, value: c.id })),
@@ -49,6 +52,30 @@ export function useReceiptScan({
     const tax = parseFloat(String(receiptData.taxAmount)) || 0;
     return Math.round(itemsTotal + tax);
   }, [receiptData.items, receiptData.taxAmount]);
+
+  const lookupInput = useMemo(() => {
+    const storeName = receiptData.storeName?.trim() ?? '';
+    const purchaseDate = receiptData.purchaseDate?.trim() ?? '';
+    const totalAmount = totalOverride.trim() === '' ? calculatedTotal : Number(totalOverride);
+    if (!storeName || !isValidReceiptDate(purchaseDate) || ((receiptData.totalAmount == null || !Number.isFinite(Number(receiptData.totalAmount))) && totalOverride.trim() === '') || !Number.isSafeInteger(totalAmount) || totalAmount < 0) return null;
+    return { storeName, purchaseDate, totalAmount };
+  }, [receiptData.storeName, receiptData.purchaseDate, receiptData.totalAmount, totalOverride, calculatedTotal]);
+  const lookupKey = lookupInput ? JSON.stringify(lookupInput) : '';
+  useEffect(() => {
+    if (!lookupInput) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      receiptApi.findDuplicateCandidates(lookupInput).then((result) => {
+        if (!cancelled) setLookup({ key: lookupKey, status: 'ready', count: result.hasMore ? 51 : result.candidates.length });
+      }).catch(() => {
+        if (!cancelled) setLookup({ key: lookupKey, status: 'error', count: 0 });
+      });
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [lookupKey, lookupAttempt]);
+  const reviewButton = resolveReviewButton(lookupKey, lookup);
+  const lookupPending = reviewButton.pending;
+  const lookupFailed = reviewButton.failed;
 
   const updateItem = (
     index: number,
@@ -75,6 +102,10 @@ export function useReceiptScan({
     if (!receiptData.storeName?.trim()) { showAlert('店舗名を確認してください', 'レシートの店舗名を入力してください。'); return; }
     if (!receiptData.purchaseDate?.trim()) {
       showAlert('購入日時を確認してください', 'レシートの日付を入力してください。');
+      return;
+    }
+    if (!isValidReceiptDate(receiptData.purchaseDate)) {
+      showAlert('購入日時を確認してください', '実在する日付を YYYY-MM-DD または YYYY-MM-DD HH:mm の形式で入力してください。');
       return;
     }
     if ((receiptData.totalAmount == null || !Number.isFinite(Number(receiptData.totalAmount))) && totalOverride.trim() === '') {
@@ -119,7 +150,9 @@ export function useReceiptScan({
 
       if (message === 'DUPLICATE') {
         setCandidates(null);
-        showAlert('候補が変更されました', 'もう一度保存を押して候補を確認してください。');
+        setLookup({ key: '', status: 'ready', count: 0 });
+        setLookupAttempt((value) => value + 1);
+        showAlert('候補が変更されました', '登録済みのレシートをもう一度確認してください。');
         return;
       }
 
@@ -146,6 +179,15 @@ export function useReceiptScan({
     removeItem,
     addItem,
     handleCommit,
+    lookupPending,
+    lookupFailed,
+    showDuplicate: Boolean(lookupKey) && !lookupPending && !lookupFailed && lookup.count > 0,
+    submitLabel: reviewButton.label,
+    handleSubmit: () => {
+      if (lookupPending) return;
+      if (lookupFailed) { setLookup({ key: '', status: 'ready', count: 0 }); setLookupAttempt((value) => value + 1); return; }
+      void handleCommit();
+    },
   };
 }
 

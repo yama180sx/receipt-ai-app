@@ -408,7 +408,7 @@ sequenceDiagram
     API->>Q: enqueue (receipt-analysis)
     API-->>C: 202 jobId
 
-    loop 2秒ポーリング
+    loop トレイ表示中・解析中のみ5秒ポーリング
         C->>API: GET /api/receipts/jobs
     end
 
@@ -429,7 +429,7 @@ sequenceDiagram
 | キュー名 | `receipt-analysis` |
 | Worker 起動 | `server.ts` import 時、backend コンテナと同一プロセス |
 | concurrency | 5 |
-| 完了ジョブ保持 | 30 分（ポーリング用） |
+| 完了ジョブ保持 | 利用者が登録または破棄するまで保持（変更前に投入されたジョブは旧設定が残る） |
 | リトライ | attempts: 3, exponential backoff 5s |
 | 復旧台帳 | `ReceiptAnalysisJob`（PostgreSQL）。キュー喪失時は未完了ジョブを同じjobIdで再投入する。 |
 

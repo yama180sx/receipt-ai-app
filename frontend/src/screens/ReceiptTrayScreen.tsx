@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackButton, AppButton } from '../components/ui';
 import { ReceiptTrayPanel } from '../components/ReceiptTrayPanel';
@@ -18,6 +18,7 @@ export function ReceiptTrayScreen({ onBack }: Props) {
   const {
     trayItems,
     trayItemCount,
+    activeCount,
     refreshing,
     refresh,
     openTrayItem,
@@ -29,11 +30,16 @@ export function ReceiptTrayScreen({ onBack }: Props) {
     retryingJobId,
   } = useReceiptTray();
 
-  /** 解析一覧表示のたびに 1 回取得（自動ポーリングはしない） */
+  /** 画面表示中、解析が進行している間だけ状態を更新する。 */
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh])
+      if (!activeCount) return undefined;
+      const timer = setInterval(() => {
+        if (AppState.currentState === 'active') void refresh();
+      }, 5000);
+      return () => clearInterval(timer);
+    }, [refresh, activeCount])
   );
 
   return (
